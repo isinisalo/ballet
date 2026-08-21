@@ -163,7 +163,7 @@ Canvas ei luokittele hyväksyttyä päätöstä jälkikäteen mielipiteellä “
 
 - **Frontend:** strict TypeScript, React 18, Vite 6, Tailwind 4, shadcn/Base UI sekä XYFlow/Dagre.
 - **Backend:** Node.js 22 release-baseline, TypeScript/ESM, Express 4 ja Zod 4.
-- **Data:** Git + Markdown/JSON/YAML project truthille; SQLite schema v6 + `better-sqlite3` runtimelle; Git branch/worktree lähdekooditulokselle.
+- **Data:** Git + Markdown/JSON/YAML project truthille; SQLite schema v9 + `better-sqlite3` runtime- ja tracker-outboxille; `.tickets/orchestration` ja `.tickets/work` issueille; Git branch/worktree lähdekooditulokselle.
 - **Execution:** Codex app-server -adapteri, `@github/copilot-sdk`, provider-kohtaiset FIFO-kaistat ja strict outcome schemas.
 - **Lifecycle:** macOS `arm64`/`x64`, launchd, npm, GitHub Actions, GitHub Releases/attestations ja Homebrew.
 - **Quality:** Vitest, Testing Library, strict TypeScript build, ESLint, arc42-validator ja design.md-lint.

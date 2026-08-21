@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -50,843 +50,316 @@
       "networkAccess": true
     }
   ],
+  "issueTracker": {
+    "kind": "tk",
+    "testedRevision": "d778bb520ee526c314c26f2bb876447e0a19caa5",
+    "orchestrationDirectory": ".tickets/orchestration",
+    "workDirectory": ".tickets/work"
+  },
   "orchestrator": {
-    "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-    "primaryInstructionId": "project:loop-orchestrator",
-    "skillIds": [],
-    "maxRepairDepth": 6,
-    "maxRepairAttempts": 4
+    "mode": "runbook",
+    "maxTransitions": 256
   },
   "graph": {
-    "loopEdges": [
+    "id": "graph-engineering",
+    "name": "Graph Engineering",
+    "startLoopId": "design",
+    "transitions": [
       {
-        "id": "flow-clarify-requirements-solution-strategy",
-        "source": "arc42-clarify-requirements",
-        "target": "arc42-solution-strategy",
-        "kind": "flow",
-        "description": "A clarified specification enables a bounded solution strategy.",
-        "capability": "arc42:requirements.clarified"
+        "id": "design-success",
+        "source": "design",
+        "decision": "PASS",
+        "outcome": "success",
+        "target": {
+          "loopId": "plan"
+        },
+        "description": "PASS success routes design to plan."
       },
       {
-        "id": "flow-solution-strategy-building-block-view",
-        "source": "arc42-solution-strategy",
-        "target": "arc42-building-block-view",
-        "kind": "flow",
-        "description": "An approved solution strategy enables the source-mapped Building Block View.",
-        "capability": "arc42:solution-strategy.designed"
+        "id": "design-failure",
+        "source": "design",
+        "decision": "FAIL",
+        "outcome": "failure",
+        "target": {
+          "loopId": "design"
+        },
+        "description": "FAIL failure routes design to design."
       },
       {
-        "id": "flow-building-block-view-runtime-deployment",
-        "source": "arc42-building-block-view",
-        "target": "arc42-runtime-deployment",
-        "kind": "flow",
-        "description": "A validated Building Block View enables architecture-significant runtime/deployment scenarios.",
-        "capability": "arc42:building-block-view.designed"
+        "id": "plan-success",
+        "source": "plan",
+        "decision": "PASS",
+        "outcome": "success",
+        "target": {
+          "loopId": "build"
+        },
+        "description": "PASS success routes plan to build."
       },
       {
-        "id": "flow-runtime-deployment-crosscutting-concepts",
-        "source": "arc42-runtime-deployment",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "flow",
-        "description": "Validated runtime/deployment structures enable necessary crosscutting concepts.",
-        "capability": "arc42:runtime-deployment.designed"
+        "id": "plan-failure",
+        "source": "plan",
+        "decision": "FAIL",
+        "outcome": "failure",
+        "target": {
+          "loopId": "design"
+        },
+        "description": "FAIL failure routes plan to design."
       },
       {
-        "id": "flow-crosscutting-concepts-architecture-decision",
-        "source": "arc42-crosscutting-concepts",
-        "target": "arc42-architecture-decision",
-        "kind": "flow",
-        "description": "Reviewed crosscutting concepts expose architecture-significant choices for explicit decision.",
-        "capability": "arc42:concepts.designed"
+        "id": "build-more-work",
+        "source": "build",
+        "decision": "PASS",
+        "outcome": "more_work",
+        "target": {
+          "loopId": "build"
+        },
+        "description": "PASS more_work routes build to build."
       },
       {
-        "id": "flow-architecture-decision-communicate-document",
-        "source": "arc42-architecture-decision",
-        "target": "arc42-communicate-document",
-        "kind": "flow",
-        "description": "Recorded architecture decisions enable canonical communication and handoff.",
-        "capability": "arc42:architecture-decision.recorded"
+        "id": "build-success",
+        "source": "build",
+        "decision": "PASS",
+        "outcome": "success",
+        "target": {
+          "loopId": "deploy"
+        },
+        "description": "PASS success routes build to deploy."
       },
       {
-        "id": "flow-communicate-document-accompany-implementation",
-        "source": "arc42-communicate-document",
-        "target": "arc42-accompany-implementation",
-        "kind": "flow",
-        "description": "An approved architecture handoff enables bounded implementation.",
-        "capability": "arc42:architecture.communicated"
+        "id": "build-implementation-defect",
+        "source": "build",
+        "decision": "FAIL",
+        "outcome": "implementation_defect",
+        "target": {
+          "loopId": "build"
+        },
+        "description": "FAIL implementation_defect routes build to build."
       },
       {
-        "id": "flow-accompany-implementation-analyze-evaluate",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-analyze-evaluate",
-        "kind": "flow",
-        "description": "Accepted implementation evidence enables architecture analysis and evaluation.",
-        "capability": "arc42:implementation.accepted"
+        "id": "build-invalid-plan",
+        "source": "build",
+        "decision": "FAIL",
+        "outcome": "invalid_plan",
+        "target": {
+          "loopId": "plan"
+        },
+        "description": "FAIL invalid_plan routes build to plan."
       },
       {
-        "id": "repair-solution-strategy-clarify-requirements",
-        "source": "arc42-solution-strategy",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-solution-strategy cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
+        "id": "build-invalid-design",
+        "source": "build",
+        "decision": "FAIL",
+        "outcome": "invalid_design",
+        "target": {
+          "loopId": "design"
+        },
+        "description": "FAIL invalid_design routes build to design."
       },
       {
-        "id": "repair-solution-strategy-solution-strategy",
-        "source": "arc42-solution-strategy",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-solution-strategy cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
+        "id": "deploy-success",
+        "source": "deploy",
+        "decision": "PASS",
+        "outcome": "success",
+        "target": {
+          "loopId": "verify"
+        },
+        "description": "PASS success routes deploy to verify."
       },
       {
-        "id": "repair-building-block-view-clarify-requirements",
-        "source": "arc42-building-block-view",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-building-block-view cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
+        "id": "deploy-transient-deployment-error",
+        "source": "deploy",
+        "decision": "FAIL",
+        "outcome": "transient_deployment_error",
+        "target": {
+          "loopId": "deploy"
+        },
+        "description": "FAIL transient_deployment_error routes deploy to deploy."
       },
       {
-        "id": "repair-building-block-view-solution-strategy",
-        "source": "arc42-building-block-view",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-building-block-view cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
+        "id": "deploy-implementation-defect",
+        "source": "deploy",
+        "decision": "FAIL",
+        "outcome": "implementation_defect",
+        "target": {
+          "loopId": "build"
+        },
+        "description": "FAIL implementation_defect routes deploy to build."
       },
       {
-        "id": "repair-building-block-view-building-block-view",
-        "source": "arc42-building-block-view",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-building-block-view cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
+        "id": "deploy-invalid-plan",
+        "source": "deploy",
+        "decision": "FAIL",
+        "outcome": "invalid_plan",
+        "target": {
+          "loopId": "plan"
+        },
+        "description": "FAIL invalid_plan routes deploy to plan."
       },
       {
-        "id": "repair-runtime-deployment-clarify-requirements",
-        "source": "arc42-runtime-deployment",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-runtime-deployment cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
+        "id": "verify-more-work",
+        "source": "verify",
+        "decision": "PASS",
+        "outcome": "more_work",
+        "target": {
+          "loopId": "plan"
+        },
+        "description": "PASS more_work routes verify to plan."
       },
       {
-        "id": "repair-runtime-deployment-solution-strategy",
-        "source": "arc42-runtime-deployment",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-runtime-deployment cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
+        "id": "verify-complete",
+        "source": "verify",
+        "decision": "PASS",
+        "outcome": "complete",
+        "target": {
+          "runResult": "DONE"
+        },
+        "description": "PASS complete routes verify to DONE."
       },
       {
-        "id": "repair-runtime-deployment-building-block-view",
-        "source": "arc42-runtime-deployment",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-runtime-deployment cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
+        "id": "verify-implementation-defect",
+        "source": "verify",
+        "decision": "FAIL",
+        "outcome": "implementation_defect",
+        "target": {
+          "loopId": "build"
+        },
+        "description": "FAIL implementation_defect routes verify to build."
       },
       {
-        "id": "repair-runtime-deployment-runtime-deployment",
-        "source": "arc42-runtime-deployment",
-        "target": "arc42-runtime-deployment",
-        "kind": "repair",
-        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-runtime-deployment cannot meet its done-condition locally.",
-        "capability": "arc42:runtime-deployment.designed"
+        "id": "verify-invalid-plan",
+        "source": "verify",
+        "decision": "FAIL",
+        "outcome": "invalid_plan",
+        "target": {
+          "loopId": "plan"
+        },
+        "description": "FAIL invalid_plan routes verify to plan."
       },
       {
-        "id": "repair-crosscutting-concepts-clarify-requirements",
-        "source": "arc42-crosscutting-concepts",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
-      },
-      {
-        "id": "repair-crosscutting-concepts-solution-strategy",
-        "source": "arc42-crosscutting-concepts",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
-      },
-      {
-        "id": "repair-crosscutting-concepts-building-block-view",
-        "source": "arc42-crosscutting-concepts",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
-      },
-      {
-        "id": "repair-crosscutting-concepts-runtime-deployment",
-        "source": "arc42-crosscutting-concepts",
-        "target": "arc42-runtime-deployment",
-        "kind": "repair",
-        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
-        "capability": "arc42:runtime-deployment.designed"
-      },
-      {
-        "id": "repair-crosscutting-concepts-crosscutting-concepts",
-        "source": "arc42-crosscutting-concepts",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "repair",
-        "description": "Request the project-local arc42:concepts.designed capability when arc42-crosscutting-concepts cannot meet its done-condition locally.",
-        "capability": "arc42:concepts.designed"
-      },
-      {
-        "id": "repair-architecture-decision-clarify-requirements",
-        "source": "arc42-architecture-decision",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-architecture-decision cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
-      },
-      {
-        "id": "repair-architecture-decision-crosscutting-concepts",
-        "source": "arc42-architecture-decision",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "repair",
-        "description": "Request the project-local arc42:concepts.designed capability when arc42-architecture-decision cannot meet its done-condition locally.",
-        "capability": "arc42:concepts.designed"
-      },
-      {
-        "id": "repair-architecture-decision-architecture-decision",
-        "source": "arc42-architecture-decision",
-        "target": "arc42-architecture-decision",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-architecture-decision cannot meet its done-condition locally.",
-        "capability": "arc42:architecture-decision.recorded"
-      },
-      {
-        "id": "repair-communicate-document-clarify-requirements",
-        "source": "arc42-communicate-document",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
-      },
-      {
-        "id": "repair-communicate-document-solution-strategy",
-        "source": "arc42-communicate-document",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
-      },
-      {
-        "id": "repair-communicate-document-building-block-view",
-        "source": "arc42-communicate-document",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
-      },
-      {
-        "id": "repair-communicate-document-runtime-deployment",
-        "source": "arc42-communicate-document",
-        "target": "arc42-runtime-deployment",
-        "kind": "repair",
-        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:runtime-deployment.designed"
-      },
-      {
-        "id": "repair-communicate-document-crosscutting-concepts",
-        "source": "arc42-communicate-document",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "repair",
-        "description": "Request the project-local arc42:concepts.designed capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:concepts.designed"
-      },
-      {
-        "id": "repair-communicate-document-architecture-decision",
-        "source": "arc42-communicate-document",
-        "target": "arc42-architecture-decision",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:architecture-decision.recorded"
-      },
-      {
-        "id": "repair-communicate-document-communicate-document",
-        "source": "arc42-communicate-document",
-        "target": "arc42-communicate-document",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture.communicated capability when arc42-communicate-document cannot meet its done-condition locally.",
-        "capability": "arc42:architecture.communicated"
-      },
-      {
-        "id": "repair-accompany-implementation-clarify-requirements",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
-      },
-      {
-        "id": "repair-accompany-implementation-solution-strategy",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
-      },
-      {
-        "id": "repair-accompany-implementation-building-block-view",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
-      },
-      {
-        "id": "repair-accompany-implementation-runtime-deployment",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-runtime-deployment",
-        "kind": "repair",
-        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:runtime-deployment.designed"
-      },
-      {
-        "id": "repair-accompany-implementation-crosscutting-concepts",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "repair",
-        "description": "Request the project-local arc42:concepts.designed capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:concepts.designed"
-      },
-      {
-        "id": "repair-accompany-implementation-architecture-decision",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-architecture-decision",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:architecture-decision.recorded"
-      },
-      {
-        "id": "repair-accompany-implementation-communicate-document",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-communicate-document",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture.communicated capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:architecture.communicated"
-      },
-      {
-        "id": "repair-accompany-implementation-accompany-implementation",
-        "source": "arc42-accompany-implementation",
-        "target": "arc42-accompany-implementation",
-        "kind": "repair",
-        "description": "Request the project-local arc42:implementation.accepted capability when arc42-accompany-implementation cannot meet its done-condition locally.",
-        "capability": "arc42:implementation.accepted"
-      },
-      {
-        "id": "repair-analyze-evaluate-clarify-requirements",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
-      },
-      {
-        "id": "repair-analyze-evaluate-solution-strategy",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
-      },
-      {
-        "id": "repair-analyze-evaluate-building-block-view",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
-      },
-      {
-        "id": "repair-analyze-evaluate-runtime-deployment",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-runtime-deployment",
-        "kind": "repair",
-        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:runtime-deployment.designed"
-      },
-      {
-        "id": "repair-analyze-evaluate-crosscutting-concepts",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "repair",
-        "description": "Request the project-local arc42:concepts.designed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:concepts.designed"
-      },
-      {
-        "id": "repair-analyze-evaluate-architecture-decision",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-architecture-decision",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:architecture-decision.recorded"
-      },
-      {
-        "id": "repair-analyze-evaluate-communicate-document",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-communicate-document",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture.communicated capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:architecture.communicated"
-      },
-      {
-        "id": "repair-analyze-evaluate-accompany-implementation",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-accompany-implementation",
-        "kind": "repair",
-        "description": "Request the project-local arc42:implementation.accepted capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:implementation.accepted"
-      },
-      {
-        "id": "repair-analyze-evaluate-analyze-evaluate",
-        "source": "arc42-analyze-evaluate",
-        "target": "arc42-analyze-evaluate",
-        "kind": "repair",
-        "description": "Request the project-local arc42:evaluation.completed capability when arc42-analyze-evaluate cannot meet its done-condition locally.",
-        "capability": "arc42:evaluation.completed"
-      },
-      {
-        "id": "repair-continuous-learning-clarify-requirements",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-clarify-requirements",
-        "kind": "repair",
-        "description": "Request the project-local arc42:requirements.clarified capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:requirements.clarified"
-      },
-      {
-        "id": "repair-continuous-learning-solution-strategy",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-solution-strategy",
-        "kind": "repair",
-        "description": "Request the project-local arc42:solution-strategy.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:solution-strategy.designed"
-      },
-      {
-        "id": "repair-continuous-learning-building-block-view",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-building-block-view",
-        "kind": "repair",
-        "description": "Request the project-local arc42:building-block-view.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:building-block-view.designed"
-      },
-      {
-        "id": "repair-continuous-learning-runtime-deployment",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-runtime-deployment",
-        "kind": "repair",
-        "description": "Request the project-local arc42:runtime-deployment.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:runtime-deployment.designed"
-      },
-      {
-        "id": "repair-continuous-learning-crosscutting-concepts",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-crosscutting-concepts",
-        "kind": "repair",
-        "description": "Request the project-local arc42:concepts.designed capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:concepts.designed"
-      },
-      {
-        "id": "repair-continuous-learning-architecture-decision",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-architecture-decision",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture-decision.recorded capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:architecture-decision.recorded"
-      },
-      {
-        "id": "repair-continuous-learning-communicate-document",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-communicate-document",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture.communicated capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:architecture.communicated"
-      },
-      {
-        "id": "repair-continuous-learning-analyze-evaluate",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-analyze-evaluate",
-        "kind": "repair",
-        "description": "Request the project-local arc42:evaluation.completed capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:evaluation.completed"
-      },
-      {
-        "id": "repair-continuous-learning-continuous-learning",
-        "source": "arc42-continuous-learning",
-        "target": "arc42-continuous-learning",
-        "kind": "repair",
-        "description": "Request the project-local arc42:research.findings capability when arc42-continuous-learning cannot meet its done-condition locally.",
-        "capability": "arc42:research.findings"
-      },
-      {
-        "id": "repair-release-validation-communicate-document",
-        "source": "release-validation",
-        "target": "arc42-communicate-document",
-        "kind": "repair",
-        "description": "Request the project-local arc42:architecture.communicated capability when release-validation cannot meet its done-condition locally.",
-        "capability": "arc42:architecture.communicated"
-      },
-      {
-        "id": "repair-release-validation-accompany-implementation",
-        "source": "release-validation",
-        "target": "arc42-accompany-implementation",
-        "kind": "repair",
-        "description": "Request the project-local arc42:implementation.accepted capability when release-validation cannot meet its done-condition locally.",
-        "capability": "arc42:implementation.accepted"
-      },
-      {
-        "id": "repair-release-validation-analyze-evaluate",
-        "source": "release-validation",
-        "target": "arc42-analyze-evaluate",
-        "kind": "repair",
-        "description": "Request the project-local arc42:evaluation.completed capability when release-validation cannot meet its done-condition locally.",
-        "capability": "arc42:evaluation.completed"
-      },
-      {
-        "id": "repair-release-validation-release-validation",
-        "source": "release-validation",
-        "target": "release-validation",
-        "kind": "repair",
-        "description": "Request the project-local release:validation.completed capability when release-validation cannot meet its done-condition locally.",
-        "capability": "release:validation.completed"
+        "id": "verify-invalid-design",
+        "source": "verify",
+        "decision": "FAIL",
+        "outcome": "invalid_design",
+        "target": {
+          "loopId": "design"
+        },
+        "description": "FAIL invalid_design routes verify to design."
       }
-    ]
+    ],
+    "repairEdges": []
   },
   "loops": [
     {
-      "id": "arc42-clarify-requirements",
-      "description": "Clarify one initiative specification. Done when the approved BRIEF makes human-owned intent, stakeholders, scope, constraints, measurable quality scenarios and unresolved decisions explicit.",
+      "id": "design",
+      "description": "Define the complete desired system state through all twelve canonical arc42 sections.",
       "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
+        "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
         "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
+          "contractVersion": "GraphEngineeringStateV1",
+          "releaseMap": {
+            "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+            "selectedReleaseId": null,
+            "status": "unselected"
           },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
+          "work": {
+            "releaseTicketId": null,
+            "activeIssueId": null,
+            "remainingIssueCount": 0
           },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
+          "deployment": {
+            "targetEnvironment": null,
             "authorization": null,
-            "evidenceIds": []
+            "evidenceRefs": []
           },
-          "evaluation": {
+          "verification": {
             "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
+            "result": null,
+            "evidenceRefs": [],
+            "openGapIds": []
           }
         }
       },
       "capabilities": {
         "accepts": [
-          "arc42:initiative.requested"
+          "graph:desired-state.requested"
         ],
         "provides": [
-          "arc42:requirements.clarified"
+          "graph:desired-state.defined"
         ]
       },
       "workflow": {
-        "startJobNodeId": "clarify-initiative-brief",
+        "startJobNodeId": "design-01-introduction-and-goals",
         "jobNodes": [
           {
-            "id": "clarify-initiative-brief",
-            "description": "Create or update the initiative BRIEF with goals, stakeholders, scope, non-goals, constraints and context.",
-            "validationNodeId": "clarify-initiative-brief-validation",
-            "maxRetries": 3,
+            "id": "design-01-introduction-and-goals",
+            "description": "Maintain arc42 01 Introduction and Goals.",
+            "validationNodeId": "design-01-introduction-and-goals-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Create or update `.ballet/arc42/initiatives/<initiative-id>/BRIEF.md` from accepted Goals, ADRs and explicit human input. Separate Fact, Decision, Assumption, Hypothesis, Finding and Open question. Return needs_input instead of inventing missing WHAT/WHY, priority or ownership.",
+            "task": "Update only `.ballet/arc42/01-introduction-and-goals.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-requirements-agent",
             "skillIds": [
               "project:arc42/document-maintenance",
-              "project:arc42/initiative-handoff"
+              "project:arc42/quality-scenarios"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
           },
           {
-            "id": "clarify-quality-scenarios",
-            "description": "Define top quality goals and complete measurable quality scenarios with explicit human authority.",
-            "validationNodeId": "clarify-quality-scenarios-validation",
-            "maxRetries": 3,
+            "id": "design-02-constraints",
+            "description": "Maintain arc42 02 Constraints.",
+            "validationNodeId": "design-02-constraints-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Define or update the initiative's measurable quality scenarios and trace them to accepted Goal/Requirement IDs. Every scenario must contain all section 10 fields. Ask for human input when priority or acceptance measure is missing.",
+            "task": "Update only `.ballet/arc42/02-constraints.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-requirements-agent",
             "skillIds": [
-              "project:arc42/quality-scenarios",
-              "project:arc42/traceability"
+              "project:arc42/document-maintenance"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
+          },
           {
-            "id": "clarify-initiative-brief-validation",
-            "description": "Validate Create or update the initiative BRIEF with goals, stakeholders, scope, non-goals, constraints and context.",
+            "id": "design-03-context-and-scope",
+            "description": "Maintain arc42 03 Context and Scope.",
+            "validationNodeId": "design-03-context-and-scope-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Validate that the BRIEF is bounded, source-linked and explicit about stakeholders, scope, non-goals, constraints, context and every unresolved human decision. Do not edit it.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
+            "task": "Update only `.ballet/arc42/03-context-and-scope.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:arc42-requirements-agent",
             "skillIds": [
-              "project:arc42/conformance-review"
+              "project:arc42/architecture-views",
+              "project:arc42/document-maintenance"
             ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
+            "nodeStyle": "sol",
+            "nodeSize": "large"
           },
           {
-            "id": "clarify-quality-scenarios-validation",
-            "description": "Validate Define top quality goals and complete measurable quality scenarios with explicit human authority.",
-            "type": "human",
-            "task": "Approve the initiative WHAT/WHY, scope, priority and measurable quality-scenario criteria, or return FAIL with the exact missing decision/correction. Do not approve an invented or unmeasurable criterion.",
-            "nodeStyle": "luna",
-            "nodeSize": "tiny"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "clarify-brief-ok",
-            "sourceValidationNodeId": "clarify-initiative-brief-validation",
-            "target": {
-              "jobNodeId": "clarify-quality-scenarios"
-            }
-          },
-          {
-            "id": "clarify-completed",
-            "sourceValidationNodeId": "clarify-quality-scenarios-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "clarify-initiative-brief-fail",
-            "sourceValidationNodeId": "clarify-initiative-brief-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "clarify-quality-scenarios-fail",
-            "sourceValidationNodeId": "clarify-quality-scenarios-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-solution-strategy",
-      "description": "Define one quality-driven solution strategy for an approved initiative. Done when the bounded strategy and unresolved significant choices are explicit and validated against the BRIEF, constraints and priority quality scenarios.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:requirements.clarified"
-        ],
-        "provides": [
-          "arc42:solution-strategy.designed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "solution-strategy",
-        "jobNodes": [
-          {
-            "id": "solution-strategy",
-            "description": "Create and validate the initiative's bounded solution strategy.",
-            "validationNodeId": "solution-strategy-validation",
-            "maxRetries": 3,
+            "id": "design-04-solution-strategy",
+            "description": "Maintain arc42 04 Solution Strategy.",
+            "validationNodeId": "design-04-solution-strategy-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Update arc42 section 4 and initiative planning references with the smallest solution strategy that satisfies the approved BRIEF, constraints and priority quality scenarios. Done means the chosen approach, rejected material alternatives and every unresolved significant choice are explicit and source-linked.",
+            "task": "Update only `.ballet/arc42/04-solution-strategy.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-solution-strategy-agent",
             "skillIds": [
               "project:arc42/architecture-views",
-              "project:arc42/traceability"
+              "project:arc42/decision-records"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
+          },
           {
-            "id": "solution-strategy-validation",
-            "description": "Validate Create and validate the initiative's bounded solution strategy.",
+            "id": "design-05-building-block-view",
+            "description": "Maintain arc42 05 Building Block View.",
+            "validationNodeId": "design-05-building-block-view-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Validate that one bounded solution strategy is source-linked, internally coherent and sufficient for the approved BRIEF, constraints and measurable priority quality scenarios. Reject completion when a significant choice is hidden or lacks human authority; do not edit the strategy.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "arc42-solution-strategy-completed",
-            "sourceValidationNodeId": "solution-strategy-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "solution-strategy-fail",
-            "sourceValidationNodeId": "solution-strategy-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-building-block-view",
-      "description": "Maintain the Building Block View for an approved solution strategy. Done when every in-scope block has validated responsibility, interfaces, quality significance, source mapping, implemented requirements and open risks.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:solution-strategy.designed"
-        ],
-        "provides": [
-          "arc42:building-block-view.designed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "building-block-view",
-        "jobNodes": [
-          {
-            "id": "building-block-view",
-            "description": "Create and validate the initiative's source-mapped Building Block View.",
-            "validationNodeId": "building-block-view-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Update arc42 section 5 for the approved strategy. Done means every relevant building block states responsibility, interfaces, quality significance, source location, implemented requirements and open risks, with stable BB/QS/ADR references.",
+            "task": "Update only `.ballet/arc42/05-building-block-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-building-block-agent",
             "skillIds": [
@@ -895,1240 +368,852 @@
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
+          },
           {
-            "id": "building-block-view-validation",
-            "description": "Validate Create and validate the initiative's source-mapped Building Block View.",
+            "id": "design-06-runtime-view",
+            "description": "Maintain arc42 06 Runtime View.",
+            "validationNodeId": "design-06-runtime-view-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Validate that Building Block ownership, interfaces, source mappings, implemented requirements, quality-scenario trace and open risks match the repository and approved strategy. Reject any missing responsibility or interface boundary; do not edit the view.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "arc42-building-block-view-completed",
-            "sourceValidationNodeId": "building-block-view-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "building-block-view-fail",
-            "sourceValidationNodeId": "building-block-view-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-runtime-deployment",
-      "description": "Describe only architecture-significant runtime and deployment scenarios for an approved Building Block View. Done when every selected scenario is justified by risk or quality evidence and validated against the static structure.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:building-block-view.designed"
-        ],
-        "provides": [
-          "arc42:runtime-deployment.designed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "runtime-deployment",
-        "jobNodes": [
-          {
-            "id": "runtime-deployment",
-            "description": "Create and validate the architecture-significant runtime/deployment view.",
-            "validationNodeId": "runtime-deployment-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Update arc42 sections 6 and 7 only for important, risky, complex or quality-scenario-required runtime/deployment scenarios. Done means every included interaction maps to building blocks, interfaces, QS/ADR IDs, source locations and an explicit evidence expectation; omit decorative scenarios.",
+            "task": "Update only `.ballet/arc42/06-runtime-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-runtime-deployment-agent",
             "skillIds": [
               "project:arc42/architecture-views",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
-          {
-            "id": "runtime-deployment-validation",
-            "description": "Validate Create and validate the architecture-significant runtime/deployment view.",
-            "type": "agent",
-            "task": "Validate that each selected runtime/deployment scenario is architecture-significant, consistent with the Building Block View and sufficient for the in-scope quality scenarios. Reject decorative, unmapped or unsupported scenarios; do not add or edit scenarios.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "arc42-runtime-deployment-completed",
-            "sourceValidationNodeId": "runtime-deployment-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "runtime-deployment-fail",
-            "sourceValidationNodeId": "runtime-deployment-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-crosscutting-concepts",
-      "description": "Design the smallest quality-driven set of crosscutting concepts for approved structures. Done when every retained concept has validated applicability, building-block and quality-scenario links, implementation anchors and limits.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:runtime-deployment.designed"
-        ],
-        "provides": [
-          "arc42:concepts.designed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "crosscutting-concepts",
-        "jobNodes": [
-          {
-            "id": "crosscutting-concepts",
-            "description": "Create and validate the initiative's necessary crosscutting concepts.",
-            "validationNodeId": "crosscutting-concepts-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Update arc42 section 8 with only the crosscutting concepts required by the approved quality scenarios and structures. Done means each concept states applicability, BB/QS links, implementation anchors and limits without making or accepting an ADR.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-crosscutting-concepts-agent",
-            "skillIds": [
               "project:arc42/traceability"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
+          },
           {
-            "id": "crosscutting-concepts-validation",
-            "description": "Validate Create and validate the initiative's necessary crosscutting concepts.",
+            "id": "design-07-deployment-view",
+            "description": "Maintain arc42 07 Deployment View.",
+            "validationNodeId": "design-07-deployment-view-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Validate that each concept is necessary, quality-driven, linked to stable BB/QS IDs and concrete enough to guide implementation. Reject generic catalog entries or implicit architecture decisions; do not edit the concepts.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
+            "task": "Update only `.ballet/arc42/07-deployment-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:arc42-runtime-deployment-agent",
             "skillIds": [
-              "project:arc42/conformance-review"
+              "project:arc42/architecture-views",
+              "project:arc42/traceability"
             ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
+            "nodeStyle": "sol",
+            "nodeSize": "large"
+          },
           {
-            "id": "arc42-crosscutting-concepts-completed",
-            "sourceValidationNodeId": "crosscutting-concepts-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "crosscutting-concepts-fail",
-            "sourceValidationNodeId": "crosscutting-concepts-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-architecture-decision",
-      "description": "Resolve architecture-significant choices for an approved concept baseline. Done when every significant choice has an explicit accepted, rejected or no-ADR-needed status and no accepted ADR was changed silently.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:concepts.designed"
-        ],
-        "provides": [
-          "arc42:architecture-decision.recorded"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "architecture-decision",
-        "jobNodes": [
-          {
-            "id": "architecture-decision",
-            "description": "Propose and obtain the explicit status of architecture-significant decisions.",
-            "validationNodeId": "architecture-decision-validation",
-            "maxRetries": 3,
+            "id": "design-08-crosscutting-concepts",
+            "description": "Maintain arc42 08 Crosscutting Concepts.",
+            "validationNodeId": "design-08-crosscutting-concepts-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Assess unresolved architecture-significant choices against accepted Goals, quality scenarios, concepts and existing ADRs. Create or update only justified draft/review ADR proposals. Done means every significant choice is linked to its decision drivers and has an explicit proposal, existing-decision or no-ADR-needed status.",
+            "task": "Update only `.ballet/arc42/08-crosscutting-concepts.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:arc42-crosscutting-concepts-agent",
+            "skillIds": [
+              "project:arc42/document-maintenance",
+              "project:arc42/decision-records"
+            ],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
+          },
+          {
+            "id": "design-09-architecture-decisions",
+            "description": "Maintain arc42 09 Architecture Decisions.",
+            "validationNodeId": "design-09-architecture-decisions-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Update only `.ballet/arc42/09-architecture-decisions.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-decision-agent",
             "skillIds": [
               "project:arc42/decision-records",
-              "project:arc42/initiative-handoff"
+              "project:arc42/document-maintenance"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
+          },
           {
-            "id": "architecture-decision-validation",
-            "description": "Validate Propose and obtain the explicit status of architecture-significant decisions.",
-            "type": "human",
-            "task": "Accept or reject each new architecture-significant ADR proposal, or explicitly confirm with evidence that no new ADR is required. Never approve an implicit change to an accepted ADR.",
-            "nodeStyle": "luna",
-            "nodeSize": "tiny"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "arc42-architecture-decision-completed",
-            "sourceValidationNodeId": "architecture-decision-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "architecture-decision-fail",
-            "sourceValidationNodeId": "architecture-decision-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-communicate-document",
-      "description": "Communicate the accepted architecture baseline and bounded implementation handoff. Done when canonical indexes, traceability, glossary, status and initiative handoff are synchronized and the next action has focused stakeholder review.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:architecture-decision.recorded"
-        ],
-        "provides": [
-          "arc42:architecture.communicated"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "communicate-synchronize-docs",
-        "jobNodes": [
-          {
-            "id": "communicate-synchronize-docs",
-            "description": "Synchronize indexes, traceability, glossary, persistent status and initiative handoff without duplication.",
-            "validationNodeId": "communicate-synchronize-docs-validation",
-            "maxRetries": 3,
+            "id": "design-10-quality-requirements",
+            "description": "Maintain arc42 10 Quality Requirements.",
+            "validationNodeId": "design-10-quality-requirements-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Synchronize arc42 indexes, TRACEABILITY, glossary, STATUS and the initiative handoff. Resolve links and statuses from canonical owners, update only changed facts and avoid duplicating Goal/ADR/DESIGN or runtime content.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-documentation-agent",
-            "skillIds": [
-              "project:arc42/document-maintenance",
-              "project:arc42/traceability",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "terra",
-            "nodeSize": "medium"
-          },
-          {
-            "id": "communicate-stakeholder-review",
-            "description": "Prepare and review a concise stakeholder summary and implementation handoff.",
-            "validationNodeId": "communicate-stakeholder-review-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Prepare an initiative review summary listing changes, Decisions, Assumptions, Findings, risks, Open questions, evidence and the next approved action. Link canonical sources instead of copying them.",
+            "task": "Update only `.ballet/arc42/10-quality-requirements.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-documentation-agent",
+            "primaryInstructionId": "project:arc42-requirements-agent",
             "skillIds": [
-              "project:arc42/document-maintenance",
-              "project:arc42/initiative-handoff"
+              "project:arc42/quality-scenarios",
+              "project:arc42/traceability"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
+          },
           {
-            "id": "communicate-synchronize-docs-validation",
-            "description": "Validate Synchronize indexes, traceability, glossary, persistent status and initiative handoff without duplication.",
+            "id": "design-11-risks-and-technical-debt",
+            "description": "Maintain arc42 11 Risks and Technical Debt.",
+            "validationNodeId": "design-11-risks-and-technical-debt-validation",
+            "maxRetries": 2,
             "type": "agent",
-            "task": "Validate canonical ownership, frontmatter, stable IDs, links, trace completeness and absence of duplicated active sources. Do not edit the documents.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/traceability"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          {
-            "id": "communicate-stakeholder-review-validation",
-            "description": "Validate Prepare and review a concise stakeholder summary and implementation handoff.",
-            "type": "human",
-            "task": "Review the architecture summary and handoff. Approve the next action or identify the exact capability/decision needing repair; do not approve unresolved WHAT/WHY or priority-1 evidence gaps.",
-            "nodeStyle": "luna",
-            "nodeSize": "tiny"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "communicate-sync-ok",
-            "sourceValidationNodeId": "communicate-synchronize-docs-validation",
-            "target": {
-              "jobNodeId": "communicate-stakeholder-review"
-            }
-          },
-          {
-            "id": "communicate-completed",
-            "sourceValidationNodeId": "communicate-stakeholder-review-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "communicate-synchronize-docs-fail",
-            "sourceValidationNodeId": "communicate-synchronize-docs-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "communicate-stakeholder-review-fail",
-            "sourceValidationNodeId": "communicate-stakeholder-review-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-accompany-implementation",
-      "description": "Implement one bounded initiative. Done when its traced plan, in-scope code and tests, conformance review and acceptance evidence are complete without granting release authority.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:architecture.communicated"
-        ],
-        "provides": [
-          "arc42:implementation.accepted"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "implementation-plan-initiative",
-        "jobNodes": [
-          {
-            "id": "implementation-plan-initiative",
-            "description": "Create a bounded initiative PLAN traced to architecture and tests.",
-            "validationNodeId": "implementation-plan-initiative-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Create or update the initiative PLAN. Every step must reference in-scope REQ/QS/ADR/CON/BB/RT/DEP/test IDs, exact source areas, dependencies, risks, legacy removal and completion evidence. Do not grant release authority.",
-            "executionProfileId": "codex-gpt-5-6-terra-medium-network-off",
-            "primaryInstructionId": "project:arc42-implementation-agent",
-            "skillIds": [
-              "project:arc42/traceability",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "terra",
-            "nodeSize": "medium"
-          },
-          {
-            "id": "implementation-bounded-change",
-            "description": "Implement the approved bounded change and tests while surfacing architecture drift.",
-            "validationNodeId": "implementation-bounded-change-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Implement the bounded PLAN steps and tests. Run relevant checks, remove in-scope legacy and compare discoveries against architecture. Update non-decision architecture within scope or request repair for a better solution; never hide drift or perform release/deploy/push/merge.",
-            "executionProfileId": "codex-gpt-5-6-terra-medium-network-off",
-            "primaryInstructionId": "project:arc42-implementation-agent",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/traceability"
-            ],
-            "nodeStyle": "terra",
-            "nodeSize": "large"
-          },
-          {
-            "id": "implementation-acceptance-evidence",
-            "description": "Collect acceptance/conformance evidence and obtain human implementation acceptance before any release.",
-            "validationNodeId": "implementation-acceptance-evidence-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Run or collect the PLAN's acceptance and conformance checks and update initiative EVIDENCE. Record exact commands/results, changed paths, stable IDs, limitations and unresolved priority-1 gaps without modifying the implementation under review.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-implementation-agent",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "medium"
-          }
-        ],
-        "validationNodes": [
-          {
-            "id": "implementation-plan-initiative-validation",
-            "description": "Validate Create a bounded initiative PLAN traced to architecture and tests.",
-            "type": "agent",
-            "task": "Validate PLAN scope, ordering, dependencies, architecture trace and test/evidence coverage. Do not edit the plan.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/traceability"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          {
-            "id": "implementation-bounded-change-validation",
-            "description": "Validate Implement the approved bounded change and tests while surfacing architecture drift.",
-            "type": "agent",
-            "task": "Independently compare the diff and tests against the PLAN, QS, ADR, CON, BB and runtime/deployment references. Do not modify implementation or tests; request a measurable repair for any drift.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "medium"
-          },
-          {
-            "id": "implementation-acceptance-evidence-validation",
-            "description": "Validate Collect acceptance/conformance evidence and obtain human implementation acceptance before any release.",
-            "type": "human",
-            "task": "Accept or reject the implementation and evidence before any release request. Approval is implementation acceptance only and does not authorize release, deploy, rollback, merge or push.",
-            "nodeStyle": "luna",
-            "nodeSize": "tiny"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "implementation-plan-ok",
-            "sourceValidationNodeId": "implementation-plan-initiative-validation",
-            "target": {
-              "jobNodeId": "implementation-bounded-change"
-            }
-          },
-          {
-            "id": "implementation-change-ok",
-            "sourceValidationNodeId": "implementation-bounded-change-validation",
-            "target": {
-              "jobNodeId": "implementation-acceptance-evidence"
-            }
-          },
-          {
-            "id": "implementation-completed",
-            "sourceValidationNodeId": "implementation-acceptance-evidence-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "implementation-plan-initiative-fail",
-            "sourceValidationNodeId": "implementation-plan-initiative-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "implementation-bounded-change-fail",
-            "sourceValidationNodeId": "implementation-bounded-change-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "implementation-acceptance-evidence-fail",
-            "sourceValidationNodeId": "implementation-acceptance-evidence-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-analyze-evaluate",
-      "description": "Evaluate one bounded implementation. Done when every in-scope quality scenario has an evidence-backed verdict and resulting risk, debt, drift, traceability, review and method-health findings are validated.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:implementation.accepted"
-        ],
-        "provides": [
-          "arc42:evaluation.completed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "evaluate-quality-evidence",
-        "jobNodes": [
-          {
-            "id": "evaluate-quality-evidence",
-            "description": "Evaluate actual evidence against every in-scope measurable quality scenario.",
-            "validationNodeId": "evaluate-quality-evidence-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Evaluate the initiative against each in-scope measurable quality scenario. Record pass/fail/blocked/missing evidence separately and update TRACEABILITY plus initiative REVIEW without inferring success from absent evidence.",
+            "task": "Update only `.ballet/arc42/11-risks-and-technical-debt.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
             "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
             "primaryInstructionId": "project:arc42-evaluation-agent",
             "skillIds": [
               "project:arc42/evaluation",
+              "project:arc42/document-maintenance"
+            ],
+            "nodeStyle": "sol",
+            "nodeSize": "large"
+          },
+          {
+            "id": "design-12-glossary",
+            "description": "Maintain arc42 12 Glossary.",
+            "validationNodeId": "design-12-glossary-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Update only `.ballet/arc42/12-glossary.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:arc42-documentation-agent",
+            "skillIds": [
+              "project:arc42/document-maintenance",
               "project:arc42/traceability"
             ],
             "nodeStyle": "sol",
             "nodeSize": "large"
+          }
+        ],
+        "validationNodes": [
+          {
+            "id": "design-01-introduction-and-goals-validation",
+            "description": "Validate arc42 01 Introduction and Goals.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
           },
           {
-            "id": "evaluate-risk-debt-drift",
-            "description": "Assess risks, technical debt, architecture drift and decision fitness.",
-            "validationNodeId": "evaluate-risk-debt-drift-validation",
-            "maxRetries": 3,
+            "id": "design-02-constraints-validation",
+            "description": "Validate arc42 02 Constraints.",
             "type": "agent",
-            "task": "Analyze risk, technical debt, architecture drift, stale/contradictory documentation and whether relevant ADRs/concepts still achieve their intended quality response. Update section 11 and REVIEW only for evidence-backed Findings.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-evaluation-agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
             "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-03-context-and-scope-validation",
+            "description": "Validate arc42 03 Context and Scope.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-04-solution-strategy-validation",
+            "description": "Validate arc42 04 Solution Strategy.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-05-building-block-view-validation",
+            "description": "Validate arc42 05 Building Block View.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-06-runtime-view-validation",
+            "description": "Validate arc42 06 Runtime View.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-07-deployment-view-validation",
+            "description": "Validate arc42 07 Deployment View.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-08-crosscutting-concepts-validation",
+            "description": "Validate arc42 08 Crosscutting Concepts.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-09-architecture-decisions-validation",
+            "description": "Validate arc42 09 Architecture Decisions.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-10-quality-requirements-validation",
+            "description": "Validate arc42 10 Quality Requirements.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-11-risks-and-technical-debt-validation",
+            "description": "Validate arc42 11 Risks and Technical Debt.",
+            "type": "agent",
+            "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "design-12-glossary-validation",
+            "description": "Validate arc42 12 Glossary.",
+            "type": "agent",
+            "task": "Validate only this canonical section. On PASS select success; on exhausted terminal FAIL select failure. Do not edit artifacts.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          }
+        ],
+        "passEdges": [
+          {
+            "id": "design-01-pass",
+            "sourceValidationNodeId": "design-01-introduction-and-goals-validation",
+            "target": {
+              "jobNodeId": "design-02-constraints"
+            }
+          },
+          {
+            "id": "design-02-pass",
+            "sourceValidationNodeId": "design-02-constraints-validation",
+            "target": {
+              "jobNodeId": "design-03-context-and-scope"
+            }
+          },
+          {
+            "id": "design-03-pass",
+            "sourceValidationNodeId": "design-03-context-and-scope-validation",
+            "target": {
+              "jobNodeId": "design-04-solution-strategy"
+            }
+          },
+          {
+            "id": "design-04-pass",
+            "sourceValidationNodeId": "design-04-solution-strategy-validation",
+            "target": {
+              "jobNodeId": "design-05-building-block-view"
+            }
+          },
+          {
+            "id": "design-05-pass",
+            "sourceValidationNodeId": "design-05-building-block-view-validation",
+            "target": {
+              "jobNodeId": "design-06-runtime-view"
+            }
+          },
+          {
+            "id": "design-06-pass",
+            "sourceValidationNodeId": "design-06-runtime-view-validation",
+            "target": {
+              "jobNodeId": "design-07-deployment-view"
+            }
+          },
+          {
+            "id": "design-07-pass",
+            "sourceValidationNodeId": "design-07-deployment-view-validation",
+            "target": {
+              "jobNodeId": "design-08-crosscutting-concepts"
+            }
+          },
+          {
+            "id": "design-08-pass",
+            "sourceValidationNodeId": "design-08-crosscutting-concepts-validation",
+            "target": {
+              "jobNodeId": "design-09-architecture-decisions"
+            }
+          },
+          {
+            "id": "design-09-pass",
+            "sourceValidationNodeId": "design-09-architecture-decisions-validation",
+            "target": {
+              "jobNodeId": "design-10-quality-requirements"
+            }
+          },
+          {
+            "id": "design-10-pass",
+            "sourceValidationNodeId": "design-10-quality-requirements-validation",
+            "target": {
+              "jobNodeId": "design-11-risks-and-technical-debt"
+            }
+          },
+          {
+            "id": "design-11-pass",
+            "sourceValidationNodeId": "design-11-risks-and-technical-debt-validation",
+            "target": {
+              "jobNodeId": "design-12-glossary"
+            }
+          },
+          {
+            "id": "design-12-pass",
+            "sourceValidationNodeId": "design-12-glossary-validation",
+            "target": {
+              "workflowResult": "PASS"
+            }
+          }
+        ],
+        "failEdges": [
+          {
+            "id": "design-01-fail",
+            "sourceValidationNodeId": "design-01-introduction-and-goals-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-02-fail",
+            "sourceValidationNodeId": "design-02-constraints-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-03-fail",
+            "sourceValidationNodeId": "design-03-context-and-scope-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-04-fail",
+            "sourceValidationNodeId": "design-04-solution-strategy-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-05-fail",
+            "sourceValidationNodeId": "design-05-building-block-view-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-06-fail",
+            "sourceValidationNodeId": "design-06-runtime-view-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-07-fail",
+            "sourceValidationNodeId": "design-07-deployment-view-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-08-fail",
+            "sourceValidationNodeId": "design-08-crosscutting-concepts-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-09-fail",
+            "sourceValidationNodeId": "design-09-architecture-decisions-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-10-fail",
+            "sourceValidationNodeId": "design-10-quality-requirements-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-11-fail",
+            "sourceValidationNodeId": "design-11-risks-and-technical-debt-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "design-12-fail",
+            "sourceValidationNodeId": "design-12-glossary-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "plan",
+      "description": "Select the next release and materialize executable tk work.",
+      "state": {
+        "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
+        "initial": {
+          "contractVersion": "GraphEngineeringStateV1",
+          "releaseMap": {
+            "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+            "selectedReleaseId": null,
+            "status": "unselected"
+          },
+          "work": {
+            "releaseTicketId": null,
+            "activeIssueId": null,
+            "remainingIssueCount": 0
+          },
+          "deployment": {
+            "targetEnvironment": null,
+            "authorization": null,
+            "evidenceRefs": []
+          },
+          "verification": {
+            "status": "not_started",
+            "result": null,
+            "evidenceRefs": [],
+            "openGapIds": []
+          }
+        }
+      },
+      "capabilities": {
+        "accepts": [
+          "graph:desired-state.defined",
+          "graph:plan.invalid"
+        ],
+        "provides": [
+          "graph:release.planned"
+        ]
+      },
+      "workflow": {
+        "startJobNodeId": "plan-select-release",
+        "jobNodes": [
+          {
+            "id": "plan-select-release",
+            "description": "Select the first eligible planned release.",
+            "validationNodeId": "plan-select-release-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Read the ordered Story/Release Map, select its first eligible planned release, validate design, acceptance and environment references, and patch only bounded State references. Return needs_input for ambiguous priority.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:graph-plan-agent",
+            "skillIds": [
+              "project:arc42/traceability"
+            ],
+            "nodeStyle": "terra",
+            "nodeSize": "large"
+          },
+          {
+            "id": "plan-materialize-work",
+            "description": "Materialize the selected release work idempotently.",
+            "validationNodeId": "plan-materialize-work-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Use only ballet tracker. Upsert one ballet-release:<stable-id> epic and its implementation issues with stable external refs, acceptance references, parent and dependencies. Do not duplicate tasks in the Story/Release Map.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:graph-plan-agent",
+            "skillIds": [
+              "project:arc42/traceability"
+            ],
+            "nodeStyle": "terra",
+            "nodeSize": "large"
+          }
+        ],
+        "validationNodes": [
+          {
+            "id": "plan-select-release-validation",
+            "description": "Validate selected release.",
+            "type": "agent",
+            "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          },
+          {
+            "id": "plan-materialize-work-validation",
+            "description": "Validate materialized release work.",
+            "type": "agent",
+            "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          }
+        ],
+        "passEdges": [
+          {
+            "id": "plan-select-release-pass",
+            "sourceValidationNodeId": "plan-select-release-validation",
+            "target": {
+              "jobNodeId": "plan-materialize-work"
+            }
+          },
+          {
+            "id": "plan-materialize-work-pass",
+            "sourceValidationNodeId": "plan-materialize-work-validation",
+            "target": {
+              "workflowResult": "PASS"
+            }
+          }
+        ],
+        "failEdges": [
+          {
+            "id": "plan-select-release-fail",
+            "sourceValidationNodeId": "plan-select-release-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          },
+          {
+            "id": "plan-materialize-work-fail",
+            "sourceValidationNodeId": "plan-materialize-work-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "build",
+      "description": "Implement exactly one ready issue per invocation.",
+      "state": {
+        "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
+        "initial": {
+          "contractVersion": "GraphEngineeringStateV1",
+          "releaseMap": {
+            "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+            "selectedReleaseId": null,
+            "status": "unselected"
+          },
+          "work": {
+            "releaseTicketId": null,
+            "activeIssueId": null,
+            "remainingIssueCount": 0
+          },
+          "deployment": {
+            "targetEnvironment": null,
+            "authorization": null,
+            "evidenceRefs": []
+          },
+          "verification": {
+            "status": "not_started",
+            "result": null,
+            "evidenceRefs": [],
+            "openGapIds": []
+          }
+        }
+      },
+      "capabilities": {
+        "accepts": [
+          "graph:release.planned",
+          "graph:implementation.defect"
+        ],
+        "provides": [
+          "graph:release.built",
+          "graph:release.work-remaining"
+        ]
+      },
+      "workflow": {
+        "startJobNodeId": "build-one-ready-issue",
+        "jobNodes": [
+          {
+            "id": "build-one-ready-issue",
+            "description": "Implement exactly one ready issue.",
+            "validationNodeId": "build-one-ready-issue-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Call ballet tracker claim exactly once for the selected release. Prefer its in_progress issue, then ready issues by priority, created and ID. Implement only it, run checks and note evidence; never claim another issue.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:graph-build-agent",
+            "skillIds": [
+              "project:arc42/traceability"
+            ],
+            "nodeStyle": "terra",
+            "nodeSize": "large"
+          }
+        ],
+        "validationNodes": [
+          {
+            "id": "build-one-ready-issue-validation",
+            "description": "Validate one issue implementation.",
+            "type": "agent",
+            "task": "Close only accepted work. PASS more_work while child issues remain, otherwise success. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          }
+        ],
+        "passEdges": [
+          {
+            "id": "build-one-ready-issue-pass",
+            "sourceValidationNodeId": "build-one-ready-issue-validation",
+            "target": {
+              "workflowResult": "PASS"
+            }
+          }
+        ],
+        "failEdges": [
+          {
+            "id": "build-one-ready-issue-fail",
+            "sourceValidationNodeId": "build-one-ready-issue-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "deploy",
+      "description": "Deploy the selected release only with exact human authorization.",
+      "state": {
+        "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
+        "initial": {
+          "contractVersion": "GraphEngineeringStateV1",
+          "releaseMap": {
+            "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+            "selectedReleaseId": null,
+            "status": "unselected"
+          },
+          "work": {
+            "releaseTicketId": null,
+            "activeIssueId": null,
+            "remainingIssueCount": 0
+          },
+          "deployment": {
+            "targetEnvironment": null,
+            "authorization": null,
+            "evidenceRefs": []
+          },
+          "verification": {
+            "status": "not_started",
+            "result": null,
+            "evidenceRefs": [],
+            "openGapIds": []
+          }
+        }
+      },
+      "capabilities": {
+        "accepts": [
+          "graph:release.built"
+        ],
+        "provides": [
+          "graph:release.deployed"
+        ]
+      },
+      "workflow": {
+        "startJobNodeId": "deploy-release",
+        "jobNodes": [
+          {
+            "id": "deploy-release",
+            "description": "Deploy one explicitly authorized release.",
+            "validationNodeId": "deploy-release-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Prepare exact environment, version, actions and rollback plan; return needs_input before any external write. Continue only with explicit authorization for those exact actions and record evidence refs.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:graph-deploy-agent",
+            "skillIds": [
+              "project:arc42/architecture-views"
+            ],
+            "nodeStyle": "terra",
+            "nodeSize": "large"
+          }
+        ],
+        "validationNodes": [
+          {
+            "id": "deploy-release-validation",
+            "description": "Validate authorization and deployment evidence.",
+            "type": "agent",
+            "task": "PASS success. Terminal FAIL transient_deployment_error, implementation_defect, or invalid_plan. Do not deploy.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
+            "skillIds": [
+              "project:arc42/conformance-review"
+            ],
+            "nodeStyle": "luna",
+            "nodeSize": "small"
+          }
+        ],
+        "passEdges": [
+          {
+            "id": "deploy-release-pass",
+            "sourceValidationNodeId": "deploy-release-validation",
+            "target": {
+              "workflowResult": "PASS"
+            }
+          }
+        ],
+        "failEdges": [
+          {
+            "id": "deploy-release-fail",
+            "sourceValidationNodeId": "deploy-release-validation",
+            "target": {
+              "workflowResult": "FAIL"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "verify",
+      "description": "Verify the deployment against design, acceptance and ticket evidence.",
+      "state": {
+        "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
+        "initial": {
+          "contractVersion": "GraphEngineeringStateV1",
+          "releaseMap": {
+            "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+            "selectedReleaseId": null,
+            "status": "unselected"
+          },
+          "work": {
+            "releaseTicketId": null,
+            "activeIssueId": null,
+            "remainingIssueCount": 0
+          },
+          "deployment": {
+            "targetEnvironment": null,
+            "authorization": null,
+            "evidenceRefs": []
+          },
+          "verification": {
+            "status": "not_started",
+            "result": null,
+            "evidenceRefs": [],
+            "openGapIds": []
+          }
+        }
+      },
+      "capabilities": {
+        "accepts": [
+          "graph:release.deployed"
+        ],
+        "provides": [
+          "graph:release.verified",
+          "graph:desired-state.complete"
+        ]
+      },
+      "workflow": {
+        "startJobNodeId": "verify-release",
+        "jobNodes": [
+          {
+            "id": "verify-release",
+            "description": "Verify the deployed release.",
+            "validationNodeId": "verify-release-validation",
+            "maxRetries": 2,
+            "type": "agent",
+            "task": "Check all 12 arc42 sections, release acceptance, deployment and ticket evidence. Create or reopen a bug before classifying an implementation defect; close the release only after acceptance.",
+            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+            "primaryInstructionId": "project:graph-verify-agent",
+            "skillIds": [
+              "project:arc42/conformance-review",
               "project:arc42/evaluation",
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large"
-          },
-          {
-            "id": "evaluate-method-health",
-            "description": "Update method health and derive only evidence-backed improvement actions and handoff.",
-            "validationNodeId": "evaluate-method-health-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Update METHOD-HEALTH from actual Validation FAILs, retries, repair targets, open questions, drift, evidence gaps and interventions. For any proposed method change record baseline, hypothesis, expected metric and later eval; require human approval for behavior changes.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-evaluation-agent",
-            "skillIds": [
-              "project:arc42/method-health",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
-          {
-            "id": "evaluate-quality-evidence-validation",
-            "description": "Validate Evaluate actual evidence against every in-scope measurable quality scenario.",
-            "type": "agent",
-            "task": "Validate every QS verdict against its exact measurable criterion and evidence reference. Do not change implementation, tests or verdict sources.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          {
-            "id": "evaluate-risk-debt-drift-validation",
-            "description": "Validate Assess risks, technical debt, architecture drift and decision fitness.",
-            "type": "agent",
-            "task": "Validate that each retained risk/debt/drift finding has concrete evidence, affected stable IDs, impact and an appropriate capability/outcome. Do not edit findings.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          {
-            "id": "evaluate-method-health-validation",
-            "description": "Validate Update method health and derive only evidence-backed improvement actions and handoff.",
-            "type": "agent",
-            "task": "Validate that method-health changes come from cited evidence, preserve human approval boundaries and contain no preference-only churn. Do not modify evaluated records.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/method-health"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "evaluate-quality-ok",
-            "sourceValidationNodeId": "evaluate-quality-evidence-validation",
-            "target": {
-              "jobNodeId": "evaluate-risk-debt-drift"
-            }
-          },
-          {
-            "id": "evaluate-risk-ok",
-            "sourceValidationNodeId": "evaluate-risk-debt-drift-validation",
-            "target": {
-              "jobNodeId": "evaluate-method-health"
-            }
-          },
-          {
-            "id": "evaluate-completed",
-            "sourceValidationNodeId": "evaluate-method-health-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "evaluate-quality-evidence-fail",
-            "sourceValidationNodeId": "evaluate-quality-evidence-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "evaluate-risk-debt-drift-fail",
-            "sourceValidationNodeId": "evaluate-risk-debt-drift-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "evaluate-method-health-fail",
-            "sourceValidationNodeId": "evaluate-method-health-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "arc42-continuous-learning",
-      "description": "Research one bounded set of authoritative technology and method changes on schedule. Done when material findings or an explicit no-material-finding result are validated and any action is expressed only as a capability request.",
-      "state": {
-        "description": "Arc42MethodStateV1 bounded references shared by every arc42 Loop in the Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "arc42:research.requested"
-        ],
-        "provides": [
-          "arc42:research.findings"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "learning-authoritative-research",
-        "jobNodes": [
-          {
-            "id": "learning-authoritative-research",
-            "description": "Research dependencies, technologies, official advisories and repeated method evidence from primary sources.",
-            "validationNodeId": "learning-authoritative-research-validation",
-            "maxRetries": 2,
-            "type": "scheduled",
-            "task": "Research current dependencies/technologies, official release notes/advisories, repeated validation failures, repair routes, document drift and test evidence. Use only authoritative primary sources; do not write externally or change code/config/behavior. If nothing material is found, make no semantic document change.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-on",
-            "primaryInstructionId": "project:arc42-learning-agent",
-            "skillIds": [
-              "project:arc42/authoritative-research",
-              "project:arc42/method-health"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large",
-            "schedule": {
-              "kind": "recurring",
-              "cadence": "weekly",
-              "startsOn": "2026-08-17",
-              "time": "09:00",
-              "timeZone": "Europe/Helsinki",
-              "weekdays": [
-                "mon"
-              ]
-            }
-          },
-          {
-            "id": "learning-route-findings",
-            "description": "Record material findings and request the correct repair capability without changing method behavior.",
-            "validationNodeId": "learning-route-findings-validation",
-            "maxRetries": 2,
-            "type": "agent",
-            "task": "For each material finding record impact, primary-source evidence, relevant QS/RISK/ADR/BB IDs and expected measurable improvement. Prepare a capability-based repair request when action is warranted. Do not change Loops, profiles, permissions, Goals, ADRs, instructions or skills.",
-            "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-            "primaryInstructionId": "project:arc42-learning-agent",
-            "skillIds": [
-              "project:arc42/authoritative-research",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "sol",
-            "nodeSize": "large"
-          }
-        ],
-        "validationNodes": [
-          {
-            "id": "learning-authoritative-research-validation",
-            "description": "Validate Research dependencies, technologies, official advisories and repeated method evidence from primary sources.",
-            "type": "agent",
-            "task": "Validate source authority, materiality, impact, stable QS/RISK/ADR/BB links and expected measurable improvement. Reject preference-only findings and document churn; do not edit research artifacts.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/method-health"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          },
-          {
-            "id": "learning-route-findings-validation",
-            "description": "Validate Record material findings and request the correct repair capability without changing method behavior.",
-            "type": "agent",
-            "task": "Validate that each action is evidence-based and routed by capability. Return needs_input for any proposed topology, permission, network, accepted decision, instruction or skill behavior change; do not apply it.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:arc42-reviewer",
-            "skillIds": [
-              "project:arc42/method-health"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "learning-research-ok",
-            "sourceValidationNodeId": "learning-authoritative-research-validation",
-            "target": {
-              "jobNodeId": "learning-route-findings"
-            }
-          },
-          {
-            "id": "learning-completed",
-            "sourceValidationNodeId": "learning-route-findings-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "learning-authoritative-research-fail",
-            "sourceValidationNodeId": "learning-authoritative-research-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "learning-route-findings-fail",
-            "sourceValidationNodeId": "learning-route-findings-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "id": "release-validation",
-      "description": "Validate one explicitly authorized external release, deployment or rollback action. Done when the exact authorization, execution result, verification evidence and remaining rollback status are human-approved without automatic invocation from development flow.",
-      "state": {
-        "description": "Arc42MethodStateV1-compatible release and evidence references for a separately authorized Root Run.",
-        "initial": {
-          "contractVersion": "Arc42MethodStateV1",
-          "initiative": {
-            "id": null,
-            "status": "unselected",
-            "briefPath": null,
-            "goalIds": [],
-            "openQuestionIds": []
-          },
-          "architecture": {
-            "status": "baseline",
-            "qualityScenarioIds": [],
-            "adrIds": [],
-            "buildingBlockIds": [],
-            "riskIds": []
-          },
-          "delivery": {
-            "status": "not_started",
-            "planPath": null,
-            "changedArtifactPaths": [],
-            "checkIds": [],
-            "conformanceFindingIds": []
-          },
-          "release": {
-            "status": "not_requested",
-            "authorization": null,
-            "evidenceIds": []
-          },
-          "evaluation": {
-            "status": "not_started",
-            "evidenceIds": [],
-            "findingIds": [],
-            "methodHealthUpdatedAt": null
-          },
-          "handoff": {
-            "status": "pending",
-            "summary": null,
-            "nextAction": null,
-            "changedArtifactPaths": [],
-            "stableIds": [],
-            "checks": []
-          }
-        }
-      },
-      "capabilities": {
-        "accepts": [
-          "release:validation.requested"
-        ],
-        "provides": [
-          "release:validation.completed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "release-prepare-authorization",
-        "jobNodes": [
-          {
-            "id": "release-prepare-authorization",
-            "description": "Prepare a bounded release plan and obtain exact human authorization before any external write.",
-            "validationNodeId": "release-prepare-authorization-validation",
-            "maxRetries": 2,
-            "type": "agent",
-            "task": "Verify accepted implementation evidence and prepare a local release/deploy/rollback plan naming exact version, repository, environment, commands, checks and rollback intent. Do not perform any external write.",
-            "executionProfileId": "codex-gpt-5-6-terra-medium-network-off",
-            "primaryInstructionId": "project:release-agent",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/initiative-handoff"
+              "project:arc42/traceability"
             ],
             "nodeStyle": "terra",
-            "nodeSize": "medium"
-          },
-          {
-            "id": "release-execute-authorized",
-            "description": "Execute only the exact human-authorized release/deploy action and record external evidence.",
-            "validationNodeId": "release-execute-authorized-validation",
-            "maxRetries": 2,
-            "type": "agent",
-            "task": "Execute only the actions explicitly authorized by the preceding Human Validation and existing project release contract. Record exact commands, targets and results without secrets. Never merge or push unless separately named in the authorization.",
-            "executionProfileId": "codex-gpt-5-6-terra-medium-network-on",
-            "primaryInstructionId": "project:release-agent",
-            "skillIds": [
-              "project:arc42/conformance-review"
-            ],
-            "nodeStyle": "terra",
-            "nodeSize": "medium"
-          },
-          {
-            "id": "release-verify-authorized",
-            "description": "Verify the authorized release and obtain the final human decision, including any separately authorized rollback.",
-            "validationNodeId": "release-verify-authorized-validation",
-            "maxRetries": 2,
-            "type": "agent",
-            "task": "Run the authorized health, smoke, acceptance and observability checks and record evidence. If rollback is needed but not explicitly authorized, return needs_input before performing it. Do not infer permission from failure.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-on",
-            "primaryInstructionId": "project:release-agent",
-            "skillIds": [
-              "project:arc42/conformance-review",
-              "project:arc42/initiative-handoff"
-            ],
-            "nodeStyle": "luna",
-            "nodeSize": "medium"
+            "nodeSize": "large"
           }
         ],
         "validationNodes": [
           {
-            "id": "release-prepare-authorization-validation",
-            "description": "Validate Prepare a bounded release plan and obtain exact human authorization before any external write.",
-            "type": "human",
-            "task": "Authorize or reject the exact named external actions, targets and limits. Implementation acceptance alone is not authorization. State separately whether release, deploy, rollback, merge or push is allowed; unmentioned actions remain forbidden.",
-            "nodeStyle": "luna",
-            "nodeSize": "tiny"
-          },
-          {
-            "id": "release-execute-authorized-validation",
-            "description": "Validate Execute only the exact human-authorized release/deploy action and record external evidence.",
+            "id": "verify-release-validation",
+            "description": "Validate release verification.",
             "type": "agent",
-            "task": "Validate external release/deploy evidence against the exact human authorization, idempotency, environment, permissions and rollback readiness. Do not perform or repair the external action.",
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-on",
-            "primaryInstructionId": "project:arc42-reviewer",
+            "task": "PASS more_work when releases remain; complete only with no release, acceptance or design gap. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-engineering-reviewer",
             "skillIds": [
               "project:arc42/conformance-review"
             ],
             "nodeStyle": "luna",
             "nodeSize": "small"
-          },
-          {
-            "id": "release-verify-authorized-validation",
-            "description": "Validate Verify the authorized release and obtain the final human decision, including any separately authorized rollback.",
-            "type": "human",
-            "task": "Accept or reject the release evidence and explicitly authorize any remaining rollback or external follow-up. Do not treat this gate as automatic merge or push permission.",
-            "nodeStyle": "luna",
-            "nodeSize": "tiny"
           }
         ],
         "passEdges": [
           {
-            "id": "release-authorization-ok",
-            "sourceValidationNodeId": "release-prepare-authorization-validation",
-            "target": {
-              "jobNodeId": "release-execute-authorized"
-            }
-          },
-          {
-            "id": "release-execution-ok",
-            "sourceValidationNodeId": "release-execute-authorized-validation",
-            "target": {
-              "jobNodeId": "release-verify-authorized"
-            }
-          },
-          {
-            "id": "release-completed",
-            "sourceValidationNodeId": "release-verify-authorized-validation",
+            "id": "verify-release-pass",
+            "sourceValidationNodeId": "verify-release-validation",
             "target": {
               "workflowResult": "PASS"
             }
@@ -2136,22 +1221,8 @@
         ],
         "failEdges": [
           {
-            "id": "release-prepare-authorization-fail",
-            "sourceValidationNodeId": "release-prepare-authorization-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "release-execute-authorized-fail",
-            "sourceValidationNodeId": "release-execute-authorized-validation",
-            "target": {
-              "workflowResult": "FAIL"
-            }
-          },
-          {
-            "id": "release-verify-authorized-fail",
-            "sourceValidationNodeId": "release-verify-authorized-validation",
+            "id": "verify-release-fail",
+            "sourceValidationNodeId": "verify-release-validation",
             "target": {
               "workflowResult": "FAIL"
             }

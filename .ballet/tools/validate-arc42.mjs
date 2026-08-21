@@ -46,36 +46,43 @@ const sections = [
   "12-glossary.md"
 ];
 
-const expectedFlow = [
-  "arc42-clarify-requirements→arc42-solution-strategy",
-  "arc42-solution-strategy→arc42-building-block-view",
-  "arc42-building-block-view→arc42-runtime-deployment",
-  "arc42-runtime-deployment→arc42-crosscutting-concepts",
-  "arc42-crosscutting-concepts→arc42-architecture-decision",
-  "arc42-architecture-decision→arc42-communicate-document",
-  "arc42-communicate-document→arc42-accompany-implementation",
-  "arc42-accompany-implementation→arc42-analyze-evaluate"
+const expectedLoopIds = ["design", "plan", "build", "deploy", "verify"];
+const expectedTransitions = [
+  "design|PASS|success|plan",
+  "design|FAIL|failure|design",
+  "plan|PASS|success|build",
+  "plan|FAIL|failure|design",
+  "build|PASS|more_work|build",
+  "build|PASS|success|deploy",
+  "build|FAIL|implementation_defect|build",
+  "build|FAIL|invalid_plan|plan",
+  "build|FAIL|invalid_design|design",
+  "deploy|PASS|success|verify",
+  "deploy|FAIL|transient_deployment_error|deploy",
+  "deploy|FAIL|implementation_defect|build",
+  "deploy|FAIL|invalid_plan|plan",
+  "verify|PASS|more_work|plan",
+  "verify|PASS|complete|DONE",
+  "verify|FAIL|implementation_defect|build",
+  "verify|FAIL|invalid_plan|plan",
+  "verify|FAIL|invalid_design|design"
+];
+const expectedDesignJobs = [
+  "design-01-introduction-and-goals",
+  "design-02-constraints",
+  "design-03-context-and-scope",
+  "design-04-solution-strategy",
+  "design-05-building-block-view",
+  "design-06-runtime-view",
+  "design-07-deployment-view",
+  "design-08-crosscutting-concepts",
+  "design-09-architecture-decisions",
+  "design-10-quality-requirements",
+  "design-11-risks-and-technical-debt",
+  "design-12-glossary"
 ];
 
-const requiredRepairs = {
-  "arc42-solution-strategy": ["arc42-clarify-requirements", "arc42-solution-strategy"],
-  "arc42-building-block-view": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view"],
-  "arc42-runtime-deployment": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment"],
-  "arc42-crosscutting-concepts": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts"],
-  "arc42-architecture-decision": ["arc42-clarify-requirements", "arc42-crosscutting-concepts", "arc42-architecture-decision"],
-  "arc42-communicate-document": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document"],
-  "arc42-accompany-implementation": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document", "arc42-accompany-implementation"],
-  "arc42-analyze-evaluate": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document", "arc42-accompany-implementation", "arc42-analyze-evaluate"],
-  "arc42-continuous-learning": ["arc42-clarify-requirements", "arc42-solution-strategy", "arc42-building-block-view", "arc42-runtime-deployment", "arc42-crosscutting-concepts", "arc42-architecture-decision", "arc42-communicate-document", "arc42-analyze-evaluate", "arc42-continuous-learning"],
-  "release-validation": ["arc42-communicate-document", "arc42-accompany-implementation", "arc42-analyze-evaluate", "release-validation"]
-};
-
-const networkAllowed = new Set([
-  "arc42-continuous-learning/learning-authoritative-research/job",
-  "release-validation/release-execute-authorized/job",
-  "release-validation/release-execute-authorized-validation/validation",
-  "release-validation/release-verify-authorized/job"
-]);
+const networkAllowed = new Set();
 
 const addIssue = (message) => issues.push(message);
 const rel = (absolute) => path.relative(root, absolute).split(path.sep).join("/");
@@ -254,7 +261,7 @@ if (!parsedConfig.success) {
 } else {
   config = parsedConfig.data;
   const automation = {
-    version: 12,
+    version: 13,
     orchestrator: config.orchestrator,
     graph: config.graph,
     loops: config.loops
@@ -279,19 +286,19 @@ if (!parsedConfig.success) {
       if (passEdges.length !== 1) addIssue(`${loop.id}/${validation.id} has ${passEdges.length} PassEdges; expected 1.`);
       if (failEdges.length !== 1) addIssue(`${loop.id}/${validation.id} has ${failEdges.length} FailEdges; expected 1.`);
     }
-    if (loop.capabilities.accepts.length !== 1 || loop.capabilities.provides.length !== 1) {
-      addIssue(`${loop.id} must declare exactly one accepted and one provided capability.`);
-    }
-    if (!/\bDone when\b/.test(loop.description)) addIssue(`${loop.id} must declare one explicit Done when condition.`);
   }
 
-  const flow = config.graph.loopEdges.filter((edge) => edge.kind === "flow").map((edge) => `${edge.source}→${edge.target}`);
-  if (JSON.stringify(flow) !== JSON.stringify(expectedFlow)) addIssue(`Default flow mismatch: ${flow.join(", ")}`);
-
-  const repairPairs = new Set(config.graph.loopEdges.filter((edge) => edge.kind === "repair").map((edge) => `${edge.source}→${edge.target}`));
-  for (const [source, targets] of Object.entries(requiredRepairs)) for (const target of targets) {
-    if (!repairPairs.has(`${source}→${target}`)) addIssue(`Missing repair capability ${source}→${target}.`);
-  }
+  const loopIds = config.loops.map((entry) => entry.id);
+  if (JSON.stringify(loopIds) !== JSON.stringify(expectedLoopIds)) addIssue(`Default Loop order mismatch: ${loopIds.join(", ")}`);
+  if (config.graph.startLoopId !== "design") addIssue(`Default start Loop must be design, received ${config.graph.startLoopId}.`);
+  const transitions = config.graph.transitions.map((entry) => {
+    const target = "loopId" in entry.target ? entry.target.loopId : entry.target.runResult;
+    return `${entry.source}|${entry.decision}|${entry.outcome}|${target}`;
+  });
+  if (JSON.stringify(transitions) !== JSON.stringify(expectedTransitions)) addIssue(`Default RunBook mismatch: ${transitions.join(", ")}`);
+  if (config.graph.repairEdges.length !== 0) addIssue("Default Graph must not contain repair edges.");
+  const designJobs = config.loops.find((entry) => entry.id === "design")?.workflow.jobNodes.map((entry) => entry.id) ?? [];
+  if (JSON.stringify(designJobs) !== JSON.stringify(expectedDesignJobs)) addIssue(`DESIGN Job order mismatch: ${designJobs.join(", ")}`);
 
   const stateSource = docs.get(path.join(arc42Root, "STATE-CONTRACT.md"))?.source ?? "";
   const stateJson = markerBlock(stateSource, "arc42-state-initial").match(/```json\s*([\s\S]*?)```/)?.[1];
@@ -303,10 +310,9 @@ if (!parsedConfig.success) {
     : value && typeof value === "object"
       ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${deepCanonical(value[key])}`).join(",")}}`
       : JSON.stringify(value);
-  const arc42Loops = config.loops.filter((entry) => entry.id.startsWith("arc42-"));
-  const baseline = arc42Loops[0]?.state.initial;
-  for (const entry of arc42Loops) {
-    if (deepCanonical(entry.state.initial) !== deepCanonical(baseline)) addIssue(`${entry.id} initial State differs from other arc42 Loops.`);
+  const baseline = config.loops[0]?.state.initial;
+  for (const entry of config.loops) {
+    if (deepCanonical(entry.state.initial) !== deepCanonical(baseline)) addIssue(`${entry.id} initial State differs from other default Loops.`);
     if (contractState && deepCanonical(entry.state.initial) !== deepCanonical(contractState)) addIssue(`${entry.id} initial State differs from STATE-CONTRACT.`);
   }
   void canonical;
@@ -333,12 +339,6 @@ if (!parsedConfig.success) {
   for (const location of networkAllowed) if (!observedNetworkOn.has(location)) addIssue(`Expected network-on node is not configured: ${location}.`);
   if (profiles.get(config.orchestrator.executionProfileId)?.networkAccess) addIssue("Orchestrator must use network-off profile.");
 
-  const learning = config.loops.find((entry) => entry.id === "arc42-continuous-learning");
-  const learningJob = learning?.workflow.jobNodes.find((entry) => entry.id === learning.workflow.startJobNodeId);
-  const schedule = learningJob?.type === "scheduled" ? learningJob.schedule : undefined;
-  if (!schedule || schedule.kind !== "recurring" || schedule.cadence !== "weekly" || schedule.startsOn !== "2026-08-17" || schedule.time !== "09:00" || schedule.timeZone !== "Europe/Helsinki" || JSON.stringify(schedule.weekdays) !== JSON.stringify(["mon"])) {
-    addIssue("Continuous-learning schedule must be weekly Monday 09:00 Europe/Helsinki from 2026-08-17.");
-  }
 }
 
 const instructionFiles = (await Promise.all([
@@ -377,5 +377,5 @@ if (issues.length > 0) {
   process.exitCode = 1;
 } else {
   const jobs = config?.loops.reduce((total, loop) => total + loop.workflow.jobNodes.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${jobs} Jobs, ${config?.graph.loopEdges.length ?? 0} Loop Edges.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${jobs} Jobs, ${config?.graph.transitions.length ?? 0} RunBook transitions.\n`);
 }

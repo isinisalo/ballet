@@ -16,7 +16,6 @@ import {
   type ProjectInstruction,
   type ProjectJobNode,
   type ProjectLoop,
-  type ProjectLoopEdge,
   type ProjectPassEdge,
   type ProjectValidationNode,
   type Skill
@@ -59,16 +58,28 @@ export function automationDraftIssues(
   issues.push(...duplicateIdIssues([
     ...config.loops.flatMap((loop, loopIndex) => loop.workflow.passEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.workflow.passEdges.${edgeIndex}.id` }))),
     ...config.loops.flatMap((loop, loopIndex) => loop.workflow.failEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.workflow.failEdges.${edgeIndex}.id` }))),
-    ...config.graph.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.loopEdges.${edgeIndex}.id` }))
+    ...config.graph.transitions.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.transitions.${edgeIndex}.id` })),
+    ...config.graph.repairEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.repairEdges.${edgeIndex}.id` }))
   ], "Edge"));
 
-  validateComposition(config.orchestrator, "orchestrator", profileById, instructionIds, skillIds, runtime, issues);
+  if (config.orchestrator.repairRouter) validateComposition(
+    config.orchestrator.repairRouter, "orchestrator.repairRouter",
+    profileById, instructionIds, skillIds, runtime, issues
+  );
   config.loops.forEach((loop, loopIndex) => validateWorkflow(loop, loopIndex, profileById, instructionIds, skillIds, runtime, issues));
-  config.graph.loopEdges.forEach((edge, edgeIndex) => {
-    if (!loopIds.has(edge.source)) issues.push({ path: `graph.loopEdges.${edgeIndex}.source`, message: `Unknown source Loop: ${edge.source}.` });
-    if (!loopIds.has(edge.target)) issues.push({ path: `graph.loopEdges.${edgeIndex}.target`, message: `Unknown target Loop: ${edge.target}.` });
+  if (!loopIds.has(config.graph.startLoopId)) issues.push({ path: "graph.startLoopId", message: `Unknown start Loop: ${config.graph.startLoopId}.` });
+  config.graph.transitions.forEach((edge, edgeIndex) => {
+    if (!loopIds.has(edge.source)) issues.push({ path: `graph.transitions.${edgeIndex}.source`, message: `Unknown source Loop: ${edge.source}.` });
+    if ("loopId" in edge.target && !loopIds.has(edge.target.loopId)) issues.push({ path: `graph.transitions.${edgeIndex}.target.loopId`, message: `Unknown target Loop: ${edge.target.loopId}.` });
   });
-  issues.push(...duplicateIdIssues(config.graph.loopEdges.map((edge, edgeIndex) => ({ id: `${edge.source}→${edge.target}:${edge.kind}:${edge.capability}`, path: `graph.loopEdges.${edgeIndex}.capability` })), "Loop Edge route candidate"));
+  config.graph.repairEdges.forEach((edge, edgeIndex) => {
+    if (!loopIds.has(edge.source)) issues.push({ path: `graph.repairEdges.${edgeIndex}.source`, message: `Unknown source Loop: ${edge.source}.` });
+    const target = config.loops.find((loop) => loop.id === edge.target);
+    if (!target) issues.push({ path: `graph.repairEdges.${edgeIndex}.target`, message: `Unknown target Loop: ${edge.target}.` });
+    else if (!target.capabilities.provides.includes(edge.capability)) issues.push({ path: `graph.repairEdges.${edgeIndex}.capability`, message: `Target Loop ${edge.target} does not provide ${edge.capability}.` });
+  });
+  if (config.graph.repairEdges.length && !config.orchestrator.repairRouter) issues.push({ path: "orchestrator.repairRouter", message: "Repair edges require a repair router." });
+  issues.push(...duplicateIdIssues(config.graph.transitions.map((edge, edgeIndex) => ({ id: `${edge.source}:${edge.decision}:${edge.outcome}`, path: `graph.transitions.${edgeIndex}.outcome` })), "RunBook transition key"));
   return issues;
 }
 
@@ -176,19 +187,6 @@ export const workflowEdgeIdError = (edge: ProjectPassEdge | ProjectFailEdge, loo
   if (!kebabCaseIdPattern.test(edge.id)) return "Workflow Edge ID must be lowercase kebab-case.";
   const duplicate = [...loop.workflow.passEdges, ...loop.workflow.failEdges].some((candidate) => candidate !== edge && candidate.id === edge.id);
   return duplicate ? "Workflow Edge ID must be unique." : undefined;
-};
-
-export const loopEdgeIdError = (edge: ProjectLoopEdge, config: ProjectAutomationConfig): string | undefined => {
-  if (!edge.id) return "Loop Edge ID is required.";
-  if (!kebabCaseIdPattern.test(edge.id)) return "Loop Edge ID must be lowercase kebab-case.";
-  const workflowEdgeHasId = config.loops.some((loop) => [...loop.workflow.passEdges, ...loop.workflow.failEdges].some((candidate) => candidate.id === edge.id));
-  const loopEdgeHasId = config.graph.loopEdges.some((candidate) => candidate !== edge && candidate.id === edge.id);
-  return workflowEdgeHasId || loopEdgeHasId ? "Edge ID must be unique across Workflow and Loop Edges." : undefined;
-};
-
-export const loopEdgeRouteError = (edge: ProjectLoopEdge, config: ProjectAutomationConfig): string | undefined => {
-  const duplicate = config.graph.loopEdges.some((candidate) => candidate !== edge && candidate.source === edge.source && candidate.target === edge.target && candidate.kind === edge.kind && candidate.capability === edge.capability);
-  return duplicate ? "This route candidate already exists." : undefined;
 };
 
 export type InitialStateParseResult = { value: JsonValue; error?: never } | { value?: never; error: string };

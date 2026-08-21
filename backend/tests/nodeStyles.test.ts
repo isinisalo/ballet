@@ -7,7 +7,7 @@ import {
   loopNodeStyles,
   type ProjectAutomationConfig
 } from "../../shared/domain/automation.js";
-import { testAutomationConfig } from "./v12TestConfig.js";
+import { testAutomationConfig } from "./v13TestConfig.js";
 
 const config = (): ProjectAutomationConfig => testAutomationConfig();
 

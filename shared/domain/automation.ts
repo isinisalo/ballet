@@ -1,9 +1,12 @@
-export const projectConfigurationVersion = 12 as const;
+export const projectConfigurationVersion = 13 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxJobRetriesLimit = 100;
+export const maxProjectLoops = 40;
+export const maxGraphTransitions = 256;
 export {
   getProjectFailEdges,
-  getProjectLoopEdges,
+  getProjectGraphTransitions,
+  getProjectRepairEdges,
   getProjectPassEdges,
   getProjectPassTargetJobId,
   getProjectValidationNode,
@@ -190,19 +193,31 @@ export interface ProjectWorkflow {
   failEdges: ProjectFailEdge[];
 }
 
-export type ProjectLoopEdgeKind = "flow" | "repair";
+export const graphTransitionOutcomePattern = /^[a-z][a-z0-9_]*$/;
 
-export interface ProjectLoopEdge {
+export interface ProjectGraphTransition {
+  id: string;
+  source: string;
+  decision: WorkflowResult;
+  outcome: string;
+  target: { loopId: string } | { runResult: "DONE" };
+  description: string;
+}
+
+export interface ProjectRepairEdge {
   id: string;
   source: string;
   target: string;
-  kind: ProjectLoopEdgeKind;
   capability: string;
   description: string;
 }
 
 export interface ProjectGraph {
-  loopEdges: ProjectLoopEdge[];
+  id: string;
+  name: string;
+  startLoopId: string;
+  transitions: ProjectGraphTransition[];
+  repairEdges: ProjectRepairEdge[];
 }
 
 export interface ProjectLoopCapabilities {
@@ -223,9 +238,15 @@ export interface ProjectLoop {
   workflow: ProjectWorkflow;
 }
 
-export interface ProjectLoopOrchestrator extends ProjectExecutionComposition {
+export interface ProjectLoopRepairRouter extends ProjectExecutionComposition {
   maxRepairDepth: number;
   maxRepairAttempts: number;
+}
+
+export interface ProjectLoopOrchestrator {
+  mode: "runbook";
+  maxTransitions: number;
+  repairRouter?: ProjectLoopRepairRouter;
 }
 
 export interface ProjectAutomationConfig {
@@ -236,17 +257,14 @@ export interface ProjectAutomationConfig {
 }
 
 export const defaultProjectLoopOrchestrator = (): ProjectLoopOrchestrator => ({
-  executionProfileId: "",
-  primaryInstructionId: "",
-  skillIds: [],
-  maxRepairDepth: 4,
-  maxRepairAttempts: 3
+  mode: "runbook",
+  maxTransitions: maxGraphTransitions
 });
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: projectConfigurationVersion,
   orchestrator: defaultProjectLoopOrchestrator(),
-  graph: { loopEdges: [] },
+  graph: { id: "graph-engineering", name: "Graph Engineering", startLoopId: "", transitions: [], repairEdges: [] },
   loops: [],
 });
 

@@ -62,15 +62,29 @@ const loop = (executionProfileId: string): ProjectLoop => ({
 });
 
 const automation = (executionProfileId: string): ProjectAutomationConfig => ({
-  version: 12,
+  version: 13,
   orchestrator: {
-    executionProfileId,
-    primaryInstructionId: "project:primary",
-    skillIds: ["project:zeta", "project:alpha"],
-    maxRepairDepth: 4,
-    maxRepairAttempts: 3
+    mode: "runbook",
+    maxTransitions: 256,
+    repairRouter: {
+      executionProfileId,
+      primaryInstructionId: "project:primary",
+      skillIds: ["project:zeta", "project:alpha"],
+      maxRepairDepth: 4,
+      maxRepairAttempts: 3
+    }
   },
-  graph: { loopEdges: [] },
+  graph: {
+    id: "test-graph", name: "Test Graph", startLoopId: "delivery",
+    transitions: [{
+      id: "delivery-done", source: "delivery", decision: "PASS", outcome: "success",
+      target: { runResult: "DONE" }, description: "Finish delivery."
+    }],
+    repairEdges: [{
+      id: "delivery-repair", source: "delivery", target: "delivery",
+      capability: "test:loop.transfer", description: "Allow bounded self repair."
+    }]
+  },
   loops: [loop(executionProfileId)]
 });
 
@@ -80,7 +94,14 @@ describe("project configuration repository", () => {
     const repository = new ProjectConfigurationRepository();
     expect(repository.load(projectRoot)).toMatchObject({
       exists: false,
-      config: { version: 12, executionProfiles: [], orchestrator: expect.any(Object), graph: { loopEdges: [] }, loops: [] },
+      config: {
+        version: 13,
+        executionProfiles: [],
+        issueTracker: { kind: "tk" },
+        orchestrator: { mode: "runbook" },
+        graph: { transitions: [], repairEdges: [] },
+        loops: []
+      },
       issues: []
     });
     await expect(readFile(repository.path(projectRoot), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
@@ -94,13 +115,17 @@ describe("project configuration repository", () => {
     repository.putAutomation(projectRoot, automation("zeta"));
 
     expect(JSON.parse(await readFile(repository.path(projectRoot), "utf8"))).toEqual({
-      version: 12,
+      version: 13,
       executionProfiles: [profile("alpha"), profile("zeta", true)],
+      issueTracker: defaultProjectConfiguration().issueTracker,
       orchestrator: {
         ...automation("zeta").orchestrator,
-        skillIds: ["project:alpha", "project:zeta"]
+        repairRouter: {
+          ...automation("zeta").orchestrator.repairRouter!,
+          skillIds: ["project:alpha", "project:zeta"]
+        }
       },
-      graph: { loopEdges: [] },
+      graph: automation("zeta").graph,
       loops: [{
         ...loop("zeta"),
         workflow: {
@@ -132,7 +157,7 @@ describe("project configuration repository", () => {
     const projectRoot = await root();
     const repository = new ProjectConfigurationRepository();
     await mkdir(path.dirname(repository.path(projectRoot)), { recursive: true });
-    const legacySource = `${JSON.stringify({ version: 11, loops: [] }, null, 2)}\n`;
+    const legacySource = `${JSON.stringify({ version: 12, loops: [] }, null, 2)}\n`;
     await writeFile(repository.path(projectRoot), legacySource, "utf8");
 
     expect(repository.load(projectRoot)).toMatchObject({
@@ -141,7 +166,7 @@ describe("project configuration repository", () => {
       issues: [expect.objectContaining({
         code: "invalid_schema",
         path: "version",
-        message: expect.stringContaining("version 12 is required")
+        message: expect.stringContaining("version 13 is required")
       })]
     });
     expect(() => repository.createExecutionProfile(projectRoot, profile("primary")))

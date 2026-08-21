@@ -6,7 +6,7 @@ const nonEmptyText = z.string().trim().min(1).max(20_000);
 export const orchestrationRequestSchema = z.object({
   orchestrationRequestId: id,
   rootRunId: id,
-  kind: z.enum(["flow", "repair"]),
+  kind: z.literal("repair"),
   sourceLoopRunId: id,
   sourceLoopId: z.string().min(1),
   sourceNodeRunId: id,
@@ -30,7 +30,7 @@ export const orchestratorRouteSchema = z.object({
   routeId: id,
   rootRunId: id,
   orchestrationRequestId: id,
-  kind: z.enum(["flow", "repair"]),
+  kind: z.literal("repair"),
   repairRequestId: id.optional(),
   orchestratorNodeRunId: id,
   loopEdgeId: z.string().min(1),

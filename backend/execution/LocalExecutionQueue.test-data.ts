@@ -4,8 +4,8 @@ import { jobNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import type { ExecutionSpec, RootExecutionSnapshot, RuntimeProvider } from "../../shared/domain/runtime.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
-import { serializeTaskEnvelopeV5 } from "../integration/TaskEnvelopeV5.js";
-import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v12TestConfig.js";
+import { serializeTaskEnvelopeV6 } from "../integration/TaskEnvelopeV6.js";
+import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v13TestConfig.js";
 
 export const specification = (
   taskId: string,
@@ -13,7 +13,7 @@ export const specification = (
   provider: RuntimeProvider = "codex",
   createdAt = "2026-01-01T00:00:00.000Z"
 ): ExecutionSpec => ({
-  version: 7,
+  version: 8,
   taskId,
   kind: "node_execution",
   rootRunId,
@@ -21,7 +21,7 @@ export const specification = (
   jobRunId: `job-run-${taskId}`,
   nodeRunId: `node-${taskId}`,
   evidence: {
-    compositionVersion: 6,
+    compositionVersion: 7,
     loopId: "delivery",
     jobNodeId: taskId,
     workflowNodeId: taskId,
@@ -38,8 +38,8 @@ export const specification = (
       relativePath: ".ballet/instructions/test-instruction.md", sourceSha256: "c".repeat(64)
     }],
     ...jobPromptEvidence(taskId, rootRunId),
-    outputSchemaVersion: 5,
-    outputSchemaId: "job-node-outcome-v5",
+    outputSchemaVersion: 6,
+    outputSchemaId: "job-node-outcome-v6",
     outputSchema: jobNodeOutcomeJsonSchema,
     outputSchemaSha256: sha256(canonicalJson(jobNodeOutcomeJsonSchema))
   },
@@ -108,14 +108,27 @@ const insertRunnableNode = (
 };
 
 const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
-  version: 5,
+  version: 6,
+  rootKind: "loop",
   rootLoopId: "delivery",
   project: {
     checkoutRoot: "/checkout", headSha: "a".repeat(40),
     configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
   },
   orchestrator: testOrchestrator(),
-  graph: { loopEdges: [] },
+  issueTracker: {
+    kind: "tk",
+    testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+    orchestrationDirectory: ".tickets/orchestration",
+    workDirectory: ".tickets/work"
+  },
+  graph: {
+    id: "test-graph", name: "Test Graph", startLoopId: "delivery", transitions: [],
+    repairEdges: [{
+      id: "delivery-self-repair", source: "delivery", target: "delivery",
+      capability: "test:loop.transfer", description: "Allow a bounded self repair."
+    }]
+  },
   loops: [testLoop("delivery")],
   theme: defaultLoopTheme,
   executionProfiles: [testExecutionProfile],
@@ -125,8 +138,8 @@ const rootExecutionSnapshot = (): RootExecutionSnapshot => ({
 });
 
 const jobPromptEvidence = (taskId: string, rootRunId: string) => {
-  const envelope = serializeTaskEnvelopeV5({
-    version: 5, role: "job",
+  const envelope = serializeTaskEnvelopeV6({
+    version: 6, role: "job",
     run: {
       rootRunId, loopRunId: `loop-${rootRunId}`, nodeRunId: `node-${taskId}`,
       jobRunId: `job-run-${taskId}`
@@ -140,18 +153,18 @@ const jobPromptEvidence = (taskId: string, rootRunId: string) => {
   });
   const schema = canonicalJson(jobNodeOutcomeJsonSchema);
   const prompt = [
-    section("TASK-ENVELOPE", "v5", envelope.serialized),
-    section("OUTPUT-SCHEMA", "v5", schema)
+    section("TASK-ENVELOPE", "v6", envelope.serialized),
+    section("OUTPUT-SCHEMA", "v6", schema)
   ].join("\n\n");
   return {
     prompt,
     promptSha256: sha256(prompt),
-    taskEnvelopeVersion: 5 as const,
+    taskEnvelopeVersion: 6 as const,
     taskEnvelopeSha256: envelope.sha256
   };
 };
 
 const section = (kind: string, id: string, content: string): string =>
-  `<<< BALLET EXECUTION COMPOSITION V6 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
+  `<<< BALLET EXECUTION COMPOSITION V7 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");

@@ -3,8 +3,8 @@ id: ballet-tech-stack-canvas
 title: Ballet Tech Stack Canvas
 status: draft
 createdAt: '2026-08-17'
-updatedAt: '2026-08-20'
-version: 4
+updatedAt: '2026-08-21'
+version: 5
 tags:
   - architecture
   - canvas
@@ -16,7 +16,7 @@ tags:
 | Kenttä | Arvo |
 | --- | --- |
 | Product | Ballet 0.1.0, alpha |
-| Snapshot | 2026-08-17 |
+| Snapshot | 2026-08-21 |
 | Iteraatio | 1 |
 | Scope | Nykyisen repositoryn status quo; ei tulevaisuuden teknologiavalintaa |
 | Yleisö | Projektin omistaja, arkkitehti, kehittäjä, AI-agentti ja operaattori |
@@ -51,8 +51,8 @@ block
   frontend("<b>FRONTEND</b><br/>React 18 + TypeScript<br/>Vite + Tailwind + shadcn<br/>XYFlow + Dagre")
 
   backend("<b>BACKEND</b><br/>Node.js 22 + TypeScript/ESM<br/>Express 4 + Zod 4<br/>Strict application services")
-  data("<b>DATA</b><br/>Git = project truth<br/>SQLite v6 = runtime<br/>Worktree = Run output")
-  api("<b>API & INTEGRATIONS</b><br/>Loopback JSON + SSE<br/>Codex + Copilot adapters<br/>Git / GitHub / Homebrew")
+  data("<b>DATA</b><br/>Git = project truth<br/>SQLite v9 = runtime/outbox<br/>tk stores = issues")
+  api("<b>API & INTEGRATIONS</b><br/>Loopback JSON + SSE<br/>Codex + Copilot adapters<br/>Git + pinned tk")
   security("<b>SECURITY</b><br/>Origin + checkout identity<br/>Worktree / network policy<br/>Ei credential-persistenssiä")
 
   infra("<b>INFRA &<br/>DEPLOYMENT</b><br/>macOS arm64 / x64<br/>launchd + Ballet CLI<br/>Attested release bundle")
@@ -94,7 +94,7 @@ Rakenne perustuu viralliseen [Tech Stack Canvasiin](https://techstackcanvas.io/)
 | Snapshot | 32 MiB / tiedosto; 256 MiB / configuration snapshot | Root Run pysyy paikallisesti käsiteltävänä ja liian suuri snapshot estyy ennen suoritusta. | `LocalWorkspaceManager.ts` |
 | Event/log retention | Non-terminal console 1 MiB / task; application log 20 MiB ja 5 backupia | Diagnostiikka on rajattu; terminal events ja truncation-status säilyvät. | `ExecutionStore.ts`, `RotatingFileLogger.ts`, `README.md` |
 | Tuettu release-matriisi | macOS `arm64` ja `x64`; Node 22 release CI:ssä | Native `better-sqlite3` paketoidaan ja smoke-testataan per arkkitehtuuri. | DEP-003, `.github/workflows/release.yml` |
-| Nykyinen Ballet-project-topologia | 11 Loopia, 20 JobNode/ValidationNode-paria, 6 Human Validation -porttia, 62 LoopEdgeä | Tämä on ADR-019/020:n project-data-baseline, ei platformin kovakoodattu maksimi. | `.ballet/project.json`, `validate:arc42` |
+| Nykyinen Ballet-project-topologia | 5 Loopia, 17 JobNode/ValidationNode-paria, 18 named transitionia ja 0 oletus-repair-edgeä | Tämä on ADR-022:n project-data-baseline; platformin geneerinen raja on 1–40 Loopia. | `.ballet/project.json`, `validate:arc42` |
 
 ## Major Quality Attributes
 
@@ -139,7 +139,8 @@ Lähdeankkurit: `backend/`, `shared/`, `tsconfig.node.json`, `package.json` sek�
 | Teknologia/data | Omistettu tieto | Rajaus |
 | --- | --- | --- |
 | Git + Markdown/JSON/YAML | Goals, ADR:t, arc42, `.ballet/project.json`, theme, instructionit, skillit ja Loop packages | Versionhallittu project truth; ei runtime task/event -historiaa. |
-| SQLite schema v6 + `better-sqlite3` 12.11 | Root/Loop/Node Runit, State revisions, repair frames, tasks/events ja schedule state | `.git/ballet/state.sqlite`; checkout-local, synchronous transaction boundary, ei jaettua HA-kantaa. |
+| SQLite schema v9 + `better-sqlite3` 12.11 | Root/Graph/Loop/Node Runit, State revisions, repair frames, tasks/events, schedule state sekä tracker outbox/linkit | `.git/ballet/state.sqlite`; checkout-local, synchronous transaction boundary, ei jaettua HA-kantaa. |
+| `tk` orchestration/work stores | Root Run/Loop invocation -seuranta sekä release- ja implementation-issuet | `.tickets/orchestration` on runtime-only, `.tickets/work` rajatun agentti-CLI:n käytössä; SQLite säilyy runtime-ohjauksen totuutena. |
 | Git branch/worktree | Root Runin mutable source/output | Dedicated worktree per Run; onnistuminen voidaan commitoida, epäonnistuminen säilyttää diagnostiikan. |
 | JSON machine-local settings | Provider command overrides, read-only roots ja service identity | `.git/ballet`; ei versionhallintaan eikä credential-storeksi. |
 | Rotating text logs | Application- ja launchd-diagnostiikka | Paikallinen diagnostiikka, ei canonical control flow eikä ulkoinen logipalvelu. |
@@ -170,7 +171,7 @@ Kanoninen deployment-kuvaus: [osio 7](../07-deployment-view.md), DEP-001–DEP-0
 
 - Git-diffiin perustuva versionhallittu project truth ja conventional commit -käytäntö.
 - npm + `package-lock.json`; paikallinen `npm run dev`, `build`, `test`, `lint` ja `validate:arc42`.
-- Yhden vastuun project-local Ballet Method: specification clarification → solution strategy → Building Block View → runtime/deployment → crosscutting concepts → architecture decision → communication → implementation → evaluation sekä continuous learning.
+- Project-local Ballet RunBook: DESIGN → PLAN → BUILD → DEPLOY → VERIFY, named outcomes ja deterministiset takaisinreitit. Jokainen DESIGNin 12 JobNodea omistaa yhden arc42-osion.
 - BRIEF/PLAN/EVIDENCE/REVIEW per bounded initiative; ihmisrajat WHAT/WHY:lle, ADR:lle ja external writeille.
 - ESLint 9 + typescript-eslint; tunnettu baseline 0 erroria / 14 warningia (RISK-011).
 - `DESIGN.md` ja design.md-lint UI-designjärjestelmän ylläpitoon.
@@ -183,6 +184,7 @@ Kanoninen deployment-kuvaus: [osio 7](../07-deployment-view.md), DEP-001–DEP-0
 | Ballet ↔ Codex | Codex CLI app-server, JSON-RPC/event-normalization | Exact prompt + schema; credentials/provider ambient context jää providerille. |
 | Ballet ↔ GitHub Copilot | `@github/copilot-sdk` 1.0.6 ja CLI-capability probe | Sama canonical task/outcome -portti; ei fallbackia. |
 | Ballet ↔ Git | Paikalliset Git-komennot | Root Run -worktree write boundary; remote ei ole Run-oletus. |
+| Ballet ↔ `tk` | Rajattu argv-adapteri ja `ballet tracker` -CLI | Vain konfiguroitu worktree; strict probe/output, timeoutit, external-ref-idempotenssi ja SQLite-outbox. |
 | Release ↔ GitHub/Homebrew | GitHub Actions, Releases, attestations ja tap repository | Ulkoinen kirjoitus vain erikseen valtuutetussa release-polussa. |
 | Loop module import | Browser File API → bounded JSON loopback API | Ei arbitrary server pathia, remote fetchiä tai executable package codea. |
 
@@ -192,7 +194,7 @@ Kanoninen deployment-kuvaus: [osio 7](../07-deployment-view.md), DEP-001–DEP-0
 - **UI:** Testing Library React, user-event ja jest-dom; typed route/projection/panel -testit.
 - **Contract:** Zod/schema-, HTTP-, outcome-, Task Envelope-, State-, recovery-, queue-, scheduler- ja module-testit.
 - **Static gates:** strict TypeScript build, ESLint ja `git diff --check`.
-- **Architecture:** `npm run validate:arc42` tarkistaa 12 osiota, stable ID:t, trace/linkit, State-contractin ja strict-v10-graafin.
+- **Architecture:** `npm run validate:arc42` tarkistaa 12 osiota, stable ID:t, trace/linkit, State-contractin ja strict-v13-graafin.
 - **Release:** macOS arm64/x64 native package smoke, `better-sqlite3` load, local server fixture, Git cleanliness ja graceful shutdown.
 - **UI design:** `npx @google/design.md lint DESIGN.md`; erillistä browser-E2E-frameworkia ei ole dependencyissä.
 

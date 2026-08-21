@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loopModulePackageV2Schema } from "../../shared/api/loop-module-schemas.js";
+import { loopModulePackageV3Schema } from "../../shared/api/loop-module-schemas.js";
 import type { ProjectLoop } from "../../shared/domain/automation.js";
 import { LoopModuleService } from "../loop-modules/LoopModuleService.js";
 import { canonicalLoopModuleJson } from "../loop-modules/canonicalLoopModule.js";
@@ -18,10 +18,10 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LoopModulePackageV2", () => {
+describe("LoopModulePackageV3", () => {
   it("round-trips a strict canonical package", () => {
-    const parsed = loopModulePackageV2Schema.parse(testLoopModulePackage());
-    expect(loopModulePackageV2Schema.parse(JSON.parse(canonicalLoopModuleJson(parsed)))).toEqual(parsed);
+    const parsed = loopModulePackageV3Schema.parse(testLoopModulePackage());
+    expect(loopModulePackageV3Schema.parse(JSON.parse(canonicalLoopModuleJson(parsed)))).toEqual(parsed);
   });
 
   it("rejects malformed UTF-8, oversized content, schema downgrade, and unknown fields", async () => {
@@ -201,7 +201,27 @@ describe("Loop module install/export service", () => {
       skillIds: [plan.idRemapping.skills.sample!]
     };
     repository.putAutomation(root, {
-      version: 12, orchestrator: loaded.orchestrator, graph: loaded.graph, loops: [...loaded.loops, shared]
+      version: 13,
+      orchestrator: loaded.orchestrator,
+      graph: {
+        ...loaded.graph,
+        transitions: [
+          ...loaded.graph.transitions,
+          {
+            id: "sample-loop-consumer-entry", source: plan.loop.id, decision: "PASS", outcome: "consumer",
+            target: { loopId: shared.id }, description: "Exercise an explicit consumer transition."
+          },
+          {
+            id: "consumer-loop-pass", source: shared.id, decision: "PASS", outcome: "success",
+            target: { runResult: "DONE" }, description: "Complete the consumer Loop."
+          },
+          {
+            id: "consumer-loop-fail", source: shared.id, decision: "FAIL", outcome: "failure",
+            target: { loopId: shared.id }, description: "Retry the consumer Loop."
+          }
+        ]
+      },
+      loops: [...loaded.loops, shared]
     });
     await modules.remove(plan.loop.id);
     expect(await readFile(path.join(root, ".ballet/instructions/modules/sample-loop/worker.md"), "utf8")).toContain("Sample worker");
@@ -209,42 +229,49 @@ describe("Loop module install/export service", () => {
     expect(repository.load(root).config?.loops.map((loop) => loop.id)).toEqual(["consumer-loop"]);
   });
 
-  it("installs two arc42 modules into a Loop-empty project and validates an operator-owned flow edge", async () => {
+  it("installs two Graph Engineering modules and validates an operator-owned RunBook transition", async () => {
     const root = await project();
     const modules = service(root);
-    const packageRoot = path.resolve(process.cwd(), ".ballet/loop-library/arc42");
-    const packageFiles = (await readdir(packageRoot)).filter((filename) => filename.endsWith(".ballet-loop.json")).sort().slice(0, 2);
+    const packageRoot = path.resolve(process.cwd(), ".ballet/loop-library/graph-engineering");
+    const packageFiles = ["design.ballet-loop.json", "plan.ballet-loop.json"];
     const packages = await Promise.all(packageFiles.map(async (filename) =>
       JSON.parse(await readFile(path.join(packageRoot, filename), "utf8")) as ReturnType<typeof testLoopModulePackage>));
     for (const [index, pkg] of packages.entries()) {
       const source = `test-library:${index}`;
       const plan = await modules.plan({ package: pkg, source });
-      expect(plan.canInstall).toBe(true);
+      expect(plan.canInstall, JSON.stringify(plan.issues)).toBe(true);
       await modules.commit({ package: pkg, source, expectedPlanHash: plan.planHash });
     }
     const repository = new ProjectConfigurationRepository();
     const loaded = repository.load(root).config!;
     const [sourceLoopId, targetLoopId] = packages.map((pkg) => pkg.manifest.id);
     const automation = {
-      version: 12 as const,
+      version: 13 as const,
       orchestrator: loaded.orchestrator,
-      graph: { loopEdges: [{
-        id: "operator-flow-clarify-structures",
-        source: sourceLoopId!,
-        target: targetLoopId!,
-        kind: "flow" as const,
-        capability: packages[1]!.capabilities.accepts[0]!,
-        description: "Operator-owned flow between independently installed modules."
-      }] },
+      graph: {
+        ...loaded.graph,
+        transitions: [...loaded.graph.transitions, {
+          id: "operator-transition-design-plan",
+          source: sourceLoopId!,
+          decision: "PASS" as const,
+          outcome: "operator_handoff",
+          target: { loopId: targetLoopId! },
+          description: "Operator-owned transition between independently installed modules."
+        }]
+      },
       loops: loaded.loops,
     };
     const resources = await loadProjectResources(root);
     expect(validateProjectAutomationConfig(automation, loaded.executionProfiles)).toEqual([]);
     expect(validateProjectExecutionResources(automation, resources)).toEqual([]);
-    expect(automation.graph.loopEdges).toHaveLength(1);
+    expect(automation.graph.transitions).toContainEqual(expect.objectContaining({
+      id: "operator-transition-design-plan",
+      decision: "PASS",
+      outcome: "operator_handoff"
+    }));
   });
 
-  it("installs, exports, and removes each software-delivery starter without implicit Loop Edges", async () => {
+  it("installs, exports, and removes each software-delivery starter with explicit RunBook transitions", async () => {
     const packageRoot = path.resolve(process.cwd(), ".ballet/loop-library/software-delivery");
     const packageFiles = (await readdir(packageRoot)).filter((filename) => filename.endsWith(".ballet-loop.json")).sort();
     expect(packageFiles).toEqual([
@@ -255,7 +282,7 @@ describe("Loop module install/export service", () => {
     for (const filename of packageFiles) {
       const root = await project();
       const modules = service(root);
-      const pkg = loopModulePackageV2Schema.parse(JSON.parse(await readFile(path.join(packageRoot, filename), "utf8")));
+      const pkg = loopModulePackageV3Schema.parse(JSON.parse(await readFile(path.join(packageRoot, filename), "utf8")));
       expect(pkg.loop.workflow.jobNodes).toHaveLength(3);
       expect(pkg.loop.workflow.validationNodes).toHaveLength(3);
       expect(pkg.capabilities.requires).toEqual([]);
@@ -271,9 +298,13 @@ describe("Loop module install/export service", () => {
       expect(loaded.loops).toHaveLength(1);
       expect(loaded.loops[0]?.workflow.jobNodes).toHaveLength(3);
       expect(loaded.loops[0]?.workflow.validationNodes).toHaveLength(3);
-      expect(loaded.graph.loopEdges).toEqual([]);
+      expect(loaded.graph.repairEdges).toEqual([]);
+      expect(loaded.graph.transitions).toEqual(expect.arrayContaining([
+        expect.objectContaining({ source: installed.loopId, decision: "PASS", outcome: "success", target: { runResult: "DONE" } }),
+        expect.objectContaining({ source: installed.loopId, decision: "FAIL", outcome: "failure", target: { loopId: installed.loopId } })
+      ]));
       const exported = await modules.exportLoop({ loopId: installed.loopId });
-      expect(loopModulePackageV2Schema.parse(exported.package).loop.workflow.jobNodes).toHaveLength(3);
+      expect(loopModulePackageV3Schema.parse(exported.package).loop.workflow.jobNodes).toHaveLength(3);
       await modules.remove(installed.loopId);
       expect(new ProjectConfigurationRepository().load(root).config?.loops).toEqual([]);
       expect(await modules.statuses()).toEqual([]);
@@ -296,14 +327,41 @@ const project = async ({ loops = [], extraProfiles = [] }: { loops?: ProjectLoop
   await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
   await writeFile(path.join(root, ".ballet/instructions/architect.md"), "---\nid: architect\ntitle: Architect\n---\nRoute project repair work.\n", "utf8");
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 12,
+    version: 13,
     executionProfiles: [profile(), ...extraProfiles],
-    orchestrator: { executionProfileId: "codex-test", primaryInstructionId: "project:architect", skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3 },
-    graph: { loopEdges: [] },
+    issueTracker: {
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
+    },
+    orchestrator: { mode: "runbook", maxTransitions: 256 },
+    graph: graphForLoops(loops),
     loops
   }, null, 2), "utf8");
   return root;
 };
+
+const graphForLoops = (loops: ProjectLoop[]) => ({
+  id: "test-graph",
+  name: "Test Graph",
+  startLoopId: loops[0]?.id ?? "",
+  transitions: loops.length === 0 ? [] : loops.flatMap((loop, index) => [
+    ...(index > 0 ? [{
+      id: `${loops[0]!.id}-${loop.id}-entry`, source: loops[0]!.id, decision: "PASS" as const,
+      outcome: `enter_${loop.id.replaceAll("-", "_")}`, target: { loopId: loop.id }, description: `Enter ${loop.id}.`
+    }] : []),
+    {
+      id: `${loop.id}-done`, source: loop.id, decision: "PASS" as const, outcome: "success",
+      target: { runResult: "DONE" as const }, description: `Complete ${loop.id}.`
+    },
+    {
+      id: `${loop.id}-retry`, source: loop.id, decision: "FAIL" as const, outcome: "failure",
+      target: { loopId: loop.id }, description: `Retry ${loop.id}.`
+    }
+  ]),
+  repairEdges: []
+});
 
 const existingLoop = (id = "sample-loop"): ProjectLoop => ({
   id,

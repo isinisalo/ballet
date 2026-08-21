@@ -1,32 +1,29 @@
-import { getSmartEdge } from "@tisoap/react-flow-smart-edge";
 import {
   BaseEdge,
   EdgeLabelRenderer,
   Handle,
   Position,
   getSmoothStepPath,
-  useNodes,
+  getStraightPath,
   type Edge,
   type EdgeProps,
+  type MarkerType,
   type Node,
   type NodeProps
 } from "@xyflow/react";
-import { ArrowRight, LockKeyhole, PackageCheck, Wrench } from "lucide-react";
-import type { MarkerType } from "@xyflow/react";
+import { Check, LockKeyhole, PackageCheck, Route, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LoopNodeArtwork } from "./LoopNodeArtwork";
-import { LoopRouteArtwork } from "./LoopRouteArtwork";
 import type {
   GraphEngineeringEdge,
   GraphEngineeringLiveStatus,
   GraphEngineeringNode,
   GraphEngineeringOrchestratorNode
 } from "./engineeringProjections";
-import { loopSmartEdgeRoutingOptions } from "./loopSmartEdgeRouting";
 
 export type GraphLoopNodeData = Record<string, unknown> & {
   node: GraphEngineeringNode;
   selected: boolean;
+  transitionCount: number;
   repairCount: number;
   onSelect: (loopId: string) => void;
   onOpen: (loopId: string) => void;
@@ -34,140 +31,149 @@ export type GraphLoopNodeData = Record<string, unknown> & {
 export type GraphOrchestratorNodeData = Record<string, unknown> & {
   node: GraphEngineeringOrchestratorNode;
   selected: boolean;
-  policyCount: number;
+  transitionCount: number;
+  repairCount: number;
+  graphName: string;
   onSelect: () => void;
 };
+export type GraphDoneNodeData = Record<string, unknown> & { label: "DONE" };
 export type GraphLoopFlowNode = Node<GraphLoopNodeData, "graphLoop">;
 export type GraphOrchestratorFlowNode = Node<GraphOrchestratorNodeData, "graphOrchestrator">;
-export type GraphFlowNode = GraphLoopFlowNode | GraphOrchestratorFlowNode;
+export type GraphDoneFlowNode = Node<GraphDoneNodeData, "graphDone">;
+export type GraphFlowNode = GraphLoopFlowNode | GraphOrchestratorFlowNode | GraphDoneFlowNode;
 
-export type GraphRouteSegmentData = Record<string, unknown> & {
+export type GraphRouteData = Record<string, unknown> & {
   edge: GraphEngineeringEdge;
-  segment: "request" | "dispatch";
+  pathKind: "straight" | "smoothstep";
+  lane?: { side: "negative" | "positive"; depth: number };
   onSelect: (edge: GraphEngineeringEdge) => void;
 };
-export type GraphRouteSegmentEdge = Edge<GraphRouteSegmentData, "graphRouteSegment"> & {
+export type GraphRouteEdge = Edge<GraphRouteData, "graphRoute"> & {
   markerEnd: { type: MarkerType; color: string };
 };
 
 export function GraphEngineeringLoopNodeView({ data }: NodeProps<GraphLoopFlowNode>) {
   const { node } = data;
-  const capabilitySummary = `${node.accepts.length} accepts · ${node.provides.length} provides`;
-  return (
-    <div className="relative h-full w-full">
-      <GraphHandles />
-      <button
-        type="button"
-        data-graph-loop-node={node.loopId}
-        data-live-run-status={node.liveStatus}
-        aria-label={`${node.kind === "installed" ? "Installed module" : "Custom Loop"} ${node.title}, Loop ID ${node.loopId}, responsibility ${node.description}, ${capabilitySummary}, ${node.jobCount} Jobs${node.liveStatus ? `, live Run status ${node.liveStatus}` : ""}${node.locked ? ", editing locked by active Run" : ""}`}
-        title={node.loopId}
-        className={cn(
-          "nodrag nopan grid h-full w-full grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2.5 overflow-hidden rounded-lg border bg-card px-3 py-2.5 text-left outline-none transition-colors hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
-          data.selected ? "border-primary ring-2 ring-primary/20" : statusBorder(node.liveStatus)
-        )}
-        onClick={() => data.onSelect(node.loopId)}
-        onDoubleClick={() => data.onOpen(node.loopId)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            data.onOpen(node.loopId);
-          }
-        }}
-      >
-        <span aria-hidden="true" className="loop-artwork-node relative mt-0.5 size-10 shrink-0 rounded-full" data-loop-node-size="small"><LoopNodeArtwork nodeStyle={node.artworkStyle} /></span>
-        <span className="min-w-0">
-          <span className="flex min-w-0 items-center gap-1.5">
-            {node.kind === "installed" ? <PackageCheck className="size-3.5 shrink-0 text-primary" aria-hidden="true" /> : null}
-            <span className="truncate font-mono text-[0.72rem] font-semibold">{node.title}</span>
-            {node.locked ? <LockKeyhole className="ml-auto size-3.5 shrink-0 text-tertiary" aria-hidden="true" /> : null}
+  return <div className="relative h-full w-full">
+    <GraphHandles />
+    <button
+      type="button"
+      data-graph-loop-node={node.loopId}
+      data-live-run-status={node.liveStatus}
+      aria-label={`Loop ${node.title}, ID ${node.loopId}, ${node.description}, ${node.jobCount} Jobs${node.start ? ", Graph start" : ""}${node.liveStatus ? `, status ${node.liveStatus}` : ""}${node.locked ? ", editing locked by active Run" : ""}`}
+      className={cn(
+        "nodrag nopan grid h-full w-full content-between overflow-hidden rounded-md border bg-card px-3 py-2.5 text-left outline-none transition-colors hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/30",
+        data.selected ? "border-primary ring-1 ring-primary/30" : statusBorder(node.liveStatus)
+      )}
+      onClick={() => data.onSelect(node.loopId)}
+      onDoubleClick={() => data.onOpen(node.loopId)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          data.onOpen(node.loopId);
+        }
+      }}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className={cn("grid size-7 shrink-0 place-items-center rounded border font-mono text-[0.58rem]", node.start ? "border-primary/60 bg-primary/10 text-primary" : "border-divider-strong bg-muted text-muted-foreground")}>
+          {node.start ? "01" : <Route className="size-3.5" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <strong className="truncate font-mono text-sm tracking-[0.04em]">{node.title}</strong>
+            {node.kind === "installed" ? <PackageCheck className="size-3.5 shrink-0 text-primary" /> : null}
+            {node.locked ? <LockKeyhole className="ml-auto size-3.5 shrink-0 text-tertiary" /> : null}
           </span>
-          <span className="mt-1 line-clamp-1 text-[0.68rem] leading-4 text-muted-foreground">{node.description}</span>
+          <span className="block truncate font-mono text-[0.58rem] text-muted-foreground">{node.loopId}</span>
         </span>
-        <span className="col-span-2 mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 border-t border-divider-strong pt-1.5 font-mono text-[0.6rem] leading-4 text-muted-foreground">
-          <span className="min-w-0 truncate">{capabilitySummary}</span>
-          <span>{node.jobCount} Jobs</span>
-          <span className="min-w-0 truncate">{node.kind === "installed" ? `module ${node.moduleVersion ?? ""} · ${node.provenanceStatus ?? "unknown"}` : "Custom Loop"}</span>
-          <LiveStatus status={node.liveStatus} />
-        </span>
-        {data.repairCount > 0 ? <span aria-hidden="true" title={`${data.repairCount} repair policies`} className="absolute top-1.5 right-1.5 inline-flex items-center gap-0.5 rounded-full border border-tertiary/40 bg-background px-1 py-0.5 font-mono text-[0.55rem] text-tertiary"><Wrench className="size-2.5" />{data.repairCount}</span> : null}
-      </button>
-    </div>
-  );
+      </span>
+      <span className="line-clamp-2 text-xs leading-4 text-muted-foreground">{node.description}</span>
+      <span className="flex items-center justify-between border-t border-divider-strong pt-1.5 font-mono text-[0.58rem] text-muted-foreground">
+        <span>{node.jobCount} jobs · {data.transitionCount} routes{data.repairCount ? ` · ${data.repairCount} repair` : ""}</span>
+        <LiveStatus status={node.liveStatus} />
+      </span>
+    </button>
+  </div>;
 }
 
 export function GraphEngineeringOrchestratorNodeView({ data }: NodeProps<GraphOrchestratorFlowNode>) {
   const { node } = data;
-  return (
-    <div className="relative h-full w-full">
-      <GraphHandles />
-      <button
-        type="button"
-        data-graph-orchestrator-node
-        data-live-run-status={node.liveStatus}
-        aria-label={`Loop Orchestrator control node, ${data.policyCount} persisted route policies${node.liveStatus ? `, live Run status ${node.liveStatus}` : ""}, ${node.activeRootRunCount} active Root Runs`}
-        className={cn(
-          "nodrag nopan grid h-full w-full content-start gap-2 overflow-hidden rounded-lg border bg-card px-4 py-3 text-left outline-none transition-colors hover:border-primary focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
-          data.selected ? "border-primary ring-2 ring-primary/20" : statusBorder(node.liveStatus)
-        )}
-        onClick={data.onSelect}
-      >
-        <span className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="grid size-9 place-items-center rounded border border-primary/40 bg-primary/10 text-primary"><LoopRouteArtwork size={24} /></span>
-          <span><strong className="block font-mono text-xs">{node.title}</strong><span className="font-mono text-[0.6rem] uppercase tracking-[0.08em] text-primary">control node</span></span>
-        </span>
-        <span className="line-clamp-2 text-[0.68rem] leading-4 text-muted-foreground">{node.description}</span>
-        <span className="flex items-center justify-between border-t border-divider-strong pt-1.5 font-mono text-[0.6rem] text-muted-foreground"><span>{data.policyCount} persisted policies</span><LiveStatus status={node.liveStatus} /></span>
-      </button>
-    </div>
-  );
+  return <button
+    type="button"
+    data-graph-orchestrator-node
+    className={cn(
+      "nodrag nopan grid h-full w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-md border bg-card px-4 text-left outline-none hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/30",
+      data.selected ? "border-primary ring-1 ring-primary/30" : statusBorder(node.liveStatus)
+    )}
+    aria-label={`Loop Orchestrator for ${data.graphName}; ${data.transitionCount} deterministic transitions and ${data.repairCount} repair routes`}
+    onClick={data.onSelect}
+  >
+    <span className="grid size-10 place-items-center rounded border border-primary/50 bg-primary/10 text-primary"><Route className="size-5" /></span>
+    <span className="min-w-0"><strong className="block font-mono text-sm">{node.title}</strong><span className="block truncate text-[0.68rem] text-muted-foreground">{node.description}</span></span>
+    <span className="grid gap-0.5 text-right font-mono text-[0.6rem] text-muted-foreground"><span>{data.graphName}</span><span>{data.transitionCount} transitions · {data.repairCount} repairs</span></span>
+  </button>;
 }
 
-export function GraphEngineeringRouteSegmentView(props: EdgeProps<GraphRouteSegmentEdge>) {
-  const nodes = useNodes();
-  const [fallbackPath, fallbackLabelX, fallbackLabelY] = getSmoothStepPath({
-    sourceX: props.sourceX, sourceY: props.sourceY, targetX: props.targetX, targetY: props.targetY,
-    sourcePosition: props.sourcePosition, targetPosition: props.targetPosition, borderRadius: 4, offset: 32
-  });
-  const smartEdge = getSmartEdge({
-    sourceX: props.sourceX, sourceY: props.sourceY, targetX: props.targetX, targetY: props.targetY,
-    sourcePosition: props.sourcePosition, targetPosition: props.targetPosition, nodes,
-    options: loopSmartEdgeRoutingOptions({ sourceY: props.sourceY, targetY: props.targetY })
-  });
-  const path = smartEdge instanceof Error ? fallbackPath : smartEdge.svgPathString;
-  const labelX = smartEdge instanceof Error ? fallbackLabelX : smartEdge.edgeCenterX;
-  const labelY = smartEdge instanceof Error ? fallbackLabelY : smartEdge.edgeCenterY;
+export function GraphEngineeringDoneNodeView() {
+  return <div className="relative h-full w-full">
+    <Handle id="left-target" type="target" position={Position.Left} isConnectable={false} className="loop-react-flow-handle" />
+    <div data-graph-done-node className="grid h-full w-full place-items-center rounded-full border border-secondary/60 bg-secondary/10 font-mono text-xs font-semibold tracking-[0.12em] text-secondary"><span className="inline-flex items-center gap-1"><Check className="size-3.5" />DONE</span></div>
+  </div>;
+}
+
+export function GraphEngineeringRouteView(props: EdgeProps<GraphRouteEdge>) {
   const edge = props.data?.edge;
   if (!edge) return null;
-  const active = Boolean(edge.activeRoute);
-  const request = props.data?.segment === "request";
-  const label = `${edge.kind} · ${edge.capability}`;
-  const Icon = edge.kind === "repair" ? Wrench : ArrowRight;
-  const accessible = `${edge.kind} route ${edge.source} to ${edge.target} via Loop Orchestrator, capability ${edge.capability}, persisted policy ${edge.id}${active ? ", active canonical Run route" : ""}`;
-  return (
-    <>
-      <BaseEdge id={props.id} path={path} markerEnd={props.markerEnd} style={props.style} interactionWidth={18} />
-      {!request ? <EdgeLabelRenderer>
-        <button
-          type="button"
-          data-graph-edge-label={edge.id}
-          data-control-segment={props.data?.segment}
-          data-active-canonical-route={active || undefined}
-          aria-label={accessible}
-          title={`${edge.description} (${edge.source} → ${edge.target})`}
-          className={cn(
-            "nodrag nopan absolute z-10 inline-flex max-w-52 items-center gap-1 rounded-sm border bg-background/95 px-1.5 py-0.5 font-mono text-[0.62rem] outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-            edge.kind === "repair" ? "border-tertiary/40 text-tertiary" : "border-divider-strong text-[var(--loop-theme-edge-label)]",
-            active && "border-secondary text-secondary"
-          )}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-          onClick={() => props.data?.onSelect(edge)}
-        >
-          <Icon className="size-2.5 shrink-0" aria-hidden="true" /><span className="truncate">{label}</span>
-        </button>
-      </EdgeLabelRenderer> : null}
-    </>
-  );
+  const [path, labelX, labelY] = props.data?.pathKind === "straight"
+    ? getStraightPath(props)
+    : detourPath(props, edge);
+  const transition = edge.kind === "transition";
+  const label = transition ? `${edge.decision} · ${edge.outcome}` : `REPAIR · ${edge.capability}`;
+  const accessible = transition
+    ? `${edge.decision} outcome ${edge.outcome}, ${edge.source} to ${edge.targetId === "graph-done" ? "DONE" : edge.targetId}`
+    : `Repair capability ${edge.capability}, ${edge.source} to ${edge.target}`;
+  return <>
+    <BaseEdge id={props.id} path={path} markerEnd={props.markerEnd} style={props.style} interactionWidth={18} />
+    <EdgeLabelRenderer>
+      <button
+        type="button"
+        data-graph-edge-label={edge.id}
+        aria-label={accessible}
+        title={edge.description}
+        className={cn(
+          "nodrag nopan absolute z-10 max-w-52 truncate rounded-sm border bg-background/95 px-1.5 py-0.5 font-mono text-[0.6rem] outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+          transition
+            ? edge.decision === "PASS" ? "border-secondary/40 text-secondary" : "border-error/45 text-error"
+            : "border-tertiary/50 text-tertiary"
+        )}
+        style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+        onClick={() => props.data?.onSelect(edge)}
+      >
+        {edge.kind === "repair" ? <Wrench className="mr-1 inline size-2.5" /> : null}{label}
+      </button>
+    </EdgeLabelRenderer>
+  </>;
+}
+
+function detourPath(props: EdgeProps<GraphRouteEdge>, edge: GraphEngineeringEdge) {
+  const lane = props.data?.lane ?? { side: "negative" as const, depth: 0 };
+  const direction = lane.side === "negative" ? -1 : 1;
+  if (edge.source === edge.targetId) return getSmoothStepPath({
+    ...props,
+    centerX: props.sourceX + direction * (72 + lane.depth * 40),
+    centerY: props.sourceY + direction * (72 + lane.depth * 44),
+    borderRadius: 6,
+    offset: 32
+  });
+  const referenceY = direction < 0
+    ? Math.min(props.sourceY, props.targetY)
+    : Math.max(props.sourceY, props.targetY);
+  return getSmoothStepPath({
+    ...props,
+    centerY: referenceY + direction * (72 + lane.depth * 44),
+    borderRadius: 6,
+    offset: 24
+  });
 }
 
 function GraphHandles() {
@@ -184,7 +190,7 @@ function GraphHandles() {
 }
 
 function LiveStatus({ status }: { status?: GraphEngineeringLiveStatus }) {
-  return status ? <span className={cn("justify-self-end", statusText(status))}>{status}</span> : <span className="justify-self-end">idle</span>;
+  return <span className={status ? statusText(status) : undefined}>{status ?? "idle"}</span>;
 }
 
 const statusBorder = (status?: GraphEngineeringLiveStatus) => {

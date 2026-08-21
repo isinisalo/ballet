@@ -14,7 +14,7 @@ const projectSchema = z.object({
 }).strict();
 
 export const executionSpecSchema = z.object({
-  version: z.literal(7),
+  version: z.literal(8),
   taskId: z.string(),
   kind: z.literal("node_execution"),
   rootRunId: z.string(),
@@ -22,7 +22,7 @@ export const executionSpecSchema = z.object({
   jobRunId: z.string().optional(),
   nodeRunId: z.string(),
   evidence: z.object({
-    compositionVersion: z.literal(6), loopId: z.string(), jobNodeId: z.string().optional(), workflowNodeId: z.string().optional(),
+    compositionVersion: z.literal(7), loopId: z.string(), jobNodeId: z.string().optional(), workflowNodeId: z.string().optional(),
     nodeRole: z.enum(["job", "validation", "orchestrator"]), nodeDefinitionId: z.string(),
     executionProfile: executionProfileSchema,
     resources: z.array(z.object({
@@ -30,10 +30,10 @@ export const executionSpecSchema = z.object({
       id: z.string(), relativePath: z.string().optional(), sourceSha256: sha256Schema
     }).strict()),
     prompt: z.string(), promptSha256: sha256Schema,
-    taskEnvelopeVersion: z.literal(5), taskEnvelopeSha256: sha256Schema,
-    outputSchemaVersion: z.literal(5),
+    taskEnvelopeVersion: z.literal(6), taskEnvelopeSha256: sha256Schema,
+    outputSchemaVersion: z.literal(6),
     outputSchemaId: z.enum([
-      "job-node-outcome-v5", "validation-node-outcome-v5", "orchestrator-node-outcome-v5"
+      "job-node-outcome-v6", "validation-node-outcome-v6", "orchestrator-node-outcome-v6"
     ]),
     outputSchema: z.record(z.string(), z.json()), outputSchemaSha256: sha256Schema
   }).strict(),

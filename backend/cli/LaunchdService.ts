@@ -80,7 +80,8 @@ export const renderPlist = (
     "--port", String(state.port),
     "--state-root", options.project.stateRoot,
     ...(settings.codexCommand ? ["--codex-command", settings.codexCommand] : []),
-    ...(settings.copilotCommand ? ["--copilot-command", settings.copilotCommand] : [])
+    ...(settings.copilotCommand ? ["--copilot-command", settings.copilotCommand] : []),
+    ...(settings.tkCommand ? ["--tk-command", settings.tkCommand] : [])
   ];
   const argumentsList = serverArguments
     .map((argument) => `      <string>${escapeXml(argument)}</string>`)

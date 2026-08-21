@@ -32,9 +32,16 @@ const writeSkill = async (root: string, id: string, body = "Skill body.") => {
 };
 
 const automationConfig = (composition: ProjectExecutionComposition): ProjectAutomationConfig => ({
-  version: 12,
-  orchestrator: { ...composition, maxRepairDepth: 4, maxRepairAttempts: 3 },
-  graph: { loopEdges: [] },
+  version: 13,
+  orchestrator: { mode: "runbook", maxTransitions: 256 },
+  graph: {
+    id: "test-graph", name: "Test Graph", startLoopId: "delivery",
+    transitions: [{
+      id: "delivery-done", source: "delivery", decision: "PASS", outcome: "success",
+      target: { runResult: "DONE" }, description: "Finish delivery."
+    }],
+    repairEdges: []
+  },
   loops: [{
     id: "delivery",
     description: "Complete and validate the work.",

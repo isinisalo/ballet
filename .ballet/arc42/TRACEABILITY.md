@@ -3,8 +3,8 @@ id: arc42-traceability
 title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 13
+updatedAt: '2026-08-21'
+version: 15
 tags:
   - arc42
   - traceability
@@ -15,11 +15,11 @@ tags:
 
 ## Tarkoitus
 
-Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-013` / `REQ-001`–`REQ-013` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
+Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-014` / `REQ-001`–`REQ-014` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
 
 ## Tila
 
-Matriisi sisältää 15 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien ja dokumentaation lopputarkistuksen perusteella. QS-014 säilyttää strict-v11-historiallisen evidenssin. QS-015:n strict-v12/v2-tekniset suitet ja final gatet ovat passed; ihmisacceptance on pending.
+Matriisi sisältää 18 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien perusteella. QS-014 ja QS-015 säilyttävät strict-v11/v12-historiallisen evidenssin. QS-016 on paikallisesti verified 2026-08-21; QS-017:n technical/browser-osuus ja QS-018:n hermetic-osuus läpäisivät. Ihmisen visual verdict, pinnattu live `tk` -smoke ja tuotantokaltainen pilotti säilyvät avoimina.
 
 ## Trace-matriisi
 
@@ -41,6 +41,9 @@ Matriisi sisältää 15 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | goal-011 / REQ-011 | QS-010 | adr-017 / CON-005 | BB-001 / BB-009 | RT-006 / DEP-001 | TEST-010 | EVID-010 | verified |
 | goal-012 / REQ-012 | QS-014 | adr-018 / adr-019 / CON-002 / CON-005 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-011 / DEP-001 / DEP-002 | TEST-014 | EVID-014 | technical implementation including Graph control and one-responsibility Loop library passed; human acceptance pending |
 | goal-013 / REQ-013 | QS-015 | adr-020 / adr-021 / CON-002 / CON-005 / CON-008 | BB-001 / BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-002 / RT-003 / RT-009 / RT-011 / DEP-001 / DEP-002 | TEST-015 | EVID-015 | technical implementation, ADR-021 canvas correction and final gates passed; human visual acceptance pending |
+| goal-014 / REQ-014 | QS-016 | adr-022 / CON-009 | BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-012 / DEP-002 | TEST-016 | EVID-016 | verified locally |
+| goal-014 / REQ-014 | QS-017 | adr-021 / adr-022 / CON-005 / CON-009 | BB-001 / BB-002 / BB-009 | RT-010 / RT-012 / DEP-001 | TEST-017 | EVID-017 | technical/browser verified; human visual acceptance pending |
+| goal-014 / REQ-014 | QS-018 | adr-022 / CON-010 | BB-004 / BB-005 / BB-010 | RT-013 / DEP-002 / DEP-004 | TEST-018 | EVID-018 | hermetic verified; pinned live smoke pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -57,18 +60,21 @@ Matriisi sisältää 15 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | TEST-008 | METHOD-HEALTH-vertailu ensimmäisen pilotin baselineen. | continuous learning / evaluate Loops |
 | TEST-009 | Loop module package/service/API/UI-testit, one-responsibility/done-condition conformance, install/export State/provenance/hash-roundtrip, capability swap, strict build gatet ja packaged Loop Library smoke. | module platform + project-local test suites |
 | TEST-010 | Loop Engineer typed routing, pure projection, keyboard/UI sekä desktop/narrow browser -tarkistukset. | frontend ja module test suites |
-| TEST-011 | `ExecutionComposition`, `TaskEnvelopeV5` sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
+| TEST-011 | `ExecutionComposition`, nykyinen Task Envelope sekä Codex/Copilot-adapteritestit: exact bytes/hash/order/schema, blocking composition ja no fallback. | execution/integration test suites |
 | TEST-012 | `ExecutionStore.local`, `LocalExecutionQueue`, `LoopOrchestratorRecovery` ja `RootRunCancellationBarrier.persistence`: queued/running recovery, no replay/duplicate ja post-cancel barrier. | execution/runtime/run persistence test suites |
 | TEST-013 | `loopRunViewModel` ja `runRuntimePanels`: snapshot/canonical mapping, repair/return/human/finalization ja forbidden invented telemetry. | frontend Run UI test suite |
 | TEST-014 | Strict-v11 domain/schema/snapshot/persistence/runtime/API/module/routing/projection/UI hard cut -matriisi: zero/one/many flow, repair return, capability/allowlist, ambiguity/permission `needs_input`, Graph/Loop-datarajat, yhden vastuun project-local Loopit ja starter library, legacy-poisto sekä full test/lint/build/smoke/visual gate. | `graph-and-loop-engineering` initiative |
 | TEST-015 | Strict-v12/v2 Workflow schema/runtime/Orchestrator/persistence/API/module/UI -matriisi: 1:1-paritus, exact Pass/Fail Edget, reachability, Job→Validation, PASS→Job/PASS, kolme retryä ja neljännen FAIL-eskalointi, same-Validation repair return ilman Job rerunia/retry resetiä, technical failure bypass, State/restart/cancel/recovery, atomic authoring, canvasilla vain composite Job-artworkit ja persisted `straight | smoothstep` Edget, nolla endpoint-nodea/validate/retry-viivaa, canonical routing, keyboard/a11y, desktop/narrow QA, v7 fail-closed, active legacy/boundary search ja full gates. | `workflow-engineering` initiative |
+| TEST-016 | V13 schema- ja runtime-matriisi: 1/5/40 Loopia, invalid graphit, kaikki 18 oletustransitionia, snapshot immutability, 256-raja, Graph/Loop/scheduled-ajot, DONE ja repair call/return. | `graph-engineering-runbook` schema/runtime suites |
+| TEST-017 | Transition editor, Run-kohteet, 1/5/40 deterministic layout, decision+outcome-accessibility, desktop/narrow Graph QA ja Workflow Engineeringin suojatun visuaalisen sopimuksen regressio-QA. | frontend suites + browser QA |
+| TEST-018 | Hermetic `tk`-matriisi: success, timeout, malformed JSONL/Markdown, duplicate external-ref, dangling parent/dependency, cycle, partial write, restart, cancel, reconciliation ja yksi BUILD claim invocationissa; live smoke raportoidaan erikseen. | tracker/runtime suites + optional pinned `tk` smoke |
 
 ## Evidenssikatalogi
 
 | ID | Evidenssi | Sijainti |
 | --- | --- | --- |
 | EVID-001 | Automatisoidut local service- ja HTTP-testitulokset. | `npm run test` |
-| EVID-002 | Strict-v12 schema- ja resource resolution -tulokset. | `npm run validate:arc42`, `npm run test` |
+| EVID-002 | Strict project schema- ja resource resolution -tulokset. | `npm run validate:arc42`, `npm run test` |
 | EVID-003 | Workflow runtime- ja persistence-tulokset. | `npm run test` |
 | EVID-004 | Worktree- ja permission-policy-tulokset. | `npm run test` |
 | EVID-005 | arc42 repository conformance -raportti. | `npm run validate:arc42` |
@@ -82,6 +88,9 @@ Matriisi sisältää 15 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | EVID-013 | Run view-model/panel -testitulokset ja canonical source -katselmointi ilman keksittyä telemetriaa. | `.ballet/arc42/initiatives/comprehensive-arc42-documentation/EVIDENCE.md`, TEST-013-output |
 | EVID-014 | Graph Engineering / Loop Engineering strict-v11 implementation-, Phase 6 responsibility/library-, conformance- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/graph-and-loop-engineering/EVIDENCE.md`; GLE-EVID-002–008A ja current-baseline-audit GLE-EVID-006B passed, human acceptance pending |
 | EVID-015 | Workflow Engineering strict-v12/v2 implementation-, conformance-, gate- ja ihmisacceptance-evidenssi. | `.ballet/arc42/initiatives/workflow-engineering/EVIDENCE.md`; WFE-EVID-001–007 ja WFE-EVID-009 passed, WFE-EVID-008 pending |
+| EVID-016 | Strict-v13 named RunBookin schema/runtime/root-kind/snapshot/limit/repair-tulokset; paikallisesti verified 2026-08-21. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-001/003/006 |
+| EVID-017 | Graph UI:n 1/5/40-layout-, a11y- ja desktop/narrow-kuvat sekä Workflow regression -kuvat; technical/browser verified, ihmisverdict pending. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-005 |
+| EVID-018 | Tracker adapter/outbox/reconciliation/fault-matrix verified hermetic; pinnattu live-smoke pending, koska `tk` puuttuu PATHista. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-002/006/007 |
 
 ## Ketjun tulkinta
 
@@ -93,11 +102,11 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019`, `adr-020` ja `adr-021`.
+`adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-020`, `adr-021` ja `adr-022`.
 
 ## Evidenssi
 
-Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 13 Goal/REQ-parien kattavuuden.
+Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 14 Goal/REQ-parien kattavuuden.
 
 ## Avoimet kysymykset
 

@@ -12,7 +12,7 @@ import {
   maxLoopModuleResourceBodyBytes,
   maxLoopModuleResources,
   maxLoopModuleStringLength,
-  type LoopModulePackageV2
+  type LoopModulePackageV3
 } from "../domain/loopModules.js";
 import { projectJobScheduleSchema } from "./job-schedule-schema.js";
 import { loopCapabilitySchema } from "./workspace-schemas.js";
@@ -106,9 +106,9 @@ const skillResourceSchema = z.object({
   body
 }).strict();
 
-export const loopModulePackageV2Schema = z.object({
+export const loopModulePackageV3Schema = z.object({
   format: z.literal("ballet-loop-module"),
-  version: z.literal(2),
+  version: z.literal(3),
   manifest: z.object({
     id: localKey,
     title: shortText,
@@ -117,7 +117,10 @@ export const loopModulePackageV2Schema = z.object({
     category: z.string().trim().min(1).max(100).optional(),
     tags: z.array(localKey).max(20).refine(unique, "Tags must be unique.")
   }).strict(),
-  permissions: z.object({ network: networkRequirement, externalWrites: z.literal(false) }).strict(),
+  permissions: z.object({
+    network: networkRequirement,
+    externalWrites: z.union([z.literal(false), z.literal("requires-human-authorization")])
+  }).strict(),
   profileSlots: z.array(z.object({
     key: localKey,
     title: shortText,
@@ -136,8 +139,14 @@ export const loopModulePackageV2Schema = z.object({
     requires: z.array(loopCapabilitySchema).max(64).refine(unique, "Required capabilities must be unique."),
     accepts: z.array(loopCapabilitySchema).max(64).refine(unique, "Accepted capabilities must be unique."),
     provides: z.array(loopCapabilitySchema).max(64).refine(unique, "Provided capabilities must be unique."),
-    recommendedConnections: z.array(z.object({
-      kind: z.enum(["flow", "repair"]),
+    recommendedTransitions: z.array(z.object({
+      direction: z.enum(["incoming", "outgoing"]),
+      decision: z.enum(["PASS", "FAIL"]),
+      outcome: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
+      capability: loopCapabilitySchema,
+      description: shortText
+    }).strict()).max(64),
+    recommendedRepairs: z.array(z.object({
       direction: z.enum(["incoming", "outgoing"]),
       capability: loopCapabilitySchema,
       description: shortText
@@ -219,7 +228,7 @@ export const loopModulePackageV2Schema = z.object({
   const slotNetwork = new Set(pkg.profileSlots.map((slot) => slot.network));
   if (pkg.permissions.network === "required" && slotNetwork.has("forbidden")) context.addIssue({ code: "custom", path: ["permissions", "network"], message: "Package network summary conflicts with a forbidden profile slot." });
   if (pkg.permissions.network === "forbidden" && slotNetwork.has("required")) context.addIssue({ code: "custom", path: ["permissions", "network"], message: "Package network summary conflicts with a required profile slot." });
-}) satisfies z.ZodType<LoopModulePackageV2>;
+}) satisfies z.ZodType<LoopModulePackageV3>;
 
 export const loopModuleInspectRequestSchema = z.object({
   package: z.unknown(),

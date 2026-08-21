@@ -29,9 +29,18 @@ const jobs = [job("luna", "luna", "tiny"), job("flat", "flat", "medium"), job("t
 const validations = [validation("luna", "luna", "tiny"), validation("flat", "flat", "medium"), validation("terra", "terra", "medium")];
 
 export const previewConfig: ProjectAutomationConfig = {
-  version: 12,
-  orchestrator: { executionProfileId: profileId, primaryInstructionId: instructionId, skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3 },
-  graph: { loopEdges: [] },
+  version: 13,
+  orchestrator: { mode: "runbook", maxTransitions: 256 },
+  graph: {
+    id: "theme-preview-graph",
+    name: "Theme Preview",
+    startLoopId: previewLoopId,
+    transitions: [
+      { id: "theme-preview-pass", source: previewLoopId, decision: "PASS", outcome: "complete", target: { runResult: "DONE" }, description: "Finish preview." },
+      { id: "theme-preview-fail", source: previewLoopId, decision: "FAIL", outcome: "failure", target: { loopId: previewLoopId }, description: "Retry preview." }
+    ],
+    repairEdges: []
+  },
   loops: [{
     id: previewLoopId,
     description: "Theme preview Workflow.",

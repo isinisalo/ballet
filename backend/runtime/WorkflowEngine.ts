@@ -1,10 +1,11 @@
+/* eslint-disable max-lines -- The transactional Workflow aggregate keeps outcome, State, retry, repair and RunBook ordering auditable in one unit. */
 import type Database from "better-sqlite3";
 import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import type {
   CanonicalNodeOutcome, JobNodeOutcome, LoopRunDetails, LoopRunSource, NodeRun,
   ValidationCompletedOutcome, ValidationNodeOutcome
 } from "../../shared/domain/runtime.js";
-import { maxControlFlowTransitions } from "../../shared/domain/runtime.js";
+import { GraphRunbookEngine } from "./GraphRunbookEngine.js";
 import { LoopCompletionEngine } from "./LoopCompletionEngine.js";
 import { LoopOrchestrator, type LoopOrchestratorCallbacks } from "./LoopOrchestrator.js";
 import { LoopRunIntegrityError, LoopRunStateError } from "./LoopRunErrors.js";
@@ -18,7 +19,7 @@ import { WorkflowPhaseFactory } from "./WorkflowPhaseFactory.js";
 import { WorkflowProgressStore } from "./WorkflowProgressStore.js";
 import { WorkflowRetryEngine } from "./WorkflowRetryEngine.js";
 import {
-  definitionForNode, readInteger, requireActiveNode, requireJobNode, requireOutcome,
+  definitionForNode, requireActiveNode, requireJobNode, requireOutcome,
   requireValidationNode, resumeContext
 } from "./WorkflowEngineSupport.js";
 
@@ -31,6 +32,7 @@ export class WorkflowEngine {
   private readonly phases: WorkflowPhaseFactory;
   private readonly completion: LoopCompletionEngine;
   private readonly retry: WorkflowRetryEngine;
+  private readonly runbook: GraphRunbookEngine;
   private readonly orchestrator: LoopOrchestrator;
   private readonly orchestration: OrchestrationStore;
 
@@ -43,11 +45,12 @@ export class WorkflowEngine {
     this.snapshots = new RootExecutionSnapshotStore(connection);
     this.progress = new WorkflowProgressStore(connection);
     this.orchestration = new OrchestrationStore(connection);
-    this.phases = new WorkflowPhaseFactory(loops, this.snapshots, this.progress);
+    this.phases = new WorkflowPhaseFactory(connection, loops, this.snapshots, this.progress);
     this.completion = new LoopCompletionEngine(
       connection, loops, repairs, new RepairResultStore(connection), this.progress
     );
     this.retry = new WorkflowRetryEngine(loops, states, this.progress);
+    this.runbook = new GraphRunbookEngine(connection, this.snapshots, this.progress);
     this.orchestrator = new LoopOrchestrator(
       connection, loops, states, repairs, this.orchestration, this.snapshots, this.progress, this.completion
     );
@@ -78,11 +81,6 @@ export class WorkflowEngine {
           this.orchestration.markWaiting(request.orchestrationRequestId);
         }
         this.states.pauseNodeOutcome({ rootRunId, nodeRunId, baseRevision: node.stateRevisionBefore, outcome });
-        return this.requireDetails(node.loopRunId);
-      }
-      if (this.transitionLimitReached(rootRunId)) {
-        this.progress.blockAtTransitionLimit(node, this.states.current(rootRunId).revision, maxControlFlowTransitions);
-        this.reconcileTerminalNode(node.nodeRunId);
         return this.requireDetails(node.loopRunId);
       }
       if (node.role === "job") this.applyJob(node, parseNodeOutcomeForRole("job", outcome));
@@ -214,6 +212,64 @@ export class WorkflowEngine {
       });
       return;
     }
+    const passEdge = loop.workflow.passEdges.find((edge) => edge.sourceValidationNodeId === validation.id);
+    const terminalValidation = Boolean(passEdge && "workflowResult" in passEdge.target);
+    if (!terminalValidation && outcome.transitionOutcome) {
+      throw new LoopRunIntegrityError(
+        `Intermediate Validation ${node.nodeDefinitionId} cannot select a graph transition outcome.`
+      );
+    }
+    if (outcome.transitionOutcome && outcome.escalation) {
+      throw new LoopRunIntegrityError(
+        `Terminal Validation ${node.nodeDefinitionId} cannot select both a graph transition and a repair request.`
+      );
+    }
+    const snapshot = this.snapshots.require(node.rootRunId);
+    if (!terminalValidation && !outcome.escalation) {
+      this.states.commitNodeOutcome({
+        rootRunId: node.rootRunId,
+        nodeRunId: node.nodeRunId,
+        baseRevision: node.stateRevisionBefore,
+        outcome,
+        nodeStatus: "failed",
+        jobRunStatus: "failed",
+        jobRunTerminal: "failed",
+        errorCode: "intermediate_validation_failed",
+        errorMessage: outcome.feedback,
+        control: { kind: "validation_terminal" }
+      });
+      const persisted = requireOutcome(this.loops.getNodeRun(node.nodeRunId), "validation", "failed");
+      this.completion.complete(
+        persisted, "failed", persisted.stateRevisionAfter ?? node.stateRevisionBefore,
+        persisted.outcome, this.callbacks(node.rootRunId)
+      );
+      return;
+    }
+    if (snapshot.rootKind === "graph" && !outcome.transitionOutcome && !outcome.escalation) {
+      throw new LoopRunIntegrityError(
+        `Terminal Validation ${node.nodeDefinitionId} must select a FAIL transition outcome or request repair.`
+      );
+    }
+    if (!outcome.escalation) {
+      this.states.commitNodeOutcome({
+        rootRunId: node.rootRunId,
+        nodeRunId: node.nodeRunId,
+        baseRevision: node.stateRevisionBefore,
+        outcome,
+        jobRunStatus: "completed",
+        jobRunTerminal: "completed",
+        control: { kind: "validation_terminal" }
+      });
+      const persisted = requireOutcome(this.loops.getNodeRun(node.nodeRunId), "validation", "completed");
+      this.completion.complete(
+        persisted,
+        "completed",
+        persisted.stateRevisionAfter ?? node.stateRevisionBefore,
+        persisted.outcome,
+        this.callbacks(node.rootRunId)
+      );
+      return;
+    }
     const details = this.requireDetails(node.loopRunId);
     this.orchestrator.requestRepair(
       node, outcome, loop, job, jobRunId, details.nestingDepth, this.callbacks(node.rootRunId)
@@ -228,6 +284,17 @@ export class WorkflowEngine {
       `Validation Node ${loop.id}:${validation.id} has ${edges.length} PassEdges; expected one.`
     );
     const edge = edges[0]!;
+    if (!("workflowResult" in edge.target) && outcome.transitionOutcome) {
+      throw new LoopRunIntegrityError(
+        `Intermediate Validation ${node.nodeDefinitionId} cannot select a graph transition outcome.`
+      );
+    }
+    const snapshot = this.snapshots.require(node.rootRunId);
+    if ("workflowResult" in edge.target && snapshot.rootKind === "graph" && !outcome.transitionOutcome) {
+      throw new LoopRunIntegrityError(
+        `Terminal Validation ${node.nodeDefinitionId} must select a PASS transition outcome.`
+      );
+    }
     const committed = this.states.commitNodeOutcome({
       rootRunId: node.rootRunId,
       nodeRunId: node.nodeRunId,
@@ -289,19 +356,15 @@ export class WorkflowEngine {
         this.phases.createOrchestrator(loop, rootRunId, loopRunId, requestId, attempt, revision, context),
       startRepair: (loop, callerLoopRunId, repairRequest, orchestrationRequest, input, revision) =>
         this.phases.startRepair(loop, callerLoopRunId, repairRequest, orchestrationRequest, input, revision),
-      startFlow: (loop, request, input, revision) => this.phases.startFlow(loop, request, input, revision),
-      requestFlow: (node, revision, outcome) =>
-        this.orchestrator.requestFlow(node, revision, outcome, this.callbacks(rootRunId)),
+      routeGraphTransition: (node, revision, outcome) => this.runbook.route(node, revision, outcome, {
+        startTransition: (loop, input, stateRevision) =>
+          this.phases.startTransition(rootRunId, loop, input, stateRevision)
+      }),
       returnValidation: (frame, context, revision) => {
         const node = this.phases.returnValidation(frame, context, revision);
         return { nodeRunId: node.nodeRunId, jobRunId: node.jobRunId! };
       }
     };
-  }
-
-  private transitionLimitReached(rootRunId: string): boolean {
-    const row = this.connection().prepare("SELECT transition_count FROM root_runs WHERE root_run_id = ?").get(rootRunId);
-    return readInteger(row, "transition_count") >= maxControlFlowTransitions;
   }
 
   private requireDetails(loopRunId: string): LoopRunDetails {

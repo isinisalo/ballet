@@ -3,8 +3,8 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 11
+updatedAt: '2026-08-21'
+version: 12
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Project config käyttää strict v12 -Workflow/Graph/capability-sopimusta, Loop Module v2:ta, snapshot v5:tä ja SQLite schema v8:aa. Authoring-UI:ssa käytetään Graph Engineeringiä ja selected-Loop-only Workflow Engineeringiä; `view=loop`-aliasta ei ole. Graphin Orchestrator-control-node ja canonical policy/Run-evidenssiin sidottu edge-presentation säilyvät. Workflow Engineeringin tekninen toteutus on paikallisesti testattu, mutta lopulliset gatet ja ihmisacceptance ovat pending. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi. Todennettu tieto sijoitetaan sen omistavaan osioon, ja puuttuva tieto kirjataan avoimeksi kysymykseksi eikä keksitä.
+12-osioinen baseline on hyväksytty. Nykyinen hard cut käyttää strict-v13 Graph/Workflow-sopimusta, Loop Module V3:a, Root Snapshot/Task Envelope/outcome V6:ta, composition V7:ää, ExecutionSpec V8:aa ja SQLite schema V9:ää. Repositoryn oletusgraafi on DESIGN → PLAN → BUILD → DEPLOY → VERIFY -RunBook, jossa on 18 nimettyä transitionia, DESIGNin 12 osiokohtaista JobNodea ja erillinen repair-politiikka. Graph Engineering käyttää pelkistettyä kerrostettua korttiesitystä; selected-Loop-only Workflow Engineering säilyttää suojatun avaruusteeman. `graph-engineering-runbook`-initiativen tekninen ja visuaalinen evidenssi indeksoidaan erikseen eikä pending-tulosta käsitellä hyväksyntänä. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
 
 ## Osiot
 
@@ -56,6 +56,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Architecture canvases initiative](initiatives/architecture-canvases/BRIEF.md): kolmen canvas-projektion draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju.
 - [Graph and Loop Engineering initiative](initiatives/graph-and-loop-engineering/BRIEF.md): accepted v11-päätöksen BRIEF/PLAN/EVIDENCE/REVIEW-ketju; domain/config/snapshot/module/runtime sekä routing/Graph/Loop Engineering -tekninen evidenssi on kerätty, ihmisacceptance on pending.
 - [Workflow Engineering initiative](initiatives/workflow-engineering/BRIEF.md): accepted `goal-013` / `adr-020` / `adr-021` -päätösrajan draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju; strict-v12/v2-tekninen evidenssi ja Job-only canvas-korjaus arvioidaan erikseen, final gate ja ihmisacceptance ovat pending.
+- [Graph Engineering RunBook initiative](initiatives/graph-engineering-runbook/BRIEF.md): accepted `goal-014` / `adr-022` -rajan strict-v13/V3-, tracker-, viiden Loopin data-, Graph UI- ja conformance-evidenssi.
 
 ## Kanoninen omistajuus
 
@@ -72,15 +73,15 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 
 ## Työskentelysääntö
 
-Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Oletus-flow on specification clarification → solution strategy → Building Block View → architecture-significant runtime/deployment → crosscutting concepts → architecture decision → communication → implementation → evaluation. Validation voi pyytää allowlistattua capability repairia, mutta epäselvä WHAT/WHY, prioriteetti tai merkittävä valinta pysähtyy `needs_input`-tilaan. Release/deploy/merge/push eivät sisälly oletus-flow’hun.
+Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. DESIGN ylläpitää kaikki 12 arc42-osiota järjestyksessä, PLAN valitsee seuraavan release-mapin julkaisun, BUILD toteuttaa yhden ready-issuen kerrallaan, DEPLOY vaatii täsmällisen ihmisvaltuutuksen ulkoiseen kirjoitukseen ja VERIFY vertaa tulosta designiin sekä acceptance-evidenssiin. Validation voi pyytää erillisen allowlistatun repairin, mutta tavallinen RunBook-target ratkaistaan exact `(source, decision, outcome)`-avaimesta. Epäselvä WHAT/WHY, prioriteetti tai merkittävä valinta pysähtyy `needs_input`-tilaan. Merge/push eivät sisälly oletusflow'hun.
 
 ## Relevantit päätökset
 
-`goal-009`, `goal-010`, `goal-011`, `goal-012`, `goal-013`, `adr-011`, `adr-013`, `adr-014`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019`, `adr-020` ja `adr-021`.
+`goal-009`–`goal-014`, `adr-011`, `adr-013`–`adr-016`, `adr-020`, `adr-021` ja `adr-022`.
 
 ## Evidenssi
 
-Virallinen [arc42-dokumentaatio](https://docs.arc42.org/home/) määrittää osiorakenteen. Paikallinen `npm run validate:arc42` tarkistaa dokumentti- ja trace-sopimuksen sekä project-local-menetelmäresurssit.
+Virallinen [arc42-dokumentaatio](https://docs.arc42.org/home/) määrittää osiorakenteen. Paikallinen `npm run validate:arc42` tarkistaa dokumentti- ja trace-sopimuksen, strict-v13 Graphin sekä project-local-menetelmäresurssit.
 
 ## Avoimet kysymykset
 

@@ -1,11 +1,13 @@
 import type { GraphEngineeringProjection } from "./engineeringProjections";
 
-export const graphEngineeringLoopNodeSize = { width: 264, height: 144 } as const;
-export const graphEngineeringOrchestratorNodeSize = { width: 264, height: 144 } as const;
+export const graphEngineeringLoopNodeSize = { width: 184, height: 104 } as const;
+export const graphEngineeringOrchestratorNodeSize = { width: 408, height: 80 } as const;
+export const graphEngineeringDoneNodeSize = { width: 96, height: 64 } as const;
 
 export interface GraphEngineeringLayoutNode {
   id: string;
-  kind: "loop" | "orchestrator";
+  kind: "loop" | "orchestrator" | "done";
+  rank: number;
   x: number;
   y: number;
   width: number;
@@ -13,37 +15,68 @@ export interface GraphEngineeringLayoutNode {
 }
 
 const grid = 24;
-const columns = [48, 360, 672] as const;
-const rows = [48, 240, 432] as const;
-const orchestratorPosition = { x: columns[1], y: rows[1] } as const;
-const surroundingSlots = [
-  { x: columns[0], y: rows[1] }, { x: columns[2], y: rows[1] },
-  { x: columns[0], y: rows[0] }, { x: columns[2], y: rows[0] },
-  { x: columns[0], y: rows[2] }, { x: columns[2], y: rows[2] },
-  { x: columns[1], y: rows[0] }, { x: columns[1], y: rows[2] }
-] as const;
+const left = 48;
+const graphTop = 168;
+const columnGap = 56;
+const rowGap = 48;
 
 export function calculateGraphEngineeringLayout(
   projection: GraphEngineeringProjection
 ): GraphEngineeringLayoutNode[] {
-  const loops = projection.nodes.map((node, index): GraphEngineeringLayoutNode => {
-    const slot = surroundingSlots[index] ?? overflowSlot(index - surroundingSlots.length);
-    return { id: node.loopId, kind: "loop", ...slot, ...graphEngineeringLoopNodeSize };
+  const ranks = graphRanks(projection);
+  const byRank = new Map<number, string[]>();
+  projection.nodes.forEach(({ loopId }) => {
+    const rank = ranks.get(loopId) ?? 0;
+    byRank.set(rank, [...(byRank.get(rank) ?? []), loopId]);
   });
+  const loops = [...byRank.entries()].flatMap(([rank, ids]) => ids.sort(compareUtf8).map((id, row) => ({
+    id,
+    kind: "loop" as const,
+    rank,
+    x: snap(left + rank * (graphEngineeringLoopNodeSize.width + columnGap)),
+    y: snap(graphTop + row * (graphEngineeringLoopNodeSize.height + rowGap)),
+    ...graphEngineeringLoopNodeSize
+  })));
+  const maxRank = Math.max(0, ...ranks.values());
+  const done = projection.done ? [{
+    id: "graph-done",
+    kind: "done" as const,
+    rank: maxRank + 1,
+    x: snap(left + (maxRank + 1) * (graphEngineeringLoopNodeSize.width + columnGap)),
+    y: snap(graphTop + Math.round((graphEngineeringLoopNodeSize.height - graphEngineeringDoneNodeSize.height) / 2)),
+    ...graphEngineeringDoneNodeSize
+  }] : [];
   return [{
     id: projection.orchestrator.id,
     kind: "orchestrator",
-    ...orchestratorPosition,
+    rank: -1,
+    x: left,
+    y: 40,
     ...graphEngineeringOrchestratorNodeSize
-  }, ...loops];
+  }, ...loops, ...done];
 }
 
-function overflowSlot(index: number) {
-  const row = Math.floor(index / columns.length);
-  return {
-    x: columns[index % columns.length]!,
-    y: snapToGrid(rows[2] + grid * 8 * (row + 1))
-  };
+function graphRanks(projection: GraphEngineeringProjection): Map<string, number> {
+  const ranks = new Map<string, number>([[projection.startLoopId, 0]]);
+  const queue = [projection.startLoopId];
+  while (queue.length) {
+    const source = queue.shift()!;
+    const nextRank = (ranks.get(source) ?? 0) + 1;
+    projection.edges
+      .filter((edge) => edge.kind === "transition" && edge.source === source && edge.targetId !== "graph-done")
+      .map((edge) => edge.targetId)
+      .sort(compareUtf8)
+      .forEach((target) => {
+        if (ranks.has(target)) return;
+        ranks.set(target, nextRank);
+        queue.push(target);
+      });
+  }
+  projection.nodes.map(({ loopId }) => loopId).sort(compareUtf8).forEach((id) => {
+    if (!ranks.has(id)) ranks.set(id, 0);
+  });
+  return ranks;
 }
 
-const snapToGrid = (value: number) => Math.round(value / grid) * grid;
+const snap = (value: number) => Math.round(value / grid) * grid;
+const compareUtf8 = (left: string, right: string) => left.localeCompare(right);

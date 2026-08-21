@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import {
   defaultLoopNodeStyle,
+  type ProjectGraphTransition,
   type ProjectLoop,
-  type ProjectLoopEdge,
+  type ProjectRepairEdge,
   type RootRunDetail
 } from "@shared/api/workspace-contracts";
 import { ArrowRight, BriefcaseBusiness, GitBranch, Network, RotateCcw, ShieldCheck, Wrench } from "lucide-react";
@@ -14,8 +15,8 @@ import { loopThemeCssProperties } from "./loopTheme";
 export function RunLoopMap({ root }: { root: RootRunDetail }) {
   const activeLoopId = root.current?.loopId;
   const activeEdgeId = root.repair.pendingRepair ? root.repair.routedTarget?.loopEdgeId : undefined;
-  const flowEdges = root.executionSnapshot.graph.loopEdges.filter(({ kind }) => kind === "flow");
-  const activeRepairEdge = root.executionSnapshot.graph.loopEdges.find(({ id }) => id === activeEdgeId);
+  const transitions = root.executionSnapshot.graph.transitions;
+  const activeRepairEdge = root.executionSnapshot.graph.repairEdges.find(({ id }) => id === activeEdgeId);
   return (
     <section
       className="grid min-h-[28rem] content-start gap-4 overflow-hidden bg-background p-4"
@@ -27,7 +28,7 @@ export function RunLoopMap({ root }: { root: RootRunDetail }) {
           <h3 id="run-loop-map-heading" className="font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em]">All Loops · focused Run map</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">Immutable topology with the active Loop and repair route brought forward.</p>
         </div>
-        <span className="font-mono text-[0.58rem] text-muted-foreground">{root.executionSnapshot.loops.length} Loops · {root.executionSnapshot.graph.loopEdges.length} routes</span>
+        <span className="font-mono text-[0.58rem] text-muted-foreground">{root.executionSnapshot.loops.length} Loops · {transitions.length} transitions</span>
       </header>
       <div className={cn(
         "flex flex-wrap items-center gap-2 border bg-card px-3 py-2 font-mono text-[0.6rem]",
@@ -35,7 +36,7 @@ export function RunLoopMap({ root }: { root: RootRunDetail }) {
       )} data-active-orchestrator={root.current?.nodeRole === "orchestrator" || undefined}>
         <span className="flex size-8 items-center justify-center rounded-full border border-tertiary/40 bg-background text-tertiary"><Network className="size-4" /></span>
         <span className="font-semibold text-foreground">Loop Orchestrator</span>
-        <span>repair allowlist · max depth {root.executionSnapshot.orchestrator.maxRepairDepth}</span>
+        <span>deterministic RunBook · repair depth {root.executionSnapshot.orchestrator.repairRouter?.maxRepairDepth ?? 0}</span>
         {root.repair.routedTarget ? <span className="ml-auto">→ {root.repair.routedTarget.targetLoopId}</span> : null}
       </div>
       <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
@@ -43,7 +44,7 @@ export function RunLoopMap({ root }: { root: RootRunDetail }) {
           <LoopPlanet key={loop.id} loop={loop} root={root} active={loop.id === activeLoopId} />
         ))}
       </div>
-      <RouteStrip title="Flow routes" icon={<GitBranch className="size-3.5" />} edges={flowEdges} />
+      <RouteStrip title="RunBook transitions" icon={<GitBranch className="size-3.5" />} edges={transitions} />
       {activeRepairEdge ? <RouteStrip title="Active repair route" icon={<Wrench className="size-3.5" />} edges={[activeRepairEdge]} active /> : null}
       <ReturnPath root={root} />
     </section>
@@ -77,12 +78,18 @@ function LoopPlanet({ loop, root, active }: { loop: ProjectLoop; root: RootRunDe
   );
 }
 
-function RouteStrip({ title, icon, edges, active = false }: { title: string; icon: ReactNode; edges: ProjectLoopEdge[]; active?: boolean }) {
+function RouteStrip({ title, icon, edges, active = false }: { title: string; icon: ReactNode; edges: Array<ProjectGraphTransition | ProjectRepairEdge>; active?: boolean }) {
   return (
     <div className={cn("grid gap-2 border bg-card px-3 py-2", active ? "border-tertiary/60 text-tertiary" : "border-divider-strong text-muted-foreground")}>
       <span className="flex items-center gap-1.5 font-mono text-[0.58rem] uppercase tracking-[0.05em]">{icon} {title}</span>
       <div className="flex flex-wrap gap-2">
-        {edges.length ? edges.map((edge) => <span key={edge.id} data-active-repair-edge={active || undefined} className="flex items-center gap-1 font-mono text-[0.6rem]"><span>{edge.source}</span><ArrowRight className="size-3" /><span>{edge.target}</span>{active ? <span>· {edge.id}</span> : null}</span>) : <span className="font-mono text-[0.6rem]">No routes</span>}
+        {edges.length ? edges.map((edge) => {
+          const transition = "decision" in edge;
+          const target = transition
+            ? "loopId" in edge.target ? edge.target.loopId : "DONE"
+            : edge.target;
+          return <span key={edge.id} data-active-repair-edge={active || undefined} className="flex items-center gap-1 font-mono text-[0.6rem]"><span>{transition ? `${edge.decision} · ${edge.outcome} · ` : "REPAIR · "}{edge.source}</span><ArrowRight className="size-3" /><span>{target}</span>{active ? <span>· {edge.id}</span> : null}</span>;
+        }) : <span className="font-mono text-[0.6rem]">No routes</span>}
       </div>
     </div>
   );

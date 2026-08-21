@@ -61,11 +61,14 @@ const validationEntry = (
 ): RunTimelineEntry => {
   const decision = outcome.state === "completed" ? ` · ${outcome.decision}` : "";
   const repair = outcome.state === "completed" && outcome.decision === "FAIL"
-    ? ` · Correction: ${outcome.feedback} · Expected: ${outcome.expectedCorrection} · Escalation: ${outcome.escalation.reason}`
+    ? ` · Correction: ${outcome.feedback} · Expected: ${outcome.expectedCorrection}${outcome.escalation ? ` · Escalation: ${outcome.escalation.reason}` : ""}`
+    : "";
+  const transition = outcome.state === "completed" && outcome.transitionOutcome
+    ? ` · RunBook outcome: ${outcome.transitionOutcome}`
     : "";
   return {
     id: `node:${node.nodeRunId}`, at: node.completedAt ?? node.updatedAt,
-    title: `Validation ${outcome.state}${decision}`, detail: `${outcome.summary}${repair}${delta}`,
+    title: `Validation ${outcome.state}${decision}`, detail: `${outcome.summary}${repair}${transition}${delta}`,
     stateRevision: revision,
     tone: outcome.state === "completed" && outcome.decision === "PASS" ? "validation"
       : outcome.state === "blocked" || outcome.state === "failed" ? "terminal" : "repair"

@@ -4,7 +4,7 @@ title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 9
+version: 10
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-003 ja RT-006–RT-011 ovat toteutettua platform-käyttäytymistä. Config on strict v12, immutable snapshot v5 ja SQLite schema v8. RT-002 toteuttaa Workflow'n Job/Validation-retryrajan ja RT-011:n cross-Loop flow/repair kulkee persisted Graph/capability-allowlistan kautta Orchestratorille. RT-004 on konfiguroitu project-local schedule, jonka ensimmäinen materiaalinen ajo on vielä pending. RT-005 käynnistyy ainoastaan täsmällisellä ihmisvaltuutuksella.
+RT-001–RT-003 ja RT-006–RT-011 säilyvät runtime-invariantteina tai historiallisina skenaarioina. Strict-v13-baseline lisää RT-012:n exact Graph RunBook -siirtymän ja RT-013:n tracker-outbox-sovituksen; niiden acceptance-evidenssi on pending. Config on v13, immutable snapshot v6 ja SQLite schema v9. Scheduled JobNode on isolated Loop Root Run, ja DEPLOYin ulkoinen toimi käynnistyy vain täsmällisellä ihmisvaltuutuksella.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -32,7 +32,7 @@ sequenceDiagram
   participant Runtime as LoopOrchestrator
   participant Queue as Provider FIFO lane
   participant Adapter as Provider adapter
-  Operator->>API: Käynnistä target Loop
+  Operator->>API: Käynnistä target Graph tai isolated Loop
   API->>Planner: Validoi ja suunnittele
   Planner->>DB: Commitoi snapshot + Run
   Planner->>Planner: Luo branch/worktree
@@ -53,7 +53,7 @@ Järjestys ja invariantit:
 1. Request ja kaikki reachable config/resource -viitteet validoidaan ennen Runin luontia.
 2. Snapshot sekä Root Run -identiteetti commitoidaan ennen ensimmäistä provider-tehtävää.
 3. Branch/worktree on Node-kirjoitusten ainoa työalue; active checkout säilyy muuttumattomana.
-4. Root Run ajaa yhden Job-, Validation- tai Orchestrator-roolin kerrallaan. Seuraava rooli määräytyy strict-v12 Workflow'sta ja runtime-invarianteista, ei providerin vapaasta tekstistä.
+4. Root Run ajaa yhden Job-, Validation- tai optional repair-router -roolin kerrallaan. Workflow-rooli ja Graph-transition määräytyvät strict-v13 snapshotista ja runtime-invarianteista, eivät providerin vapaasta target-tekstistä.
 5. Outcome, State patch/revision, attempt ja control-flow-tapahtuma kuuluvat samaan atomiseen vaikutukseen silloin, kun ne muuttavat samaa runtime-siirtymää.
 6. Finalization tekee terminal-tilan näkyväksi mutta ei mergeä tai pushaa worktreetä.
 
@@ -135,7 +135,52 @@ flowchart TD
 
 Workflow PASS on ainoa sisäinen tulos, joka käynnistää top-level Graph flow'n. Nolla outgoing flow candidatea päättää Root Runin. Yksi tai useampi candidate kulkee Orchestrator-dispatchin kautta; flow ei luo repair-framea. Workflow FAIL käynnistää RT-003:n durable repair call/returnin. Jokainen valinta perustuu immutable snapshotin graph-allowlistiin ja targetin capability metadataan. Puuttuva/ristiriitainen capability, ambiguity tai ihmisvaltuutus pysähtyy ennen target invocationia.
 
-## Skenaarioindeksi RT-001–RT-011
+RT-011 säilyttää strict-v11/v12-historiallisen dispatch-evidenssin. Sen tavallisen flow'n agentti-/candidate-valinta ja zero-flow-completion eivät ole strict-v13:n aktiivista semantiikkaa; ADR-022/RT-012 korvaavat ne. RT-003:n repair call/return säilyy.
+
+## RT-012: strict-v13 Graph RunBook
+
+```mermaid
+flowchart TD
+  start["Graph Root Run"] --> snapshot["Snapshot v6: graph, start, transitions, repairs, resources"]
+  snapshot --> loop["Aja current Loopin Workflow"]
+  loop --> terminal{"Terminal Validation strict outcome"}
+  terminal -->|"decision + transitionOutcome"| exact["Resolve exact source/decision/outcome"]
+  exact -->|"Loop target"| guard{"transition count < 256"}
+  guard -->|"yes"| next["Commit Graph state; invoke target Loop"]
+  next --> loop
+  guard -->|"no"| blocked["Fail closed at transition limit"]
+  exact -->|"DONE"| done["Commit DONE; finalize Graph Run"]
+  terminal -->|"FAIL + Repair Request"| repair["RT-003 repair call/return"]
+```
+
+Terminal Validationin Task Envelope sisältää current Loopille sallitut transitionit. Composition v7 muodostaa decision-kohtaisen `transitionOutcome`-enumin; väli-Validation ei saa antaa Graph-outcomea. Runtime hyväksyy vain immutable snapshotin yksikäsitteisen avaimen ja committoi viimeisimmän transition ID:n, decisionin, outcomen, current Loopin ja laskurin `GraphOrchestrationStateV1`:een. `DONE` on terminal-fakta, ei Loop invocation.
+
+Graph Root Run aloittaa `graph.startLoopId`:stä ja voi jatkaa transitioneihin. Eksplisiittinen Loop Root Run ja scheduled start Job ajavat vain valitun Loopin ja finalisoituvat sen tulokseen. Repair reititetään erillisestä collectionista RT-003:n mukaisesti eikä kasvata tavallisen RunBookin kohdevalinnan vapautta.
+
+## RT-013: `tk`-outbox ja reconciliation
+
+```mermaid
+sequenceDiagram
+  participant Run as Root/Loop coordinator
+  participant DB as SQLite v9 outbox + links
+  participant Tk as tk process in Run worktree
+  Run->>DB: Insert idempotent intent + external-ref
+  DB-->>Run: pending operation
+  Run->>Tk: argv-only command in bounded store
+  alt Valid success
+    Tk-->>Run: strict JSONL/Markdown result
+    Run->>DB: Commit tracker link + applied outbox
+    Run->>Run: Continue Node/transition
+  else timeout, malformed or invariant failure
+    Tk-->>Run: failure
+    Run->>DB: Keep pending/error + waiting_for_input
+  end
+  Note over Run,DB: Startup/Resume reconciles pending operations first
+```
+
+Root Runin orchestration epic ja Loop invocationin chore käyttävät pysyviä external-refeja. Osittainen ulkoinen kirjoitus ei luo seuraavalla yrityksellä duplikaattia, koska reconciliation kysyy external-refin ja sovittaa linkin ennen uutta createa. Work-store CLI käyttää samaa strict adapteria mutta ei voi muokata orchestration-storea. BUILD claim valitsee enintään yhden ready-issuen yhtä invocationia kohti.
+
+## Skenaarioindeksi RT-001–RT-013
 
 | ID | Trigger ja vuorovaikutus | Rakennusosat | Tulos ja evidenssi |
 | --- | --- | --- | --- |
@@ -150,6 +195,8 @@ Workflow PASS on ainoa sisäinen tulos, joka käynnistää top-level Graph flow'
 | RT-009 | Palvelu restarttaa tai Run peruutetaan kesken provider-työn; queue/store reconciliation soveltaa viimeistä commitoitua faktaa. | BB-002, BB-004–BB-006 | Queued säilyy, running → interrupted ilman replayta, committed State/control flow ei monistu ja post-cancel-payload vaikuttaa 0 kertaa. |
 | RT-010 | Operaattori avaa Run mission controlin ja vastaa tarvittaessa Human Nodeen; UI johtaa roolin, profilen, attemptin, revisionin, repairin, returnin ja finalizationin snapshotista/read storesta. | BB-001, BB-002, BB-004, BB-005 | Mission / All Loops / inspector vastaavat canonical dataa; ei keksittyä prosenttia, ETA:a tai provider-tekstistä johdettua tilaa. |
 | RT-011 | V11 Root Run alkaa eksplisiittisestä entry Loopista tai completed/repair-outcome tuottaa cross-Loop-candidatet; Orchestrator validoi graph-allowlistin, capabilityn ja permission-rajan. | BB-001, BB-003–BB-006, BB-009 | Zero-flow päättää Runin; yksi eroteltu target dispatchataan; ambiguity/ihmisvaltuutus → `needs_input`; repair palaa samaan Validationiin, flow-frameja 0. Runtime passed `GLE-EVID-004`, routing/Loop UI `GLE-EVID-005/007`; koko `EVID-014` pending. |
+| RT-012 | Graph Root Run käynnistyy snapshotatusta start Loopista ja terminal Validation antaa sallitun decision/outcomen; isolated/scheduled Loop Run päättyy ilman Graph-transitionia. | BB-001, BB-003–BB-006, BB-009 | Exact transition tai DONE commitoidaan; unknown/duplicate/missing outcome tai transition 257 failaa suljetusti; repair palaa RT-003:n mukaan. `GER-EVID-001` pending. |
+| RT-013 | Root/Loop tracker-intent kirjoitetaan tai palvelu restarttaa pending/partial `tk`-operaation jälkeen. | BB-004, BB-005, BB-010 | Run ei etene ennen sovitettua linkkiä; external-ref esiintyy kerran; malformed/dangling/cycle/timeout tuottaa waiting-tilan; BUILD claimaa enintään yhden issuen. `GER-EVID-002` pending. |
 
 ## Samanaikaisuusmalli
 
@@ -159,6 +206,7 @@ Workflow PASS on ainoa sisäinen tulos, joka käynnistää top-level Graph flow'
 - **Project config mutation:** authoring/module-mutaatiot serialisoidaan; stale plan revalidoidaan ennen commitia.
 - **Schedule:** due-slotin persistence estää saman schedule-instanssin duplikaattikäynnistyksen.
 - **Cancel/finalize:** persistent barrier ratkaisee kilpailun myöhäisen provider-payloadin kanssa.
+- **Tracker:** outbox/external-ref ratkaisee SQLite-commitin ja `tk`-prosessin välisen osittaisen vaikutuksen; pending intent estää control-flow'n.
 
 ## Virhetilat ja vastuut
 
@@ -171,19 +219,20 @@ Workflow PASS on ainoa sisäinen tulos, joka käynnistää top-level Graph flow'
 | Persistence-transaction failure | BB-005/store | Rollback; osittaista revisionia/control flow’ta ei näy. | Restart/retry viimeisestä commitista. |
 | Worktree/Git failure | BB-004/BB-007 | Run failaa ennen active checkout -kirjoitusta. | Operaattori tarkastaa worktreen ja korjaa Git-tilan. |
 | Module plan stale/conflict | BB-009 | Commit estyy eikä project configia kirjoiteta. | Inspect/plan uudelleen nykytilasta. |
+| `tk` missing/incompatible/timeout/malformed | BB-010 | Preflight tai pending outbox estää Runin; ei provider-tehtävää tai seuraavaa transitionia. | Korjaa pinnattu prerequisite/store ja Resume sovittaa pending-operaatiot. |
 | Myöhäinen payload cancellationin jälkeen | BB-004–BB-006 | Payload hylätään, state-effect = 0. | Ei replayta; canonical cancelled-tila säilyy. |
 
 ## Kanoniset lähteet
 
-ADR-020 ja runtime-lähde omistavat nykyisen Workflow-control-semanticsin. ADR-018 omistaa cross-Loop-dispatch-rajan. `.ballet/project.json` omistaa strict-v12 project-local Workflow't, Graphin, Loop capabilityt, schedule-konfiguraation ja tehtävät. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
+ADR-020 ja runtime-lähde omistavat Workflow-control-semanticsin; ADR-022 omistaa strict-v13 Graph RunBookin ja tracker-sovitusrajan. `.ballet/project.json` omistaa project-local Workflow't, Graphin transition/repair-datan ja tracker-konfiguraation. Story/Release Map omistaa toimitusjärjestyksen ja `tk` work-store toteutusissuet. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-018` ja `adr-020`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021` ja `adr-022`.
 
 ## Evidenssi
 
-Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat toteutetut skenaariot. RT-008–RT-010:n hyväksymisevidenssi on `EVID-011`–`EVID-013`. RT-011:n runtime-, routing-, Graph-control- ja selected-Loop-UI-evidenssi on `GLE-EVID-004`–`GLE-EVID-007`; ihmisacceptancen sisältävä koko `EVID-014` on pending. Scheduled learning ja release pysyvät pending-tilassa, kunnes todellinen ajo/valtuutus on olemassa.
+Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat säilyvät skenaariot. RT-008–RT-011:n historiallinen evidenssi säilyy `EVID-011`–`EVID-014`:ssä. RT-012/013:n strict-v13 runtime- ja tracker-evidenssi on `EVID-016/018` ja pysyy pending-tilassa, kunnes vastaavat testit ovat läpäisseet. Scheduled ja deploy pysyvät erillisen triggerin/valtuutuksen takana.
 
 ## Avoimet kysymykset
 

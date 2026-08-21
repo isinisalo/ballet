@@ -1,5 +1,6 @@
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
+import { defaultProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import type { RunTargetIssue } from "../../shared/domain/runs.js";
 import {
   ExecutionCompositionError,
@@ -24,12 +25,15 @@ export interface ReachableProfileReference {
 
 export const compositionIssuesForLoop = (
   data: RunTargetPreflightData,
-  rootLoopId: string
+  rootLoopId: string,
+  rootKind: "graph" | "loop" = "loop"
 ): RunTargetIssue[] => {
   try {
-    const graph = reachableExecutionGraph(data.automation, rootLoopId);
+    const graph = reachableExecutionGraph(data.automation, rootLoopId, rootKind);
     const compositions = [
-      { id: "orchestrator", ...data.automation.orchestrator },
+      ...(data.automation.orchestrator.repairRouter
+        ? [{ id: "orchestrator", ...data.automation.orchestrator.repairRouter }]
+        : []),
       ...providerCompositionsForLoops(graph.loops).map(({ id, composition }) => ({ id, ...composition }))
     ];
     const profileIds = new Set(compositions.map(({ executionProfileId }) => executionProfileId));
@@ -47,10 +51,12 @@ export const compositionIssuesForLoop = (
       issues: data.resourceIssues
     }, compositions);
     const snapshot: RootExecutionSnapshot = {
-      version: 5,
+      version: 6,
+      rootKind,
       rootLoopId,
       project: { checkoutRoot: "", headSha: "", configHash: "", snapshotHash: "" },
       orchestrator: data.automation.orchestrator,
+      issueTracker: defaultProjectConfiguration().issueTracker,
       graph: graph.graph,
       loops: graph.loops,
       theme: data.loopTheme,
@@ -72,13 +78,16 @@ export const compositionIssuesForLoop = (
 
 export const reachableProfileReferences = (
   data: RunTargetPreflightData,
-  rootLoopId: string
+  rootLoopId: string,
+  rootKind: "graph" | "loop" = "loop"
 ): ReachableProfileReference[] => {
-  const references: ReachableProfileReference[] = reachableProviderCompositions(data.automation, rootLoopId).map((value) => ({
+  const references: ReachableProfileReference[] = reachableProviderCompositions(data.automation, rootLoopId, rootKind).map((value) => ({
     executionProfileId: value.composition.executionProfileId,
     nodeId: value.nodeId
   }));
-  references.push({ executionProfileId: data.automation.orchestrator.executionProfileId });
+  if (data.automation.orchestrator.repairRouter) references.push({
+    executionProfileId: data.automation.orchestrator.repairRouter.executionProfileId
+  });
   const unique = new Map(references.map((reference) => [
     `${reference.executionProfileId}\0${reference.nodeId ?? "orchestrator"}`,
     reference

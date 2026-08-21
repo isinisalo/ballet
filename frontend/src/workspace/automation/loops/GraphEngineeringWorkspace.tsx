@@ -1,12 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowDownLeft, ArrowUpRight, Download, LockKeyhole, PanelTopOpen, Route, Settings2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Download, LockKeyhole, PanelRightClose, PanelTopOpen, Route, Settings2 } from "lucide-react";
 import type {
   ExecutionProfile,
   InstalledLoopModuleStatus,
   LocalRuntime,
   ProjectAutomationConfig,
   ProjectInstruction,
-  ProjectLoopEdge,
   Skill,
   LoopTheme
 } from "@shared/api/workspace-contracts";
@@ -19,8 +18,35 @@ import { cn } from "@/lib/utils";
 import { GraphEngineeringCanvas } from "./GraphEngineeringCanvas";
 import { GraphOrchestratorInspector } from "./GraphOrchestratorInspector";
 import { LoopEdgesEditor } from "./LoopEdgesEditor";
-import type { GraphEngineeringProjection } from "./engineeringProjections";
-import { addLoopEdge, removeLoopEdge, updateLoopEdge } from "./loopEditorState";
+import type { GraphEngineeringEdge, GraphEngineeringProjection } from "./engineeringProjections";
+import {
+  addGraphTransition,
+  addRepairEdge,
+  removeGraphTransition,
+  removeRepairEdge,
+  updateGraphTransition,
+  updateRepairEdge
+} from "./loopEditorState";
+
+interface GraphEngineeringWorkspaceProps {
+  config: ProjectAutomationConfig;
+  projection: GraphEngineeringProjection;
+  selectedLoopId?: string;
+  installedModules: InstalledLoopModuleStatus[];
+  executionProfiles: ExecutionProfile[];
+  instructions: ProjectInstruction[];
+  skills: Skill[];
+  runtime: LocalRuntime;
+  theme: LoopTheme;
+  disabled: boolean;
+  lockedLoopIds: ReadonlySet<string>;
+  onSelectLoop: (loopId: string) => void;
+  onOpenLoop: (loopId: string) => void;
+  onConfigChange: (config: ProjectAutomationConfig) => void;
+  onDeleteLoop: (loopId: string) => unknown | Promise<unknown>;
+  onExportLoop?: (loopId: string) => unknown | Promise<unknown>;
+  onRemoveInstalledLoop?: (loopId: string) => unknown | Promise<unknown>;
+}
 
 export function GraphEngineeringWorkspace({
   config,
@@ -40,34 +66,19 @@ export function GraphEngineeringWorkspace({
   onDeleteLoop,
   onExportLoop,
   onRemoveInstalledLoop
-}: {
-  config: ProjectAutomationConfig;
-  projection: GraphEngineeringProjection;
-  selectedLoopId?: string;
-  installedModules: InstalledLoopModuleStatus[];
-  executionProfiles: ExecutionProfile[];
-  instructions: ProjectInstruction[];
-  skills: Skill[];
-  runtime: LocalRuntime;
-  theme: LoopTheme;
-  disabled: boolean;
-  lockedLoopIds: ReadonlySet<string>;
-  onSelectLoop: (loopId: string) => void;
-  onOpenLoop: (loopId: string) => void;
-  onConfigChange: (config: ProjectAutomationConfig) => void;
-  onDeleteLoop: (loopId: string) => unknown | Promise<unknown>;
-  onExportLoop?: (loopId: string) => unknown | Promise<unknown>;
-  onRemoveInstalledLoop?: (loopId: string) => unknown | Promise<unknown>;
-}) {
+}: GraphEngineeringWorkspaceProps) {
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
+  const [desktopInspectorOpen, setDesktopInspectorOpen] = useState(Boolean(selectedLoopId));
   const [narrow, setNarrow] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<"loop" | "orchestrator">(selectedLoopId ? "loop" : "orchestrator");
   const selectedLoop = config.loops.find((loop) => loop.id === selectedLoopId);
   const selectedModule = installedModules.find((module) => module.loopId === selectedLoopId);
-  const incoming = config.graph.loopEdges.filter((edge) => edge.target === selectedLoopId);
-  const outgoing = config.graph.loopEdges.filter((edge) => edge.source === selectedLoopId);
+  const allEdges = projection.edges;
+  const incoming = allEdges.filter((edge) => edge.targetId === selectedLoopId);
+  const outgoing = allEdges.filter((edge) => edge.source === selectedLoopId);
   const connectionLocked = Boolean(selectedLoopId && (
-    lockedLoopIds.has(selectedLoopId) || [...incoming, ...outgoing].some((edge) => lockedLoopIds.has(edge.source) || lockedLoopIds.has(edge.target))
+    lockedLoopIds.has(selectedLoopId) || [...incoming, ...outgoing].some((edge) =>
+      lockedLoopIds.has(edge.source) || lockedLoopIds.has(edge.targetId))
   ));
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1023px)");
@@ -76,17 +87,22 @@ export function GraphEngineeringWorkspace({
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  useEffect(() => setInspectorTab(selectedLoopId ? "loop" : "orchestrator"), [selectedLoopId]);
+  useEffect(() => {
+    setInspectorTab(selectedLoopId ? "loop" : "orchestrator");
+    if (selectedLoopId && !narrow) setDesktopInspectorOpen(true);
+  }, [narrow, selectedLoopId]);
 
   const selectLoop = (loopId: string) => {
     setInspectorTab("loop");
     onSelectLoop(loopId);
     if (narrow) setMobileInspectorOpen(true);
+    else setDesktopInspectorOpen(true);
   };
-  const selectEdge = (edge: ProjectLoopEdge) => {
+  const selectEdge = (edge: GraphEngineeringEdge) => {
     setInspectorTab("loop");
     onSelectLoop(edge.source);
     if (narrow) setMobileInspectorOpen(true);
+    else setDesktopInspectorOpen(true);
   };
   const loopInspector = selectedLoop ? (
     <GraphLoopInspector
@@ -112,18 +128,29 @@ export function GraphEngineeringWorkspace({
   const selectOrchestrator = () => {
     setInspectorTab("orchestrator");
     if (narrow) setMobileInspectorOpen(true);
+    else setDesktopInspectorOpen(true);
   };
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3 sm:p-4 md:overflow-hidden">
-      <div className="grid min-h-[34rem] min-w-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className={cn(
+        "grid min-h-[34rem] min-w-0 flex-1 overflow-hidden",
+        desktopInspectorOpen ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "lg:grid-cols-1"
+      )}>
         <GraphEngineeringCanvas
-          projection={projection} selectedLoopId={selectedLoopId} orchestratorSelected={inspectorTab === "orchestrator"}
+          projection={projection} narrow={narrow} selectedLoopId={selectedLoopId}
+          orchestratorSelected={desktopInspectorOpen && inspectorTab === "orchestrator"}
           theme={theme} onSelectLoop={selectLoop} onOpenLoop={onOpenLoop}
           onSelectEdge={selectEdge} onSelectOrchestrator={selectOrchestrator}
         />
-        <aside aria-label="Graph Engineering Loop and Orchestrator inspector" className="hidden min-h-0 flex-col overflow-hidden border-y border-r border-divider-strong bg-popover lg:flex">
-          <InspectorTabs selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab} />
+        <aside aria-label="Graph Engineering Loop and Orchestrator inspector" className={cn(
+          "hidden min-h-0 flex-col overflow-hidden border-y border-r border-divider-strong bg-popover",
+          desktopInspectorOpen && "lg:flex"
+        )}>
+          <InspectorTabs
+            selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab}
+            onClose={() => setDesktopInspectorOpen(false)}
+          />
           <div className="min-h-0 flex-1 overflow-y-auto">{inspector}</div>
         </aside>
       </div>
@@ -131,7 +158,7 @@ export function GraphEngineeringWorkspace({
         <SheetContent className="overflow-x-hidden overflow-y-auto p-0 data-[side=right]:w-[calc(100%-1rem)] data-[side=right]:max-w-md">
           <SheetHeader className="border-b border-divider-strong pr-12">
             <SheetTitle>Graph Engineering inspector</SheetTitle>
-            <SheetDescription>{inspectorTab === "loop" ? "Project-global Loop Edges and black box metadata." : "Project-global flow and repair policy settings."}</SheetDescription>
+            <SheetDescription>{inspectorTab === "loop" ? "Named RunBook transitions, repair routes and Loop metadata." : "Graph identity, start Loop and RunBook policy."}</SheetDescription>
           </SheetHeader>
           <InspectorTabs selected={inspectorTab} loopAvailable={Boolean(selectedLoop)} onSelect={setInspectorTab} />
           {inspector}
@@ -141,14 +168,19 @@ export function GraphEngineeringWorkspace({
   );
 }
 
-function InspectorTabs({ selected, loopAvailable, onSelect }: {
+function InspectorTabs({ selected, loopAvailable, onSelect, onClose }: {
   selected: "loop" | "orchestrator";
   loopAvailable: boolean;
   onSelect: (tab: "loop" | "orchestrator") => void;
+  onClose?: () => void;
 }) {
-  return <div role="tablist" aria-label="Graph Engineering inspector sections" className="grid shrink-0 grid-cols-2 border-b border-divider-strong bg-card p-1">
+  return <div role="tablist" aria-label="Graph Engineering inspector sections" className={cn(
+    "grid shrink-0 border-b border-divider-strong bg-card p-1",
+    onClose ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" : "grid-cols-2"
+  )}>
     <Button type="button" role="tab" size="sm" className="max-sm:h-10" variant={selected === "loop" ? "secondary" : "ghost"} aria-selected={selected === "loop"} disabled={!loopAvailable} onClick={() => onSelect("loop")}><Route /> Selected Loop</Button>
     <Button type="button" role="tab" size="sm" className="max-sm:h-10" variant={selected === "orchestrator" ? "secondary" : "ghost"} aria-selected={selected === "orchestrator"} onClick={() => onSelect("orchestrator")}><Settings2 /> Orchestrator</Button>
+    {onClose ? <Button type="button" size="icon-sm" variant="ghost" aria-label="Close inspector" onClick={onClose}><PanelRightClose /></Button> : null}
   </div>;
 }
 
@@ -156,8 +188,8 @@ function GraphLoopInspector({ config, loopId, installed, incoming, outgoing, dis
   config: ProjectAutomationConfig;
   loopId: string;
   installed?: InstalledLoopModuleStatus;
-  incoming: ProjectLoopEdge[];
-  outgoing: ProjectLoopEdge[];
+  incoming: GraphEngineeringEdge[];
+  outgoing: GraphEngineeringEdge[];
   disabled: boolean;
   onOpen: () => void;
   onConfigChange: (config: ProjectAutomationConfig) => void;
@@ -186,27 +218,30 @@ function GraphLoopInspector({ config, loopId, installed, incoming, outgoing, dis
           <DeleteAction deleteLabel={`${installed ? "Remove installed" : "Delete custom"} Loop ${loop.id}`} deleteType="Loop" resourceName={loop.id} disabled={disabled} onDelete={onDelete} />
         </div>
       </header>
-      <ConnectionSummary title="Incoming route policy" icon={<ArrowDownLeft />} edges={incoming} empty="No incoming persisted route policy." />
-      <ConnectionSummary title="Allowed flow and repair candidates" icon={<ArrowUpRight />} edges={outgoing} empty="No outgoing persisted route candidates." />
+      <ConnectionSummary title="Incoming routes" icon={<ArrowDownLeft />} edges={incoming} empty="No incoming RunBook or repair route." />
+      <ConnectionSummary title="Outgoing routes" icon={<ArrowUpRight />} edges={outgoing} empty="No outgoing RunBook or repair route." />
       <div className="border-t border-divider-strong p-4">
         <LoopEdgesEditor
           config={config}
           sourceLoopId={loop.id}
           disabled={disabled}
-          onAdd={() => onConfigChange(addLoopEdge(config, loop.id))}
-          onChange={(edgeId, edge) => onConfigChange(updateLoopEdge(config, edgeId, edge))}
-          onRemove={(edgeId) => onConfigChange(removeLoopEdge(config, edgeId))}
+          onAddTransition={() => onConfigChange(addGraphTransition(config, loop.id))}
+          onChangeTransition={(edgeId, edge) => onConfigChange(updateGraphTransition(config, edgeId, edge))}
+          onRemoveTransition={(edgeId) => onConfigChange(removeGraphTransition(config, edgeId))}
+          onAddRepair={() => onConfigChange(addRepairEdge(config, loop.id))}
+          onChangeRepair={(edgeId, edge) => onConfigChange(updateRepairEdge(config, edgeId, edge))}
+          onRemoveRepair={(edgeId) => onConfigChange(removeRepairEdge(config, edgeId))}
         />
       </div>
     </div>
   );
 }
 
-function ConnectionSummary({ title, icon, edges, empty }: { title: string; icon: ReactNode; edges: ProjectLoopEdge[]; empty: string }) {
+function ConnectionSummary({ title, icon, edges, empty }: { title: string; icon: ReactNode; edges: GraphEngineeringEdge[]; empty: string }) {
   return (
     <section className="grid gap-2 border-t border-divider-strong p-4">
       <h3 className="flex items-center gap-2 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground"><span className="[&_svg]:size-3">{icon}</span>{title}</h3>
-      {edges.length ? <ul className="grid min-w-0 gap-1.5">{edges.map((edge) => <li key={edge.id} className="min-w-0 rounded border border-divider-strong bg-background px-2 py-1.5 text-xs" aria-label={`${edge.kind} allowlist candidate ${edge.source} to ${edge.target}, capability ${edge.capability}`}><div className="flex min-w-0 items-center gap-2"><span className={cn("shrink-0 font-mono", edge.kind === "repair" ? "text-tertiary" : "text-loop-flow")}>{edge.kind}</span><span className="min-w-0 flex-1 truncate text-right font-mono text-[0.65rem] text-muted-foreground" title={`${edge.source} → ${edge.target}`}>{edge.source} → {edge.target}</span></div><p className="mt-1 break-words font-mono text-[0.65rem] text-foreground">{edge.capability}</p><p className="mt-1 break-words text-muted-foreground">{edge.description}</p><span className="mt-1 block font-mono text-[0.58rem] uppercase text-muted-foreground">persisted graph allowlist · {edge.id}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">{empty}</p>}
+      {edges.length ? <ul className="grid min-w-0 gap-1.5">{edges.map((edge) => <li key={edge.id} className="min-w-0 rounded border border-divider-strong bg-background px-2 py-1.5 text-xs" aria-label={edge.kind === "transition" ? `${edge.decision} outcome ${edge.outcome}, ${edge.source} to ${edge.targetId}` : `Repair capability ${edge.capability}, ${edge.source} to ${edge.target}`}><div className="flex min-w-0 items-center gap-2"><span className={cn("shrink-0 font-mono", edge.kind === "repair" ? "text-tertiary" : edge.decision === "PASS" ? "text-secondary" : "text-error")}>{edge.kind === "repair" ? "REPAIR" : `${edge.decision} · ${edge.outcome}`}</span><span className="min-w-0 flex-1 truncate text-right font-mono text-[0.65rem] text-muted-foreground" title={`${edge.source} → ${edge.targetId}`}>{edge.source} → {edge.targetId === "graph-done" ? "DONE" : edge.targetId}</span></div>{edge.kind === "repair" ? <p className="mt-1 break-words font-mono text-[0.65rem] text-foreground">{edge.capability}</p> : null}<p className="mt-1 break-words text-muted-foreground">{edge.description}</p><span className="mt-1 block font-mono text-[0.58rem] uppercase text-muted-foreground">persisted {edge.kind === "repair" ? "repair allowlist" : "RunBook transition"} · {edge.id}</span></li>)}</ul> : <p className="text-xs text-muted-foreground">{empty}</p>}
     </section>
   );
 }

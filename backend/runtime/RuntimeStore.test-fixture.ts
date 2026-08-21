@@ -3,11 +3,15 @@ import type Database from "better-sqlite3";
 import os from "node:os";
 import path from "node:path";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
-import type { JsonValue, ProjectLoop, ProjectLoopEdge } from "../../shared/domain/automation.js";
+import type {
+  JsonValue, ProjectGraphTransition, ProjectLoop, ProjectRepairEdge
+} from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
 import { LocalDatabase } from "../storage/LocalDatabase.js";
-import { testExecutionProfile, testLoop, testOrchestrator } from "../tests/v12TestConfig.js";
+import {
+  testExecutionProfile, testLoop, testOrchestrator, testRunbookOrchestrator
+} from "../tests/v13TestConfig.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { LoopRunStore } from "./LoopRunStore.js";
 import { LoopStateStore } from "./LoopStateStore.js";
@@ -41,7 +45,9 @@ export const createRuntimeStoreFixture = async (
   options: {
     loop?: ProjectLoop;
     loops?: ProjectLoop[];
-    loopEdges?: ProjectLoopEdge[];
+    rootKind?: "graph" | "loop";
+    transitions?: ProjectGraphTransition[];
+    repairEdges?: ProjectRepairEdge[];
     orchestrator?: ReturnType<typeof testOrchestrator>;
   } = {}
 ): Promise<RuntimeStoreTestFixture> => {
@@ -51,18 +57,33 @@ export const createRuntimeStoreFixture = async (
   let databaseOpen = true;
   let connection = () => database.connection();
   const loop = { ...(options.loop ?? testLoop()), state: { description: "Test state.", initial } };
+  const rootKind = options.rootKind ?? "loop";
+  const repairEdges = options.repairEdges ?? (rootKind === "loop" ? [{
+    id: "self-repair", source: loop.id, target: loop.id,
+    capability: "test:loop.transfer", description: "Self repair."
+  }] : []);
   const snapshot: RootExecutionSnapshot = {
-    version: 5,
+    version: 6,
+    rootKind,
     rootLoopId: loop.id,
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40),
       configHash: "b".repeat(64), snapshotHash: "c".repeat(64)
     },
-    orchestrator: options.orchestrator ?? testOrchestrator(),
-    graph: { loopEdges: options.loopEdges ?? [{
-      id: "self-repair", source: loop.id, target: loop.id, kind: "repair",
-      capability: "test:loop.transfer", description: "Self repair."
-    }] },
+    orchestrator: options.orchestrator ?? (repairEdges.length > 0 ? testOrchestrator() : testRunbookOrchestrator()),
+    issueTracker: {
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
+    },
+    graph: {
+      id: "test-graph",
+      name: "Test Graph",
+      startLoopId: loop.id,
+      transitions: options.transitions ?? [],
+      repairEdges
+    },
     loops: [loop, ...(options.loops ?? []).filter((candidate) => candidate.id !== loop.id)],
     theme: defaultLoopTheme,
     executionProfiles: [testExecutionProfile],
@@ -72,7 +93,8 @@ export const createRuntimeStoreFixture = async (
   };
   const roots = new RootRunStore(connection);
   roots.create({
-    rootRunId: "root-run", kind: "loop", targetId: loop.id, source: "manual",
+    rootRunId: "root-run", kind: rootKind,
+    targetId: rootKind === "graph" ? snapshot.graph.id : loop.id, source: "manual",
     worktreePath: "/workspace/.git/ballet/worktrees/root-run", branch: "ballet/run/root-run",
     headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64),
     executionSnapshot: snapshot, createdAt: runtimeTestTimestamp

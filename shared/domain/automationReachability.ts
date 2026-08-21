@@ -1,12 +1,12 @@
 import type {
   ProjectAutomationConfig,
   ProjectFailEdge,
+  ProjectGraphTransition,
   ProjectJobNode,
   ProjectLoop,
-  ProjectLoopEdge,
-  ProjectLoopEdgeKind,
   ProjectPassEdge,
   ProjectPassEdgeTarget,
+  ProjectRepairEdge,
   ProjectValidationNode
 } from "./automation.js";
 
@@ -34,19 +34,27 @@ export const getProjectFailEdges = (
   ? [...loop.workflow.failEdges]
   : loop.workflow.failEdges.filter((edge) => edge.sourceValidationNodeId === sourceValidationNodeId);
 
-export const getProjectLoopEdges = (
+export const getProjectGraphTransitions = (
   config: Pick<ProjectAutomationConfig, "graph">,
   sourceLoopId?: string,
-  kind?: ProjectLoopEdgeKind
-): ProjectLoopEdge[] => config.graph.loopEdges.filter((edge) =>
-  (sourceLoopId === undefined || edge.source === sourceLoopId)
-  && (kind === undefined || edge.kind === kind));
+  decision?: "PASS" | "FAIL",
+  outcome?: string
+): ProjectGraphTransition[] => config.graph.transitions.filter((transition) =>
+  (sourceLoopId === undefined || transition.source === sourceLoopId)
+  && (decision === undefined || transition.decision === decision)
+  && (outcome === undefined || transition.outcome === outcome));
+
+export const getProjectRepairEdges = (
+  config: Pick<ProjectAutomationConfig, "graph">,
+  sourceLoopId?: string
+): ProjectRepairEdge[] => config.graph.repairEdges.filter((edge) =>
+  sourceLoopId === undefined || edge.source === sourceLoopId);
 
 export const isAllowedProjectRepairRoute = (
   config: Pick<ProjectAutomationConfig, "graph">,
   sourceLoopId: string,
   loopEdgeId: string
-): boolean => getProjectLoopEdges(config, sourceLoopId, "repair")
+): boolean => getProjectRepairEdges(config, sourceLoopId)
   .some((edge) => edge.id === loopEdgeId);
 
 export const getProjectPassTargetJobId = (target: ProjectPassEdgeTarget): string | undefined =>
@@ -70,7 +78,8 @@ export const getReachableProjectJobNodeIds = (loop: ProjectLoop): Set<string> =>
 
 export interface ReachableProjectLoopGraph {
   loopIds: Set<string>;
-  loopEdgeIds: Set<string>;
+  transitionIds: Set<string>;
+  repairEdgeIds: Set<string>;
   minimumRepairDepthByLoopId: Map<string, number>;
 }
 
@@ -81,8 +90,8 @@ export const getReachableProjectLoopIds = (
 ): Set<string> => getReachableProjectLoopGraph(config, startLoopId, maxRepairDepth).loopIds;
 
 /**
- * Computes every statically usable Loop route. Flow Edges preserve the repair
- * depth and Repair Edges consume one level, so cycles terminate while a Loop
+ * Computes every statically usable Loop route. RunBook transitions preserve
+ * the repair depth and Repair Edges consume one level, so cycles terminate while a Loop
  * can still be revisited at a shallower, more permissive depth.
  */
 export const getReachableProjectLoopGraph = (
@@ -94,15 +103,25 @@ export const getReachableProjectLoopGraph = (
     throw new Error(`maxRepairDepth must be an integer between 0 and ${maxRepairDepthLimit}.`);
   }
   const minimumRepairDepthByLoopId = new Map<string, number>([[startLoopId, 0]]);
-  const loopEdgeIds = new Set<string>();
+  const transitionIds = new Set<string>();
+  const repairEdgeIds = new Set<string>();
   const pending: Array<{ loopId: string; repairDepth: number }> = [{ loopId: startLoopId, repairDepth: 0 }];
   while (pending.length > 0) {
     const current = pending.shift();
     if (!current || minimumRepairDepthByLoopId.get(current.loopId) !== current.repairDepth) continue;
-    for (const edge of getProjectLoopEdges(config, current.loopId)) {
-      if (edge.kind === "repair" && current.repairDepth >= maxRepairDepth) continue;
-      const targetDepth = current.repairDepth + (edge.kind === "repair" ? 1 : 0);
-      loopEdgeIds.add(edge.id);
+    for (const transition of getProjectGraphTransitions(config, current.loopId)) {
+      transitionIds.add(transition.id);
+      if (!("loopId" in transition.target)) continue;
+      const previousDepth = minimumRepairDepthByLoopId.get(transition.target.loopId);
+      if (previousDepth === undefined || current.repairDepth < previousDepth) {
+        minimumRepairDepthByLoopId.set(transition.target.loopId, current.repairDepth);
+        pending.push({ loopId: transition.target.loopId, repairDepth: current.repairDepth });
+      }
+    }
+    if (current.repairDepth >= maxRepairDepth) continue;
+    for (const edge of getProjectRepairEdges(config, current.loopId)) {
+      const targetDepth = current.repairDepth + 1;
+      repairEdgeIds.add(edge.id);
       const previousDepth = minimumRepairDepthByLoopId.get(edge.target);
       if (previousDepth === undefined || targetDepth < previousDepth) {
         minimumRepairDepthByLoopId.set(edge.target, targetDepth);
@@ -112,7 +131,8 @@ export const getReachableProjectLoopGraph = (
   }
   return {
     loopIds: new Set(minimumRepairDepthByLoopId.keys()),
-    loopEdgeIds,
+    transitionIds,
+    repairEdgeIds,
     minimumRepairDepthByLoopId
   };
 };

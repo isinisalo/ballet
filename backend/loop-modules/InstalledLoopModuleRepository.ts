@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { InstalledLoopModuleV2, InstalledLoopModulesFileV2 } from "../../shared/domain/loopModules.js";
+import type { InstalledLoopModuleV3, InstalledLoopModulesFileV3 } from "../../shared/domain/loopModules.js";
 import { resolveSafeProjectPath } from "../documents/safeProjectPath.js";
 import { canonicalLoopModuleJson } from "./canonicalLoopModule.js";
 
@@ -14,8 +14,12 @@ const capabilitiesSchema = z.object({
   requires: z.array(z.string()),
   accepts: z.array(z.string()),
   provides: z.array(z.string()),
-  recommendedConnections: z.array(z.object({
-    kind: z.enum(["flow", "repair"]), direction: z.enum(["incoming", "outgoing"]), capability: z.string(), description: z.string()
+  recommendedTransitions: z.array(z.object({
+    direction: z.enum(["incoming", "outgoing"]), decision: z.enum(["PASS", "FAIL"]),
+    outcome: z.string(), capability: z.string(), description: z.string()
+  }).strict()),
+  recommendedRepairs: z.array(z.object({
+    direction: z.enum(["incoming", "outgoing"]), capability: z.string(), description: z.string()
   }).strict())
 }).strict();
 const installedSchema = z.object({
@@ -35,24 +39,24 @@ const installedSchema = z.object({
   }).strict()),
   installedContentSha256: z.string()
 }).strict();
-const fileSchema = z.object({ version: z.literal(2), installed: z.array(installedSchema) }).strict();
+const fileSchema = z.object({ version: z.literal(3), installed: z.array(installedSchema) }).strict();
 
 export class InstalledLoopModuleRepository {
   relativePath = ".ballet/loop-modules/installed.json" as const;
 
-  async load(root: string): Promise<InstalledLoopModulesFileV2> {
+  async load(root: string): Promise<InstalledLoopModulesFileV3> {
     const filename = await resolveSafeProjectPath(root, this.relativePath);
     try {
       const source = await readFile(filename, { encoding: "utf8", flag: constants.O_RDONLY | constants.O_NOFOLLOW });
-      return fileSchema.parse(JSON.parse(source)) as InstalledLoopModulesFileV2;
+      return fileSchema.parse(JSON.parse(source)) as InstalledLoopModulesFileV3;
     } catch (error) {
-      if (isMissing(error)) return { version: 2, installed: [] };
+      if (isMissing(error)) return { version: 3, installed: [] };
       throw error;
     }
   }
 
-  async put(root: string, file: InstalledLoopModulesFileV2): Promise<void> {
-    const parsed = fileSchema.parse(file) as InstalledLoopModulesFileV2;
+  async put(root: string, file: InstalledLoopModulesFileV3): Promise<void> {
+    const parsed = fileSchema.parse(file) as InstalledLoopModulesFileV3;
     const filename = await resolveSafeProjectPath(root, this.relativePath);
     const directory = path.dirname(filename);
     await mkdir(directory, { recursive: true });
@@ -69,12 +73,12 @@ export class InstalledLoopModuleRepository {
     try { await dir.sync(); } finally { await dir.close(); }
   }
 
-  async add(root: string, record: InstalledLoopModuleV2): Promise<void> {
+  async add(root: string, record: InstalledLoopModuleV3): Promise<void> {
     const file = await this.load(root);
     if (file.installed.some((candidate) => candidate.loopId === record.loopId)) {
       throw new Error(`Loop ${record.loopId} already has module provenance.`);
     }
-    await this.put(root, { version: 2, installed: [...file.installed, record].sort((a, b) => a.loopId.localeCompare(b.loopId)) });
+    await this.put(root, { version: 3, installed: [...file.installed, record].sort((a, b) => a.loopId.localeCompare(b.loopId)) });
   }
 
   async remove(root: string, loopId: string): Promise<void> {
@@ -86,7 +90,7 @@ export class InstalledLoopModuleRepository {
       await rm(filename, { force: true });
       return;
     }
-    await this.put(root, { version: 2, installed });
+    await this.put(root, { version: 3, installed });
   }
 }
 

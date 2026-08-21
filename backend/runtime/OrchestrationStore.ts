@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
-import type { JsonValue, ProjectLoopEdge } from "../../shared/domain/automation.js";
+import type { JsonValue, ProjectRepairEdge } from "../../shared/domain/automation.js";
 import type {
   OrchestrationRequest, OrchestrationRequestKind, OrchestratorRoute
 } from "../../shared/domain/runtime.js";
@@ -39,9 +39,7 @@ export class OrchestrationStore {
     const id = input.orchestrationRequestId ?? randomUUID();
     const timestamp = input.createdAt ?? new Date().toISOString();
     if (!input.completionSummary.trim()) throw new Error("Orchestration Request completion summary must be non-empty.");
-    if ((input.kind === "repair") !== Boolean(input.repairRequestId)) {
-      throw new Error("A repair Orchestration Request requires exactly one Repair Request identity.");
-    }
+    if (!input.repairRequestId) throw new Error("A repair Orchestration Request requires a Repair Request identity.");
     this.snapshots.loop(this.snapshots.require(input.rootRunId), input.sourceLoopId);
     assertJsonValue(input.completionEvidence, {
       label: `Orchestration Request ${id} completion evidence`, maxBytes: maxOrchestrationRequestEnvelopeBytes
@@ -113,16 +111,13 @@ export class OrchestrationStore {
     return this.changeStatus(orchestrationRequestId, "waiting_for_input", "pending");
   }
 
-  allowedCandidates(request: OrchestrationRequest): ProjectLoopEdge[] {
+  allowedCandidates(request: OrchestrationRequest): ProjectRepairEdge[] {
     const snapshot = this.snapshots.require(request.rootRunId);
-    return snapshot.graph.loopEdges.filter((edge) => {
-      if (edge.kind !== request.kind || edge.source !== request.sourceLoopId) return false;
-      if (request.kind === "repair" && request.requestedCapability
-        && edge.capability !== request.requestedCapability) return false;
+    return snapshot.graph.repairEdges.filter((edge) => {
+      if (edge.source !== request.sourceLoopId) return false;
+      if (request.requestedCapability && edge.capability !== request.requestedCapability) return false;
       const target = snapshot.loops.find((loop) => loop.id === edge.target);
-      return request.kind === "repair"
-        ? Boolean(target?.capabilities.provides.includes(edge.capability))
-        : Boolean(target?.capabilities.accepts.includes(edge.capability));
+      return Boolean(target?.capabilities.provides.includes(edge.capability));
     });
   }
 

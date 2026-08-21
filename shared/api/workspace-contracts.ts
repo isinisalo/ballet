@@ -31,9 +31,10 @@ import type {
   ProjectHumanJobNode,
   ProjectLoop,
   ProjectLoopCapabilities,
-  ProjectLoopEdge,
-  ProjectLoopEdgeKind,
+  ProjectGraphTransition,
+  ProjectRepairEdge,
   ProjectLoopOrchestrator,
+  ProjectLoopRepairRouter,
   ProjectLoopState,
   ProjectNodeAppearance,
   ProjectFailEdge,
@@ -70,7 +71,7 @@ import type {
   ProjectResourceIssue,
   Skill
 } from "../domain/documents.js";
-import type { ExecutionProfile } from "../domain/projectConfig.js";
+import type { ExecutionProfile, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import type {
   CanonicalNodeOutcome,
   ControlFlowEvent,
@@ -112,7 +113,7 @@ import type {
   JobRun
 } from "../domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV5,
+  OrchestratorTaskEnvelopeV6,
   TaskEnvelopeHistoryEntry,
   TaskEnvelopeLoopIdentity,
   TaskEnvelopeOrchestrationRequest,
@@ -123,14 +124,15 @@ import type {
   TaskEnvelopeRunIdentity,
   TaskEnvelopeState,
   TaskEnvelopeRouteCandidate,
-  TaskEnvelopeV5,
+  TaskEnvelopeV6,
   TaskEnvelopeWorkflowNodeIdentity,
-  ValidationTaskEnvelopeV5,
-  JobTaskEnvelopeV5
+  ValidationTaskEnvelopeV6,
+  JobTaskEnvelopeV6
 } from "../domain/taskEnvelope.js";
 import type {
   BalletMode,
   DashboardRunStatus,
+  GraphOrchestrationStateV1,
   RootRunDetail,
   RootRunRepairProjection,
   RootRunOrchestrationProjection,
@@ -155,7 +157,7 @@ import type {
   LoopModuleInspection,
   LoopModuleInstallPlan,
   LoopModuleLibraryEntry,
-  LoopModulePackageV2
+  LoopModulePackageV3
 } from "../domain/loopModules.js";
 
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
@@ -223,7 +225,8 @@ export {
   defaultLoopNodeStyle,
   defaultProjectAutomationConfig,
   defaultProjectLoopOrchestrator,
-  getProjectLoopEdges,
+  getProjectGraphTransitions,
+  getProjectRepairEdges,
   getProjectFailEdges,
   getProjectPassEdges,
   getProjectPassTargetJobId,
@@ -264,13 +267,14 @@ export {
   maxResumeContextBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion
 } from "../domain/taskEnvelope.js";
 export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
-export { loopModulePackageV2Schema } from "./loop-module-schemas.js";
+export { loopModulePackageV3Schema } from "./loop-module-schemas.js";
 
 export type {
   MarkdownDocument, Project, ProjectInstruction, ProjectResourceIssue, ExecutionProfile,
   JsonValue, WorkflowResult, ProjectAutomationConfig, ProjectAutomationIssue, ProjectDocumentTreeNode,
   ProjectAgentValidationNode, ProjectAgentJobNode, ProjectExecutionComposition, ProjectHumanValidationNode, ProjectHumanJobNode,
-  ProjectGraph, ProjectLoop, ProjectLoopCapabilities, ProjectLoopEdge, ProjectLoopEdgeKind, ProjectLoopOrchestrator, ProjectLoopState,
+  ProjectGraph, ProjectLoop, ProjectLoopCapabilities, ProjectGraphTransition, ProjectRepairEdge,
+  ProjectLoopOrchestrator, ProjectLoopRepairRouter, ProjectLoopState, ProjectIssueTrackerConfig,
   ProjectNodeAppearance, ProjectFailEdge, ProjectJobNode, ProjectPassEdge, ProjectPassEdgeTarget,
   ProjectProviderJobNode, ProjectScheduledJobNode, ProjectValidationNode, ProjectWorkflow, ReachableProjectLoopGraph,
   LoopNodeSize, LoopNodeSizeDefinition, LoopNodeStyle, LoopNodeStyleDefinition, LoopNodeStyleGroup,
@@ -281,16 +285,16 @@ export type {
   CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, LoopStateRevisionMetadata, NodeRun, NodeRunRole, NodeRunStatus,
   OrchestrationFrame, OrchestrationRequest, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
   StatePatch, ValidationNodeOutcome, JobRun, JobNodeOutcome,
-  OrchestratorTaskEnvelopeV5, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
+  OrchestratorTaskEnvelopeV6, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
   TaskEnvelopeOrchestrationRequest, TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest,
   TaskEnvelopeRepairReturn, TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate,
-  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV5,
+  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV6,
   TaskEnvelopeWorkflowNodeIdentity,
-  ValidationTaskEnvelopeV5, JobTaskEnvelopeV5,
+  ValidationTaskEnvelopeV6, JobTaskEnvelopeV6,
   ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
   ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
   LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,
-  BalletMode, DashboardRunStatus, RootRunDetail, RootRunOrchestrationProjection, RootRunRepairProjection, RootRunReturnDestination,
+  BalletMode, DashboardRunStatus, GraphOrchestrationStateV1, RootRunDetail, RootRunOrchestrationProjection, RootRunRepairProjection, RootRunReturnDestination,
   RootRunStateProjection, RootRunKind, RootRunListResponse, RootRunListState,
   RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest, StartRootRunRequest,
   WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill
@@ -301,5 +305,5 @@ export type {
   LoopModuleInspection,
   LoopModuleInstallPlan,
   LoopModuleLibraryEntry,
-  LoopModulePackageV2
+  LoopModulePackageV3
 };

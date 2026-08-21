@@ -9,7 +9,7 @@ import {
   resolveProjectWorkflowStartJob
 } from "../../shared/domain/automation.js";
 import { validateProjectAutomationConfig } from "../automation.js";
-import { testAutomationConfig, testJobPair, testLoop } from "./v12TestConfig.js";
+import { testAutomationConfig, testJobPair, testLoop } from "./v13TestConfig.js";
 
 describe("ProjectWorkflow domain", () => {
   it("resolves start, paired Validation, and explicit Pass/Fail edges", () => {

@@ -236,7 +236,8 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
   worktreePath: prepared.path, branch: prepared.branch, headSha: prepared.headSha,
   configHash: prepared.configHash, snapshotHash: prepared.snapshotHash,
   executionSnapshot: {
-    version: 5,
+    version: 6,
+    rootKind: "loop",
     rootLoopId: "delivery",
     project: {
       checkoutRoot: prepared.path,
@@ -246,6 +247,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
     },
     loops: projectConfiguration("Test profile").loops,
     orchestrator: projectConfiguration("Test profile").orchestrator,
+    issueTracker: projectConfiguration("Test profile").issueTracker,
     graph: projectConfiguration("Test profile").graph,
     theme: defaultLoopTheme,
     executionProfiles: projectConfiguration("Test profile").executionProfiles,
@@ -256,7 +258,7 @@ const storedRun = (rootRunId: string, prepared: PreparedRootWorkspace): StoredRo
 });
 
 const projectConfiguration = (profileName: string): ProjectConfiguration => ({
-  version: 12,
+  version: 13,
   executionProfiles: [{
     id: "test-profile",
     name: profileName,
@@ -265,14 +267,23 @@ const projectConfiguration = (profileName: string): ProjectConfiguration => ({
     reasoningEffort: "medium",
     networkAccess: false
   }],
-  orchestrator: {
-    executionProfileId: "test-profile",
-    primaryInstructionId: "project:tracked-instruction",
-    skillIds: ["project:review"],
-    maxRepairDepth: 4,
-    maxRepairAttempts: 3
+  issueTracker: {
+    kind: "tk",
+    testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+    orchestrationDirectory: ".tickets/orchestration",
+    workDirectory: ".tickets/work"
   },
-  graph: { loopEdges: [] },
+  orchestrator: { mode: "runbook", maxTransitions: 256 },
+  graph: {
+    id: "test-graph",
+    name: "Test Graph",
+    startLoopId: "delivery",
+    transitions: [{
+      id: "delivery-done", source: "delivery", decision: "PASS", outcome: "success",
+      target: { runResult: "DONE" }, description: "Finish delivery."
+    }],
+    repairEdges: []
+  },
   loops: [{
     id: "delivery",
     description: "Complete and validate the work.",

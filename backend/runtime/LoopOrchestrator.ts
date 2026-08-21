@@ -26,9 +26,6 @@ export interface LoopOrchestratorCallbacks extends LoopCompletionCallbacks {
     loop: ProjectLoop, callerLoopRunId: string, repairRequest: RepairRequest,
     orchestrationRequest: OrchestrationRequest, input: JsonValue, revision: number
   ): { loopRunId: string; jobRunId: string };
-  startFlow(
-    loop: ProjectLoop, request: OrchestrationRequest, input: JsonValue, revision: number
-  ): { loopRunId: string; jobRunId: string };
 }
 
 export class LoopOrchestrator {
@@ -53,20 +50,26 @@ export class LoopOrchestrator {
     callbacks: LoopOrchestratorCallbacks
   ): void {
     const snapshot = this.snapshots.require(node.rootRunId);
+    const router = snapshot.orchestrator.repairRouter;
+    if (!router || !outcome.escalation) {
+      throw new LoopRunIntegrityError(
+        `Validation ${node.nodeDefinitionId} requested repair without a configured repair router and escalation.`
+      );
+    }
     const attempt = this.repairs.orchestratorAttemptCount(jobRunId) + 1;
-    if (attempt > snapshot.orchestrator.maxRepairAttempts) {
+    if (attempt > router.maxRepairAttempts) {
       this.rejectRequestLimit(
         node, outcome, "repair_attempt_limit",
-        `Job Node ${definition.id} exceeded ${snapshot.orchestrator.maxRepairAttempts} external repair attempts.`,
+        `Job Node ${definition.id} exceeded ${router.maxRepairAttempts} external repair attempts.`,
         callbacks
       );
       return;
     }
     const requestDepth = nestingDepth + 1;
-    if (requestDepth > snapshot.orchestrator.maxRepairDepth) {
+    if (requestDepth > router.maxRepairDepth) {
       this.rejectRequestLimit(
         node, outcome, "repair_depth_limit",
-        `Repair depth ${requestDepth} exceeds limit ${snapshot.orchestrator.maxRepairDepth}.`,
+        `Repair depth ${requestDepth} exceeds limit ${router.maxRepairDepth}.`,
         callbacks
       );
       return;
@@ -110,29 +113,6 @@ export class LoopOrchestrator {
     this.orchestration.bindOrchestrator(orchestrationRequest.orchestrationRequestId, orchestrator.nodeRunId);
   }
 
-  requestFlow(
-    node: NodeRun,
-    revision: number,
-    outcome: CanonicalNodeOutcome,
-    callbacks: LoopOrchestratorCallbacks
-  ): boolean {
-    const snapshot = this.snapshots.require(node.rootRunId);
-    if (!snapshot.graph.loopEdges.some((edge) => edge.kind === "flow" && edge.source === node.loopId)) return false;
-    const request = this.orchestration.create({
-      rootRunId: node.rootRunId, kind: "flow", sourceLoopRunId: node.loopRunId,
-      sourceLoopId: node.loopId, sourceNodeRunId: node.nodeRunId,
-      stateRevisionAtRequest: revision,
-      completionSummary: summaryOf(outcome, `Loop ${node.loopId} completed.`),
-      completionEvidence: outcome as unknown as JsonValue
-    });
-    const orchestrator = callbacks.createOrchestrator(
-      this.snapshots.loop(snapshot, node.loopId), node.loopRunId,
-      request.orchestrationRequestId, 1, revision
-    );
-    this.orchestration.bindOrchestrator(request.orchestrationRequestId, orchestrator.nodeRunId);
-    return true;
-  }
-
   apply(node: NodeRun, outcome: OrchestratorNodeOutcome, callbacks: LoopOrchestratorCallbacks): void {
     const request = this.orchestration.forOrchestrator(node.nodeRunId);
     if (!request) throw new LoopRunIntegrityError(
@@ -151,7 +131,7 @@ export class LoopOrchestrator {
       rootRunId: node.rootRunId, nodeRunId: node.nodeRunId, baseRevision: node.stateRevisionBefore,
       outcome,
       control: {
-        kind: request.kind === "repair" ? "repair_call" : "flow_transition",
+        kind: "repair_call",
         orchestrationRequestId: request.orchestrationRequestId,
         repairRequestId: request.repairRequestId
       }
@@ -175,12 +155,6 @@ export class LoopOrchestrator {
     });
     const revision = persisted.stateRevisionAfter ?? node.stateRevisionBefore;
     const targetLoop = this.snapshots.loop(this.snapshots.require(node.rootRunId), route.targetLoopId);
-    if (request.kind === "flow") {
-      const target = callbacks.startFlow(targetLoop, request, persistedOutcome.dispatchInput, revision);
-      this.orchestration.markDispatched(request.orchestrationRequestId, target.loopRunId);
-      this.bindControlTarget(committed.controlFlowEventId, target, request.orchestrationRequestId);
-      return;
-    }
     const repairRequest = this.requireRepairRequest(request);
     this.repairs.markRouted(repairRequest.repairRequestId, route.loopEdgeId, route.targetLoopId);
     const parentFrame = this.repairs.openFrameForCallee(node.loopRunId);
@@ -212,13 +186,9 @@ export class LoopOrchestrator {
     errorMessage: string
   ): void {
     this.orchestration.fail(request.orchestrationRequestId, "failed");
-    if (request.kind === "repair") {
-      this.completion.failPendingRequest(
-        this.requireRepairRequest(request), node, terminal, revision, outcome, errorCode, errorMessage
-      );
-      return;
-    }
-    this.progress.finishRoot(request.rootRunId, outcome, { code: errorCode, message: errorMessage });
+    this.completion.failPendingRequest(
+      this.requireRepairRequest(request), node, terminal, revision, outcome, errorCode, errorMessage
+    );
   }
 
   private failOutcome(
@@ -279,7 +249,7 @@ export class LoopOrchestrator {
   }
 
   private requireRepairRequest(request: OrchestrationRequest): RepairRequest {
-    if (request.kind !== "repair" || !request.repairRequestId) {
+    if (!request.repairRequestId) {
       throw new LoopRunIntegrityError(`Orchestration Request ${request.orchestrationRequestId} is not a repair request.`);
     }
     return this.repairs.requireRequest(request.repairRequestId);
@@ -306,6 +276,3 @@ const requireCompletedOrchestratorOutcome = (
   }
   return outcome;
 };
-
-const summaryOf = (outcome: CanonicalNodeOutcome | undefined, fallback: string): string =>
-  outcome && "summary" in outcome && outcome.summary.trim() ? outcome.summary : fallback;

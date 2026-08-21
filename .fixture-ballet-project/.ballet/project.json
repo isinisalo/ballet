@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 13,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-high-network-off",
@@ -10,17 +10,39 @@
       "networkAccess": false
     }
   ],
+  "issueTracker": {
+    "kind": "tk",
+    "testedRevision": "d778bb520ee526c314c26f2bb876447e0a19caa5",
+    "orchestrationDirectory": ".tickets/orchestration",
+    "workDirectory": ".tickets/work"
+  },
   "orchestrator": {
-    "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
-    "primaryInstructionId": "project:architect",
-    "skillIds": [
-      "project:fixture-skill"
-    ],
-    "maxRepairDepth": 4,
-    "maxRepairAttempts": 3
+    "mode": "runbook",
+    "maxTransitions": 256
   },
   "graph": {
-    "loopEdges": []
+    "id": "fixture-graph",
+    "name": "Fixture Graph",
+    "startLoopId": "adr-review",
+    "transitions": [
+      {
+        "id": "adr-review-success",
+        "source": "adr-review",
+        "decision": "PASS",
+        "outcome": "success",
+        "target": { "runResult": "DONE" },
+        "description": "Complete the fixture Graph."
+      },
+      {
+        "id": "adr-review-failure",
+        "source": "adr-review",
+        "decision": "FAIL",
+        "outcome": "failure",
+        "target": { "loopId": "adr-review" },
+        "description": "Retry the fixture Loop."
+      }
+    ],
+    "repairEdges": []
   },
   "loops": [
     {

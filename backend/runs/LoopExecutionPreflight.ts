@@ -1,14 +1,13 @@
 import {
   isProjectAgentValidationNode,
   isProjectProviderJobNode,
-  type ProjectLoop,
-  type ProjectLoopEdgeKind
+  type ProjectLoop
 } from "../../shared/domain/automation.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV5,
-  ValidationTaskEnvelopeV5,
-  JobTaskEnvelopeV5
+  OrchestratorTaskEnvelopeV6,
+  ValidationTaskEnvelopeV6,
+  JobTaskEnvelopeV6
 } from "../../shared/domain/taskEnvelope.js";
 import { composeExecutionPrompt } from "../execution/ExecutionComposition.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
@@ -28,19 +27,15 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
       }
       const validation = loop.workflow.validationNodes.find((candidate) => candidate.id === node.validationNodeId);
       if (validation && isProjectAgentValidationNode(validation)) {
-        composeExecutionPrompt(snapshot, validationEnvelope(loop, node.id, stateEnvelope));
+        composeExecutionPrompt(snapshot, validationEnvelope(snapshot, loop, node.id, stateEnvelope));
       }
     }
   }
-  const routes = snapshot.graph.loopEdges.map((edge) => ({ source: edge.source, kind: edge.kind }));
-  const uniqueRoutes = routes.filter((route, index) => routes.findIndex((candidate) =>
-    candidate.source === route.source && candidate.kind === route.kind) === index);
-  for (const route of uniqueRoutes.length > 0
-    ? uniqueRoutes
-    : [{ source: rootLoop.id, kind: "repair" as const }]) {
+  const repairSources = [...new Set(snapshot.graph.repairEdges.map((edge) => edge.source))];
+  for (const source of snapshot.orchestrator.repairRouter ? repairSources : []) {
     composeExecutionPrompt(
       snapshot,
-      orchestratorEnvelope(snapshot, requireLoop(snapshot, route.source), route.kind, stateEnvelope)
+      orchestratorEnvelope(snapshot, requireLoop(snapshot, source), stateEnvelope)
     );
   }
 };
@@ -48,11 +43,11 @@ export const preflightExecutionPrompts = (snapshot: RootExecutionSnapshot): void
 const jobEnvelope = (
   loop: ProjectLoop,
   nodeId: string,
-  state: JobTaskEnvelopeV5["state"]
-): JobTaskEnvelopeV5 => {
+  state: JobTaskEnvelopeV6["state"]
+): JobTaskEnvelopeV6 => {
   const node = requireNode(loop, nodeId);
   return {
-    version: 5,
+    version: 6,
     role: "job",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
@@ -65,15 +60,16 @@ const jobEnvelope = (
 };
 
 const validationEnvelope = (
+  snapshot: RootExecutionSnapshot,
   loop: ProjectLoop,
   nodeId: string,
-  state: ValidationTaskEnvelopeV5["state"]
-): ValidationTaskEnvelopeV5 => {
+  state: ValidationTaskEnvelopeV6["state"]
+): ValidationTaskEnvelopeV6 => {
   const node = requireNode(loop, nodeId);
   const validation = loop.workflow.validationNodes.find((candidate) => candidate.id === node.validationNodeId);
   if (!validation) throw new Error(`ValidationNode ${node.validationNodeId} is missing from Loop ${loop.id}.`);
   return {
-    version: 5,
+    version: 6,
     role: "validation",
     run: providerRunIdentity,
     loop: { id: loop.id, description: loop.description },
@@ -89,6 +85,11 @@ const validationEnvelope = (
       artifacts: {},
       checks: []
     },
+    allowedTransitions: snapshot.rootKind === "graph"
+      && loop.workflow.passEdges.some((edge) => edge.sourceValidationNodeId === validation.id
+        && "workflowResult" in edge.target)
+      ? snapshot.graph.transitions.filter((transition) => transition.source === loop.id)
+      : [],
     relevantHistory: []
   };
 };
@@ -96,10 +97,9 @@ const validationEnvelope = (
 const orchestratorEnvelope = (
   snapshot: RootExecutionSnapshot,
   loop: ProjectLoop,
-  kind: ProjectLoopEdgeKind,
-  state: OrchestratorTaskEnvelopeV5["state"]
-): OrchestratorTaskEnvelopeV5 => ({
-  version: 5,
+  state: OrchestratorTaskEnvelopeV6["state"]
+): OrchestratorTaskEnvelopeV6 => ({
+  version: 6,
   role: "orchestrator",
   run: orchestratorRunIdentity,
   loop: { id: loop.id, description: loop.description },
@@ -107,7 +107,7 @@ const orchestratorEnvelope = (
   state,
   orchestrationRequest: {
     id: "preflight-orchestration-request",
-    kind,
+    kind: "repair",
     sourceLoopId: loop.id,
     sourceLoopRunId: "preflight-loop-run",
     sourceNodeRunId: "preflight-source-node-run",
@@ -115,17 +115,15 @@ const orchestratorEnvelope = (
     completionSummary: "Preflight source completion.",
     completionEvidence: {}
   },
-  allowedCandidates: snapshot.graph.loopEdges
-    .filter((edge) => edge.kind === kind && edge.source === loop.id)
+  allowedCandidates: snapshot.graph.repairEdges
+    .filter((edge) => edge.source === loop.id)
     .flatMap((edge) => {
       const target = requireLoop(snapshot, edge.target);
-      const compatible = edge.kind === "repair"
-        ? target.capabilities.provides.includes(edge.capability)
-        : target.capabilities.accepts.includes(edge.capability);
+      const compatible = target.capabilities.provides.includes(edge.capability);
       return compatible ? [{
         id: target.id, description: target.description,
         capabilities: target.capabilities,
-        route: { kind: edge.kind, capability: edge.capability, description: edge.description }
+        route: { kind: "repair", capability: edge.capability, description: edge.description }
       }] : [];
     }),
   relevantHistory: []

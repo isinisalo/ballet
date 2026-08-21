@@ -1,19 +1,18 @@
-import {
-  defaultLoopNodeStyle,
-  type InstalledLoopModuleStatus,
-  type LoopNodeStyle,
-  type LoopRunDetails,
-  type LoopRunStatus,
-  type NodeRunStatus,
-  type OrchestratorRoute,
-  type ProjectAutomationConfig,
-  type ProjectFailEdge,
-  type ProjectJobNode,
-  type ProjectLoop,
-  type ProjectLoopEdge,
-  type ProjectPassEdge,
-  type ProjectValidationNode,
-  type RootRun
+import type {
+  InstalledLoopModuleStatus,
+  LoopRunDetails,
+  LoopRunStatus,
+  NodeRunStatus,
+  OrchestratorRoute,
+  ProjectAutomationConfig,
+  ProjectFailEdge,
+  ProjectGraphTransition,
+  ProjectJobNode,
+  ProjectLoop,
+  ProjectPassEdge,
+  ProjectRepairEdge,
+  ProjectValidationNode,
+  RootRun
 } from "@shared/api/workspace-contracts";
 
 export type GraphEngineeringLiveStatus = LoopRunStatus | NodeRunStatus | "finalizing";
@@ -26,10 +25,8 @@ export interface GraphEngineeringNode {
   moduleVersion?: string;
   provenanceStatus?: InstalledLoopModuleStatus["status"];
   jobCount: number;
-  accepts: string[];
-  provides: string[];
-  artworkStyle: LoopNodeStyle;
   locked: boolean;
+  start: boolean;
   liveStatus?: GraphEngineeringLiveStatus;
 }
 
@@ -47,21 +44,33 @@ export interface GraphEngineeringRouteEvidence {
   reason?: string;
 }
 
-export interface GraphEngineeringEdge extends ProjectLoopEdge {
-  activeRoute?: OrchestratorRoute;
-}
+export type GraphEngineeringEdge =
+  | (ProjectGraphTransition & {
+      kind: "transition";
+      targetId: string;
+      activeRoute?: never;
+    })
+  | (ProjectRepairEdge & {
+      kind: "repair";
+      targetId: string;
+      activeRoute?: OrchestratorRoute;
+    });
 
 export interface GraphEngineeringProjection {
+  graphId: string;
+  graphName: string;
+  startLoopId: string;
   orchestrator: GraphEngineeringOrchestratorNode;
   nodes: GraphEngineeringNode[];
+  done: boolean;
   edges: GraphEngineeringEdge[];
   routeEvidence: GraphEngineeringRouteEvidence[];
 }
 
 export interface GraphEngineeringFocus {
   edges: GraphEngineeringEdge[];
-  visibleRepairCount: number;
-  hiddenRepairCount: number;
+  transitionCount: number;
+  repairCount: number;
 }
 
 export interface WorkflowEngineeringProjection {
@@ -93,7 +102,7 @@ export function buildGraphEngineeringProjection({
   const liveLoopRuns = loopRuns.filter((run) => activeRootIds.has(run.rootRunId));
   const routeEvidence = orchestratorRoutes
     .filter((route) => activeRootIds.has(route.rootRunId))
-    .map((route) => projectRouteEvidence(route, activeRootRuns, liveLoopRuns));
+    .map((route) => projectRepairRouteEvidence(route, activeRootRuns, liveLoopRuns));
   const activeRouteByEdgeId = new Map(routeEvidence
     .filter((evidence) => evidence.state === "active")
     .map((evidence) => [evidence.route.loopEdgeId, evidence.route]));
@@ -101,52 +110,56 @@ export function buildGraphEngineeringProjection({
     .filter((node) => node.role === "orchestrator");
 
   return {
+    graphId: config.graph.id,
+    graphName: config.graph.name,
+    startLoopId: config.graph.startLoopId,
     orchestrator: {
       id: "loop-orchestrator",
       title: "Loop Orchestrator",
-      description: "Validates completion and escalation dispatch against the immutable Graph allowlist.",
-      activeRootRunCount: activeRootRuns.length,
+      description: "Routes immutable PASS and FAIL outcomes by exact decision and named RunBook outcome.",
+      activeRootRunCount: activeRootRuns.filter((run) => run.kind === "graph").length,
       liveStatus: latestStatus(orchestratorNodeRuns)
     },
     nodes: config.loops.map((loop) => {
       const installed = installedByLoopId.get(loop.id);
-      const startNode = loop.workflow.jobNodes.find((node) => node.id === loop.workflow.startJobNodeId);
       return {
         loopId: loop.id,
-        title: installed?.title ?? loop.id,
+        title: installed?.title ?? loop.id.toUpperCase(),
         description: loop.description,
         kind: installed ? "installed" : "custom",
         moduleVersion: installed?.moduleVersion,
         provenanceStatus: installed?.status,
         jobCount: loop.workflow.jobNodes.length,
-        accepts: [...loop.capabilities.accepts],
-        provides: [...loop.capabilities.provides],
-        artworkStyle: startNode?.nodeStyle ?? defaultLoopNodeStyle,
         locked: lockedLoopIds.has(loop.id),
+        start: loop.id === config.graph.startLoopId,
         liveStatus: latestStatus(liveLoopRuns.filter((run) => run.loopId === loop.id))
       };
     }),
-    edges: config.graph.loopEdges.map((edge) => ({
-      ...edge,
-      activeRoute: activeRouteByEdgeId.get(edge.id)
-    })),
+    done: config.graph.transitions.some((transition) => "runResult" in transition.target),
+    edges: [
+      ...config.graph.transitions.map((transition): GraphEngineeringEdge => ({
+        ...transition,
+        kind: "transition",
+        targetId: "loopId" in transition.target ? transition.target.loopId : "graph-done"
+      })),
+      ...config.graph.repairEdges.map((edge): GraphEngineeringEdge => ({
+        ...edge,
+        kind: "repair",
+        targetId: edge.target,
+        activeRoute: activeRouteByEdgeId.get(edge.id)
+      }))
+    ],
     routeEvidence
   };
 }
 
 export function buildGraphEngineeringFocus(
-  projection: GraphEngineeringProjection,
-  selectedLoopId?: string
+  projection: GraphEngineeringProjection
 ): GraphEngineeringFocus {
-  const flowEdges = projection.edges.filter((edge) => edge.kind === "flow");
-  const repairEdges = projection.edges.filter((edge) => edge.kind === "repair");
-  const visibleRepairEdges = selectedLoopId
-    ? repairEdges.filter((edge) => edge.source === selectedLoopId || edge.target === selectedLoopId)
-    : repairEdges.filter((edge) => Boolean(edge.activeRoute));
   return {
-    edges: [...flowEdges, ...visibleRepairEdges],
-    visibleRepairCount: visibleRepairEdges.length,
-    hiddenRepairCount: repairEdges.length - visibleRepairEdges.length
+    edges: projection.edges,
+    transitionCount: projection.edges.filter((edge) => edge.kind === "transition").length,
+    repairCount: projection.edges.filter((edge) => edge.kind === "repair").length
   };
 }
 
@@ -166,17 +179,17 @@ export function buildWorkflowEngineeringProjection(
   };
 }
 
-function projectRouteEvidence(
+function projectRepairRouteEvidence(
   route: OrchestratorRoute,
   roots: RootRun[],
   loopRuns: LoopRunDetails[]
 ): GraphEngineeringRouteEvidence {
   const root = roots.find((candidate) => candidate.rootRunId === route.rootRunId);
-  const snapshotEdge = root?.executionSnapshot.graph.loopEdges.find((edge) => edge.id === route.loopEdgeId);
+  const snapshotEdge = root?.executionSnapshot.graph.repairEdges.find((edge) => edge.id === route.loopEdgeId);
   const mismatch = !snapshotEdge
-    ? "Route is outside the immutable Root Run graph allowlist."
-    : route.sourceLoopId !== snapshotEdge.source || route.targetLoopId !== snapshotEdge.target || route.kind !== snapshotEdge.kind
-      ? "Persisted route identity does not match its immutable Root Run policy."
+    ? "Route is outside the immutable Root Run repair allowlist."
+    : route.kind !== "repair" || route.sourceLoopId !== snapshotEdge.source || route.targetLoopId !== snapshotEdge.target
+      ? "Persisted repair route identity does not match its immutable Root Run policy."
       : capabilityMismatch(root, snapshotEdge);
   if (mismatch) return { route, state: "blocked", reason: mismatch };
   const targetIsActive = loopRuns.some((run) =>
@@ -187,12 +200,11 @@ function projectRouteEvidence(
   return { route, state: targetIsActive ? "active" : "recorded" };
 }
 
-function capabilityMismatch(root: RootRun | undefined, edge: ProjectLoopEdge): string | undefined {
+function capabilityMismatch(root: RootRun | undefined, edge: ProjectRepairEdge): string | undefined {
   const target = root?.executionSnapshot.loops.find((loop) => loop.id === edge.target);
-  const accepted = edge.kind === "repair"
-    ? target?.capabilities.provides.includes(edge.capability)
-    : target?.capabilities.accepts.includes(edge.capability);
-  return accepted ? undefined : `Target Loop does not satisfy ${edge.kind} capability ${edge.capability}.`;
+  return target?.capabilities.provides.includes(edge.capability)
+    ? undefined
+    : `Target Loop does not provide repair capability ${edge.capability}.`;
 }
 
 function latestStatus<T extends { status: GraphEngineeringLiveStatus; updatedAt: string }>(values: T[]) {

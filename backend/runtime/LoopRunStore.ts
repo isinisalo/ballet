@@ -118,13 +118,14 @@ export class LoopRunStore {
     const snapshot = this.snapshots.require(input.rootRunId);
     this.snapshots.loop(snapshot, input.loop.id);
     const nestingDepth = input.nestingDepth ?? 0;
-    if (nestingDepth > snapshot.orchestrator.maxRepairDepth) {
-      throw new Error(`Loop Run nesting depth ${nestingDepth} exceeds limit ${snapshot.orchestrator.maxRepairDepth}.`);
+    const maxRepairDepth = snapshot.orchestrator.repairRouter?.maxRepairDepth ?? 0;
+    if (nestingDepth > maxRepairDepth) {
+      throw new Error(`Loop Run nesting depth ${nestingDepth} exceeds limit ${maxRepairDepth}.`);
     }
     const revision = input.entryStateRevision ?? this.currentRevision(input.rootRunId);
     const inputJson = input.input === undefined ? null : canonicalJson(validateState(input.input));
-    if (["flow", "repair"].includes(input.source) !== Boolean(input.orchestrationRequestId)) {
-      throw new Error("A flow or repair Loop Run requires exactly one Orchestration Request identity.");
+    if ((input.source === "repair") !== Boolean(input.orchestrationRequestId)) {
+      throw new Error("A repair Loop Run requires exactly one Orchestration Request identity.");
     }
     if ((input.source === "repair") !== Boolean(input.repairRequestId)) {
       throw new Error("A repair Loop Run requires exactly one Repair Request identity.");

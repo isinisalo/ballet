@@ -1,3 +1,4 @@
+/* eslint-disable max-lines, max-lines-per-function -- Snapshot closure scenarios intentionally share one hermetic V13 fixture. */
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -13,7 +14,7 @@ import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
-import { testJobPair, testLoop, type TestJobPair } from "../tests/v12TestConfig.js";
+import { testJobPair, testLoop, type TestJobPair } from "../tests/v13TestConfig.js";
 import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
 
 const roots: string[] = [];
@@ -73,23 +74,47 @@ const configuration = (): ProjectConfiguration => {
     "unused-work", "unused-runtime", "project:unused"
   ));
   return {
-    version: 12,
+    version: 13,
     executionProfiles: [profile("zeta-runtime"), profile("unused-runtime"), profile("alpha-runtime")],
-    orchestrator: {
-      executionProfileId: "zeta-runtime",
-      primaryInstructionId: "project:orchestrator",
-      skillIds: ["project:route"],
-      maxRepairDepth: 2,
-      maxRepairAttempts: 3
+    issueTracker: {
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
     },
-    graph: { loopEdges: [{
-      id: "root-repair",
-      source: "root-loop",
-      target: "repair-loop",
-      kind: "repair",
-      capability: "test:loop.transfer",
-      description: "Allow the repair Loop."
-    }] },
+    orchestrator: {
+      mode: "runbook",
+      maxTransitions: 256,
+      repairRouter: {
+        executionProfileId: "zeta-runtime",
+        primaryInstructionId: "project:orchestrator",
+        skillIds: ["project:route"],
+        maxRepairDepth: 2,
+        maxRepairAttempts: 3
+      }
+    },
+    graph: {
+      id: "test-graph",
+      name: "Test Graph",
+      startLoopId: "root-loop",
+      transitions: [
+        {
+          id: "root-unused", source: "root-loop", decision: "PASS", outcome: "success",
+          target: { loopId: "unused-loop" }, description: "Reach the normal-flow Loop."
+        },
+        {
+          id: "unused-done", source: "unused-loop", decision: "PASS", outcome: "complete",
+          target: { runResult: "DONE" }, description: "Finish the Graph."
+        }
+      ],
+      repairEdges: [{
+        id: "root-repair",
+        source: "root-loop",
+        target: "repair-loop",
+        capability: "test:loop.transfer",
+        description: "Allow the repair Loop."
+      }]
+    },
     loops: [unused, repair, root]
   };
 };
@@ -98,12 +123,13 @@ describe("LoopExecutionPlanner", () => {
   it("snapshots every reachable flow and repair composition before queuing", async () => {
     const workspace = await writeProject(configuration());
     const harness = runtimeHarness();
-    const planner = new LoopExecutionPlanner(harness.configurations, harness.runtime);
+    const planner = new LoopExecutionPlanner(harness.configurations, harness.runtime, harness.tracker);
 
-    const snapshot = await planner.create(workspace, "root-loop");
+    const snapshot = await planner.create(workspace, "loop", "root-loop");
 
     expect(snapshot).toMatchObject({
-      version: 5,
+      version: 6,
+      rootKind: "loop",
       rootLoopId: "root-loop",
       project: {
         checkoutRoot: workspace.path,
@@ -113,8 +139,9 @@ describe("LoopExecutionPlanner", () => {
       }
     });
     expect(snapshot.loops.map((loop) => loop.id)).toEqual(["repair-loop", "root-loop"]);
-    expect(snapshot.graph.loopEdges.map((edge) => edge.id)).toEqual(["root-repair"]);
-    expect(snapshot.graph.loopEdges[0]?.capability).toBe("test:loop.transfer");
+    expect(snapshot.graph.transitions).toEqual([]);
+    expect(snapshot.graph.repairEdges.map((edge) => edge.id)).toEqual(["root-repair"]);
+    expect(snapshot.graph.repairEdges[0]?.capability).toBe("test:loop.transfer");
     expect(snapshot.loops.find((loop) => loop.id === "repair-loop")?.capabilities)
       .toEqual({ accepts: ["test:loop.transfer"], provides: ["test:loop.transfer"] });
     expect(snapshot.executionProfiles.map((entry) => entry.id)).toEqual([
@@ -148,17 +175,17 @@ describe("LoopExecutionPlanner", () => {
     const config = configuration();
     const workspace = await writeProject(config);
     const harness = runtimeHarness();
-    const planner = new LoopExecutionPlanner(harness.configurations, harness.runtime);
-    const first = await planner.create(workspace, "root-loop");
-    const second = await planner.create(workspace, "root-loop");
+    const planner = new LoopExecutionPlanner(harness.configurations, harness.runtime, harness.tracker);
+    const first = await planner.create(workspace, "loop", "root-loop");
+    const second = await planner.create(workspace, "loop", "root-loop");
 
     expect(snapshotComparable(second)).toEqual(snapshotComparable(first));
     expect(second.project.snapshotHash).toBe(workspace.snapshotHash);
     const mutableRoot = config.loops.find((loop) => loop.id === "root-loop")!;
     mutableRoot.description = "Changed after the Root snapshot.";
     mutableRoot.state = { description: "Changed State contract.", initial: { changed: true } };
-    config.graph.loopEdges[0]!.target = "unused-loop";
-    config.orchestrator.primaryInstructionId = "project:changed-orchestrator";
+    config.graph.repairEdges[0]!.target = "unused-loop";
+    config.orchestrator.repairRouter!.primaryInstructionId = "project:changed-orchestrator";
     await writeConfiguration(workspace.path, config);
     await writeInstruction(workspace.path, "root-work", "Changed after the Root snapshot.");
 
@@ -168,8 +195,8 @@ describe("LoopExecutionPlanner", () => {
       .toBe("Perform root Job.");
     expect(first.loops.find((loop) => loop.id === "root-loop")?.state)
       .toEqual({ description: "State for root-loop.", initial: { alpha: { count: 0 }, zeta: true } });
-    expect(first.graph.loopEdges[0]?.target).toBe("repair-loop");
-    expect(first.orchestrator.primaryInstructionId).toBe("project:orchestrator");
+    expect(first.graph.repairEdges[0]?.target).toBe("repair-loop");
+    expect(first.orchestrator.repairRouter?.primaryInstructionId).toBe("project:orchestrator");
     expect(first.project.snapshotHash).toBe(workspace.snapshotHash);
   });
 
@@ -180,8 +207,9 @@ describe("LoopExecutionPlanner", () => {
     rootJob.executionProfileId = "missing-runtime";
     const profileWorkspace = await writeProject(missingProfile);
     const profileHarness = runtimeHarness();
-    await expect(new LoopExecutionPlanner(profileHarness.configurations, profileHarness.runtime)
-      .create(profileWorkspace, "root-loop"))
+    await expect(new LoopExecutionPlanner(
+      profileHarness.configurations, profileHarness.runtime, profileHarness.tracker
+    ).create(profileWorkspace, "loop", "root-loop"))
       .rejects.toThrow(/unknown execution profile: missing-runtime/);
     expect(profileHarness.requireProfile).not.toHaveBeenCalled();
 
@@ -191,8 +219,9 @@ describe("LoopExecutionPlanner", () => {
     resourceJob.primaryInstructionId = "project:missing";
     const resourceWorkspace = await writeProject(missingResource);
     const resourceHarness = runtimeHarness();
-    await expect(new LoopExecutionPlanner(resourceHarness.configurations, resourceHarness.runtime)
-      .create(resourceWorkspace, "root-loop"))
+    await expect(new LoopExecutionPlanner(
+      resourceHarness.configurations, resourceHarness.runtime, resourceHarness.tracker
+    ).create(resourceWorkspace, "loop", "root-loop"))
       .rejects.toThrow(/missing primary instruction project:missing/);
     expect(resourceHarness.requireProfile).not.toHaveBeenCalled();
   });
@@ -201,22 +230,23 @@ describe("LoopExecutionPlanner", () => {
     const workspace = await writeProject(configuration());
     const harness = runtimeHarness("alpha-runtime");
 
-    await expect(new LoopExecutionPlanner(harness.configurations, harness.runtime)
-      .create(workspace, "root-loop"))
+    await expect(new LoopExecutionPlanner(
+      harness.configurations, harness.runtime, harness.tracker
+    ).create(workspace, "loop", "root-loop"))
       .rejects.toThrow("Execution profile alpha-runtime failed preflight: selected capability is unavailable");
   });
 
   it("preflights the Orchestrator prompt against the exact prompt byte limit", async () => {
     const config = configuration();
-    config.orchestrator.primaryInstructionId = "project:large-orchestrator";
-    config.orchestrator.skillIds = ["project:large-a", "project:large-b", "project:large-c"];
+    config.orchestrator.repairRouter!.primaryInstructionId = "project:large-orchestrator";
+    config.orchestrator.repairRouter!.skillIds = ["project:large-a", "project:large-b", "project:large-c"];
     const workspace = await writeProject(config);
     await writeInstruction(workspace.path, "large-orchestrator", "x".repeat(MAX_PRIMARY_INSTRUCTION_BYTES));
     await Promise.all(["large-a", "large-b", "large-c"].map((id) =>
       writeSkill(workspace.path, id, "x".repeat(MAX_SKILL_BYTES))));
     const harness = runtimeHarness();
-    const result = new LoopExecutionPlanner(harness.configurations, harness.runtime)
-      .create(workspace, "root-loop");
+    const result = new LoopExecutionPlanner(harness.configurations, harness.runtime, harness.tracker)
+      .create(workspace, "loop", "root-loop");
 
     await expect(result).rejects.toBeInstanceOf(ExecutionCompositionError);
     await expect(result).rejects.toMatchObject({ code: "prompt_too_large" });
@@ -251,6 +281,7 @@ const runtimeHarness = (failingProfileId?: string) => {
   return {
     requireProfile,
     preflight,
+    tracker: { preflight: vi.fn(async () => undefined) },
     configurations: {
       readOnlyRootsForRun: vi.fn(async () => ["/read-only"]),
       require: requireProfile

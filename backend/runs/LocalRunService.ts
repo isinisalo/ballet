@@ -23,6 +23,8 @@ import { LoopExecutionPlanner } from "./LoopExecutionPlanner.js";
 import { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.js";
 import { RootRunExecutionCoordinator } from "./RootRunExecutionCoordinator.js";
 import { RootRunStore, type StoredRootRun } from "./RootRunStore.js";
+import { TkTracker } from "../tracker/TkTracker.js";
+import { TrackerOutbox } from "../tracker/TrackerOutbox.js";
 import {
   currentPosition,
   decodeRunCursor,
@@ -41,6 +43,7 @@ export interface LocalRunServiceOptions {
   configurations: RuntimeConfigurationService;
   queue: LocalExecutionQueue;
   onChanged?(rootRunId: string): void;
+  tkCommand?: string;
 }
 
 export class LocalRunService {
@@ -57,10 +60,14 @@ export class LocalRunService {
       this.workspaces,
       (rootRunId) => this.changed(rootRunId)
     );
-    this.planner = new LoopExecutionPlanner(options.configurations, options.runtime);
+    this.planner = new LoopExecutionPlanner(options.configurations, options.runtime, options.tkCommand);
+    const tracker = new TrackerOutbox(
+      options.connection,
+      new TkTracker(options.tkCommand ?? "tk")
+    );
     this.coordinator = new RootRunExecutionCoordinator({
       ...options,
-      finalizer: this.finalizer,
+      finalizer: this.finalizer, tracker,
       workspaces: this.workspaces
     });
   }
@@ -80,14 +87,14 @@ export class LocalRunService {
       );
     }
     try {
-      const snapshot = await this.planner.create(workspace, input.targetId, input.input ?? "");
+      const snapshot = await this.planner.create(workspace, input.kind, input.targetId, input.input ?? "");
       assertScheduledStart(snapshot, schedule);
       await this.workspaces.verifyPreparedSnapshot(workspace);
       const timestamp = new Date().toISOString();
       this.options.connection().transaction(() => {
         this.options.roots.create({
           rootRunId,
-          kind: "loop",
+          kind: input.kind,
           targetId: input.targetId,
           source,
           input: input.input,

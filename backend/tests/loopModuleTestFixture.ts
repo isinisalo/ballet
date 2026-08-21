@@ -1,8 +1,8 @@
-import type { LoopModulePackageV2 } from "../../shared/domain/loopModules.js";
+import type { LoopModulePackageV3 } from "../../shared/domain/loopModules.js";
 
-export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV2> = {}): LoopModulePackageV2 => ({
+export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV3> = {}): LoopModulePackageV3 => ({
   format: "ballet-loop-module",
-  version: 2,
+  version: 3,
   manifest: {
     id: "sample-loop",
     title: "Sample Loop",
@@ -30,7 +30,8 @@ export const testLoopModulePackage = (overrides: Partial<LoopModulePackageV2> = 
     requires: [],
     accepts: ["sample:task.requested"],
     provides: ["sample:task.completed"],
-    recommendedConnections: []
+    recommendedTransitions: [],
+    recommendedRepairs: []
   },
   resources: [
     { kind: "instruction", key: "worker", title: "Sample worker", metadata: {}, body: "Perform the sample work.\n" },

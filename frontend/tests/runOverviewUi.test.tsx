@@ -57,6 +57,7 @@ describe("Run Overview", () => {
       active: [activeRun],
       recent: [recentRun],
       targets: {
+        graph: { kind: "graph", id: "test-graph", name: "Test Graph", ready: true, issues: [] },
         loops: [
           { kind: "loop", id: "release", name: "Release", ready: true, issues: [] },
           {
@@ -90,14 +91,22 @@ describe("Run Overview", () => {
     expect(screen.getByText(/No local provider is configured/)).toBeInTheDocument();
     const startButtons = screen.getAllByRole("button", { name: "Start" });
     expect(startButtons[0]).toBeEnabled();
-    expect(startButtons[1]).toBeDisabled();
+    expect(startButtons[1]).toBeEnabled();
+    expect(startButtons[2]).toBeDisabled();
 
     await user.click(startButtons[0]!);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/runs",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "loop", targetId: "release" }) })
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "graph", targetId: "test-graph" }) })
     ));
     expect(refresh).toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/run/graphs/test-graph?run=root-new");
+
+    await user.click(startButtons[1]!);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/runs",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ kind: "loop", targetId: "release" }) })
+    ));
     expect(navigate).toHaveBeenCalledWith("/run/loops/release?run=root-new");
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));

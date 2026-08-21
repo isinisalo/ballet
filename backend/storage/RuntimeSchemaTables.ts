@@ -2,7 +2,7 @@ export const runtimeSchemaTables = `
   CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE root_runs (
     root_run_id TEXT PRIMARY KEY,
-    kind TEXT NOT NULL CHECK(kind = 'loop'),
+    kind TEXT NOT NULL CHECK(kind IN ('graph','loop')),
     target_id TEXT NOT NULL,
     source TEXT NOT NULL CHECK(source IN ('manual','schedule')),
     status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','finalizing','completed','blocked','failed','cancelled')),
@@ -17,7 +17,7 @@ export const runtimeSchemaTables = `
     snapshot_hash TEXT NOT NULL,
     execution_snapshot_json TEXT NOT NULL CHECK(json_valid(execution_snapshot_json)),
     current_state_revision INTEGER NOT NULL DEFAULT 0 CHECK(current_state_revision >= 0),
-    transition_count INTEGER NOT NULL DEFAULT 0 CHECK(transition_count BETWEEN 0 AND 256),
+    transition_count INTEGER NOT NULL DEFAULT 0 CHECK(transition_count BETWEEN 0 AND 2048),
     active_loop_run_id TEXT,
     active_node_run_id TEXT,
     finalization_status TEXT CHECK(finalization_status IN ('finalizing','completed','failed')),
@@ -59,7 +59,7 @@ export const runtimeSchemaTables = `
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     loop_id TEXT NOT NULL,
     parent_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id),
-    source TEXT NOT NULL CHECK(source IN ('manual','flow','repair','schedule')),
+    source TEXT NOT NULL CHECK(source IN ('manual','transition','repair','schedule')),
     status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
     input_json TEXT CHECK(input_json IS NULL OR json_valid(input_json)),
     orchestration_request_id TEXT REFERENCES orchestration_requests(orchestration_request_id) DEFERRABLE INITIALLY DEFERRED,
@@ -76,7 +76,7 @@ export const runtimeSchemaTables = `
     FOREIGN KEY(root_run_id, entry_state_revision) REFERENCES state_revisions(root_run_id, revision),
     FOREIGN KEY(root_run_id, completion_state_revision) REFERENCES state_revisions(root_run_id, revision),
     CHECK((source = 'schedule') = (schedule_job_node_id IS NOT NULL AND scheduled_for IS NOT NULL)),
-    CHECK((source IN ('flow','repair')) = (orchestration_request_id IS NOT NULL)),
+    CHECK((source = 'repair') = (orchestration_request_id IS NOT NULL)),
     CHECK((source = 'repair') = (repair_request_id IS NOT NULL)),
     CHECK((status IN ('completed','blocked','failed','cancelled')) = (completed_at IS NOT NULL))
   );

@@ -15,7 +15,7 @@ export const loadProjectAutomationConfigWithIssues = async (
     issues: loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
   };
   const value: ProjectAutomationConfig = {
-    version: 12,
+    version: 13,
     orchestrator: loaded.config.orchestrator,
     graph: loaded.config.graph,
     loops: loaded.config.loops,

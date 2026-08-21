@@ -41,8 +41,9 @@ export class RepairStore {
       throw new Error("Repair Request requires exactly one requested capability or requested outcome.");
     }
     const snapshot = this.snapshots.require(input.rootRunId);
-    if (input.nestingDepth > snapshot.orchestrator.maxRepairDepth) {
-      throw new Error(`Repair Request nesting depth ${input.nestingDepth} exceeds limit ${snapshot.orchestrator.maxRepairDepth}.`);
+    const maxRepairDepth = snapshot.orchestrator.repairRouter?.maxRepairDepth ?? 0;
+    if (input.nestingDepth > maxRepairDepth) {
+      throw new Error(`Repair Request nesting depth ${input.nestingDepth} exceeds limit ${maxRepairDepth}.`);
     }
     this.connection().prepare(`
       INSERT INTO repair_requests (

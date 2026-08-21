@@ -73,6 +73,14 @@ export const routeFromPath = (path: string): RouteState => {
     rootRunId: url.searchParams.get("run") ?? undefined
   };
 
+  const runGraphMatch = url.pathname.match(/^\/run\/graphs\/([^/]+)\/?$/);
+  if (runGraphMatch) return {
+    view: "run",
+    runTargetKind: "graph",
+    runTargetId: decodeURIComponent(runGraphMatch[1]),
+    rootRunId: url.searchParams.get("run") ?? undefined
+  };
+
   if (url.pathname === "/project/goals") return projectCollectionRoute("project-goals", url);
   if (url.pathname === "/project/adrs") return projectCollectionRoute("project-adrs", url);
   if (url.pathname === "/project/instructions") return projectCollectionRoute("project-instructions", url);
@@ -104,4 +112,6 @@ export const runtimePath = () => "/runtimes";
 export const runOverviewPath = (rootRunId?: string) => `/run${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
 export const runLoopPath = (loopId: string, rootRunId?: string) =>
   `/run/loops/${encodeURIComponent(loopId)}${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
+export const runGraphPath = (graphId: string, rootRunId?: string) =>
+  `/run/graphs/${encodeURIComponent(graphId)}${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
 export const balletModeFromRoute = (route: RouteState): BalletMode => route.view === "run" ? "run" : "configure";

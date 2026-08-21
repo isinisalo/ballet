@@ -6,6 +6,7 @@ export interface LocalSettings {
   version: 1;
   codexCommand?: string;
   copilotCommand?: string;
+  tkCommand?: string;
   readOnlyRoots?: string[];
 }
 
@@ -66,11 +67,13 @@ const validate = (value: unknown): LocalSettings => {
   if (source.version !== 1) throw new Error("Local Ballet settings version must be 1.");
   const codexCommand = command(source.codexCommand, "codexCommand");
   const copilotCommand = command(source.copilotCommand, "copilotCommand");
+  const tkCommand = command(source.tkCommand, "tkCommand");
   const readOnlyRoots = roots(source.readOnlyRoots, "readOnlyRoots");
   return {
     version: 1,
     ...(codexCommand ? { codexCommand } : {}),
     ...(copilotCommand ? { copilotCommand } : {}),
+    ...(tkCommand ? { tkCommand } : {}),
     ...(readOnlyRoots ? { readOnlyRoots } : {})
   };
 };

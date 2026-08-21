@@ -5,7 +5,7 @@ import type {
   ProjectJobSchedule
 } from "./automation.js";
 
-export const loopModulePackageVersion = 2 as const;
+export const loopModulePackageVersion = 3 as const;
 export const maxLoopModulePackageBytes = 524_288;
 export const maxLoopModuleResources = 64;
 export const maxLoopModuleNodes = 64;
@@ -14,11 +14,11 @@ export const maxLoopModuleStringLength = 20_000;
 export const maxLoopModuleResourceBodyBytes = 131_072;
 
 export type LoopModuleNetworkRequirement = "required" | "forbidden" | "optional";
-export type LoopModuleConnectionKind = "flow" | "repair";
+export type LoopModuleExternalWritesPermission = false | "requires-human-authorization";
 export type LoopModuleProvenanceStatus = "exact" | "modified" | "missing-resources";
 export type LoopModuleStateCompatibility = "compatible" | "incompatible" | "unknown";
 
-export interface LoopModuleManifestV2 {
+export interface LoopModuleManifestV3 {
   id: string;
   title: string;
   description: string;
@@ -27,12 +27,12 @@ export interface LoopModuleManifestV2 {
   tags: string[];
 }
 
-export interface LoopModulePermissionsV2 {
+export interface LoopModulePermissionsV3 {
   network: LoopModuleNetworkRequirement;
-  externalWrites: false;
+  externalWrites: LoopModuleExternalWritesPermission;
 }
 
-export interface LoopModuleProfileSlotV2 {
+export interface LoopModuleProfileSlotV3 {
   key: string;
   title: string;
   description: string;
@@ -40,63 +40,63 @@ export interface LoopModuleProfileSlotV2 {
   network: LoopModuleNetworkRequirement;
 }
 
-export interface LoopModuleExecutionCompositionV2 {
+export interface LoopModuleExecutionCompositionV3 {
   profileSlot: string;
   primaryInstruction: string;
   skills: string[];
 }
 
-interface LoopModuleNodeBaseV2 extends ProjectNodeAppearance {
+interface LoopModuleNodeBaseV3 extends ProjectNodeAppearance {
   key: string;
   description: string;
   task: string;
 }
 
-interface LoopModuleJobNodeBaseV2 extends LoopModuleNodeBaseV2 {
+interface LoopModuleJobNodeBaseV3 extends LoopModuleNodeBaseV3 {
   validationNode: string;
   maxRetries: number;
 }
 
-export type LoopModuleJobNodeV2 =
-  | (LoopModuleJobNodeBaseV2 & LoopModuleExecutionCompositionV2 & { type: "agent" })
-  | (LoopModuleJobNodeBaseV2 & { type: "human" })
-  | (LoopModuleJobNodeBaseV2 & LoopModuleExecutionCompositionV2 & {
+export type LoopModuleJobNodeV3 =
+  | (LoopModuleJobNodeBaseV3 & LoopModuleExecutionCompositionV3 & { type: "agent" })
+  | (LoopModuleJobNodeBaseV3 & { type: "human" })
+  | (LoopModuleJobNodeBaseV3 & LoopModuleExecutionCompositionV3 & {
       type: "scheduled";
       schedule: ProjectJobSchedule;
     });
 
-export type LoopModuleValidationNodeV2 =
-  | (LoopModuleNodeBaseV2 & LoopModuleExecutionCompositionV2 & { type: "agent" })
-  | (LoopModuleNodeBaseV2 & { type: "human" });
+export type LoopModuleValidationNodeV3 =
+  | (LoopModuleNodeBaseV3 & LoopModuleExecutionCompositionV3 & { type: "agent" })
+  | (LoopModuleNodeBaseV3 & { type: "human" });
 
-export interface LoopModulePassEdgeV2 {
+export interface LoopModulePassEdgeV3 {
   key: string;
   sourceValidationNode: string;
   target: { jobNode: string } | { workflowResult: "PASS" };
 }
 
-export interface LoopModuleFailEdgeV2 {
+export interface LoopModuleFailEdgeV3 {
   key: string;
   sourceValidationNode: string;
   target: { workflowResult: "FAIL" };
 }
 
-export interface LoopModuleWorkflowV2 {
+export interface LoopModuleWorkflowV3 {
   startJobNode: string;
-  jobNodes: LoopModuleJobNodeV2[];
-  validationNodes: LoopModuleValidationNodeV2[];
-  passEdges: LoopModulePassEdgeV2[];
-  failEdges: LoopModuleFailEdgeV2[];
+  jobNodes: LoopModuleJobNodeV3[];
+  validationNodes: LoopModuleValidationNodeV3[];
+  passEdges: LoopModulePassEdgeV3[];
+  failEdges: LoopModuleFailEdgeV3[];
 }
 
-export interface LoopModuleLoopV2 {
+export interface LoopModuleLoopV3 {
   key: string;
   description: string;
   state: { description: string; initial: JsonValue };
-  workflow: LoopModuleWorkflowV2;
+  workflow: LoopModuleWorkflowV3;
 }
 
-export type LoopModuleResourceV2 =
+export type LoopModuleResourceV3 =
   | {
       kind: "instruction";
       key: string;
@@ -113,7 +113,7 @@ export type LoopModuleResourceV2 =
       body: string;
     };
 
-export interface LoopModuleStateContractV2 {
+export interface LoopModuleStateContractV3 {
   id: string;
   version: string;
   description: string;
@@ -121,30 +121,38 @@ export interface LoopModuleStateContractV2 {
   requiredKeys: string[];
 }
 
-export interface LoopModuleRecommendedConnectionV2 {
-  kind: LoopModuleConnectionKind;
+export interface LoopModuleRecommendedTransitionV3 {
+  direction: "incoming" | "outgoing";
+  decision: "PASS" | "FAIL";
+  outcome: string;
+  capability: string;
+  description: string;
+}
+
+export interface LoopModuleRecommendedRepairV3 {
   direction: "incoming" | "outgoing";
   capability: string;
   description: string;
 }
 
-export interface LoopModuleCapabilitiesV2 {
+export interface LoopModuleCapabilitiesV3 {
   requires: string[];
   accepts: string[];
   provides: string[];
-  recommendedConnections: LoopModuleRecommendedConnectionV2[];
+  recommendedTransitions: LoopModuleRecommendedTransitionV3[];
+  recommendedRepairs: LoopModuleRecommendedRepairV3[];
 }
 
-export interface LoopModulePackageV2 {
+export interface LoopModulePackageV3 {
   format: "ballet-loop-module";
   version: typeof loopModulePackageVersion;
-  manifest: LoopModuleManifestV2;
-  permissions: LoopModulePermissionsV2;
-  profileSlots: LoopModuleProfileSlotV2[];
-  stateContract: LoopModuleStateContractV2;
-  capabilities: LoopModuleCapabilitiesV2;
-  resources: LoopModuleResourceV2[];
-  loop: LoopModuleLoopV2;
+  manifest: LoopModuleManifestV3;
+  permissions: LoopModulePermissionsV3;
+  profileSlots: LoopModuleProfileSlotV3[];
+  stateContract: LoopModuleStateContractV3;
+  capabilities: LoopModuleCapabilitiesV3;
+  resources: LoopModuleResourceV3[];
+  loop: LoopModuleLoopV3;
 }
 
 export type LoopModuleErrorCode =
@@ -176,7 +184,7 @@ export interface LoopModuleIssue {
 
 export interface LoopModuleInspection {
   valid: boolean;
-  package?: LoopModulePackageV2;
+  package?: LoopModulePackageV3;
   sha256?: string;
   canonicalJson?: string;
   source: string;
@@ -200,7 +208,7 @@ export interface LoopModuleProfileCandidate {
 }
 
 export interface LoopModuleProfileMappingPlan {
-  slot: LoopModuleProfileSlotV2;
+  slot: LoopModuleProfileSlotV3;
   selectedProfileId?: string;
   candidates: LoopModuleProfileCandidate[];
   compatible: boolean;
@@ -236,25 +244,26 @@ export interface LoopModuleInstallPlan {
   planHash: string;
   packageSha256: string;
   source: string;
-  module: Pick<LoopModuleManifestV2, "id" | "title" | "description" | "version" | "category" | "tags">;
+  module: Pick<LoopModuleManifestV3, "id" | "title" | "description" | "version" | "category" | "tags">;
   loop: ProjectLoop;
   idRemapping: LoopModuleIdRemapping;
   resources: LoopModuleResourceWritePlan[];
   profileMappings: LoopModuleProfileMappingPlan[];
   permissions: {
-    externalWrites: false;
+    externalWrites: LoopModuleExternalWritesPermission;
     network: LoopModuleNetworkRequirement;
     compatible: boolean;
   };
   stateContract: {
-    contract: LoopModuleStateContractV2;
+    contract: LoopModuleStateContractV3;
     compatibility: LoopModuleStateCompatibility;
     comparedWith: string[];
   };
   capabilities: {
     requires: string[];
     provides: string[];
-    recommendedConnections: LoopModuleRecommendedConnectionV2[];
+    recommendedTransitions: LoopModuleRecommendedTransitionV3[];
+    recommendedRepairs: LoopModuleRecommendedRepairV3[];
     available: string[];
     missingRequires: string[];
   };
@@ -272,7 +281,7 @@ export interface LoopModuleOwnedResource {
   installedSha256: string;
 }
 
-export interface InstalledLoopModuleV2 {
+export interface InstalledLoopModuleV3 {
   moduleId: string;
   moduleVersion: string;
   title: string;
@@ -282,18 +291,18 @@ export interface InstalledLoopModuleV2 {
   installedAt: string;
   profileMappings: Record<string, string>;
   idRemapping: LoopModuleIdRemapping;
-  stateContract: LoopModuleStateContractV2;
-  capabilities: LoopModuleCapabilitiesV2;
+  stateContract: LoopModuleStateContractV3;
+  capabilities: LoopModuleCapabilitiesV3;
   ownedResources: LoopModuleOwnedResource[];
   installedContentSha256: string;
 }
 
-export interface InstalledLoopModulesFileV2 {
-  version: 2;
-  installed: InstalledLoopModuleV2[];
+export interface InstalledLoopModulesFileV3 {
+  version: 3;
+  installed: InstalledLoopModuleV3[];
 }
 
-export interface InstalledLoopModuleStatus extends InstalledLoopModuleV2 {
+export interface InstalledLoopModuleStatus extends InstalledLoopModuleV3 {
   status: LoopModuleProvenanceStatus;
   currentContentSha256?: string;
   missingResources: string[];
@@ -304,14 +313,14 @@ export interface LoopModuleLibraryEntry {
   sha256?: string;
   sizeBytes: number;
   valid: boolean;
-  manifest?: LoopModuleManifestV2;
-  permissions?: LoopModulePermissionsV2;
-  package?: LoopModulePackageV2;
+  manifest?: LoopModuleManifestV3;
+  permissions?: LoopModulePermissionsV3;
+  package?: LoopModulePackageV3;
   issues: LoopModuleIssue[];
 }
 
 export interface LoopModuleExportResult {
-  package: LoopModulePackageV2;
+  package: LoopModulePackageV3;
   canonicalJson: string;
   sha256: string;
   filename: string;

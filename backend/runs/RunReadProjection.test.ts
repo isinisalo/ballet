@@ -3,7 +3,7 @@ import { jobNodeOutcomeJsonSchema } from "../../shared/api/runtime-schemas.js";
 import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
 import type { ExecutionTask, LoopRunDetails, NodeRun, JobRun } from "../../shared/domain/runtime.js";
 import type { RootRunRepairProjection } from "../../shared/domain/runs.js";
-import { testLoop } from "../tests/v12TestConfig.js";
+import { testLoop } from "../tests/v13TestConfig.js";
 import { currentPosition } from "./RunReadProjection.js";
 import type { StoredRootRun } from "./RootRunStore.js";
 
@@ -19,16 +19,22 @@ const root = (overrides: Partial<StoredRootRun> = {}): StoredRootRun => ({
   configHash: "b".repeat(64), snapshotHash: "c".repeat(64), transitionCount: 0,
   activeLoopRunId: "loop-run", activeNodeRunId: "node-run",
   executionSnapshot: {
-    version: 5, rootLoopId: "main-loop",
+    version: 6, rootKind: "loop", rootLoopId: "main-loop",
     project: {
       checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64),
       snapshotHash: "c".repeat(64)
     },
-    orchestrator: {
-      executionProfileId: "primary", primaryInstructionId: "project:orchestrator", skillIds: [],
-      maxRepairDepth: 4, maxRepairAttempts: 3
+    orchestrator: { mode: "runbook", maxTransitions: 256 },
+    issueTracker: {
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
     },
-    graph: { loopEdges: [] }, loops: [testLoop()],
+    graph: {
+      id: "test-graph", name: "Test Graph", startLoopId: "main-loop",
+      transitions: [], repairEdges: []
+    }, loops: [testLoop()],
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   createdAt: timestamp, updatedAt: timestamp, ...overrides
@@ -60,18 +66,18 @@ const loopRun = (
 const executionTask = (nodeRunId = "agent-node-run"): ExecutionTask => ({
   id: "agent-task", kind: "node_execution", rootRunId: "root-run", status: "succeeded",
   spec: {
-    version: 7, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
+    version: 8, taskId: "agent-task", kind: "node_execution", rootRunId: "root-run",
     loopRunId: "loop-run", jobRunId: "job-run", nodeRunId,
     evidence: {
-      compositionVersion: 6, loopId: "main-loop", jobNodeId: "job", workflowNodeId: "job", nodeRole: "job",
+      compositionVersion: 7, loopId: "main-loop", jobNodeId: "job", workflowNodeId: "job", nodeRole: "job",
       nodeDefinitionId: "main-loop:job:job",
       executionProfile: {
         id: "primary", name: "Primary", provider: "codex", model: "gpt-5",
         reasoningEffort: "high", networkAccess: false
       },
       resources: [], prompt: "prompt", promptSha256: "a".repeat(64),
-      taskEnvelopeVersion: 5, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 5,
-      outputSchemaId: "job-node-outcome-v5", outputSchema: jobNodeOutcomeJsonSchema,
+      taskEnvelopeVersion: 6, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 6,
+      outputSchemaId: "job-node-outcome-v6", outputSchema: jobNodeOutcomeJsonSchema,
       outputSchemaSha256: "c".repeat(64)
     },
     runtime: {

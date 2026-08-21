@@ -13,7 +13,7 @@ import { canonicalJson, jsonSha256, parseJsonValue } from "../runtime/state/Cano
 import { validateState } from "../runtime/state/StatePatch.js";
 
 const rootRunRowSchema = z.object({
-  root_run_id: z.string(), kind: z.literal("loop"), target_id: z.string(), source: z.enum(["manual", "schedule"]),
+  root_run_id: z.string(), kind: z.enum(["graph", "loop"]), target_id: z.string(), source: z.enum(["manual", "schedule"]),
   status: z.enum(["queued", "running", "waiting_for_input", "finalizing", "completed", "blocked", "failed", "cancelled"]),
   input: z.string().nullable(), outcome_json: z.string().nullable(), error_code: z.string().nullable(),
   error_message: z.string().nullable(), worktree_path: z.string(), branch: z.string(), head_sha: z.string(),
@@ -52,8 +52,17 @@ export class RootRunStore {
 
   create(input: CreateRootRunInput): StoredRootRun {
     const snapshot = rootExecutionSnapshotSchema.parse(input.executionSnapshot);
-    if (snapshot.rootLoopId !== input.targetId) {
+    if (snapshot.rootKind !== input.kind) {
+      throw new Error(`Root Run kind ${input.kind} does not match snapshot kind ${snapshot.rootKind}.`);
+    }
+    if (input.kind === "loop" && snapshot.rootLoopId !== input.targetId) {
       throw new Error(`Root Run target ${input.targetId} does not match snapshot Root Loop ${snapshot.rootLoopId}.`);
+    }
+    if (input.kind === "graph" && (snapshot.graph.id !== input.targetId
+      || snapshot.graph.startLoopId !== snapshot.rootLoopId)) {
+      throw new Error(
+        `Graph Run target ${input.targetId} does not match snapshot Graph ${snapshot.graph.id} and start Loop ${snapshot.rootLoopId}.`
+      );
     }
     const rootLoop = snapshot.loops.find((loop) => loop.id === snapshot.rootLoopId);
     if (!rootLoop) throw new Error(`Root Loop ${snapshot.rootLoopId} is missing from its execution snapshot.`);
@@ -73,6 +82,17 @@ export class RootRunStore {
         INSERT INTO state_revisions (root_run_id, revision, state_json, state_hash, created_at)
         VALUES (?, 0, ?, ?, ?)
       `).run(input.rootRunId, stateJson, jsonSha256(state), input.createdAt);
+      if (input.kind === "graph") {
+        this.connection().prepare(`
+          INSERT INTO graph_run_states (
+            root_run_id, graph_id, start_loop_id, current_loop_id,
+            root_external_ref, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?)
+        `).run(
+          input.rootRunId, snapshot.graph.id, snapshot.graph.startLoopId, snapshot.rootLoopId,
+          `ballet-root:${input.rootRunId}`, input.createdAt
+        );
+      }
     })();
     return this.require(input.rootRunId);
   }

@@ -33,9 +33,9 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 
 ## Platformin ja projektin raja
 
-- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, ProjectWorkflow, JobNode, ValidationNode, PassEdge, FailEdge, State, Edge, LoopEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus ja runtime state.
-- Roadmap-, milestone-, issue-, acceptance-, staging-, release-, deploy- ja arc42-menettelyt kuuluvat project-local dataan tiedostoissa `.ballet/project.json`, `.ballet/instructions/**`, `.agents/skills/**` ja `.ballet/arc42/**`.
-- Loop-module package-, katalogi-, install-, export- ja provenance-primitiveet ovat geneerisiä platform-ominaisuuksia. Moduulien nimet, capabilityt, instructionit, skillsit ja recommended connectionit ovat `.ballet/loop-library/**`-dataa; runtime lukee vain materialisoitua project-local dataa.
+- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, ProjectWorkflow, JobNode, ValidationNode, PassEdge, FailEdge, State, ProjectGraphTransition, ProjectRepairEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus, tracker-adapter/outbox ja runtime state.
+- Roadmap-, milestone-, issue-, acceptance-, staging-, release-, deploy- ja arc42-menettelyt kuuluvat project-local dataan tiedostoissa `.ballet/project.json`, `.ballet/releases/**`, `.tickets/**`, `.ballet/instructions/**`, `.agents/skills/**` ja `.ballet/arc42/**`.
+- Loop-module package-, katalogi-, install-, export- ja provenance-primitiveet ovat geneerisiä platform-ominaisuuksia. Moduulien nimet, capabilityt, instructionit, skillsit, recommended transitionit/repairsit ja external-write-metadata ovat `.ballet/loop-library/**`-dataa; runtime lukee vain materialisoitua project-local dataa.
 - Älä kovakoodaa project-workflow'ta `backend/`, `frontend/` tai `shared/`-koodiin tai Balletin pakolliseen System instructioniin.
 - Tarkista execution- tai orchestration-muutoksen jälkeen, ettei platform-koodiin tullut project-workflow-kohtaisia tunnisteita:
 
@@ -49,11 +49,11 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 
 - Aloita aina `ARCHITECTURE.md`-tiedostosta. `.ballet/arc42/` on kanoninen 12-osioinen arkkitehtuurirakenne, `.ballet/goals/` omistaa WHAT/WHY-päätökset, `.ballet/adr/` arkkitehtuuripäätökset ja `DESIGN.md` UI-design-järjestelmän.
 - Luo uusi aloite kopioimalla `.ballet/arc42/initiatives/TEMPLATE/` polkuun `.ballet/arc42/initiatives/<initiative-id>/`, anna kaikille tiedostoille uniikit vakaat ID:t ja aloita `draft`-statuksella.
-- Oletus-flow on clarify → structures → concepts → communicate → implementation → evaluate. Se ei ole vesiputous: Validation pyytää capability-korjauksen, Orchestrator valitsee vain allowlistatun Loopin ja runtime palauttaa samaan Validation Nodeen.
-- State sisältää vain rajatun `Arc42MethodStateV1`-nykytilan ja vakaat viitteet. Markdown sisältää pitkäikäisen projektitotuuden. Älä kopioi dokumentteja, diffejä tai runtime-lokeja Stateen.
+- Oletus-RunBook on DESIGN → PLAN → BUILD → DEPLOY → VERIFY. Terminal Validation valitsee sallitun named outcomen ja runtime reitittää immutable snapshotin exact transitioniin; agentti ei valitse tavallisen flow'n target Loopia. Custom repair säilyy erillisenä allowlistattuna call/returnina samaan Validation Nodeen.
+- State sisältää vain rajatun `GraphEngineeringStateV1`-nykytilan ja vakaat viitteet. `GraphOrchestrationStateV1` omistaa erilliset runtime-reititysfaktat, Markdown pitkäikäisen projektitotuuden ja `tk` implementation-issuet. Älä kopioi dokumentteja, ticket-runkoja, diffejä tai runtime-lokeja Stateen.
 - Pysähdy `needs_input`-tilaan, kun WHAT/WHY, laatutavoitteen prioriteetti/mitta, merkittävä ADR tai usean yhtä hyvän repair-targetin valinta vaatii ihmistä.
-- Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen. `release-validation` ei kuulu oletus-flow'hun, eikä Ballet mergeä tai pushaa tuloksia automaattisesti.
-- Continuous-learning-schedule on `.ballet/project.json`-tiedoston `learning-authoritative-research` Job Nodessa. Schedule-, topology-, permission-, network-, instruction- ja skill-käyttäytymismuutokset ovat aina katselmoitavia ja hyväksyttäviä ennen soveltamista.
+- Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen. DEPLOY pysähtyy ilman valtuutusta `needs_input`-tilaan, eikä Ballet mergeä tai pushaa tuloksia automaattisesti.
+- Scheduled JobNode ajetaan erillisenä Loop Root Runina eikä jatka Graph-transitioneihin. Schedule-, topology-, RunBook-, tracker-, permission-, network-, instruction- ja skill-käyttäytymismuutokset ovat aina katselmoitavia ja hyväksyttäviä ennen soveltamista.
 - Päivitä `STATUS.md`, `TRACEABILITY.md`, initiative-handoff ja `METHOD-HEALTH.md` vain uuden evidenssin tai päätöksen perusteella; älä tee semanttista dokumenttichurnia.
 
 ## Tärkeää

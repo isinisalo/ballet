@@ -11,7 +11,7 @@ import type {
 } from "../../shared/domain/runtime.js";
 import type {
   TaskEnvelopeHistoryEntry, TaskEnvelopeOrchestrationRequest, TaskEnvelopeRepairReturn,
-  TaskEnvelopeResumeContext, TaskEnvelopeV5
+  TaskEnvelopeResumeContext, TaskEnvelopeV6
 } from "../../shared/domain/taskEnvelope.js";
 import { composeExecutionPrompt, runtimeForNode } from "../execution/ExecutionComposition.js";
 import { LoopRunIntegrityError } from "../runtime/LoopRunErrors.js";
@@ -36,7 +36,7 @@ export const createNodeExecutionSpec = (input: NodeExecutionPlanInput): Executio
   let profileId: string | undefined;
   if (node.role === "orchestrator") {
     requireOrchestratorRequest(node, input.orchestrationRequest);
-    profileId = root.executionSnapshot.orchestrator.executionProfileId;
+    profileId = root.executionSnapshot.orchestrator.repairRouter?.executionProfileId;
   } else {
     const job = loop.workflow.jobNodes.find((candidate) => candidate.id === node.jobNodeId);
     const validation = node.role === "validation"
@@ -58,7 +58,7 @@ export const createNodeExecutionSpec = (input: NodeExecutionPlanInput): Executio
   );
   const taskId = randomUUID();
   return {
-    version: 7,
+    version: 8,
     taskId,
     kind: "node_execution",
     rootRunId: root.rootRunId,
@@ -72,11 +72,11 @@ export const createNodeExecutionSpec = (input: NodeExecutionPlanInput): Executio
   };
 };
 
-export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvelopeV5 => {
+export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvelopeV6 => {
   const { root, run, jobRun, node, state } = input;
   const loop = requireLoop(root.executionSnapshot, node.loopId);
   const common = {
-    version: 5 as const,
+    version: 6 as const,
     loop: { id: loop.id, description: loop.description },
     state: { revision: state.revision, value: state.state, sha256: state.stateSha256 },
     resume: readResume(node.context),
@@ -90,19 +90,17 @@ export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvel
       run: { rootRunId: root.rootRunId, loopRunId: run.loopRunId, nodeRunId: node.nodeRunId },
       task: LOOP_ORCHESTRATOR_TASK,
       orchestrationRequest: requestProjection(request),
-      allowedCandidates: root.executionSnapshot.graph.loopEdges
-        .filter((edge) => edge.kind === request.kind && edge.source === loop.id)
-        .filter((edge) => request.kind !== "repair" || !request.requestedCapability
+      allowedCandidates: root.executionSnapshot.graph.repairEdges
+        .filter((edge) => edge.source === loop.id)
+        .filter((edge) => !request.requestedCapability
           || edge.capability === request.requestedCapability)
         .flatMap((edge) => {
           const target = requireLoop(root.executionSnapshot, edge.target);
-          const compatible = edge.kind === "repair"
-            ? target.capabilities.provides.includes(edge.capability)
-            : target.capabilities.accepts.includes(edge.capability);
+          const compatible = target.capabilities.provides.includes(edge.capability);
           return compatible ? [{
             id: target.id, description: target.description,
             capabilities: target.capabilities,
-            route: { kind: edge.kind, capability: edge.capability, description: edge.description }
+            route: { kind: "repair", capability: edge.capability, description: edge.description }
           }] : [];
         })
     };
@@ -128,8 +126,22 @@ export const createNodeTaskEnvelope = (input: NodeExecutionPlanInput): TaskEnvel
   return {
     ...base, role: "validation", validationNode: { id: validation.id, description: validation.description }, task: validation.task,
     jobOutcome: requireJobOutcome(run, jobRun.jobRunId),
-    repairReturn: readRepairReturn(node.context)
+    repairReturn: readRepairReturn(node.context),
+    allowedTransitions: allowedValidationTransitions(root.executionSnapshot, loop.id, validation.id)
   };
+};
+
+const allowedValidationTransitions = (
+  snapshot: RootExecutionSnapshot,
+  loopId: string,
+  validationNodeId: string
+) => {
+  if (snapshot.rootKind !== "graph") return [];
+  const loop = requireLoop(snapshot, loopId);
+  const passEdge = loop.workflow.passEdges.find((edge) => edge.sourceValidationNodeId === validationNodeId);
+  if (!passEdge || !("workflowResult" in passEdge.target)) return [];
+  return snapshot.graph.transitions.filter((transition) => transition.source === loopId)
+    .map((transition) => ({ ...transition, target: { ...transition.target } }));
 };
 
 const relevantHistory = (input: NodeExecutionPlanInput): TaskEnvelopeHistoryEntry[] => input.events.flatMap((event) => {

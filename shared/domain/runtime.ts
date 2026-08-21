@@ -11,7 +11,9 @@ export const maxStatePatchBytes = 65_536;
 export const maxOrchestratorDispatchValueBytes = 65_536;
 export const maxStatePatchOperations = 128;
 export const maxRuntimeJsonDepth = 64;
-export const maxControlFlowTransitions = 256;
+// Internal evidence events include Job, Validation, repair and Graph routing events.
+// The public RunBook transition limit is enforced separately by GraphRunbookEngine.
+export const maxControlFlowTransitions = 2_048;
 export const maxReadStateRevisionMetadata = 64;
 export const maxReadStatePatchEvidenceBytes = 262_144;
 
@@ -103,19 +105,32 @@ export type ValidationEscalation = ValidationEscalationBase & (
   | { requestedCapability?: never; requestedOutcome: JsonValue }
 );
 
-export type ValidationCompletedOutcome = CheckedOutcomeSummary & {
+type ValidationCompletedBase = CheckedOutcomeSummary & {
   role: "validation";
   state: "completed";
   evidence: JsonValue;
-} & (
-  | { decision: "PASS"; statePatch?: StatePatch; feedback?: never; expectedCorrection?: never; escalation?: never }
+};
+
+type ValidationFailRoute =
+  | { transitionOutcome?: never; escalation?: never }
+  | { transitionOutcome: string; escalation?: never }
+  | { transitionOutcome?: never; escalation: ValidationEscalation };
+
+export type ValidationCompletedOutcome = ValidationCompletedBase & (
+  | {
+      decision: "PASS";
+      transitionOutcome?: string;
+      statePatch?: StatePatch;
+      feedback?: never;
+      expectedCorrection?: never;
+      escalation?: never;
+    }
   | {
       decision: "FAIL";
       feedback: string;
       expectedCorrection: string;
-      escalation: ValidationEscalation;
       statePatch?: never;
-    }
+    } & ValidationFailRoute
 );
 
 export type ValidationNodeOutcome =
@@ -153,7 +168,7 @@ export type OrchestratorNodeOutcome =
 
 export type CanonicalNodeOutcome = JobNodeOutcome | ValidationNodeOutcome | OrchestratorNodeOutcome;
 
-export type LoopRunSource = "manual" | "flow" | "repair" | "schedule";
+export type LoopRunSource = "manual" | "transition" | "repair" | "schedule";
 export type LoopRunStatus =
   | "queued" | "running" | "waiting_for_input" | "completed"
   | "blocked" | "failed" | "cancelled";
@@ -173,7 +188,7 @@ export interface LoopScheduleState {
 
 export interface RootRun {
   rootRunId: string;
-  kind: "loop";
+  kind: "graph" | "loop";
   targetId: string;
   source: "manual" | "schedule";
   status: LoopRunStatus | "finalizing";

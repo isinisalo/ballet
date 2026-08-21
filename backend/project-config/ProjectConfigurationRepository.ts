@@ -74,14 +74,14 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version !== 12) return {
+    if (isRecord(value) && value.version !== 13) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 12 is required; version ${String(value.version)} is not supported.`
+        `Strict project config version 13 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -96,7 +96,7 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config,
-      version: 12,
+      version: 13,
       orchestrator: automation.orchestrator,
       graph: automation.graph,
       loops: automation.loops
@@ -113,7 +113,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 12,
+      version: 13,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -128,7 +128,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 12,
+      version: 13,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -142,7 +142,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 12,
+      version: 13,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -176,7 +176,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 12,
+  version: 13,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,
@@ -187,9 +187,18 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
       networkAccess: profile.networkAccess
     }))
     .sort((left, right) => compareIds(left.id, right.id)),
-  orchestrator: normalizeComposition(config.orchestrator),
+  issueTracker: { ...config.issueTracker },
+  orchestrator: {
+    mode: "runbook",
+    maxTransitions: config.orchestrator.maxTransitions,
+    ...(config.orchestrator.repairRouter ? { repairRouter: normalizeComposition(config.orchestrator.repairRouter) } : {})
+  },
   graph: {
-    loopEdges: config.graph.loopEdges.map((edge) => ({ ...edge }))
+    id: config.graph.id,
+    name: config.graph.name,
+    startLoopId: config.graph.startLoopId,
+    transitions: config.graph.transitions.map((transition) => ({ ...transition, target: { ...transition.target } })),
+    repairEdges: config.graph.repairEdges.map((edge) => ({ ...edge }))
   },
   loops: config.loops.map((loop) => ({
     ...loop,

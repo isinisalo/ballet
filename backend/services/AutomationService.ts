@@ -76,7 +76,7 @@ export class AutomationService {
         isProjectAgentValidationNode(node) && node.executionProfileId === executionProfileId
           ? [`${loop.id}:${node.id}:validation`] : [])
     ]);
-    if (loaded.config.orchestrator.executionProfileId === executionProfileId) references.push("orchestrator");
+    if (loaded.config.orchestrator.repairRouter?.executionProfileId === executionProfileId) references.push("orchestrator");
     if (references.length > 0) throw new AutomationConflictError(
       `Execution profile ${executionProfileId} is referenced by execution compositions: ${references.join(", ")}.`
     );
@@ -95,7 +95,8 @@ export class AutomationService {
         isProjectAgentValidationNode(node) && compositionReferences(node, resourceId)
           ? [`${loop.id}:${node.id}:validation`] : [])
     ]);
-    if (compositionReferences(automation.config.orchestrator, resourceId)) references.push("orchestrator");
+    if (automation.config.orchestrator.repairRouter
+      && compositionReferences(automation.config.orchestrator.repairRouter, resourceId)) references.push("orchestrator");
     if (references.length > 0) {
       throw new AutomationConflictError(
         `Project resource ${resourceId} is referenced by execution compositions: ${references.join(", ")}.`

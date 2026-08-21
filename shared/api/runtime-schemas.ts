@@ -14,11 +14,10 @@ const boundedText = z.string().max(20_000);
 const nonEmptyText = boundedText.trim().min(1);
 export const emptyBodySchema = z.object({}).strict();
 
-export const startRunBodySchema = z.object({
-  kind: z.literal("loop"),
-  targetId: z.string().trim().min(1).max(200),
-  input: z.string().max(20_000).optional()
-}).strict();
+export const startRunBodySchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("graph"), targetId: z.string().trim().min(1).max(200), input: z.string().max(20_000).optional() }).strict(),
+  z.object({ kind: z.literal("loop"), targetId: z.string().trim().min(1).max(200), input: z.string().max(20_000).optional() }).strict()
+]);
 
 export const rootRunParamsSchema = z.object({ rootRunId: idSchema }).strict();
 export const nodeRunParamsSchema = z.object({
@@ -86,16 +85,24 @@ const validationEscalationSchema = z.union([
 
 const validationCompletedPassSchema = z.object({
   role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("PASS"),
-  ...checkedSummary, evidence: z.json(), statePatch: statePatchSchema.optional()
+  ...checkedSummary, evidence: z.json(), transitionOutcome: z.string().regex(/^[a-z][a-z0-9_]*$/).optional(),
+  statePatch: statePatchSchema.optional()
 }).strict();
-const validationCompletedFailSchema = z.object({
+const validationCompletedFailFields = {
   role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("FAIL"),
   ...checkedSummary,
   evidence: z.json(),
   feedback: nonEmptyText,
-  expectedCorrection: nonEmptyText,
-  escalation: validationEscalationSchema
-}).strict();
+  expectedCorrection: nonEmptyText
+};
+const validationCompletedFailSchema = z.union([
+  z.object({ ...validationCompletedFailFields }).strict(),
+  z.object({
+    ...validationCompletedFailFields,
+    transitionOutcome: z.string().regex(/^[a-z][a-z0-9_]*$/)
+  }).strict(),
+  z.object({ ...validationCompletedFailFields, escalation: validationEscalationSchema }).strict()
+]);
 
 export const validationNodeOutcomeSchema = z.union([
   validationCompletedPassSchema,
@@ -245,7 +252,7 @@ export const controlFlowEventSchema = z.object({
   kind: z.enum([
     "job_completed", "job_needs_input", "job_terminal", "validation_pass",
     "validation_fail_retry", "validation_fail_escalated", "validation_terminal",
-    "repair_call", "repair_return", "repair_terminal", "flow_transition",
+    "repair_call", "repair_return", "repair_terminal", "graph_transition",
     "orchestrator_terminal", "root_cancelled", "root_terminal", "execution_interrupted"
   ]),
   stateRevision: z.number().int().nonnegative(),
@@ -285,9 +292,9 @@ export const validationNodeOutcomeJsonSchema = jsonSchema(validationNodeOutcomeS
 export const orchestratorNodeOutcomeJsonSchema = jsonSchema(orchestratorNodeOutcomeSchema);
 
 export const nodeOutcomeSchemaIds = {
-  job: "job-node-outcome-v5",
-  validation: "validation-node-outcome-v5",
-  orchestrator: "orchestrator-node-outcome-v5"
+  job: "job-node-outcome-v6",
+  validation: "validation-node-outcome-v6",
+  orchestrator: "orchestrator-node-outcome-v6"
 } as const;
 
 export const nodeOutcomeJsonSchemaForRole = (role: NodeRunRole): Record<string, JsonValue> => {

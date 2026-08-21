@@ -29,6 +29,7 @@ export interface CreateBalletServerOptions {
   stateRoot?: string;
   codexCommand?: string;
   copilotCommand?: string;
+  tkCommand?: string;
   webDist?: string;
   onShutdown?(): void;
 }
@@ -65,7 +66,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   const runs = new LocalRunService({
     context, connection: () => database.connection(), database, roots, executions, runtime,
-    configurations, queue,
+    configurations, queue, tkCommand: options.tkCommand ?? savedSettings.tkCommand,
     onChanged: publishRunChanged
   });
   runHolder.service = runs;

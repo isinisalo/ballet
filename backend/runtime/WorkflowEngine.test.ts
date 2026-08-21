@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ValidationCompletedOutcome } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testJobPair } from "../tests/v12TestConfig.js";
+import { testJobPair } from "../tests/v13TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 const failOutcome = (summary = "Correction required."): ValidationCompletedOutcome => ({

@@ -1,0 +1,275 @@
+{
+  "format": "ballet-loop-module",
+  "version": 3,
+  "manifest": {
+    "id": "plan",
+    "title": "PLAN",
+    "description": "Select the next release and materialize executable tk work.",
+    "version": "1.0.0",
+    "category": "graph-engineering",
+    "tags": [
+      "graph-engineering",
+      "runbook"
+    ]
+  },
+  "permissions": {
+    "network": "forbidden",
+    "externalWrites": false
+  },
+  "profileSlots": [
+    {
+      "key": "slot-1",
+      "title": "Codex GPT-5.6 Sol · Medium · Network off",
+      "description": "Compatible codex profile for Codex GPT-5.6 Sol · Medium · Network off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "slot-2",
+      "title": "Codex GPT-5.6 Luna · Medium · Network off",
+      "description": "Compatible codex profile for Codex GPT-5.6 Luna · Medium · Network off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "plan-state",
+    "version": "1.0.0",
+    "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
+    "initial": {
+      "contractVersion": "GraphEngineeringStateV1",
+      "releaseMap": {
+        "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+        "selectedReleaseId": null,
+        "status": "unselected"
+      },
+      "work": {
+        "releaseTicketId": null,
+        "activeIssueId": null,
+        "remainingIssueCount": 0
+      },
+      "deployment": {
+        "targetEnvironment": null,
+        "authorization": null,
+        "evidenceRefs": []
+      },
+      "verification": {
+        "status": "not_started",
+        "result": null,
+        "evidenceRefs": [],
+        "openGapIds": []
+      }
+    },
+    "requiredKeys": [
+      "contractVersion",
+      "deployment",
+      "releaseMap",
+      "verification",
+      "work"
+    ]
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "graph:desired-state.defined",
+      "graph:plan.invalid"
+    ],
+    "provides": [
+      "graph:release.planned"
+    ],
+    "recommendedTransitions": [
+      {
+        "direction": "outgoing",
+        "decision": "PASS",
+        "outcome": "success",
+        "capability": "graph:release.planned",
+        "description": "PASS success routes plan to build."
+      },
+      {
+        "direction": "outgoing",
+        "decision": "FAIL",
+        "outcome": "failure",
+        "capability": "graph:desired-state.requested",
+        "description": "FAIL failure routes plan to design."
+      }
+    ],
+    "recommendedRepairs": []
+  },
+  "resources": [
+    {
+      "kind": "instruction",
+      "key": "graph-plan-agent",
+      "title": "Graph Engineering Plan Agent",
+      "metadata": {
+        "createdAt": "2026-08-20",
+        "updatedAt": "2026-08-20",
+        "tags": [
+          "graph-engineering",
+          "planning"
+        ]
+      },
+      "body": "\n# Graph Engineering Plan Agent\n\nTreat `.ballet/releases/STORY-RELEASE-MAP.md` as the ordered delivery map and `.tickets/work` as the sole implementation-issue store. Select the first eligible `planned` release; never silently reorder releases or invent human-owned priority.\n\nUse only the bounded `ballet tracker` commands for work tickets. Upsert by stable external reference, create one release epic, link every implementation issue to it, preserve acceptance references and add only valid acyclic dependencies. Repeated execution must converge without duplicate tickets.\n\nPatch State with identifiers, counts, paths and status only. Do not copy ticket bodies, maps, diffs or logs into State.\n\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-engineering-reviewer",
+      "title": "Graph Engineering Independent Reviewer",
+      "metadata": {
+        "createdAt": "2026-08-20",
+        "updatedAt": "2026-08-20",
+        "tags": [
+          "graph-engineering",
+          "validation"
+        ]
+      },
+      "body": "\n# Graph Engineering Independent Reviewer\n\nValidate the paired Job independently against its task, accepted Goals and ADRs, canonical arc42 sources, current bounded State, tracker evidence and actual checks. Do not edit the artifact under review.\n\nOnly a Validation whose PassEdge terminates its Loop may return `transitionOutcome`. Select exactly one value from `allowedTransitions` and ensure its decision matches the Validation decision. An intermediate Validation must omit it. A terminal FAIL may instead request one allowed repair capability, but never both.\n\nDo not infer success from absent evidence. Return `needs_input` for a human-owned WHAT/WHY choice, quality priority or measure, significant ADR, deployment authorization, or ambiguous outcome classification. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.\n\n"
+    },
+    {
+      "kind": "skill",
+      "key": "traceability",
+      "name": "traceability",
+      "description": "Build and validate stable architecture trace chains. Use when work connects Goals or requirements to quality scenarios, decisions, concepts, building blocks, runtime/deployment scenarios, tests, monitors and evidence.",
+      "metadata": {},
+      "body": "\n# Traceability\n\n1. Start from an existing Goal/REQ ID and one measurable QS ID.\n2. Link the smallest relevant ADR/CON, BB and RT/DEP IDs; create no placeholder ID without a canonical definition.\n3. Name an executable test or monitor and a concrete evidence ID with status.\n4. Mark missing links `pending` or as an Open question; never infer passed evidence.\n5. Update `TRACEABILITY.md` only for relationships/status and keep full content in its owner document.\n6. Run `npm run validate:arc42` and include exact unresolved IDs in the outcome.\n"
+    },
+    {
+      "kind": "skill",
+      "key": "conformance-review",
+      "name": "conformance-review",
+      "description": "Compare a bounded implementation or document change against accepted architecture. Use for diff reviews, architecture drift detection, acceptance preparation and independent Validation.",
+      "metadata": {},
+      "body": "\n# Conformance review\n\n1. Read the initiative BRIEF/PLAN and referenced QS/ADR/CON/BB/RT/DEP IDs.\n2. Inspect the actual diff and relevant tests; sample critical source when the change is broad.\n3. Classify each mismatch as intended architecture update, implementation defect, documentation drift, risk/debt or an Open question.\n4. Cite exact files, stable IDs and evidence. Do not treat provider prose as control evidence.\n5. Do not modify the implementation while acting as Validation. Request local retry or capability repair with a measurable expected correction.\n6. Record acceptance/conformance evidence and remaining limitations in initiative EVIDENCE/REVIEW.\n"
+    }
+  ],
+  "loop": {
+    "key": "loop",
+    "description": "Select the next release and materialize executable tk work.",
+    "state": {
+      "description": "Bounded GraphEngineeringStateV1 references shared by every Loop in one Graph Run.",
+      "initial": {
+        "contractVersion": "GraphEngineeringStateV1",
+        "releaseMap": {
+          "path": ".ballet/releases/STORY-RELEASE-MAP.md",
+          "selectedReleaseId": null,
+          "status": "unselected"
+        },
+        "work": {
+          "releaseTicketId": null,
+          "activeIssueId": null,
+          "remainingIssueCount": 0
+        },
+        "deployment": {
+          "targetEnvironment": null,
+          "authorization": null,
+          "evidenceRefs": []
+        },
+        "verification": {
+          "status": "not_started",
+          "result": null,
+          "evidenceRefs": [],
+          "openGapIds": []
+        }
+      }
+    },
+    "workflow": {
+      "startJobNode": "select-release",
+      "jobNodes": [
+        {
+          "type": "agent",
+          "key": "select-release",
+          "description": "Select the first eligible planned release.",
+          "nodeStyle": "terra",
+          "nodeSize": "large",
+          "task": "Read the ordered Story/Release Map, select its first eligible planned release, validate design, acceptance and environment references, and patch only bounded State references. Return needs_input for ambiguous priority.",
+          "validationNode": "select-release-validation",
+          "maxRetries": 2,
+          "profileSlot": "slot-1",
+          "primaryInstruction": "graph-plan-agent",
+          "skills": [
+            "traceability"
+          ]
+        },
+        {
+          "type": "agent",
+          "key": "materialize-work",
+          "description": "Materialize the selected release work idempotently.",
+          "nodeStyle": "terra",
+          "nodeSize": "large",
+          "task": "Use only ballet tracker. Upsert one ballet-release:<stable-id> epic and its implementation issues with stable external refs, acceptance references, parent and dependencies. Do not duplicate tasks in the Story/Release Map.",
+          "validationNode": "materialize-work-validation",
+          "maxRetries": 2,
+          "profileSlot": "slot-1",
+          "primaryInstruction": "graph-plan-agent",
+          "skills": [
+            "traceability"
+          ]
+        }
+      ],
+      "validationNodes": [
+        {
+          "type": "agent",
+          "key": "select-release-validation",
+          "description": "Validate selected release.",
+          "nodeStyle": "luna",
+          "nodeSize": "small",
+          "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome.",
+          "profileSlot": "slot-2",
+          "primaryInstruction": "graph-engineering-reviewer",
+          "skills": [
+            "conformance-review"
+          ]
+        },
+        {
+          "type": "agent",
+          "key": "materialize-work-validation",
+          "description": "Validate materialized release work.",
+          "nodeStyle": "luna",
+          "nodeSize": "small",
+          "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure.",
+          "profileSlot": "slot-2",
+          "primaryInstruction": "graph-engineering-reviewer",
+          "skills": [
+            "conformance-review"
+          ]
+        }
+      ],
+      "passEdges": [
+        {
+          "key": "select-release-pass",
+          "sourceValidationNode": "select-release-validation",
+          "target": {
+            "jobNode": "materialize-work"
+          }
+        },
+        {
+          "key": "materialize-work-pass",
+          "sourceValidationNode": "materialize-work-validation",
+          "target": {
+            "workflowResult": "PASS"
+          }
+        }
+      ],
+      "failEdges": [
+        {
+          "key": "select-release-fail",
+          "sourceValidationNode": "select-release-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        },
+        {
+          "key": "materialize-work-fail",
+          "sourceValidationNode": "materialize-work-validation",
+          "target": {
+            "workflowResult": "FAIL"
+          }
+        }
+      ]
+    }
+  }
+}
+

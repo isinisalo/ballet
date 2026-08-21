@@ -68,7 +68,7 @@ export const runtimeSchemaSupportTables = `
   CREATE TABLE orchestration_requests (
     orchestration_request_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK(kind IN ('flow','repair')),
+    kind TEXT NOT NULL CHECK(kind = 'repair'),
     source_loop_run_id TEXT NOT NULL REFERENCES loop_invocations(loop_run_id),
     source_loop_id TEXT NOT NULL,
     source_node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
@@ -118,7 +118,7 @@ export const runtimeSchemaSupportTables = `
     route_id TEXT PRIMARY KEY,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     orchestration_request_id TEXT NOT NULL UNIQUE REFERENCES orchestration_requests(orchestration_request_id),
-    kind TEXT NOT NULL CHECK(kind IN ('flow','repair')),
+    kind TEXT NOT NULL CHECK(kind = 'repair'),
     orchestrator_node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
     loop_edge_id TEXT NOT NULL,
     source_loop_id TEXT NOT NULL,
@@ -143,11 +143,11 @@ export const runtimeSchemaSupportTables = `
   CREATE TABLE control_flow_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 256),
+    sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 2048),
     kind TEXT NOT NULL CHECK(kind IN (
       'job_completed','job_needs_input','job_terminal','validation_pass','validation_fail_retry',
       'validation_fail_escalated','validation_terminal','repair_call','repair_return','repair_terminal',
-      'flow_transition','orchestrator_terminal','root_cancelled','root_terminal','execution_interrupted'
+      'graph_transition','orchestrator_terminal','root_cancelled','root_terminal','execution_interrupted'
     )),
     state_revision INTEGER NOT NULL CHECK(state_revision >= 0),
     source_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id),
@@ -173,5 +173,56 @@ export const runtimeSchemaSupportTables = `
     last_error TEXT,
     updated_at TEXT NOT NULL,
     PRIMARY KEY(loop_id, job_node_id)
+  );
+  CREATE TABLE graph_run_states (
+    root_run_id TEXT PRIMARY KEY REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    graph_id TEXT NOT NULL,
+    start_loop_id TEXT NOT NULL,
+    current_loop_id TEXT,
+    current_loop_run_id TEXT REFERENCES loop_invocations(loop_run_id) DEFERRABLE INITIALLY DEFERRED,
+    last_transition_id TEXT,
+    last_source_loop_id TEXT,
+    last_decision TEXT CHECK(last_decision IN ('PASS','FAIL')),
+    last_outcome TEXT,
+    last_target_loop_id TEXT,
+    terminal_result TEXT CHECK(terminal_result = 'DONE'),
+    root_external_ref TEXT NOT NULL UNIQUE,
+    root_ticket_id TEXT,
+    active_loop_external_ref TEXT,
+    active_loop_ticket_id TEXT,
+    updated_at TEXT NOT NULL,
+    CHECK((last_transition_id IS NULL) = (last_source_loop_id IS NULL)),
+    CHECK((last_transition_id IS NULL) = (last_decision IS NULL)),
+    CHECK((last_transition_id IS NULL) = (last_outcome IS NULL)),
+    CHECK((terminal_result IS NULL) OR (current_loop_id IS NULL AND current_loop_run_id IS NULL))
+  );
+  CREATE TABLE tracker_links (
+    link_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    loop_run_id TEXT REFERENCES loop_invocations(loop_run_id) ON DELETE CASCADE,
+    store_kind TEXT NOT NULL CHECK(store_kind IN ('orchestration','work')),
+    external_ref TEXT NOT NULL,
+    ticket_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(root_run_id, store_kind, external_ref),
+    UNIQUE(root_run_id, store_kind, ticket_id)
+  );
+  CREATE TABLE tracker_outbox (
+    operation_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    loop_run_id TEXT REFERENCES loop_invocations(loop_run_id) ON DELETE CASCADE,
+    store_kind TEXT NOT NULL CHECK(store_kind IN ('orchestration','work')),
+    action TEXT NOT NULL CHECK(action IN ('upsert','start','note','close','reopen')),
+    external_ref TEXT NOT NULL,
+    payload_json TEXT NOT NULL CHECK(json_valid(payload_json)),
+    status TEXT NOT NULL CHECK(status IN ('pending','applied')),
+    ticket_id TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    applied_at TEXT,
+    UNIQUE(root_run_id, action, external_ref, payload_json),
+    CHECK((status = 'applied') = (applied_at IS NOT NULL))
   );
 `;

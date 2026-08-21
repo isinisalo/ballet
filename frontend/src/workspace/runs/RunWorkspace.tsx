@@ -1,13 +1,14 @@
-import type { AppData, ProjectLoop } from "@shared/api/workspace-contracts";
+import type { AppData, ProjectLoop, RootRunDetail, RunTarget } from "@shared/api/workspace-contracts";
+import type { ReactNode } from "react";
 import { ArrowLeft, Route } from "lucide-react";
 import { EmptyState, Panel } from "@/components/shared/workspace-ui";
 import { Button } from "@/components/ui/button";
 import type { AppStreamStatus } from "@/app/useAppStream";
 import { LoopRunView } from "../automation/loops/LoopRunView";
 import { useLoopRun } from "../automation/loops/useLoopRun";
-import { runLoopPath, runOverviewPath } from "../routing";
+import { runGraphPath, runLoopPath, runOverviewPath } from "../routing";
 import type { RouteState } from "../types";
-import { isRootRunDetailForLoop, rootRunLoopMismatchMessage } from "./rootRunAssociation";
+import { isRootRunDetailForLoop, isRootRunDetailForTarget, rootRunLoopMismatchMessage } from "./rootRunAssociation";
 import type { RunDashboardState } from "./useRunDashboard";
 import { RunOverview } from "./RunOverview";
 
@@ -19,6 +20,9 @@ export function RunWorkspace({ route, data, appStreamStatus, dashboard, navigate
   navigate: (path: string) => void;
 }) {
   if (!route.runTargetKind || !route.runTargetId) return <RunOverview dashboard={dashboard} navigate={navigate} />;
+  if (route.runTargetKind === "graph") return <GraphRunWorkspace
+    route={route} data={data} appStreamStatus={appStreamStatus} dashboard={dashboard} navigate={navigate}
+  />;
   const liveLoop = data.automation.loops.find((candidate) => candidate.id === route.runTargetId);
   if (route.rootRunId) {
     const explicitDetail = dashboard.detail?.rootRunId === route.rootRunId ? dashboard.detail : undefined;
@@ -34,6 +38,109 @@ export function RunWorkspace({ route, data, appStreamStatus, dashboard, navigate
   if (!liveLoop) return <RunMissingTarget kind="Loop" id={route.runTargetId} navigate={navigate} />;
   return <RunLoopWorkspace key={route.runTargetId} loop={liveLoop} liveLoop={liveLoop} route={route} data={data} appStreamStatus={appStreamStatus} dashboard={dashboard} navigate={navigate} />;
 }
+
+function GraphRunWorkspace({ route, data, appStreamStatus, dashboard, navigate }: {
+  route: RouteState;
+  data: AppData;
+  appStreamStatus: AppStreamStatus;
+  dashboard: RunDashboardState;
+  navigate: (path: string) => void;
+}) {
+  const resolved = resolveGraphRun(route, data, dashboard, navigate);
+  if (resolved.kind === "error") return resolved.error;
+  return <ResolvedGraphRunWorkspace
+    {...resolved} data={data} appStreamStatus={appStreamStatus} dashboard={dashboard} navigate={navigate}
+  />;
+}
+
+function ResolvedGraphRunWorkspace({ graphId, target, detail, loop, data, appStreamStatus, dashboard, navigate }: {
+  graphId: string;
+  target?: RunTarget;
+  detail?: RootRunDetail;
+  loop: ProjectLoop;
+  data: AppData;
+  appStreamStatus: AppStreamStatus;
+  dashboard: RunDashboardState;
+  navigate: (path: string) => void;
+}) {
+  const refreshSignal = `${detail?.updatedAt ?? ""}:${dashboard.streamStatus}`;
+  const controller = useLoopRun(
+    loop.id, refreshSignal, appStreamStatus, detail?.rootRunId, target, detail, "graph", graphId
+  );
+  const disabledReason = target?.ready ? undefined : target?.issues.map((issue) => issue.message).join(" · ");
+  return <Panel title="Graph Run" titleExtra={<span className="truncate text-muted-foreground">{graphId}</span>} icon={<Route />} contentClassName="p-0" action={<OverviewButton navigate={navigate} />}>
+    <LoopRunView
+      config={data.automation}
+      loop={loop}
+      executionProfiles={data.executionProfiles}
+      theme={data.loopTheme}
+      controller={controller}
+      rootDetail={controller.rootDetail ?? detail}
+      startDisabledReason={disabledReason}
+      onRootRunChange={(rootRunId) => navigate(runGraphPath(graphId, rootRunId))}
+    />
+  </Panel>;
+}
+
+interface ResolvedGraphRun {
+  kind: "ready";
+  graphId: string;
+  target?: RunTarget;
+  detail?: RootRunDetail;
+  loop: ProjectLoop;
+}
+
+interface GraphRunError { kind: "error"; error: ReactNode }
+
+const resolveGraphRun = (
+  route: RouteState,
+  data: AppData,
+  dashboard: RunDashboardState,
+  navigate: (path: string) => void
+): ResolvedGraphRun | GraphRunError => {
+  const graphId = route.runTargetId!;
+  const target = dashboard.targets.graph.id === graphId ? dashboard.targets.graph : undefined;
+  const root = resolveGraphRoot(route, dashboard, graphId, navigate);
+  if (root.kind === "error") return root;
+  if (!target && !root.detail) return {
+    kind: "error", error: <RunMissingTarget kind="Graph" id={graphId} navigate={navigate} />
+  };
+  const loops = root.detail?.executionSnapshot.loops ?? data.automation.loops;
+  const activeLoopId = root.detail?.current?.loopId
+    ?? root.detail?.executionSnapshot.rootLoopId
+    ?? data.automation.graph.startLoopId;
+  const loop = loops.find((candidate) => candidate.id === activeLoopId) ?? loops[0];
+  if (!loop) return {
+    kind: "error", error: <RunMissingTarget kind="Graph start Loop" id={activeLoopId} navigate={navigate} />
+  };
+  return { kind: "ready", graphId, target, detail: root.detail, loop };
+};
+
+const resolveGraphRoot = (
+  route: RouteState,
+  dashboard: RunDashboardState,
+  graphId: string,
+  navigate: (path: string) => void
+): { kind: "ready"; detail?: RootRunDetail } | GraphRunError => {
+  if (!route.rootRunId) return { kind: "ready" };
+  const detail = dashboard.detail?.rootRunId === route.rootRunId ? dashboard.detail : undefined;
+  if (!detail && dashboard.loading) return {
+    kind: "error", error: <RunLoadingSnapshot loopId={graphId} />
+  };
+  if (!detail) return {
+    kind: "error",
+    error: <RunMissingRoot rootRunId={route.rootRunId} loopId={graphId} navigate={navigate} />
+  };
+  if (!isRootRunDetailForTarget(detail, "graph", graphId, route.rootRunId)) return {
+    kind: "error",
+    error: <RunUnavailable
+      title="Run not found."
+      message={`Root Run "${route.rootRunId}" does not belong to Graph "${graphId}".`}
+      navigate={navigate}
+    />
+  };
+  return { kind: "ready", detail };
+};
 
 function RunLoopWorkspace({ loop, liveLoop, route, data, appStreamStatus, dashboard, navigate }: {
   loop: ProjectLoop;

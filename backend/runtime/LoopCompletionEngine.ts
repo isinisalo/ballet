@@ -1,5 +1,6 @@
 import type {
-  CanonicalNodeOutcome, NodeRun, OrchestrationFrame, RepairRequest, RepairResultStatus
+  CanonicalNodeOutcome, NodeRun, OrchestrationFrame, RepairRequest, RepairResultStatus,
+  ValidationCompletedOutcome
 } from "../../shared/domain/runtime.js";
 import type { TaskEnvelopeRepairReturn } from "../../shared/domain/taskEnvelope.js";
 import { ControlFlowTransitionStore } from "./ControlFlowTransitionStore.js";
@@ -11,7 +12,7 @@ import type { WorkflowProgressStore } from "./WorkflowProgressStore.js";
 type LoopTerminalStatus = "completed" | "blocked" | "failed";
 
 export interface LoopCompletionCallbacks {
-  requestFlow(node: NodeRun, revision: number, outcome: CanonicalNodeOutcome): boolean;
+  routeGraphTransition(node: NodeRun, revision: number, outcome: ValidationCompletedOutcome): boolean;
   returnValidation(frame: OrchestrationFrame, context: TaskEnvelopeRepairReturn, revision: number): {
     nodeRunId: string;
     jobRunId: string;
@@ -49,7 +50,12 @@ export class LoopCompletionEngine {
       else this.failRepair(frame, terminal, revision, outcome, node.nodeRunId, failure);
       return;
     }
-    if (terminal === "completed" && callbacks.requestFlow(node, revision, outcome)) return;
+    if (terminal === "completed") {
+      if (outcome.role !== "validation" || outcome.state !== "completed") {
+        throw new Error(`Completed Loop ${node.loopId} has no terminal Validation outcome.`);
+      }
+      if (callbacks.routeGraphTransition(node, revision, outcome)) return;
+    }
     this.progress.finishRoot(node.rootRunId, outcome, failure);
   }
 

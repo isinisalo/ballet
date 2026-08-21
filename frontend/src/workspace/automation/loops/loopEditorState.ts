@@ -1,9 +1,10 @@
 import {
   defaultProjectLoopOrchestrator,
   type ProjectAutomationConfig,
+  type ProjectGraphTransition,
   type ProjectLoop,
-  type ProjectLoopEdge,
   type ProjectLoopOrchestrator,
+  type ProjectRepairEdge,
 } from "@shared/api/workspace-contracts";
 
 export {
@@ -48,7 +49,16 @@ export const updateLoopAtIndex = (
     ...config,
     loops: config.loops.map((candidate, candidateIndex) => candidateIndex === index ? loop : candidate),
     graph: {
-      loopEdges: previous.id === loop.id ? config.graph.loopEdges : config.graph.loopEdges.map((edge) => ({
+      ...config.graph,
+      startLoopId: config.graph.startLoopId === previous.id ? loop.id : config.graph.startLoopId,
+      transitions: previous.id === loop.id ? config.graph.transitions : config.graph.transitions.map((transition) => ({
+        ...transition,
+        source: transition.source === previous.id ? loop.id : transition.source,
+        target: "loopId" in transition.target && transition.target.loopId === previous.id
+          ? { loopId: loop.id }
+          : transition.target
+      })),
+      repairEdges: previous.id === loop.id ? config.graph.repairEdges : config.graph.repairEdges.map((edge) => ({
         ...edge,
         source: edge.source === previous.id ? loop.id : edge.source,
         target: edge.target === previous.id ? loop.id : edge.target
@@ -66,50 +76,87 @@ export const removeLoopAtIndex = (
   return {
     ...config,
     loops: config.loops.filter((_, candidateIndex) => candidateIndex !== index),
-    graph: { loopEdges: config.graph.loopEdges.filter((edge) =>
-      edge.source !== removed.id && edge.target !== removed.id) }
+    graph: {
+      ...config.graph,
+      startLoopId: config.graph.startLoopId === removed.id
+        ? config.loops.find((_, candidateIndex) => candidateIndex !== index)?.id ?? ""
+        : config.graph.startLoopId,
+      transitions: config.graph.transitions.filter((transition) =>
+        transition.source !== removed.id
+        && !("loopId" in transition.target && transition.target.loopId === removed.id)),
+      repairEdges: config.graph.repairEdges.filter((edge) =>
+        edge.source !== removed.id && edge.target !== removed.id)
+    }
   };
 };
 
-export const updateLoopEdge = (
+export const updateGraphTransition = (
   config: ProjectAutomationConfig,
   edgeId: string,
-  edge: ProjectLoopEdge
+  edge: ProjectGraphTransition
 ): ProjectAutomationConfig => ({
   ...config,
-  graph: { loopEdges: config.graph.loopEdges.map((candidate) => candidate.id === edgeId ? edge : candidate) }
+  graph: { ...config.graph, transitions: config.graph.transitions.map((candidate) => candidate.id === edgeId ? edge : candidate) }
 });
 
-export const addLoopEdge = (
+export const addGraphTransition = (
   config: ProjectAutomationConfig,
   sourceLoopId: string
 ): ProjectAutomationConfig => {
-  const hasFlow = config.graph.loopEdges.some((edge) => edge.source === sourceLoopId && edge.kind === "flow");
-  const kind = hasFlow ? "repair" : "flow";
-  const target = config.loops.find((loop) => loop.id !== sourceLoopId
-    && (kind === "flow" || !config.graph.loopEdges.some((edge) => edge.kind === "repair"
-      && edge.source === sourceLoopId && edge.target === loop.id)))?.id ?? sourceLoopId;
-  const targetLoop = config.loops.find((loop) => loop.id === target);
-  const compatibleCapabilities = kind === "flow"
-    ? targetLoop?.capabilities.accepts ?? []
-    : targetLoop?.capabilities.provides ?? [];
-  const edge: ProjectLoopEdge = {
-    id: uniqueId(config.graph.loopEdges.map((candidate) => candidate.id), `${sourceLoopId}-${kind}`),
+  const decision = config.graph.transitions.some((edge) => edge.source === sourceLoopId && edge.decision === "PASS")
+    ? "FAIL" as const
+    : "PASS" as const;
+  const target = config.loops.find((loop) => loop.id !== sourceLoopId)?.id ?? sourceLoopId;
+  const edge: ProjectGraphTransition = {
+    id: uniqueId(config.graph.transitions.map((candidate) => candidate.id), `${sourceLoopId}-${decision.toLowerCase()}-outcome`),
     source: sourceLoopId,
-    target,
-    kind,
-    capability: compatibleCapabilities.length === 1 ? compatibleCapabilities[0]! : "",
-    description: kind === "flow" ? "Continue to the target Loop." : "Allow repair routing to the target Loop."
+    decision,
+    outcome: decision === "PASS" ? "success" : "failure",
+    target: { loopId: target },
+    description: "Route the selected RunBook outcome to the target Loop."
   };
-  return { ...config, graph: { loopEdges: [...config.graph.loopEdges, edge] } };
+  return { ...config, graph: { ...config.graph, transitions: [...config.graph.transitions, edge] } };
 };
 
-export const removeLoopEdge = (
+export const removeGraphTransition = (
   config: ProjectAutomationConfig,
   edgeId: string
 ): ProjectAutomationConfig => ({
   ...config,
-  graph: { loopEdges: config.graph.loopEdges.filter((edge) => edge.id !== edgeId) }
+  graph: { ...config.graph, transitions: config.graph.transitions.filter((edge) => edge.id !== edgeId) }
+});
+
+export const updateRepairEdge = (
+  config: ProjectAutomationConfig,
+  edgeId: string,
+  edge: ProjectRepairEdge
+): ProjectAutomationConfig => ({
+  ...config,
+  graph: { ...config.graph, repairEdges: config.graph.repairEdges.map((candidate) => candidate.id === edgeId ? edge : candidate) }
+});
+
+export const addRepairEdge = (
+  config: ProjectAutomationConfig,
+  sourceLoopId: string
+): ProjectAutomationConfig => {
+  const target = config.loops.find((loop) => loop.id !== sourceLoopId)?.id ?? sourceLoopId;
+  const capability = config.loops.find((loop) => loop.id === target)?.capabilities.provides[0] ?? "repair:capability";
+  const edge: ProjectRepairEdge = {
+    id: uniqueId(config.graph.repairEdges.map((candidate) => candidate.id), `${sourceLoopId}-repair`),
+    source: sourceLoopId,
+    target,
+    capability,
+    description: "Allow the repair router to call the target Loop and return to this Validation."
+  };
+  return { ...config, graph: { ...config.graph, repairEdges: [...config.graph.repairEdges, edge] } };
+};
+
+export const removeRepairEdge = (
+  config: ProjectAutomationConfig,
+  edgeId: string
+): ProjectAutomationConfig => ({
+  ...config,
+  graph: { ...config.graph, repairEdges: config.graph.repairEdges.filter((edge) => edge.id !== edgeId) }
 });
 
 export const updateOrchestrator = (

@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loopModulePackageV2Schema } from "../shared/api/loop-module-schemas.js";
+import { loopModulePackageV3Schema } from "../shared/api/loop-module-schemas.js";
 import type { JsonValue } from "../shared/domain/automation.js";
-import type { LoopModulePackageV2 } from "../shared/domain/loopModules.js";
+import type { LoopModulePackageV3 } from "../shared/domain/loopModules.js";
 import { canonicalLoopModuleJson } from "../backend/loop-modules/canonicalLoopModule.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,7 +17,7 @@ const initialState = {
   checks: [],
   evidence: []
 } satisfies JsonValue;
-const stateContract: LoopModulePackageV2["stateContract"] = {
+const stateContract: LoopModulePackageV3["stateContract"] = {
   id: "software-engineering-state",
   version: "1.0.0",
   description: "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Loops.",
@@ -119,12 +119,12 @@ const starters: Starter[] = [
   }
 ];
 
-const agentPackage = (starter: Starter): LoopModulePackageV2 => {
-  const resources: LoopModulePackageV2["resources"] = starter.human ? [] : [
+const agentPackage = (starter: Starter): LoopModulePackageV3 => {
+  const resources: LoopModulePackageV3["resources"] = starter.human ? [] : [
     { kind: "instruction", key: "worker", title: `${starter.title} worker`, metadata: {}, body: `${starter.instruction}\n` },
     { kind: "skill", key: "task", name: `${starter.id}-task`, description: `Complete and verify the ${starter.title} responsibility.`, metadata: {}, body: `# ${starter.title}\n\n${starter.skill}\n` }
   ];
-  const job: LoopModulePackageV2["loop"]["workflow"]["jobNodes"][number] = starter.human
+  const job: LoopModulePackageV3["loop"]["workflow"]["jobNodes"][number] = starter.human
     ? {
         key: "task", validationNode: "task-validation", description: starter.description,
         type: "human", task: starter.task, nodeStyle: "terra", nodeSize: "medium", maxRetries: 3
@@ -136,12 +136,18 @@ const agentPackage = (starter: Starter): LoopModulePackageV2 => {
       };
   return {
     format: "ballet-loop-module",
-    version: 2,
+    version: 3,
     manifest: { id: starter.id, title: starter.title, description: starter.description, version: "1.0.0", category: "software-engineering", tags: ["software-engineering", "starter"] },
-    permissions: { network: "forbidden", externalWrites: false },
+    permissions: {
+      network: "forbidden",
+      externalWrites: starter.id === "deploy-dev" ? "requires-human-authorization" : false
+    },
     profileSlots: starter.human ? [] : [{ key: "worker", title: "Worker", description: "Network-off implementation profile.", providers: ["codex", "copilot"], network: "forbidden" }],
     stateContract,
-    capabilities: { requires: [], accepts: [starter.accepts], provides: [starter.provides], recommendedConnections: [] },
+    capabilities: {
+      requires: [], accepts: [starter.accepts], provides: [starter.provides],
+      recommendedTransitions: [], recommendedRepairs: []
+    },
     resources,
     loop: {
       key: "loop",
@@ -163,13 +169,13 @@ const agentPackage = (starter: Starter): LoopModulePackageV2 => {
 
 await mkdir(target, { recursive: true });
 for (const starter of starters) {
-  const parsed = loopModulePackageV2Schema.parse(agentPackage(starter));
+  const parsed = loopModulePackageV3Schema.parse(agentPackage(starter));
   await writeFile(path.join(target, `${starter.id}.ballet-loop.json`), canonicalLoopModuleJson(parsed), "utf8");
 }
 
 for (const filename of ["backend-implementation.ballet-loop.json", "frontend-implementation.ballet-loop.json"]) {
   const source = path.join(softwareDelivery, filename);
-  const pkg = JSON.parse(await readFile(source, "utf8")) as LoopModulePackageV2;
+  const pkg = JSON.parse(await readFile(source, "utf8")) as LoopModulePackageV3;
   const description = filename.startsWith("backend-")
     ? "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated."
     : "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.";
@@ -182,8 +188,9 @@ for (const filename of ["backend-implementation.ballet-loop.json", "frontend-imp
     requires: [],
     accepts: ["implementation:change.requested"],
     provides: ["implementation:change.ready"],
-    recommendedConnections: []
+    recommendedTransitions: [],
+    recommendedRepairs: []
   };
-  const parsed = loopModulePackageV2Schema.parse(pkg);
+  const parsed = loopModulePackageV3Schema.parse(pkg);
   await writeFile(source, canonicalLoopModuleJson(parsed), "utf8");
 }

@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
-  LoopRunDetails, RespondToNodeRunRequest, RootRunDetail, RunTarget, RuntimePreflightIssue
+  LoopRunDetails, RespondToNodeRunRequest, RootRunDetail, RootRunKind, RunTarget, RuntimePreflightIssue
 } from "@shared/api/workspace-contracts";
 import { toErrorMessage } from "@/lib/errors";
 import type { AppStreamStatus } from "@/app/useAppStream";
 import { runApi } from "../../runs/runApi";
-import { isRootRunDetailForLoop, rootRunLoopMismatchMessage } from "../../runs/rootRunAssociation";
+import { isRootRunDetailForTarget, rootRunLoopMismatchMessage } from "../../runs/rootRunAssociation";
 
 export type LoopRunPendingOperation = "load" | "start" | "respond" | "cancel" | null;
 
-export function useLoopRun(loopId: string | undefined, refreshSignal: string, streamStatus: AppStreamStatus, rootRunId?: string, target?: RunTarget, suppliedRootDetail?: RootRunDetail) {
+export function useLoopRun(
+  loopId: string | undefined,
+  refreshSignal: string,
+  streamStatus: AppStreamStatus,
+  rootRunId?: string,
+  target?: RunTarget,
+  suppliedRootDetail?: RootRunDetail,
+  rootKind: RootRunKind = "loop",
+  rootTargetId: string | undefined = loopId
+) {
   const [details, setDetails] = useState<LoopRunDetails | null>(null);
   const [rootDetail, setRootDetail] = useState<RootRunDetail>();
   const [pendingOperation, setPendingOperation] = useState<LoopRunPendingOperation>("load");
@@ -35,14 +44,14 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
   }, []);
 
   const acceptRoot = useCallback((root: RootRunDetail, expectedRootRunId?: string) => {
-    if (!loopId || !isRootRunDetailForLoop(root, loopId, expectedRootRunId)) {
+    if (!loopId || !rootTargetId || !isRootRunDetailForTarget(root, rootKind, rootTargetId, expectedRootRunId)) {
       applyRoot(undefined);
       setError(rootRunLoopMismatchMessage(expectedRootRunId ?? root.rootRunId, loopId ?? "unknown"));
       return null;
     }
     setError("");
     return applyRoot(root);
-  }, [applyRoot, loopId]);
+  }, [applyRoot, loopId, rootKind, rootTargetId]);
 
   const refresh = useCallback(async () => {
     const current = ++generation.current;
@@ -86,9 +95,11 @@ export function useLoopRun(loopId: string | undefined, refreshSignal: string, st
 
   const start = useCallback(async (input: string) => {
     if (!loopId || !preflight?.ok) return false;
-    return mutate("start", () => runApi.start("loop", loopId, input));
-  }, [loopId, mutate, preflight?.ok]);
-  const currentRootDetail = rootDetail && loopId && isRootRunDetailForLoop(rootDetail, loopId, selectedRootRunId)
+    if (!rootTargetId) return false;
+    return mutate("start", () => runApi.start(rootKind, rootTargetId, input));
+  }, [loopId, mutate, preflight?.ok, rootKind, rootTargetId]);
+  const currentRootDetail = rootDetail && rootTargetId
+    && isRootRunDetailForTarget(rootDetail, rootKind, rootTargetId, selectedRootRunId)
     ? rootDetail
     : undefined;
   const currentDetails = currentRootDetail ? details : null;

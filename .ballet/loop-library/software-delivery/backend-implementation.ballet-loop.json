@@ -6,7 +6,8 @@
     "provides": [
       "implementation:change.ready"
     ],
-    "recommendedConnections": [],
+    "recommendedTransitions": [],
+    "recommendedRepairs": [],
     "requires": []
   },
   "format": "ballet-loop-module",
@@ -235,5 +236,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 2
+  "version": 3
 }

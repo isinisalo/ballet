@@ -1,34 +1,38 @@
 import { useMemo } from "react";
-import { MarkerType, ReactFlow, type EdgeTypes, type NodeTypes } from "@xyflow/react";
-import { Settings2 } from "lucide-react";
+import { Controls, MarkerType, ReactFlow, type EdgeTypes, type NodeTypes } from "@xyflow/react";
 import type { LoopTheme } from "@shared/api/workspace-contracts";
-import { Button } from "@/components/ui/button";
 import {
   calculateGraphEngineeringLayout,
+  graphEngineeringDoneNodeSize,
   graphEngineeringLoopNodeSize,
   graphEngineeringOrchestratorNodeSize
 } from "./graphEngineeringLayout";
 import {
+  GraphEngineeringDoneNodeView,
   GraphEngineeringLoopNodeView,
   GraphEngineeringOrchestratorNodeView,
-  GraphEngineeringRouteSegmentView,
+  GraphEngineeringRouteView,
+  type GraphDoneFlowNode,
   type GraphFlowNode,
   type GraphLoopFlowNode,
   type GraphOrchestratorFlowNode,
-  type GraphRouteSegmentEdge
+  type GraphRouteData,
+  type GraphRouteEdge
 } from "./GraphEngineeringElements";
 import { buildGraphEngineeringFocus } from "./engineeringProjections";
 import type { GraphEngineeringEdge, GraphEngineeringProjection } from "./engineeringProjections";
-import { loopEdgeDasharray, loopThemeCssProperties } from "./loopTheme";
+import { loopThemeCssProperties } from "./loopTheme";
 
 const nodeTypes = {
   graphLoop: GraphEngineeringLoopNodeView,
-  graphOrchestrator: GraphEngineeringOrchestratorNodeView
+  graphOrchestrator: GraphEngineeringOrchestratorNodeView,
+  graphDone: GraphEngineeringDoneNodeView
 } satisfies NodeTypes;
-const edgeTypes = { graphRouteSegment: GraphEngineeringRouteSegmentView } satisfies EdgeTypes;
+const edgeTypes = { graphRoute: GraphEngineeringRouteView } satisfies EdgeTypes;
 
 export function GraphEngineeringCanvas({
   projection,
+  narrow,
   selectedLoopId,
   orchestratorSelected,
   theme,
@@ -38,6 +42,7 @@ export function GraphEngineeringCanvas({
   onSelectOrchestrator
 }: {
   projection: GraphEngineeringProjection;
+  narrow: boolean;
   selectedLoopId?: string;
   orchestratorSelected: boolean;
   theme: LoopTheme;
@@ -46,7 +51,7 @@ export function GraphEngineeringCanvas({
   onSelectEdge: (edge: GraphEngineeringEdge) => void;
   onSelectOrchestrator: () => void;
 }) {
-  const focus = useMemo(() => buildGraphEngineeringFocus(projection, selectedLoopId), [projection, selectedLoopId]);
+  const focus = useMemo(() => buildGraphEngineeringFocus(projection), [projection]);
   const layout = useMemo(() => calculateGraphEngineeringLayout(projection), [projection]);
   const positions = useMemo(() => new Map(layout.map((node) => [node.id, node])), [layout]);
   const nodes = useMemo<GraphFlowNode[]>(() => [
@@ -69,71 +74,162 @@ export function GraphEngineeringCanvas({
         data: {
           node,
           selected: node.loopId === selectedLoopId && !orchestratorSelected,
-          repairCount: projection.edges.filter((edge) => edge.kind === "repair" && (edge.source === node.loopId || edge.target === node.loopId)).length,
+          transitionCount: projection.edges.filter((edge) => edge.kind === "transition" && edge.source === node.loopId).length,
+          repairCount: projection.edges.filter((edge) => edge.kind === "repair" && edge.source === node.loopId).length,
           onSelect: onSelectLoop,
           onOpen: onOpenLoop
         },
         style: { ...graphEngineeringLoopNodeSize, pointerEvents: "all" }
       };
-    })
+    }),
+    ...(projection.done ? [doneFlowNode(positions)] : [])
   ], [onOpenLoop, onSelectLoop, onSelectOrchestrator, orchestratorSelected, positions, projection, selectedLoopId]);
-  const edges = useMemo<GraphRouteSegmentEdge[]>(() => focus.edges.flatMap((edge) =>
-    routeSegments(edge, positions, theme, onSelectEdge)), [focus.edges, onSelectEdge, positions, theme]);
-  const activeRouteCount = focus.edges.filter((edge) => edge.activeRoute).length;
-
-  return (
-    <div
-      data-loop-canvas
-      data-engineering-view="graph"
-      aria-label={`Graph Engineering canvas; one Loop Orchestrator control node, ${projection.nodes.length} LoopNodes, ${focus.edges.filter((edge) => edge.kind === "flow").length} flow route policies and ${focus.visibleRepairCount} repair route policies visible; ${focus.hiddenRepairCount} repair route policies hidden; ${activeRouteCount} canonical Run routes active`}
-      className="relative h-full min-h-[34rem] min-w-0 overflow-hidden border border-divider-strong bg-background"
-      style={loopThemeCssProperties(theme)}
-    >
-      <div className="pointer-events-none absolute inset-0 opacity-50 bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px]" />
-      <div className="pointer-events-none absolute top-2 left-2 z-20 flex max-w-[calc(100%-1rem)] items-center gap-1.5 overflow-x-auto rounded border border-divider-strong bg-card/95 p-1 font-mono text-[0.62rem] text-muted-foreground">
-        <span className="shrink-0 rounded-sm bg-muted px-1.5 py-1 text-foreground">Completion → Orchestrator → Dispatch · {focus.edges.filter((edge) => edge.kind === "flow").length}</span>
-        <span data-visible-repair-count={focus.visibleRepairCount} className="shrink-0 px-1 text-tertiary">Escalation · {focus.visibleRepairCount} shown</span>
-        <span data-hidden-repair-count={focus.hiddenRepairCount} className="shrink-0">{focus.hiddenRepairCount} hidden</span>
-        {activeRouteCount ? <span className="shrink-0 text-secondary">Live route · {activeRouteCount}</span> : null}
-        <Button type="button" size="sm" variant="ghost" className="pointer-events-auto ml-auto shrink-0 lg:hidden max-sm:h-10" onClick={onSelectOrchestrator}><Settings2 /> Orchestrator</Button>
-      </div>
-      <div aria-label="Visible Graph route policies">
-        {focus.edges.map((edge) => <button
-          key={edge.id}
-          type="button"
-          data-graph-edge-keyboard={edge.id}
-          className="sr-only focus:not-sr-only focus:absolute focus:top-14 focus:left-2 focus:z-30 focus:rounded focus:border focus:border-primary focus:bg-background focus:px-2 focus:py-1 focus:font-mono focus:text-xs"
-          aria-label={`${edge.kind} route ${edge.source} to ${edge.target} via Loop Orchestrator, capability ${edge.capability}, persisted policy ${edge.id}${edge.activeRoute ? ", active canonical Run route" : ""}`}
-          onClick={() => onSelectEdge(edge)}
-        >{edge.kind} · {edge.capability}</button>)}
-      </div>
-      <ReactFlow<GraphFlowNode, GraphRouteSegmentEdge>
-        className="loop-react-flow relative z-10 h-full min-h-[34rem] w-full"
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.18, minZoom: 0.35, maxZoom: 1 }}
-        minZoom={0.3}
-        maxZoom={1}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        panOnScroll={false}
-        zoomOnScroll={false}
-        zoomOnPinch
-        zoomOnDoubleClick={false}
-        preventScrolling={false}
-        deleteKeyCode={null}
-        proOptions={{ hideAttribution: true }}
-        onEdgeClick={(event, selected) => {
-          event.stopPropagation();
-          if (selected.data?.edge) onSelectEdge(selected.data.edge);
-        }}
-      />
-    </div>
+  const routeLanes = useMemo(() => graphRouteLanes(focus.edges, positions), [focus.edges, positions]);
+  const edges = useMemo<GraphRouteEdge[]>(
+    () => focus.edges.flatMap((edge) => routeFlowEdge(edge, positions, routeLanes.get(edge.id), onSelectEdge)),
+    [focus.edges, onSelectEdge, positions, routeLanes]
   );
+  const fitNodes = narrow ? narrowInitialNodes(nodes, projection) : undefined;
+  return <GraphEngineeringSurface
+    projection={projection} focus={focus} nodes={nodes} edges={edges} fitNodes={fitNodes}
+    narrow={narrow} theme={theme} onSelectEdge={onSelectEdge}
+  />;
+}
+
+function GraphEngineeringSurface({ projection, focus, nodes, edges, fitNodes, narrow, theme, onSelectEdge }: {
+  projection: GraphEngineeringProjection;
+  focus: ReturnType<typeof buildGraphEngineeringFocus>;
+  nodes: GraphFlowNode[];
+  edges: GraphRouteEdge[];
+  fitNodes?: GraphFlowNode[];
+  narrow: boolean;
+  theme: LoopTheme;
+  onSelectEdge: (edge: GraphEngineeringEdge) => void;
+}) {
+  return <div
+    data-loop-canvas
+    data-engineering-view="graph"
+    aria-label={`Graph Engineering canvas; one RunBook Orchestrator control, ${projection.nodes.length} Loops, ${focus.transitionCount} named transitions, ${focus.repairCount} repair routes${projection.done ? ", and DONE terminal" : ""}`}
+    className="relative h-full min-h-[34rem] min-w-0 overflow-hidden border border-divider-strong bg-background"
+    style={loopThemeCssProperties(theme)}
+  >
+    <div className="pointer-events-none absolute inset-0 opacity-35 bg-[image:linear-gradient(to_right,var(--divider-strong)_1px,transparent_1px),linear-gradient(to_bottom,var(--divider-strong)_1px,transparent_1px)] bg-[size:24px_24px]" />
+    <div className="pointer-events-none absolute top-2 left-2 z-20 rounded border border-divider-strong bg-card/95 px-2 py-1 font-mono text-[0.62rem] text-muted-foreground">
+      <span className="text-foreground">{projection.graphName}</span> · start {projection.startLoopId} · {focus.transitionCount} transitions · {focus.repairCount} repairs
+    </div>
+    <div aria-label="Graph RunBook transitions">
+      {focus.edges.map((edge) => <button
+        key={edge.id}
+        type="button"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-14 focus:left-2 focus:z-30 focus:rounded focus:border focus:border-primary focus:bg-background focus:px-2 focus:py-1 focus:font-mono focus:text-xs"
+        aria-label={edge.kind === "transition"
+          ? `${edge.decision} outcome ${edge.outcome}, ${edge.source} to ${edge.targetId}`
+          : `Repair capability ${edge.capability}, ${edge.source} to ${edge.target}`}
+        onClick={() => onSelectEdge(edge)}
+      >{edge.kind === "transition" ? `${edge.decision} · ${edge.outcome}` : `REPAIR · ${edge.capability}`}</button>)}
+    </div>
+    <ReactFlow<GraphFlowNode, GraphRouteEdge>
+      key={narrow ? "narrow" : "wide"}
+      className="loop-react-flow relative z-10 h-full min-h-[34rem] w-full"
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      fitView
+      fitViewOptions={{ padding: 0.08, minZoom: 0.7, maxZoom: 1, nodes: fitNodes }}
+      minZoom={0.25}
+      maxZoom={1.5}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable={false}
+      panOnScroll
+      zoomOnScroll={false}
+      zoomOnPinch
+      zoomOnDoubleClick={false}
+      preventScrolling
+      deleteKeyCode={null}
+      proOptions={{ hideAttribution: true }}
+      onEdgeClick={(event, selected) => {
+        event.stopPropagation();
+        if (selected.data?.edge) onSelectEdge(selected.data.edge);
+      }}
+    >
+      <Controls showInteractive={false} position="bottom-left" />
+    </ReactFlow>
+  </div>;
+}
+
+function narrowInitialNodes(
+  nodes: GraphFlowNode[],
+  projection: GraphEngineeringProjection
+): GraphFlowNode[] {
+  const visible = new Set([
+    projection.orchestrator.id,
+    projection.startLoopId,
+    ...projection.edges.flatMap((edge) => edge.kind === "transition"
+      && edge.source === projection.startLoopId
+      && edge.targetId !== "graph-done" ? [edge.targetId] : [])
+  ]);
+  return nodes.filter((node) => visible.has(node.id));
+}
+
+function routeFlowEdge(
+  edge: GraphEngineeringEdge,
+  positions: Map<string, ReturnType<typeof calculateGraphEngineeringLayout>[number]>,
+  lane: GraphRouteData["lane"],
+  onSelect: (edge: GraphEngineeringEdge) => void
+): GraphRouteEdge[] {
+  const source = positions.get(edge.source);
+  const target = positions.get(edge.targetId);
+  if (!source || !target) return [];
+  const forward = edge.kind === "transition" && source.rank < target.rank;
+  const color = edge.kind === "repair"
+    ? "var(--tertiary)"
+    : edge.decision === "PASS" ? "var(--secondary)" : "var(--error)";
+  const self = edge.source === edge.targetId;
+  const negativeSelf = self && lane?.side !== "positive";
+  return [{
+    id: edge.id,
+    type: "graphRoute",
+    source: edge.source,
+    target: edge.targetId,
+    sourceHandle: self ? negativeSelf ? "left-source" : "right-source" : forward ? "right-source" : "left-source",
+    targetHandle: self ? negativeSelf ? "top-target" : "bottom-target" : forward ? "left-target" : "right-target",
+    data: { edge, pathKind: forward ? "straight" : "smoothstep", lane, onSelect },
+    focusable: false,
+    selectable: false,
+    markerEnd: { type: MarkerType.ArrowClosed, color },
+    style: {
+      stroke: color,
+      strokeWidth: edge.activeRoute ? 2.5 : 1.5,
+      strokeDasharray: edge.kind === "repair" ? "6 5" : undefined
+    }
+  }];
+}
+
+function graphRouteLanes(
+  edges: GraphEngineeringEdge[],
+  positions: Map<string, ReturnType<typeof calculateGraphEngineeringLayout>[number]>
+): Map<string, NonNullable<GraphRouteData["lane"]>> {
+  const detours = edges.filter((edge) => {
+    const source = positions.get(edge.source);
+    const target = positions.get(edge.targetId);
+    return edge.kind === "repair" || !source || !target || source.rank >= target.rank;
+  }).sort((left, right) => left.id.localeCompare(right.id));
+  const lanes = new Map<string, NonNullable<GraphRouteData["lane"]>>();
+  assignRouteLanes(detours.filter((edge) => edge.source === edge.targetId), lanes);
+  assignRouteLanes(detours.filter((edge) => edge.source !== edge.targetId), lanes);
+  return lanes;
+}
+
+function assignRouteLanes(
+  edges: GraphEngineeringEdge[],
+  target: Map<string, NonNullable<GraphRouteData["lane"]>>
+) {
+  edges.forEach((edge, index) => target.set(edge.id, {
+    side: index % 2 === 0 ? "negative" : "positive",
+    depth: Math.floor(index / 2)
+  }));
 }
 
 function orchestratorFlowNode(
@@ -156,53 +252,36 @@ function orchestratorFlowNode(
     draggable: false,
     selectable: false,
     focusable: false,
-    data: { node: projection.orchestrator, selected, policyCount: projection.edges.length, onSelect },
+    data: {
+      node: projection.orchestrator,
+      selected,
+      transitionCount: projection.edges.filter((edge) => edge.kind === "transition").length,
+      repairCount: projection.edges.filter((edge) => edge.kind === "repair").length,
+      graphName: projection.graphName,
+      onSelect
+    },
     style: { ...graphEngineeringOrchestratorNodeSize, pointerEvents: "all" }
   };
 }
 
-function routeSegments(
-  edge: GraphEngineeringEdge,
-  positions: Map<string, ReturnType<typeof calculateGraphEngineeringLayout>[number]>,
-  theme: LoopTheme,
-  onSelect: (edge: GraphEngineeringEdge) => void
-): GraphRouteSegmentEdge[] {
-  const source = positions.get(edge.source);
-  const target = positions.get(edge.target);
-  const orchestrator = positions.get("loop-orchestrator");
-  if (!source || !target || !orchestrator) return [];
-  const requestSide = sideFromOrchestrator(source, orchestrator);
-  const dispatchSide = sideFromOrchestrator(target, orchestrator);
-  const color = edge.activeRoute ? "var(--secondary)" : edge.kind === "repair" ? "var(--tertiary)" : "var(--loop-theme-edge-color)";
-  const style = {
-    stroke: color,
-    strokeWidth: edge.activeRoute ? 2.5 : 1.5,
-    strokeDasharray: loopEdgeDasharray(edge.kind === "repair" ? theme.edge.repairStyle : theme.edge.crossLoopStyle)
+function doneFlowNode(
+  positions: Map<string, ReturnType<typeof calculateGraphEngineeringLayout>[number]>
+): GraphDoneFlowNode {
+  const position = positions.get("graph-done");
+  if (!position) throw new Error("Missing Graph Engineering DONE terminal.");
+  return {
+    id: "graph-done",
+    type: "graphDone",
+    position: { x: position.x, y: position.y },
+    width: graphEngineeringDoneNodeSize.width,
+    height: graphEngineeringDoneNodeSize.height,
+    initialWidth: graphEngineeringDoneNodeSize.width,
+    initialHeight: graphEngineeringDoneNodeSize.height,
+    measured: graphEngineeringDoneNodeSize,
+    draggable: false,
+    selectable: false,
+    focusable: false,
+    data: { label: "DONE" },
+    style: { ...graphEngineeringDoneNodeSize, pointerEvents: "none" }
   };
-  const markerEnd = { type: MarkerType.ArrowClosed, color };
-  return [{
-    id: `${edge.id}:request`, type: "graphRouteSegment", source: edge.source, target: "loop-orchestrator",
-    sourceHandle: `${oppositeSide(requestSide)}-source`, targetHandle: `${requestSide}-target`,
-    data: { edge, segment: "request", onSelect }, focusable: false, selectable: false, markerEnd, style
-  }, {
-    id: `${edge.id}:dispatch`, type: "graphRouteSegment", source: "loop-orchestrator", target: edge.target,
-    sourceHandle: `${dispatchSide}-source`, targetHandle: `${oppositeSide(dispatchSide)}-target`,
-    data: { edge, segment: "dispatch", onSelect }, focusable: false, selectable: false, markerEnd, style
-  }];
 }
-
-function sideFromOrchestrator(
-  node: ReturnType<typeof calculateGraphEngineeringLayout>[number],
-  orchestrator: ReturnType<typeof calculateGraphEngineeringLayout>[number]
-) {
-  if (node.x < orchestrator.x) return "left";
-  if (node.x > orchestrator.x) return "right";
-  return node.y < orchestrator.y ? "top" : "bottom";
-}
-
-const oppositeSide = (side: ReturnType<typeof sideFromOrchestrator>) => ({
-  left: "right",
-  right: "left",
-  top: "bottom",
-  bottom: "top"
-} as const)[side];

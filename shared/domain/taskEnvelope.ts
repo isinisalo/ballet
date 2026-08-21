@@ -1,7 +1,7 @@
 import type { JsonValue } from "./automation.js";
 import type { CanonicalNodeOutcome, JobCompletedOutcome } from "./runtime.js";
 
-export const taskEnvelopeVersion = 5 as const;
+export const taskEnvelopeVersion = 6 as const;
 export const maxTaskEnvelopeBytes = 384 * 1024;
 export const maxRelevantHistoryEntries = 8;
 export const maxRelevantHistoryBytes = 64 * 1024;
@@ -75,7 +75,7 @@ export interface TaskEnvelopeRouteCandidate {
     provides: string[];
   };
   route: {
-    kind: "flow" | "repair";
+    kind: "repair";
     capability: string;
     description: string;
   };
@@ -83,7 +83,7 @@ export interface TaskEnvelopeRouteCandidate {
 
 export interface TaskEnvelopeOrchestrationRequest {
   id: string;
-  kind: "flow" | "repair";
+  kind: "repair";
   sourceLoopId: string;
   sourceLoopRunId: string;
   sourceNodeRunId: string;
@@ -116,7 +116,7 @@ interface TaskEnvelopeBase {
   relevantHistory: TaskEnvelopeHistoryEntry[];
 }
 
-export interface JobTaskEnvelopeV5 extends TaskEnvelopeBase {
+export interface JobTaskEnvelopeV6 extends TaskEnvelopeBase {
   role: "job";
   run: TaskEnvelopeProviderRunIdentity;
   jobNode: TaskEnvelopeWorkflowNodeIdentity;
@@ -127,7 +127,7 @@ export interface JobTaskEnvelopeV5 extends TaskEnvelopeBase {
   };
 }
 
-export interface ValidationTaskEnvelopeV5 extends TaskEnvelopeBase {
+export interface ValidationTaskEnvelopeV6 extends TaskEnvelopeBase {
   role: "validation";
   run: TaskEnvelopeProviderRunIdentity;
   jobNode: TaskEnvelopeWorkflowNodeIdentity;
@@ -135,16 +135,23 @@ export interface ValidationTaskEnvelopeV5 extends TaskEnvelopeBase {
   jobAttempt: number;
   jobOutcome: JobCompletedOutcome;
   repairReturn?: TaskEnvelopeRepairReturn;
+  allowedTransitions: Array<{
+    id: string;
+    decision: "PASS" | "FAIL";
+    outcome: string;
+    target: { loopId: string } | { runResult: "DONE" };
+    description: string;
+  }>;
 }
 
-export interface OrchestratorTaskEnvelopeV5 extends TaskEnvelopeBase {
+export interface OrchestratorTaskEnvelopeV6 extends TaskEnvelopeBase {
   role: "orchestrator";
   run: TaskEnvelopeRunIdentity;
   orchestrationRequest: TaskEnvelopeOrchestrationRequest;
   allowedCandidates: TaskEnvelopeRouteCandidate[];
 }
 
-export type TaskEnvelopeV5 =
-  | JobTaskEnvelopeV5
-  | ValidationTaskEnvelopeV5
-  | OrchestratorTaskEnvelopeV5;
+export type TaskEnvelopeV6 =
+  | JobTaskEnvelopeV6
+  | ValidationTaskEnvelopeV6
+  | OrchestratorTaskEnvelopeV6;

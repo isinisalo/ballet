@@ -3,6 +3,7 @@ import type {
   ProjectJobNode,
   ProjectJobSchedule,
   ProjectLoop,
+  ProjectLoopOrchestrator,
   ProjectValidationNode
 } from "../../shared/domain/automation.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
@@ -16,12 +17,20 @@ export const testExecutionProfile: ExecutionProfile = {
   networkAccess: false
 };
 
-export const testOrchestrator = () => ({
-  executionProfileId: testExecutionProfile.id,
-  primaryInstructionId: "project:architect",
-  skillIds: [],
-  maxRepairDepth: 4,
-  maxRepairAttempts: 3
+export const testRunbookOrchestrator = (): ProjectLoopOrchestrator => ({
+  mode: "runbook",
+  maxTransitions: 256
+});
+
+export const testOrchestrator = (): ProjectLoopOrchestrator => ({
+  ...testRunbookOrchestrator(),
+  repairRouter: {
+    executionProfileId: testExecutionProfile.id,
+    primaryInstructionId: "project:architect",
+    skillIds: [],
+    maxRepairDepth: 4,
+    maxRepairAttempts: 3
+  }
 });
 
 export interface TestJobPair {
@@ -94,13 +103,32 @@ export const testLoop = (id = "main-loop", pair = testJobPair()): ProjectLoop =>
 });
 
 export const testAutomationConfig = (loop = testLoop()): ProjectAutomationConfig => ({
-  version: 12,
-  orchestrator: testOrchestrator(),
-  graph: { loopEdges: [] },
+  version: 13,
+  orchestrator: testRunbookOrchestrator(),
+  graph: {
+    id: "test-graph",
+    name: "Test Graph",
+    startLoopId: loop.id,
+    transitions: [{
+      id: `${loop.id}-success-done`,
+      source: loop.id,
+      decision: "PASS",
+      outcome: "success",
+      target: { runResult: "DONE" },
+      description: "Finish the test graph."
+    }],
+    repairEdges: []
+  },
   loops: [loop]
 });
 
 export const testProjectConfiguration = (loop = testLoop()): ProjectConfiguration => ({
   ...testAutomationConfig(loop),
-  executionProfiles: [testExecutionProfile]
+  executionProfiles: [testExecutionProfile],
+  issueTracker: {
+    kind: "tk",
+    testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+    orchestrationDirectory: ".tickets/orchestration",
+    workDirectory: ".tickets/work"
+  }
 });

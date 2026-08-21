@@ -3,8 +3,8 @@ id: arc42-section-12
 title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 10
+updatedAt: '2026-08-21'
+version: 11
 tags:
   - arc42
   - glossary
@@ -15,163 +15,119 @@ arc42Section: 12
 
 ## Tarkoitus
 
-Tämä osio määrittää project-, authoring-, runtime-, provider-, persistence-, module- ja UI-termit, joiden täsmällinen yhteinen merkitys vaikuttaa arkkitehtuuriin, toteutukseen tai handoffiin. Lähdekoodin nimet säilyvät englanniksi, vaikka selitys on suomeksi.
+Tämä osio määrittää project-, authoring-, runtime-, tracker-, provider-, persistence-, module- ja UI-termit, joiden yhteinen täsmällinen merkitys vaikuttaa arkkitehtuuriin, toteutukseen tai handoffiin. Lähdekoodin nimet säilyvät englanniksi, vaikka selitys on suomeksi.
 
 ## Tila
 
-Sanasto kuvaa toteutetun strict-v12/v2 config/domain/snapshot/module/runtime-rajan ja Graph/Workflow-authoring-mallin. Historialliset Loop Engineer-, Loop Engineering-, WorkLoopNode- ja WorkNode-termit sekä legacy `Step`, `Transition` ja vanha `StepResult` eivät ole aktiivisen runtime- tai UI-domainin termejä.
+Sanasto kuvaa toteutetun strict-v13/V3-rajan ja viiden Loopin project-local-oletuksen. Strict-v12, `LoopEdge` flow -reitit, providerin flow-target-valinta, continuous-learning-oletusloop sekä aiemmat Loop Engineer-, WorkLoopNode-, `Step`- ja `Transition`-mallit ovat vain historiallisia termejä.
 
 ## Project ja authoring
 
 | Termi | Määritelmä |
 | --- | --- |
-| Project truth | Versionhallittu, ihmis- ja agenttikatselmoitava tieto checkoutissa: Goalit, ADR:t, arc42, `.ballet/project.json`, instructionit, skillit, source ja design. Eri asia kuin machine-local runtime state. |
-| Project Loop | `.ballet/project.json`:ssa materialisoitu strict-v12 `ProjectLoop`, joka sisältää identityn, `accepts`/`provides`-capabilityt, Staten ja yhden `ProjectWorkflow`-rakenteen. |
-| Loop | Nimetty runtime- ja authoring-raja, jonka sisäinen Workflow tuottaa PASS/FAIL-tuloksen ja jonka välillä project-global `LoopEdge` määrittää flow/repair-candidateja. |
-| ProjectWorkflow | Valitun Loopin sisäinen rakenne: start Job, erilliset Job/Validation-kokoelmat sekä Pass/Fail Edget. |
+| Project truth | Versionhallittu, ihmis- ja agenttikatselmoitava tieto checkoutissa: Goalit, ADR:t, arc42, `.ballet/project.json`, instructions, skills, release map, source ja design. Eri asia kuin machine-local runtime state ja ticket-store. |
+| Strict-v13 | Nykyinen project config hard cut: 1–40 `ProjectLoop`ia ja `ProjectGraphV13`, jossa tavalliset named transitionit ja repair-edget ovat eri kokoelmissa. V12-lukijaa tai automaattista muunnosta ei ole. |
+| Project Loop | `.ballet/project.json`:ssa materialisoitu Loop, joka sisältää identityn, capabilityt, bounded Staten ja yhden `ProjectWorkflow`-rakenteen. |
+| Loop | Nimetty authoring- ja runtime-raja. Oletusprojektissa Loopit ovat DESIGN, PLAN, BUILD, DEPLOY ja VERIFY; platform ei tunne näitä nimiä. |
+| ProjectWorkflow | Valitun Loopin sisäinen rakenne: start Job, erilliset Job/Validation-kokoelmat sekä persisted Pass/Fail Edget. |
 | JobNode | Rooli, joka tuottaa rajatun työn, omistaa täsmälleen yhden ValidationNoden ja siirtyy valmistuttuaan kiinteästi siihen. |
-| ValidationNode | Rooli, joka arvioi paired Jobin tuloksen ja palauttaa strict PASS- tai FAIL-päätöksen tai jatkaa samaa nodea `needs_input`-tilassa. |
-| PassEdge | ValidationNoden täsmälleen yksi onnistumisyhteys seuraavaan JobNodeen tai kiinteään Workflow PASS -endpointiin. |
-| FailEdge | ValidationNoden täsmälleen yksi eskalointiyhteys kiinteään Workflow FAIL -endpointiin; sitä seurataan vasta retryrajan täytyttyä. |
-| Fixed Workflow transition | Job → paired Validation ja retryrajan sisäinen Validation FAIL → paired Job; ei authoroitava eikä kolmas Edge-laji. |
-| Work Loop Node / WorkNode | Historiallinen ADR-015:n strict-v10/v11 composite-malli, jonka ADR-020 supersedoi. Ei aktiivinen domain-termi. |
-| LoopEdge | Project-global yhteys Loopien välillä. `flow` määrittää normaalin Loop-jatkumon ja `repair` lähdekohtaisen repair allowlistin. |
-| Context projection | Loop Engineerin read-only-taso, joka näyttää Project intention, Loop systemin ja observable outcomes lisäämättä runtime-entiteettejä. |
-| Composition projection | Loop Engineerin taso, joka näyttää yhden black-box-solmun per Loop sekä täsmälleen project-global `LoopEdge` -topologian. |
-| Detail projection | Historiallinen ADR-017:n selected-Loop-projektio; nykyinen vastine on Workflow Engineering. |
-| Edge ownership | Graph omistaa project-global `LoopEdge`:t ja Workflow valitun Loopin `PassEdge`/`FailEdge`:t; näkymät eivät kirjoita toistensa yhteyksiä. |
+| ValidationNode | Rooli, joka arvioi paired Jobin tuloksen ja palauttaa PASS/FAIL-päätöksen, terminalissa sallitun `transitionOutcome`-arvon tai rajatun repair-pyynnön. |
+| Terminal Validation | Workflow'n viimeinen Validation, joka voi valita Graph Runissa yhden snapshotin sallitun named outcomen. Väli-Validation ei voi antaa graph outcomea. |
+| PassEdge | ValidationNoden onnistumisyhteys seuraavaan JobNodeen tai Workflow PASS -endpointiin. |
+| FailEdge | ValidationNoden eskalointiyhteys Workflow FAIL -endpointiin; retryrajan sisäinen paluu ei ole Edge. |
+| Fixed Workflow transition | Job → paired Validation ja paikallinen Validation FAIL → paired Job retryrajan sisällä; ei authoroitava Edge-laji. |
+| ProjectGraphTransition | Tavallinen RunBook-reitti, jonka avain on yksilöllinen `(source, decision, outcome)` ja target on Loop tai DONE. |
+| ProjectRepairEdge | Tavallisista transitioneista erillinen capability-allowlist Validation → repair Loop -kutsulle. |
+| Named outcome | Snake_case-arvo, jonka terminal Validation valitsee snapshotatusta enumista; enintään 64 merkkiä. |
+| DONE | Graph Runin eksplisiittinen terminal-tulos. Se ei ole Loop tai canvasin authoroitava kortti. |
+| Story/Release Map | `.ballet/releases/STORY-RELEASE-MAP.md`:n kevyt docs-as-code-järjestys stable release/story ID:ille, statuksille, design/acceptance-viitteille ja target environmentille. Toteutustaskit eivät asu kartassa. |
 | ExecutionProfile | Project-local provider/model/reasoning/permission-kokoonpano, joka on erotettu Node-roolin primary instruction- ja skill-valinnoista. |
-| Primary instruction | Yksi Node-roolille valittu pääohje, joka sijoitetaan compositioniin System-tekstin jälkeen. |
-| Skill | Project-local resurssi, joka tuo rajatun workflow- tai domain-ohjeen execution compositioniin vakaassa järjestyksessä. |
 | Resource closure | Kaikki target Loopin/Node-roolin deterministisesti tarvitsemat profiili-, instruction-, skill- ja schema-resurssit. |
-| Strict-v10 | Poistettu project schema -versio. Historialliset dokumentit voivat kuvata sen aikaista baselinea. |
-| Strict-v11 | Poistettu project config/module/runtime-baseline, jota strict-v12 repository ei lue, muunna eikä oletusarvoista. Historialliset dokumentit ja EVID-014 säilyvät. |
-| Strict-v12 | Nykyinen project config hard cut: `ProjectWorkflow`, erilliset Job/Validation-nodet, Pass/Fail Edget ja first-class Loop capability metadata ilman v11 readeria tai rinnakkaista mallia. |
-| Graph | Strict-v12 `ProjectAutomationConfig`-aggregaatin project-global route-policy-projektio, joka omistaa flow- ja repair-allowlistat. Ei client state eikä erillinen runtime-entiteetti. |
-| Loop capability metadata | Koneellisesti validoitava, geneerinen kuvaus Loopin tarjoamista ja tarvitsemista capabilityistä; project-workflow'n nimiä ei kovakoodata platformiin. |
-| Route candidate | Graphissa persisted source/target/kind/capability/description-yhteys, jonka Orchestrator voi valita vain immutable snapshotin allowlistista. |
-| LoopNode | Graph Engineeringin näkymänode yhdelle `ProjectLoop`ille. Ei uusi runtime-entiteetti eikä Workflow'n JobNode. |
 
 ## Runtime ja control flow
 
 | Termi | Määritelmä |
 | --- | --- |
-| Root Run | Yhden target Loopin immutable snapshotista käynnistyvä, omalla branch/worktreellä eristetty suorituskokonaisuus ja State-omistaja. |
-| Immutable snapshot | Root Runin alussa jäädytetty reachable automation, resource closure ja display/runtime metadata, jota checkoutin myöhempi muutos ei muuta. |
-| State | Root Runin omistama, rajattu canonical JSON -koordinaatioarvo; ei dokumenttien, diffien tai runtime-lokien kopio. |
-| `Arc42MethodStateV1` | Project-local arc42-menetelmän versionoitu State-sopimus, joka säilyttää nykytilan ja vakaat viitteet ilman pitkäikäisen dokumentaation kopiointia. |
-| State patch | Job- tai Validation PASS -outcomen schema-validi ehdotus State-muutokseksi, jonka runtime soveltaa vain current revision -ehdon ja sallittujen polkujen mukaisesti. Validation FAIL ei voi sisältää patchia. |
-| State revision | Immutable patchin jälkeinen State, jolla on monotoninen revision-numero, hash ja outcome/control-evidenssi. |
-| Outcome | Roolikohtaisen strict output -skeeman läpäissyt tulos, jonka runtime voi commitoida; providerin vapaa teksti ei ole outcome. |
-| Job attempt | JobRunin laskuri: ensimmäinen ajo on 0 ja jokainen kiinteä paikallinen retry kasvattaa arvoa yhdellä. Uusi PassEdge → Job aloittaa arvosta 0. |
-| Local retry | Runtime-invariantti, joka palauttaa Validation FAILin paired Jobiin, kun Job attempt on `maxRetries`-rajan alapuolella. Validation ei valitse retry-moodia. |
-| Repair Request | Immutable Validation-finding, joka kuvaa tarvittavan capabilityn/outcomen valitsematta target Loopia. |
-| Repair allowlist | Lähde-Loopin `repair` LoopEdgeistä muodostuva sallittu Orchestrator-target-joukko. |
-| Repair frame | Persistoitu call-frame, joka säilyttää caller Loopin/Validationin ja mahdollistaa LIFO-returnin repair-targetista. |
-| Continuation | Runtime-owned paluuosoite tai seuraava control-flow-askel; agentti tai State patch ei valitse sitä. |
-| Flow dispatch | Orchestrator-valinta Workflow PASSin jälkeen outgoing flow candidateista. Nolla candidatea päättää Root Runin; flow ei luo repair-framea. |
-| LIFO return | Sisäkkäisen repairin paluu viimeksi avattuun frameen ja samaan caller Validationiin. |
-| `needs_input` | Pysähtymistila, jossa puuttuva WHAT/WHY, prioriteetti, merkittävä päätös tai ambiguous repair-target vaatii ihmisen valinnan. |
-| Finalization | Root Runin terminal-tilan, viimeisen canonical control-faktan ja worktree-evidenssin commitointi; ei automaattinen merge/push. |
-| Cancellation barrier | Persistoitu raja, jonka jälkeen saapuva provider-payload ei saa muuttaa outcomea, Statea tai continuationia. |
-| Reconciliation | Startup-prosessi, joka yhdistää commitoidun Root Run-, task-, queue- ja State-tilan ilman replayta tai duplikaattivaikutusta. |
-| Interrupted task | Ennen restartia running-tilassa ollut provider-tehtävä, joka merkitään keskeytyneeksi eikä ajeta automaattisesti uudelleen. |
-| Scheduled Root Run | Project-local schedule-triggerin käynnistämä tavallinen Root Run, jolla on samat snapshot-, permission- ja persistence-invariantit. |
+| RunBook | Immutable Root Snapshotista ajettava deterministinen state machine. Validation valitsee decision/outcomen, runtime ratkaisee exact transitionin ilman kohteen LLM-päättelyä. |
+| Loop Orchestrator | Geneerinen runtime-komponentti, jonka `runbook`-mode soveltaa named transitioneja ja joka käyttää valinnaista agenttipohjaista routeria vain repair-edgeille. |
+| Root Run | Yksi eristetty suoritus ja State-omistaja. Kind on `graph` tai `loop`. |
+| Graph Root Run | Käyttää `graph.id`:tä, aloittaa `startLoopId`:stä, seuraa named transitioneja ja päättyy vain DONEen tai pysäytykseen. |
+| Loop Root Run | Ajaa yhden eksplisiittisesti valitun Loopin. Manuaalinen ja scheduled JobNode -ajo eivät jatka Graph-transitioneihin. |
+| Loop invocation | Yhden Loopin suoritus Root Runissa; orchestration-storeen sovitetaan siitä child `chore`. |
+| Immutable Root Snapshot | Runin alussa jäädytetty graph, reachable Loopit, resource closure ja versionoidut sopimukset. Checkoutin myöhempi muutos ei muuta käynnissä olevan Runin reititystä. |
+| GraphOrchestrationStateV1 | Runtime-tyyppi graph/start/current Loop -viitteille, viimeiselle transitionille, transition countille, DONElle ja ulkoisen seurannan viitteille. |
+| GraphEngineeringStateV1 | Project-local bounded State release/map-, active issue-, target environment-, deploy authorization/evidence- ja verification-viitteille. Ei sama asia kuin GraphOrchestrationState tai `tk`-issue. |
+| State patch | Schema-validi bounded State -muutosehdotus. Validation FAIL ei patchaa Statea. |
+| Outcome | Roolikohtaisen strict output -skeeman läpäissyt tulos; providerin vapaa teksti ei ole outcome. |
+| `transitionOutcome` | Terminal ValidationCompletedOutcomeV6:n named outcome, jonka on kuuluttava snapshotin sallittuun enumiin. |
+| Local retry | Runtime-invariantti, joka palauttaa Validation FAILin paired Jobiin retryrajan sisällä. |
+| Repair Request | Immutable Validation-finding ja capability. Terminal FAIL sisältää joko transitionOutcomen tai repair-pyynnön, ei molempia. |
+| Repair frame | Persistoitu call-frame, joka säilyttää caller Loopin ja Validationin LIFO-paluuta varten. |
+| Transition limit | Graph Runin enintään 256 toteutunutta named transitionia; seuraava yritys estetään fail-closedisti. |
+| `needs_input` | Pysähtymistila, jossa puuttuva WHAT/WHY, prioriteetti, merkittävä päätös, deploy-valtuutus tai yksikäsitteinen repair-target vaatii ihmistä. |
+| Reconciliation | Startup/resume-prosessi, joka sovittaa runtime- ja tracker-intentit ilman replayta tai duplikaattivaikutusta. |
+| Finalization | Root Runin terminal-tilan, canonical control-faktan ja worktree-evidenssin commitointi; ei automaattinen merge, push tai deploy. |
 
-## Provider ja execution
+## `tk` ja persistence
 
 | Termi | Määritelmä |
 | --- | --- |
-| Execution composition | Tavutasoinen kokonaisuus järjestyksessä System → primary instruction → vakaasti järjestetyt skillit → Task Envelope → role/output schema. |
-| Task Envelope | Runtime-tehtävän rajattu payload, joka kuvaa tehtävän, nykytilan/viitteet, sallitut resurssit ja odotetun tulosmuodon providerille. |
-| Composition hash | Exact composition -sisällöstä laskettu tunniste, jolla saman inputin determinismi ja provenance voidaan todentaa. |
-| Provider adapter | Portti, joka mapittaa canonical execution taskin Codex- tai Copilot-protokollaan ja normalisoi tapahtumat/outcomen muuttamatta runtime-semanticsia. |
-| Codex app-server adapter | Codex-providerin toteutus provider adapter -portille. |
-| Copilot SDK adapter | GitHub Copilot -providerin toteutus samalle portille. |
-| Provider FIFO lane | Yhden providerin persisted/managed jonotuskaista, joka säilyttää tehtävien järjestyksen; eri provider-kaistat voivat edetä rinnakkain. |
-| Preflight | Ennen jonotusta tehtävä profile-, resource-, permission-, schema- ja adapter-capability-validointi. |
-| No fallback | Invariantti, jonka mukaan puuttuva tai invalidi model/profile/provider/resource pysäyttää tehtävän eikä vaihdu hiljaisesti vaihtoehtoon. |
-| Strict output schema | Roolikohtainen koneellisesti validoitava tulosmuoto, jonka läpäisy tarvitaan ennen canonical outcomea. |
-| Normalized event | Provider-kohtaisesta protokollasta yhteiseen runtime/UI-tapahtumamuotoon mapattu havainto; se ei itsessään päätä control flow’ta. |
-
-## Persistence ja deployment
-
-| Termi | Määritelmä |
-| --- | --- |
+| `tk` | Koneelle asennettava issue tracker -prerequisite. Ballet tukee pinnatun revision käyttäytymistä eikä vendoroi tai automaattisesti asenna komentoa. |
+| Orchestration store | Worktreen `.tickets/orchestration`: runtime-only-store, jossa Root Run on `epic` ja Loop invocation child `chore`. |
+| Work store | Worktreen `.tickets/work`: release `epic` ja `task|feature|bug|chore`-toteutusissuet, joita PLAN/BUILD/VERIFY käsittelevät rajatulla CLI:llä. |
+| External ref | Idempotenssiavain kuten `ballet-root:<id>`, `ballet-loop-run:<id>` tai `ballet-release:<id>`. Yhdellä storella arvo on yksilöllinen. |
+| Tracker outbox | SQLite v9:n intent-taulu. Runtime kirjoittaa intentin ensin ja sallii etenemisen vasta onnistuneen `tk`-sovituksen ja linkityksen jälkeen. |
+| Tracker link | SQLite-taulun runtime-entiteetin, store-roolin, external-refin ja sovitetun ticket ID:n suhde. |
+| Tracker adapter | Rajattu argv-pohjainen prosessiportti, joka toimii vain konfiguroidussa worktreessä timeout- ja output-rajoilla ilman shelliä. |
+| `ballet tracker` | Agenttien sisäinen work-store-CLI: upsert, query, ready/claim, start, note, close ja reopen. Orchestration-store ei ole agenttien muokattava. |
+| Preflight | Tilapäisessä hakemistossa tehtävä capability-, JSONL/Markdown-, parent-, dependency-, cycle- ja external-ref-validointi ennen Runia. |
+| Canonical persistence | SQLiteen atomisesti commitoitu runtime-, State-, outcome-, control- ja tracker-intent-totuus. Ticket-store ei korvaa runtime-ohjausta. |
 | Machine-local runtime state | `.git/ballet`-hakemiston SQLite-, worktree- ja lifecycle-data, jota ei versionhallita project truthina. |
-| Canonical persistence | SQLiteen atomisesti commitoitu Root Run-, task-, outcome-, State- ja control-flow-totuus, josta runtime read -projektio johdetaan. |
-| Runtime read model | Storeista johdettu, shared DTO:n mukainen canonical UI-projektio; selain ei kokoa vaihtoehtoista statusta provider-tekstistä. |
-| Atomic revision | Transaktio, jossa State/outcome/control-flow-vaikutus näkyy kokonaan tai ei lainkaan. |
-| Checkout identity | Täsmällinen repository/checkout-raja, joka erottaa palvelun, tietokannan ja lifecycle-kontekstin toisista checkouteista. |
-| Root Run worktree | `.git/ballet/worktrees/<root-run-id>`-työalue ja dedicated branch, jossa Node-kirjoitukset tapahtuvat. |
-| Active checkout | Käyttäjän varsinainen Git-working tree, jota Node-suoritus ei muokkaa. |
-| Loopback API | Vain paikalliseen loopback-osoitteeseen bindattu HTTP-rajapinta React UI:lle ja local clientille. |
-| launchd lifecycle | macOS:n checkout-kohtaisen Ballet-palveluprosessin install/start/stop/status-hallinta. |
-| Verified distribution | macOS arm64/x64 -bundle, jonka sisältö/provenance tarkistetaan ennen valtuutettua aktivointia. |
+| Runtime DB v9 | Nykyinen strict runtime schema. Vanha kanta jätetään koskemattomaksi ja käynnistys antaa archive/remediation-ohjeen. |
 
-## Loop module
+## Provider ja versionoidut sopimukset
 
 | Termi | Määritelmä |
 | --- | --- |
-| Loop Module Package | Siirrettävä strict yhden Loopin authoring JSON, joka inspectoidaan ja materialisoidaan ennen runtimea; ei live runtime source. |
-| Inspect | Paketin koko-, UTF-8-, schema-, canonicalization-, hash-, trust- ja issue-tarkistus ilman project-mutaatiota. |
-| Install plan | Current project stateen sidottu deterministic ehdotus namespacesta, profile mappingista, resurssikirjoituksista, Loopista ja recommended connections -tiedosta. |
-| Materialisointi | Pakettidatan kirjoittaminen olemassa oleviksi project-local Loop-, profile-, instruction- ja skill-primitiveiksi. |
-| Config-last commit | Mutaatioperiaate, jossa uudet resurssit/provenance kirjoitetaan ennen project configia, jotta config ei viittaa puuttuvaan sisältöön. |
-| Installed Loop | V2-paketista materialisoitu strict-v12 Project Loop Workflow-rakenteineen, capabilityineen ja project resources -sisältöineen sekä non-runtime provenance/ownership metadata. |
-| Profile slot | Paketin paikallinen execution-vaatimus, joka mapitetaan installissa olemassa olevaan yhteensopivaan `ExecutionProfile`:en. |
-| Recommended connection | Paketin neuvoa antava cross-Loop-yhteys, jota ei materialisoida automaattisesti authoritative `LoopEdge`:ksi. |
-| Canonical export | Loopin resource closuresta vakaasti järjestetty JSON ja SHA-256, joka ei sisällä runtime-tilaa tai jaon ulkopuolista dataa. |
-| Provenance status | Nykyisestä Loop/resource-sisällöstä johdettu `exact`, `modified` tai `missing-resources`; ei persistentoitu authority field. |
-| Shared resource | Resurssi, johon viittaa useampi project-kohde ja jota module removal ei saa poistaa omistajuusarvauksen perusteella. |
+| Execution composition | Tavutasoinen järjestys System → primary instruction → vakaasti järjestetyt skillit → Task Envelope → role/output schema. |
+| Strict output schema | Roolikohtainen koneellisesti validoitava tulosmuoto, jonka läpäisy tarvitaan ennen canonical outcomea. |
+| Current runtime cut | Root Snapshot V6, Task Envelope V6, outcome schema V6, prompt composition V7, ExecutionSpec V8 ja runtime DB V9. |
+| Provider adapter | Portti, joka mapittaa canonical execution taskin provider-protokollaan ja normalisoi tapahtumat muuttamatta runtime-semanticsia. |
+| No fallback | Puuttuva tai invalidi model/profile/provider/resource/tracker pysäyttää tehtävän eikä vaihdu hiljaisesti vaihtoehtoon. |
 
-## UI ja operointi
+## Module ja käyttöliittymä
 
 | Termi | Määritelmä |
 | --- | --- |
-| Loop Engineer | Historiallinen ADR-017:n authoring workspace -nimi; ei aktiivinen UI-termi. |
-| Graph Engineering | Default authoring-näkymä: kaikki `ProjectLoop`→`LoopNode`-projektiot, yksi Orchestrator-control sekä persisted project-global route-policy ja canonical Run -evidenssi ilman sisäisiä Job/Validation-nodeja. |
-| Loop Engineering | Historiallinen ADR-018:n selected-Loop-nimi ja `view=loop`-reitti, jotka ADR-020 supersedoi. |
-| Workflow Engineering | Canonical selected-Loop-only authoring-näkymä: domainissa valitun Loopin erilliset Job/Validation-roolit ja Pass/Fail Edget; canvasilla yksi Job-artwork per pari ja vain persisted `straight | smoothstep` Edget ilman Validation- tai PASS/FAIL-nodeja, validate/retry-viivoja, project-global routeja tai Orchestrator-controlia. |
-| Mission | Run mission control -välilehti, joka korostaa nykyisen tavoitteen, aktiivisen canonical-polun ja operaattorin seuraavan merkityksellisen havainnon. |
-| All Loops | Run-näkymä immutable snapshotin koko Loop-topologiasta; ei authoring-editori eikä legacy-nimitys yhdelle konfiguraatiolistalle. |
-| Live inspector | Canonical Run/read-model-dataan sidottu paneeli position-, role-, profile-, attempt-, revision-, repair-, return- ja finalization-tiedoille. |
-| Active route | Snapshotin ja commitoidun control flow’n perusteella korostettu kuljettu/aktiivinen reitti. |
-| Decorative visualization | Artwork, orbit, glow, väri tai liike, joka tukee lukemista mutta ei ole prosentti, ETA, elapsed-aika tai uusi runtime-state. |
-| Human Node response | Operaattorin schema-validi Job- tai Validation-vastaus, joka kulkee saman application/runtime-rajan kautta kuin provider-outcome. |
-| Canonical projection | UI-esitys, jonka jokainen semanttinen kenttä on jäljitettävissä project truthiin, immutable snapshottiin tai canonical persistenceen. |
+| Loop Module Package V3 | Nykyinen portable package-sopimus. `recommendedTransitions` ja `recommendedRepairs` ovat eri advisory-kokoelmia; V2-lukijaa ei ole. |
+| `externalWrites` | V3-permission metadata; arvo `requires-human-authorization` ilmaisee DEPLOY-moduulin ulkoisen kirjoituksen portin. |
+| Graph Engineering | Project-global, pelkistetty authoring-näkymä: yksi Orchestrator-control node, kompaktit Loop-kortit, DONE ja suorat tai deterministiset smoothstep-reitit. |
+| Workflow Engineering | Yhden Loopin sisäinen editori. Suojattu avaruusteema näyttää vain Job-artworkit ja persisted PassEdge/FailEdge-yhteydet. |
+| Edge label | Graph-transitionin aina näkyvä päätös ja outcome, esimerkiksi `PASS · success`; väri ei ole ainoa signaali. |
+| Deterministic layered layout | Vasemmalta oikealle laskettu Graph-layout, joka tukee 1, 5 ja 40 Loopia ilman korttien päällekkäisyyttä. |
+| Edge ownership | Graph omistaa named transitionit ja repair-edget; Workflow omistaa valitun Loopin PassEdge/FailEdge-yhteydet. |
 
-## Menetelmä ja evidenssi
+## Arkkitehtuuri ja governance
 
 | Termi | Määritelmä |
 | --- | --- |
-| arc42 Template | `.ballet/arc42/`-hakemiston 12-osioinen versionhallittu arkkitehtuurin tietorakenne. |
-| arc42 Method | Kuusi toistuvaa arkkitehtuuriaktiviteettia, jotka Balletissa on toteutettu project-local Loopseina jatkuvalla feedbackilla. |
-| 6+1 | ADR-011:n historiallinen kuuden arc42-aktiviteetti-Loopin ja continuous-learning-Loopin shorthand. ADR-019 supersedoi kiinteän topologian; menetelmäintention toteuttavat nyt yhden vastuun project-local capability-Loopit. |
 | Initiative | Rajattu muutos, jolla on BRIEF-, PLAN-, EVIDENCE- ja REVIEW-artefaktit. |
-| Stable ID | Sisältöpäivityksissä säilyvä tunniste, jolla Goal/REQ/QS/ADR/CON/BB/RT/DEP/TEST/EVID-ketju pysyy ratkaistavana. |
+| Stable ID | Sisältöpäivityksissä säilyvä Goal/REQ/QS/ADR/CON/BB/RT/DEP/TEST/EVID-tunniste. |
 | Trace chain | Goal/REQ → QS → ADR/CON → BB/RT/DEP → TEST/monitor → EVID -suhdeketju. |
-| Handoff | Tiivis pysyvä kuvaus nykytilasta, evidenssistä, löydöksistä, avoimista kysymyksistä ja yhdestä seuraavasta hyväksytystä toimesta. |
-| Fact | Kanonisesta lähteestä tai evidenssistä suoraan todennettu tieto. |
-| Decision | Goalin/ADR:n tai eksplisiittisen ihmisvaltuutuksen omistama hyväksytty valinta. |
-| Assumption | Todentamaton lähtökohta, jolla on omistaja ja review-trigger. |
-| Hypothesis | Ehdotettu kausaalinen parannus, jolla on baseline ja mitattava odotus. |
-| Finding | Evidenssiin perustuva havainto, joka ei keksi intentiota. |
-| Open question | Puuttuva tieto, joka voi vaatia `needs_input`-tilan. |
-| Conformance review | Rajatun diffi-/toteutusmuutoksen vertailu hyväksyttyyn arkkitehtuuriin muuttamatta arvioitavaa implementationia. |
 | External write | Push, merge, release, deploy, rollback, viesti tai muu mutaatio hyväksytyn Root Run -worktreen ulkopuolelle. |
+| Human authorization | Täsmällinen käyttäjän lupa tiettyyn ulkoiseen kirjoitukseen; yleinen toteutuspyyntö ei valtuuta deployta, mergeä tai pushia. |
 
 ## Kanoniset lähteet
 
-Hyväksytyt Goalit/ADR:t, shared domain -terminologia ja runtime-sopimukset menevät tämän yhteenvedon edelle ristiriidassa; ristiriita korjataan sitten sanastoon, ei jätetä rinnakkaiseksi tulkinnaksi.
+Hyväksytyt Goalit/ADR:t, shared domain -sopimukset, `.ballet/project.json`, STATE-CONTRACT ja tracker-sopimus menevät tämän yhteenvedon edelle ristiriidassa. Ristiriita korjataan sanastoon eikä jätetä rinnakkaiseksi tulkinnaksi.
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019` ja `adr-020`.
+`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021` ja `adr-022`.
 
 ## Evidenssi
 
-Termit esiintyvät project configissa, source/shared contracts -rajapinnoissa, instructioneissa, skilleissä ja State-sopimuksessa. Legacy-termihaku tarkistaa aktiivisten lähteiden strict-v12-yhdenmukaisuuden muuttamatta historiallista evidenssiä.
+Termit esiintyvät project configissa, shared contracts -rajapinnoissa, runtime/tracker-toteutuksessa, instructions/skills-resursseissa ja STATE-CONTRACTissa. Legacy- ja platform-boundary-haut tarkistavat aktiivisten lähteiden strict-v13-yhdenmukaisuuden muuttamatta historiallista evidenssiä.
 
 ## Avoimet kysymykset
 

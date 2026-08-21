@@ -5,7 +5,7 @@ import type {
   InstalledLoopModuleStatus,
   LoopModuleInstallPlan,
   LoopModuleLibraryEntry,
-  LoopModulePackageV2
+  LoopModulePackageV3
 } from "@shared/api/workspace-contracts";
 import { LoopLibraryDialog, type LoopModuleActions } from "../src/workspace/automation/loops/LoopLibraryDialog";
 
@@ -69,15 +69,15 @@ describe("Loop Library dialog", () => {
   });
 });
 
-const pkg: LoopModulePackageV2 = {
-  format: "ballet-loop-module", version: 2,
+const pkg: LoopModulePackageV3 = {
+  format: "ballet-loop-module", version: 3,
   manifest: { id: "sample-loop", title: "Sample module", description: "One portable sample Loop.", version: "1.0.0", category: "arc42", tags: ["sample"] },
   permissions: { network: "forbidden", externalWrites: false },
   profileSlots: [{ key: "worker", title: "Worker", description: "Worker profile.", providers: ["codex"], network: "forbidden" }],
   stateContract: { id: "sample-state", version: "1.0.0", description: "Sample state.", initial: {}, requiredKeys: [] },
   capabilities: {
     requires: [], accepts: ["sample:task.requested"],
-    provides: ["sample:task.completed"], recommendedConnections: []
+    provides: ["sample:task.completed"], recommendedTransitions: [], recommendedRepairs: []
   },
   resources: [],
   loop: {

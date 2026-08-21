@@ -4,7 +4,7 @@ title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-20'
-version: 10
+version: 11
 tags:
   - arc42
   - solution-strategy
@@ -19,7 +19,7 @@ Tämä osio kokoaa perustavat ratkaisut, joilla Ballet vastaa Goaleihin, laatuta
 
 ## Tila
 
-STRAT-001–STRAT-009 ovat toteutetun arkkitehtuurin strategioita. STRAT-010:n strict-v12/v2 Workflow hard cut on toteutettu teknisesti; ihmisacceptance, menetelmän vaikuttavuuden tuotantokaltainen baseline ja UI:n pidempiaikainen tulkintavirheiden seuranta ovat vielä avointa evidenssiä.
+STRAT-001–STRAT-010 säilyvät historiallisen ja nykyisen arkkitehtuurin strategioina. STRAT-011:n strict-v13 RunBook- ja tracker-hard cut on toteutettavana; `QS-016`–`QS-018`-evidenssi pysyy pending-tilassa, kunnes vastaavat tarkistukset ovat läpäisseet.
 
 ## Strategiat ja jäljitettävyys
 
@@ -35,6 +35,7 @@ STRAT-001–STRAT-009 ovat toteutetun arkkitehtuurin strategioita. STRAT-010:n s
 | STRAT-008 | Yhden Loopin strict authoring package materialisoidaan inspect/plan/commit-vaiheissa olemassa oleviksi project-local-primitiveiksi. | goal-010, goal-011 / REQ-010, REQ-011 | QS-009, QS-010 | adr-016, adr-017, CTR-011 | Reuse ei lisää live registry- tai runtime-riippuvuutta; authoring-projektiot säilyttävät runtime-semantikan. |
 | STRAT-009 | Strict-v11 graph erottaa project-global Graph Engineeringin selected-Loop-only Loop Engineeringistä ja ohjaa kaikki cross-Loop-flow/repair-valinnat snapshotattujen route-candidatejen sekä capabilityjen kautta Orchestratorille. | goal-012 / REQ-012 | QS-014 | adr-018 | V11 hard cut on poistanut Context/numeric-route/compatibility-polut; ambiguity tai ihmisvaltuutus tuottaa `needs_input`, ja UI projisoi yhden Orchestrator-control-noden, persisted policyt ja canonical Run -evidenssin ilman client-owned topologiaa. |
 | STRAT-010 | Strict-v12/v2 korvaa selected-Loop-compositen `ProjectWorkflow`-mallilla, jossa Job/Validation-paritus, Pass/Fail Edget ja retry/repair-siirtymät ovat eksplisiittisiä ja validoitavia. | goal-013 / REQ-013 | QS-015 | adr-020 | Aktiivisia WorkLoopNode/WorkNode/mode/view=loop-polkuja on 0; Workflow PASS käynnistää vasta sen jälkeen Orchestrator-ohjatun Graph flow'n, ja v7-kanta failaa suljetusti. |
+| STRAT-011 | Strict-v13/v3 erottaa named RunBook-transitionit repair call/returnista, reitittää tavallisen flow'n exact immutable snapshot -avaimella ja sovittaa Graph Runin kahteen worktree-local `tk`-storeen transactional outboxilla. | goal-014 / REQ-014 | QS-016–QS-018 | adr-022 | Repositoryn oletusdata on viisi Loopia, 18 transitionia ja 12 DESIGN Jobia; platform tukee geneerisesti 1–40 Loopia, flow-targetin provider-valintoja on 0 ja pending tracker-intent estää etenemisen. |
 
 ## Keskeiset trade-offit
 
@@ -49,6 +50,7 @@ STRAT-001–STRAT-009 ovat toteutetun arkkitehtuurin strategioita. STRAT-010:n s
 | Kanoniseen dataan perustuva UI | Operaattorin tulkinta vastaa runtime-faktoja. | Koristeellista progressia, ETA:a tai provider-tekstistä pääteltyä tilaa ei näytetä. |
 | V11 hard cut | Graph-, capability-, runtime- ja UI-semanttiikalle jää yksi strict totuus ilman compatibility-matriisia. | Domain, snapshot, persistence, API, module-data ja UI on muutettava yhdessä ennen acceptancea. |
 | V12 Workflow hard cut | Job/Validation-rakenne, Pass/Fail-reitit ja UI vastaavat samaa mallia ilman composite- tai mode-semanttiikkaa. | Repository-data ja SQLite-skeema muuttuvat koordinoidusti; v7-kanta arkistoidaan ennen uuden kannan luontia. |
+| V13 RunBook hard cut | Tavallinen Graph-flow on exact, snapshotattu ja ilman agenttireititystä; tracker-vaikutus sovitetaan ennen etenemistä. | Koko contract/runtime/module/config/UI-testipinta muuttuu kerralla, ja pinnattu `tk` on Graph Runin paikallinen prerequisite. |
 
 ## Arkkitehtuurin toteutusjärjestys
 
@@ -60,11 +62,11 @@ Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-009` ja `adr-011`–`adr-020`.
+`adr-001`–`adr-003`, `adr-005`–`adr-009`, `adr-011`–`adr-021` ja `adr-022`.
 
 ## Evidenssi
 
-Nykyinen lähdekoodi ja testit toteuttavat STRAT-001–STRAT-010:n teknisen pinnan. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v12 Workflow/Graph/capability-sopimuksen. Module-testit todentavat STRAT-008:n target-riippumattoman materialisointirajan. STRAT-009:n historiallinen tekninen evidenssi on `GLE-EVID-002`–`GLE-EVID-008`; STRAT-010:n evidenssi indeksoidaan `EVID-015`:ssä. Initiative-kohtaiset vaikutusmittarit pysyvät omissa EVIDENCE/REVIEW-tiedostoissaan.
+Nykyinen lähdekoodi toteuttaa STRAT-011:n muutospintaa. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v13 Workflow/Graph/transition/repair-sopimuksen. Module-testit todentavat STRAT-008:n V3-materialisointirajan. STRAT-009/010:n historiallinen evidenssi säilyy `EVID-014/015`:ssä; STRAT-011:n todellinen tulos indeksoidaan `EVID-016`–`EVID-018`:ssa ja `graph-engineering-runbook/EVIDENCE.md`:ssä.
 
 ## Avoimet kysymykset
 

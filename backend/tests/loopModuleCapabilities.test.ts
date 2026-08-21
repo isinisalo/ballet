@@ -38,7 +38,7 @@ describe("Loop module capability and peer-target conformance", () => {
       manifest: { ...testLoopModulePackage().manifest, id: "dependent-loop", title: "Dependent Loop" },
       capabilities: {
         requires: ["sample:task.completed"], accepts: ["dependent:task.requested"],
-        provides: ["dependent:task.completed"], recommendedConnections: []
+        provides: ["dependent:task.completed"], recommendedTransitions: [], recommendedRepairs: []
       }
     });
     const before = await modules.plan({ package: dependent, source: "test:dependent" });
@@ -62,14 +62,25 @@ const project = async (loops: ProjectLoop[] = []): Promise<string> => {
   await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
   await writeFile(path.join(root, ".ballet/instructions/architect.md"), "---\nid: architect\ntitle: Architect\n---\nRoute project repair work.\n");
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 12,
+    version: 13,
     executionProfiles: [{
       id: "codex-test", name: "Codex", provider: "codex", model: "test", reasoningEffort: "medium", networkAccess: false
     }],
-    orchestrator: {
-      executionProfileId: "codex-test", primaryInstructionId: "project:architect", skillIds: [], maxRepairDepth: 4, maxRepairAttempts: 3
+    issueTracker: {
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
     },
-    graph: { loopEdges: [] },
+    orchestrator: { mode: "runbook", maxTransitions: 256 },
+    graph: {
+      id: "test-graph", name: "Test Graph", startLoopId: loops[0]?.id ?? "",
+      transitions: loops.length === 0 ? [] : [{
+        id: `${loops[0]!.id}-done`, source: loops[0]!.id, decision: "PASS", outcome: "success",
+        target: { runResult: "DONE" }, description: "Finish the Graph."
+      }],
+      repairEdges: []
+    },
     loops
   }, null, 2));
   return root;

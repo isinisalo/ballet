@@ -1,9 +1,11 @@
-import type { JsonValue, ProjectLoop, ProjectLoopEdge } from "../../shared/domain/automation.js";
+import type {
+  JsonValue, ProjectGraphTransition, ProjectLoop, ProjectRepairEdge
+} from "../../shared/domain/automation.js";
 import type {
   LoopRunDetails, NodeRun, OrchestratorNodeOutcome, ValidationNodeOutcome, JobNodeOutcome
 } from "../../shared/domain/runtime.js";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testJobPair, testLoop, testOrchestrator } from "../tests/v12TestConfig.js";
+import { testJobPair, testLoop, testOrchestrator } from "../tests/v13TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 export interface OrchestrationHarness {
@@ -17,7 +19,8 @@ export interface OrchestrationHarness {
 export const createOrchestrationHarness = async (options: {
   initial?: Record<string, boolean | number | string>;
   targets?: ProjectLoop[];
-  edges?: ProjectLoopEdge[];
+  edges?: ProjectRepairEdge[];
+  transitions?: ProjectGraphTransition[];
   maxRepairDepth?: number;
   maxRepairAttempts?: number;
 } = {}): Promise<OrchestrationHarness> => {
@@ -33,14 +36,18 @@ export const createOrchestrationHarness = async (options: {
   }));
   const edges = options.edges ?? targets.map((target, index) => ({
     id: `repair-edge-${index + 1}`, source: caller.id, target: target.id,
-    kind: "repair" as const, capability: "test:loop.transfer", description: `Allow ${target.id}.`
+    capability: "test:loop.transfer", description: `Allow ${target.id}.`
   }));
+  const baseOrchestrator = testOrchestrator();
   const fixture = await createRuntimeStoreFixture(options.initial ?? { repaired: false }, {
-    loop: caller, loops: targets, loopEdges: edges,
+    loop: caller, loops: targets, transitions: options.transitions, repairEdges: edges,
     orchestrator: {
-      ...testOrchestrator(),
-      maxRepairDepth: options.maxRepairDepth ?? testOrchestrator().maxRepairDepth,
-      maxRepairAttempts: options.maxRepairAttempts ?? testOrchestrator().maxRepairAttempts
+      ...baseOrchestrator,
+      repairRouter: {
+        ...baseOrchestrator.repairRouter!,
+        maxRepairDepth: options.maxRepairDepth ?? baseOrchestrator.repairRouter!.maxRepairDepth,
+        maxRepairAttempts: options.maxRepairAttempts ?? baseOrchestrator.repairRouter!.maxRepairAttempts
+      }
     }
   });
   fixture.release();

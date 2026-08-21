@@ -64,13 +64,22 @@ const runDetail = (): RootRunDetail => ({
     returnDestination: { loopId: loop.id, jobNodeId: "job", validationNodeDefinitionId: "job-validation" }
   },
   executionSnapshot: {
-    version: 5, rootLoopId: loop.id,
+    version: 6, rootKind: "loop", rootLoopId: loop.id,
     project: { checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
-    orchestrator: { executionProfileId: "profile", primaryInstructionId: "project:orchestrator", skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3 },
-    graph: { loopEdges: [{
-      id: "repair-edge", source: loop.id, target: loop.id, kind: "repair",
-      capability: "test:loop.transfer", description: "Repair self-route."
-    }] }, loops: [loop],
+    orchestrator: {
+      mode: "runbook", maxTransitions: 256,
+      repairRouter: { executionProfileId: "profile", primaryInstructionId: "project:orchestrator", skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3 }
+    },
+    issueTracker: {
+      kind: "tk", testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration", workDirectory: ".tickets/work"
+    },
+    graph: {
+      id: "test-graph", name: "Test Graph", startLoopId: loop.id, transitions: [], repairEdges: [{
+        id: "repair-edge", source: loop.id, target: loop.id,
+        capability: "test:loop.transfer", description: "Repair self-route."
+      }]
+    }, loops: [loop],
     theme: defaultLoopTheme,
     executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },

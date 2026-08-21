@@ -28,7 +28,7 @@ export type DashboardRunStatus =
   | "blocked"
   | "failed"
   | "cancelled";
-export type RootRunKind = "loop";
+export type RootRunKind = "graph" | "loop";
 export type RootRunSource = "manual" | "schedule";
 export type RootRunListState = "active" | "recent";
 
@@ -86,6 +86,30 @@ export interface RootRunOrchestrationProjection {
   selectedRoute?: OrchestratorRoute;
 }
 
+export interface GraphOrchestrationStateV1 {
+  version: 1;
+  graphId: string;
+  startLoopId: string;
+  currentLoopId?: string;
+  currentLoopRunId?: string;
+  lastTransition?: {
+    id: string;
+    sourceLoopId: string;
+    decision: "PASS" | "FAIL";
+    outcome: string;
+    targetLoopId?: string;
+    runResult?: "DONE";
+  };
+  transitionCount: number;
+  terminalResult?: "DONE";
+  tracking: {
+    rootExternalRef: string;
+    rootTicketId?: string;
+    activeLoopExternalRef?: string;
+    activeLoopTicketId?: string;
+  };
+}
+
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";
   success: boolean;
@@ -118,6 +142,7 @@ export interface RootRunDetail extends RootRunSummary {
   tasks: ExecutionTask[];
   state: RootRunStateProjection;
   orchestration: RootRunOrchestrationProjection;
+  graphOrchestration?: GraphOrchestrationStateV1;
   repair: RootRunRepairProjection;
   controlFlowEvents: ControlFlowEvent[];
 }
@@ -131,7 +156,7 @@ export interface RootRunListQuery {
 export interface RootRunListResponse { items: RootRunSummary[]; nextCursor?: string }
 
 export interface StartRootRunRequest {
-  kind: "loop";
+  kind: RootRunKind;
   targetId: string;
   input?: string;
 }
@@ -142,7 +167,7 @@ export type RespondToNodeRunRequest =
   | { kind: "resume"; response: string };
 
 export interface RunTarget {
-  kind: "loop";
+  kind: RootRunKind;
   id: string;
   name: string;
   description?: string;
@@ -160,7 +185,7 @@ export interface RunTargetIssue {
   path?: string;
 }
 
-export interface RunTargetsResponse { loops: RunTarget[] }
+export interface RunTargetsResponse { graph: RunTarget; loops: RunTarget[] }
 
 export type WorkspaceInvalidationEvent =
   | { id: number; type: "workspace-changed"; at: string; reason?: string }

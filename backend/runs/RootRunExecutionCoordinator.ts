@@ -9,6 +9,7 @@ import type { RootFinalizationCoordinator } from "./RootFinalizationCoordinator.
 import type { RootRunStore, StoredRootRun } from "./RootRunStore.js";
 import { isActiveRootStatus } from "./RunReadProjection.js";
 import { createNodeExecutionSpec, type NodeExecutionPlanInput } from "./NodeExecutionPlan.js";
+import type { TrackerOutbox } from "../tracker/TrackerOutbox.js";
 
 export interface RootRunExecutionCoordinatorOptions {
   connection: () => Database.Database;
@@ -18,6 +19,7 @@ export interface RootRunExecutionCoordinatorOptions {
   queue: LocalExecutionQueue;
   finalizer: RootFinalizationCoordinator;
   workspaces: LocalWorkspaceManager;
+  tracker: TrackerOutbox;
   onChanged?(rootRunId: string): void;
 }
 
@@ -33,6 +35,8 @@ export class RootRunExecutionCoordinator {
   constructor(private readonly options: RootRunExecutionCoordinatorOptions) {}
 
   async enqueuePending(rootRunId: string): Promise<void> {
+    const root = this.options.roots.require(rootRunId);
+    if (!await this.options.tracker.reconcileOrPause(root)) return;
     const plan = this.pendingNode(rootRunId);
     if (!plan) return;
     if (plan.node.executionTaskId) {
@@ -87,6 +91,7 @@ export class RootRunExecutionCoordinator {
       this.options.roots.setStatus(rootRunId, "waiting_for_input");
       return;
     }
+    if (!await this.options.tracker.reconcileOrPause(this.options.roots.require(rootRunId))) return;
     const persistedRoot = this.options.roots.require(rootRunId);
     const status = persistedRoot.errorCode === "orchestrator_blocked" ? "blocked"
       : persistedRoot.errorCode ? "failed"
@@ -167,6 +172,7 @@ export class RootRunExecutionCoordinator {
           continue;
         } else if (isActiveRootStatus(root.status)) {
           await this.enqueuePending(root.rootRunId);
+          await this.sync(root.rootRunId);
         } else if (root.status === "completed" && root.finalization?.report?.success) {
           await this.options.workspaces.cleanupSuccessful(root).catch(() => undefined);
         }

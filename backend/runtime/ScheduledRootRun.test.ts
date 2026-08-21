@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testJobPair } from "../tests/v12TestConfig.js";
+import { testJobPair } from "../tests/v13TestConfig.js";
 import { createRuntimeStoreFixture } from "./RuntimeStore.test-fixture.js";
 
 describe("scheduled Root Run", () => {

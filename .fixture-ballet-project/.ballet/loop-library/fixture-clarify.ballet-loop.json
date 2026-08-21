@@ -6,14 +6,16 @@
     "provides": [
       "arc42:requirements.clarified"
     ],
-    "recommendedConnections": [
+    "recommendedTransitions": [
       {
-        "capability": "arc42:structures.designed",
+        "capability": "arc42:requirements.clarified",
+        "decision": "PASS",
         "description": "Continue from an approved BRIEF and measurable quality scenarios to structural design.",
         "direction": "outgoing",
-        "kind": "flow"
+        "outcome": "success"
       }
     ],
+    "recommendedRepairs": [],
     "requires": []
   },
   "format": "ballet-loop-module",
@@ -320,5 +322,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 2
+  "version": 3
 }

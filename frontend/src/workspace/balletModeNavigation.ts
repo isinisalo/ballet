@@ -1,5 +1,5 @@
 import type { BalletMode } from "@shared/api/workspace-contracts";
-import { automationGraphPath, automationLoopPath, runLoopPath, runOverviewPath } from "./routing";
+import { automationGraphPath, automationLoopPath, runGraphPath, runLoopPath, runOverviewPath } from "./routing";
 import type { RouteState } from "./types";
 
 export function pathForBalletMode({
@@ -21,6 +21,7 @@ export function pathForBalletMode({
 }
 
 const runRoutePath = (route: RouteState) => {
+  if (route.runTargetKind === "graph" && route.runTargetId) return runGraphPath(route.runTargetId, route.rootRunId);
   if (route.runTargetKind === "loop" && route.runTargetId) return runLoopPath(route.runTargetId, route.rootRunId);
   return runOverviewPath(route.rootRunId);
 };

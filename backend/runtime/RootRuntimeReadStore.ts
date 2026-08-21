@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { statePatchSchema } from "../../shared/api/runtime-schemas.js";
 import type {
-  RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection
+  GraphOrchestrationStateV1, RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection
 } from "../../shared/domain/runs.js";
 import {
   maxReadStatePatchEvidenceBytes, maxReadStateRevisionMetadata
@@ -15,6 +15,7 @@ import type { RepairStore } from "./RepairStore.js";
 import { canonicalJson } from "./state/CanonicalJson.js";
 import { statePatchSha256 } from "./state/StatePatch.js";
 import type Database from "better-sqlite3";
+import { GraphRunStateStore } from "./GraphRunStateStore.js";
 
 const nullableString = z.string().nullable();
 const stateMetadataRowSchema = z.object({
@@ -34,11 +35,14 @@ const countRowSchema = z.object({ count: z.number().int().nonnegative() }).stric
 export interface RootRuntimeReadProjection {
   state: RootRunStateProjection;
   orchestration: RootRunOrchestrationProjection;
+  graphOrchestration?: GraphOrchestrationStateV1;
   repair: RootRunRepairProjection;
   controlFlowEvents: ControlFlowEvent[];
 }
 
 export class RootRuntimeReadStore {
+  private readonly graph: GraphRunStateStore;
+
   constructor(
     private readonly connection: () => Database.Database,
     private readonly states: LoopStateStore,
@@ -46,12 +50,15 @@ export class RootRuntimeReadStore {
     private readonly repairs: RepairStore,
     private readonly repairResults: RepairResultStore,
     private readonly control: ControlFlowStore
-  ) {}
+  ) {
+    this.graph = new GraphRunStateStore(connection);
+  }
 
   read(rootRunId: string): RootRuntimeReadProjection {
     return {
       state: this.stateProjection(rootRunId),
       orchestration: this.orchestrationProjection(rootRunId),
+      graphOrchestration: this.graph.read(rootRunId),
       repair: this.repairProjection(rootRunId),
       controlFlowEvents: this.control.listByRoot(rootRunId)
     };

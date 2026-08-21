@@ -249,7 +249,7 @@ describe("Workflow runtime invariants", () => {
     `).run("a".repeat(64), "b".repeat(64), runtimeTestTimestamp))
       .toThrow("state revision must be the next monotonic revision");
     expect(() => fixture.connection().prepare(`
-      UPDATE root_runs SET transition_count = 257 WHERE root_run_id = 'root-run'
+      UPDATE root_runs SET transition_count = 2049 WHERE root_run_id = 'root-run'
     `).run()).toThrow(/CHECK constraint failed/);
     expect(() => fixture.connection().prepare(`
       UPDATE root_runs SET execution_snapshot_json = '{}' WHERE root_run_id = 'root-run'

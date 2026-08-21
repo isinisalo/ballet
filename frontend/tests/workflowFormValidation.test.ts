@@ -25,13 +25,11 @@ const skill: Skill = {
 const resources = [instruction("project:architect"), instruction("project:worker")];
 
 describe("Workflow Engineering form validation", () => {
-  it("accepts a complete v12 draft and reports missing compositions at Workflow paths", () => {
+  it("accepts a complete v13 draft and reports missing compositions at Workflow paths", () => {
     const config = workflowAutomation(workflowLoop());
     expect(automationDraftIssues(config, [profile], resources, [skill], localRuntime())).toEqual([]);
     const missing = automationDraftIssues(config, [], [], [], localRuntime());
     expect(missing.map((issue) => issue.path)).toEqual(expect.arrayContaining([
-      "orchestrator.executionProfileId",
-      "orchestrator.primaryInstructionId",
       "loops.0.workflow.jobNodes.0.executionProfileId",
       "loops.0.workflow.jobNodes.0.primaryInstructionId"
     ]));
@@ -54,18 +52,23 @@ describe("Workflow Engineering form validation", () => {
     ]));
   });
 
-  it("permits multiple flow candidates and rejects a duplicate route candidate", () => {
+  it("keeps RunBook transitions and repair routes separate and rejects a duplicate transition key", () => {
     const first = workflowLoop("first-loop");
     const second = workflowLoop("second-loop");
     const config = workflowAutomation(first, second);
-    config.graph.loopEdges = [
-      { id: "flow-1", source: first.id, target: first.id, kind: "flow", capability: "test:loop.transfer", description: "Repeat." },
-      { id: "flow-2", source: first.id, target: second.id, kind: "flow", capability: "test:loop.transfer", description: "Continue." },
-      { id: "repair-1", source: first.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair." },
-      { id: "repair-2", source: first.id, target: second.id, kind: "repair", capability: "test:loop.transfer", description: "Repair again." }
+    config.graph.transitions = [
+      { id: "route-1", source: first.id, decision: "PASS", outcome: "success", target: { loopId: second.id }, description: "Continue." },
+      { id: "route-2", source: first.id, decision: "PASS", outcome: "success", target: { loopId: first.id }, description: "Duplicate key." }
     ];
+    config.graph.repairEdges = [
+      { id: "repair-1", source: first.id, target: second.id, capability: "test:loop.transfer", description: "Repair." }
+    ];
+    config.orchestrator.repairRouter = {
+      executionProfileId: profile.id, primaryInstructionId: "project:architect",
+      skillIds: [], maxRepairDepth: 3, maxRepairAttempts: 3
+    };
     const messages = automationDraftIssues(config, [profile], resources, [], localRuntime()).map((issue) => issue.message);
-    expect(messages).toContain(`Duplicate Loop Edge route candidate id: ${first.id}→${second.id}:repair:test:loop.transfer.`);
+    expect(messages).toContain(`Duplicate RunBook transition key id: ${first.id}:PASS:success.`);
   });
 
   it("validates initial State JSON without truncation", () => {

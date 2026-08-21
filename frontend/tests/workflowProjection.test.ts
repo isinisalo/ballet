@@ -28,13 +28,17 @@ describe("Workflow Engineering projection", () => {
     ]);
   });
 
-  it("excludes project-global LoopEdges and unrelated Loops", () => {
+  it("excludes project-global transitions, Repair Edges, and unrelated Loops", () => {
     const selected = workflowLoop("selected-loop");
     const linked = workflowLoop("linked-loop");
     const config = workflowAutomation(selected, linked);
-    config.graph.loopEdges = [{
-      id: "global", source: selected.id, target: linked.id, kind: "flow",
-      capability: "test:loop.transfer", description: "Continue."
+    config.graph.transitions = [{
+      id: "global", source: selected.id, decision: "PASS", outcome: "success",
+      target: { loopId: linked.id }, description: "Continue."
+    }];
+    config.graph.repairEdges = [{
+      id: "global-repair", source: selected.id, target: linked.id,
+      capability: "test:loop.transfer", description: "Repair."
     }];
     const projection = buildWorkflowEngineeringProjection(config, selected.id)!;
     expect(JSON.stringify(projection)).not.toContain(linked.id);

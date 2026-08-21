@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import {
-  jobTaskEnvelopeV5Schema, orchestratorTaskEnvelopeV5Schema,
-  validationTaskEnvelopeV5Schema
+  jobTaskEnvelopeV6Schema, orchestratorTaskEnvelopeV6Schema,
+  validationTaskEnvelopeV6Schema
 } from "../../shared/api/task-envelope-schemas.js";
 import type { JsonValue } from "../../shared/domain/automation.js";
 import {
   maxOrchestrationRequestEnvelopeBytes, maxRelevantHistoryBytes, maxRelevantHistoryEntries,
   maxResumeContextBytes, maxTaskEnvelopeBytes, type TaskEnvelopeHistoryEntry,
-  type TaskEnvelopeV5
+  type TaskEnvelopeV6
 } from "../../shared/domain/taskEnvelope.js";
 import { assertJsonValue, canonicalJson, jsonSha256 } from "../runtime/state/CanonicalJson.js";
 import { validateState } from "../runtime/state/StatePatch.js";
@@ -19,19 +19,22 @@ export class TaskEnvelopeValidationError extends Error {
   }
 }
 
-export interface SerializedTaskEnvelopeV5 {
-  envelope: TaskEnvelopeV5;
+export interface SerializedTaskEnvelopeV6 {
+  envelope: TaskEnvelopeV6;
   serialized: string;
   sha256: string;
   sizeBytes: number;
 }
 
-export const serializeTaskEnvelopeV5 = (input: TaskEnvelopeV5): SerializedTaskEnvelopeV5 => {
+export const serializeTaskEnvelopeV6 = (input: TaskEnvelopeV6): SerializedTaskEnvelopeV6 => {
   const relevantHistory = selectRelevantHistory(input.relevantHistory);
   const normalized = input.role === "orchestrator"
     ? { ...input, relevantHistory, allowedCandidates: [...input.allowedCandidates].sort((left, right) =>
       compareUtf8(left.id, right.id) || compareUtf8(left.route.capability, right.route.capability)) }
-    : { ...input, relevantHistory };
+    : input.role === "validation"
+      ? { ...input, relevantHistory, allowedTransitions: [...input.allowedTransitions].sort((left, right) =>
+        compareUtf8(left.id, right.id)) }
+      : { ...input, relevantHistory };
   const parsed = parseEnvelope(normalized);
   const state = validateState(parsed.state.value);
   if (jsonSha256(state) !== parsed.state.sha256) {
@@ -61,7 +64,7 @@ export const serializeTaskEnvelopeV5 = (input: TaskEnvelopeV5): SerializedTaskEn
   };
 };
 
-export const parseSerializedTaskEnvelopeV5 = (serialized: string): SerializedTaskEnvelopeV5 => {
+export const parseSerializedTaskEnvelopeV6 = (serialized: string): SerializedTaskEnvelopeV6 => {
   let value: unknown;
   try { value = JSON.parse(serialized); }
   catch (error) {
@@ -69,9 +72,9 @@ export const parseSerializedTaskEnvelopeV5 = (serialized: string): SerializedTas
       `Task Envelope is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const result = serializeTaskEnvelopeV5(parseEnvelope(value));
+  const result = serializeTaskEnvelopeV6(parseEnvelope(value));
   if (result.serialized !== serialized) throw new TaskEnvelopeValidationError(
-    "Task Envelope is not in canonical V5 serialization order."
+    "Task Envelope is not in canonical V6 serialization order."
   );
   return result;
 };
@@ -82,14 +85,14 @@ export const selectRelevantHistory = (
   .sort((left, right) => left.sequence - right.sequence || compareUtf8(left.nodeRunId, right.nodeRunId))
   .slice(-maxRelevantHistoryEntries);
 
-const parseEnvelope = (input: unknown): TaskEnvelopeV5 => {
+const parseEnvelope = (input: unknown): TaskEnvelopeV6 => {
   if (typeof input !== "object" || input === null || !("role" in input)) {
     throw new TaskEnvelopeValidationError("Task Envelope must declare a Node role.");
   }
   try {
-    if (input.role === "job") return jobTaskEnvelopeV5Schema.parse(input);
-    if (input.role === "validation") return validationTaskEnvelopeV5Schema.parse(input);
-    if (input.role === "orchestrator") return orchestratorTaskEnvelopeV5Schema.parse(input);
+    if (input.role === "job") return jobTaskEnvelopeV6Schema.parse(input);
+    if (input.role === "validation") return validationTaskEnvelopeV6Schema.parse(input);
+    if (input.role === "orchestrator") return orchestratorTaskEnvelopeV6Schema.parse(input);
     throw new TaskEnvelopeValidationError(`Task Envelope has unsupported Node role ${String(input.role)}.`);
   } catch (error) {
     if (error instanceof TaskEnvelopeValidationError) throw error;

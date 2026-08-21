@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("LocalDatabase schema v8", () => {
+describe("LocalDatabase schema v9", () => {
   it("creates the clean Workflow runtime table inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -24,7 +24,7 @@ describe("LocalDatabase schema v8", () => {
     expect(tables).not.toContain("step_runs");
     expect(tables).not.toContain("loop_runs");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("8");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("9");
     database.close();
   });
 
@@ -119,7 +119,7 @@ describe("LocalDatabase schema v8", () => {
     legacy.close();
 
     expect(() => new LocalDatabase(filename).connection())
-      .toThrow("Unsupported Ballet state schema 5; expected 8.");
+      .toThrow("Unsupported Ballet state schema 5; expected 9.");
     const untouched = new Database(filename, { readonly: true });
     expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("5");
     expect(untouched.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all())
@@ -127,18 +127,18 @@ describe("LocalDatabase schema v8", () => {
     untouched.close();
   });
 
-  it("rejects schema v7 with exact archive guidance instead of migrating it", async () => {
+  it("rejects schema v8 with exact archive guidance instead of migrating it", async () => {
     const root = await temporaryRoot();
     const filename = path.join(root, "state.sqlite");
     const partial = new Database(filename);
     partial.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '7');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '8');
     `);
     partial.close();
 
     expect(() => new LocalDatabase(filename).connection()).toThrow(
-      "Unsupported Ballet state schema 7; expected 8."
+      "Unsupported Ballet state schema 8; expected 9."
     );
   });
 });

@@ -3,8 +3,8 @@ id: arc42-section-09
 title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 12
+updatedAt: '2026-08-21'
+version: 14
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-020:n strict-v12/v2 Workflow hard cut ja ADR-021:n Job-only canvas-projektio ovat accepted. ADR-021 supersedoi vain ADR-020:n erillisten canvas-artworkien, validate/retry-viivojen ja endpoint-nodejen vaatimuksen; erillinen Job/Validation-domain, runtime, editorit sekä Graph-, State-, Orchestrator-, Loop Module- ja project/platform-rajat säilyvät. Initiative-tason ihmisacceptance on pending.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-21. ADR-022:n strict-v13/v3 Graph RunBook ja `tk`-sovitus ovat accepted. ADR-022 supersedoi ADR-018:n tavallisen flow-targetin agenttivalinnan ja ADR-019:n repositoryn oletus-arc42-granulariteetin, mutta säilyttää repair call/returnin, Workflow/domain/canvas-rajat ja platformin geneerisen 1–40 Loopin mallin. Initiative-toteutuksen tekniset gatet ovat läpäisseet; ihmisreview ja live `tk` -smoke ovat pending.
 
 ## Päätösindeksi
 
@@ -42,10 +42,11 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-20. ADR-020:n strict-v12/v2 Wo
 | adr-015 | accepted; composite model partly superseded by adr-020 | Historical strict-v10 runtime and surviving State/repair invariants | [Work Loop, State ja Loop Orchestrator](../adr/adr-015-work-loop-state-ja-loop-orchestrator.md) |
 | adr-016 | accepted | Loop module boundary | [Yhden Loopin moduulipaketti ja project-local-materialisointi](../adr/adr-016-yhden-loopin-moduulipaketti-ja-project-local-materialisointi.md) |
 | adr-017 | accepted | Authoring projections | [Loop Engineer authoring-projektiot](../adr/adr-017-loop-engineer-authoring-projektiot.md) |
-| adr-018 | accepted; selected-Loop name/route partly superseded by adr-020 | Graph projection and orchestration | [Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi](../adr/adr-018-graph-ja-loop-engineering.md) |
-| adr-019 | accepted | Project-local Loop responsibility and package granularity | [Project-local Loopin yhden vastuun ja yhden onnistumisrajan sopimus](../adr/adr-019-project-local-loop-vastuuraja.md) |
-| adr-020 | accepted; canvas projection partly superseded by adr-021 | Strict-v12 Workflow domain, runtime, persistence and UI | [Workflow Engineering ja erilliset Job- ja Validation-nodet](../adr/adr-020-workflow-engineering.md) |
+| adr-018 | accepted; flow dispatch partly superseded by adr-022; selected-Loop name/route partly superseded by adr-020 | Historical Graph projection/orchestration and surviving repair boundary | [Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi](../adr/adr-018-graph-ja-loop-engineering.md) |
+| adr-019 | accepted; repository default arc42 granularity partly superseded by adr-022 | Project-local Loop responsibility and package/platform boundary | [Project-local Loopin yhden vastuun ja yhden onnistumisrajan sopimus](../adr/adr-019-project-local-loop-vastuuraja.md) |
+| adr-020 | accepted; version/Graph continuation partly superseded by adr-022; canvas projection partly superseded by adr-021 | Workflow domain, runtime and persistence invariants | [Workflow Engineering ja erilliset Job- ja Validation-nodet](../adr/adr-020-workflow-engineering.md) |
 | adr-021 | accepted | Workflow Engineering canvas projection | [Workflow-canvas projisoi Validationin JobNoden sisään](../adr/adr-021-workflow-canvas-job-projektio.md) |
+| adr-022 | accepted | Strict-v13 named Graph RunBook, tracker reconciliation and five-Loop project default | [Deterministinen Graph Engineering RunBook ja kaksistoreinen tk-sovitus](../adr/adr-022-deterministinen-graph-engineering-runbook.md) |
 
 ## Supersession-suhteet
 
@@ -79,6 +80,14 @@ adr-018:n Loop Engineering -nimi ja view=loop-reitti
 adr-020:n erilliset Job/Validation-canvas-artworkit, validate/retry-polut ja endpoint-nodet
         └── osittain superseded by ──▶ adr-021
             erillinen Job/Validation-domain, runtime, authorointi ja editorit säilyvät
+
+adr-018:n tavallisen flow-targetin agentti-/candidate-dispatch
+        └── osittain superseded by ──▶ adr-022
+            Graph/Workflow-erottelu ja repair allowlist/call-return säilyvät
+
+adr-019:n repositoryn yksi arc42-output per Loop -oletusgranulariteetti
+        └── osittain superseded by ──▶ adr-022
+            project-local vastuu, package- ja platform/project-raja säilyvät
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -92,6 +101,8 @@ adr-020:n erilliset Job/Validation-canvas-artworkit, validate/retry-polut ja end
 | adr-015, composite `WorkLoopNode` / `WorkNode` ja Validation `OK` / mode | adr-020 | Strict-v12 `ProjectWorkflow` käyttää erillisiä Job/Validation-nodeja sekä Pass/Fail Edgejä. State-, repair-frame-, continuation-, raja-, cancellation- ja recovery-periaatteet säilyvät. |
 | adr-018, **Loop Engineering** ja `view=loop` | adr-020 | Selected-Loop-projektio on **Workflow Engineering** reitillä `view=workflow`. Graph Engineering, `ProjectLoop` / `LoopNode`, project-global `LoopEdge` ja Orchestrator-ohjattu cross-Loop-flow säilyvät. |
 | adr-020, erilliset Job/Validation-canvas-artworkit, validate/retry-polut ja PASS/FAIL-endpoint-nodet | adr-021 | Workflow-canvas näyttää yhden Job-artworkin per pari, projisoi Validationin sen sisään ja piirtää vain persisted Pass/Fail Edget `straight | smoothstep` -geometrialla. Domain-, runtime- ja editorirajat säilyvät. |
+| adr-018, tavallisen flow'n capability/agentti-dispatch ja zero-flow completion | adr-022 | Strict-v13 ratkaisee exact named transitionin immutable snapshotista ja päättää Graph Runin vain eksplisiittiseen DONE-targetiin. Repair allowlist/call-return säilyy. |
+| adr-019, repositoryn oletus-arc42-granulariteetti | adr-022 | Oletusprojekti käyttää viittä toimitus-Loopia ja DESIGNin 12 osiokohtaista JobNodea. Project-local/package/platform-vastuurajat säilyvät. |
 
 ## Päätösten käyttö
 
@@ -111,7 +122,7 @@ Kaikki yllä indeksoidut ADR:t; `adr-011` määrittää indeksointi- ja source-o
 
 ## Evidenssi
 
-`npm run validate:arc42` ratkaisee jokaisen ADR-linkin ja tarkistaa viitatun frontmatter-ID:n. Dokumentaation conformance review tarkistaa, ettei diffi muuta `.ballet/adr/**`-tiedostoja.
+`npm run validate:arc42` ratkaisee jokaisen ADR-linkin ja tarkistaa viitatun frontmatter-ID:n. Dokumentaation conformance review tarkistaa, ettei hyväksyttyjen päätösten historiaa muuteta hiljaisesti; uusi `adr-022` on käyttäjän eksplisiittisesti valtuuttama päätös.
 
 ## Avoimet kysymykset
 

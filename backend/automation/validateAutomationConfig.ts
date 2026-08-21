@@ -2,6 +2,7 @@ import { automationConfigSchema } from "../../shared/api/workspace-schemas.js";
 import {
   getProjectFailEdges,
   getProjectPassEdges,
+  getReachableProjectLoopGraph,
   getReachableProjectJobNodeIds,
   hasReachableProjectWorkflowPass,
   isProjectAgentValidationNode,
@@ -167,41 +168,71 @@ export const validateProjectAutomationConfig = (
       ...loop.workflow.passEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.workflow.passEdges.${edgeIndex}.id` })),
       ...loop.workflow.failEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `loops.${loopIndex}.workflow.failEdges.${edgeIndex}.id` }))
     ]),
-    ...config.graph.loopEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.loopEdges.${edgeIndex}.id` }))
+    ...config.graph.transitions.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.transitions.${edgeIndex}.id` })),
+    ...config.graph.repairEdges.map((edge, edgeIndex) => ({ id: edge.id, path: `graph.repairEdges.${edgeIndex}.id` }))
   ], "Edge"));
-  if (profileIds && !profileIds.has(config.orchestrator.executionProfileId)) issues.push({
-    path: "orchestrator.executionProfileId",
-    message: `Orchestrator references unknown execution profile: ${config.orchestrator.executionProfileId}.`
+  if (profileIds && config.orchestrator.repairRouter
+    && !profileIds.has(config.orchestrator.repairRouter.executionProfileId)) issues.push({
+    path: "orchestrator.repairRouter.executionProfileId",
+    message: `Repair router references unknown execution profile: ${config.orchestrator.repairRouter.executionProfileId}.`
+  });
+  if (config.graph.repairEdges.length > 0 && !config.orchestrator.repairRouter) issues.push({
+    path: "orchestrator.repairRouter",
+    message: "A repairRouter is required when the graph contains Repair Edges."
   });
   config.loops.forEach((loop, index) => issues.push(...validateLoop(loop, index, profileIds)));
   const loopsById = new Map(config.loops.map((loop) => [loop.id, loop]));
-  config.graph.loopEdges.forEach((edge, index) => {
+  if (config.loops.length > 0 && !loopIds.has(config.graph.startLoopId)) issues.push({
+    path: "graph.startLoopId",
+    message: `Graph startLoopId references an unknown Loop: ${config.graph.startLoopId}.`
+  });
+  config.graph.transitions.forEach((transition, index) => {
+    if (!loopIds.has(transition.source)) issues.push({
+      path: `graph.transitions.${index}.source`,
+      message: `Transition references an unknown source Loop: ${transition.source}.`
+    });
+    if ("loopId" in transition.target && !loopIds.has(transition.target.loopId)) issues.push({
+      path: `graph.transitions.${index}.target.loopId`,
+      message: `Transition references an unknown target Loop: ${transition.target.loopId}.`
+    });
+  });
+  config.graph.repairEdges.forEach((edge, index) => {
     if (!loopIds.has(edge.source)) issues.push({
-      path: `graph.loopEdges.${index}.source`,
-      message: `Loop Edge references an unknown source Loop: ${edge.source}.`
+      path: `graph.repairEdges.${index}.source`,
+      message: `Repair Edge references an unknown source Loop: ${edge.source}.`
     });
     if (!loopIds.has(edge.target)) issues.push({
-      path: `graph.loopEdges.${index}.target`,
-      message: `Loop Edge references an unknown target Loop: ${edge.target}.`
+      path: `graph.repairEdges.${index}.target`,
+      message: `Repair Edge references an unknown target Loop: ${edge.target}.`
     });
     const target = loopsById.get(edge.target);
-    const compatible = edge.kind === "repair"
-      ? target?.capabilities.provides.includes(edge.capability)
-      : target?.capabilities.accepts.includes(edge.capability);
-    if (target && !compatible) issues.push({
-      path: `graph.loopEdges.${index}.capability`,
-      message: edge.kind === "repair"
-        ? `Repair Loop Edge capability ${edge.capability} is not provided by target Loop ${edge.target}.`
-        : `Flow Loop Edge capability ${edge.capability} is not accepted by target Loop ${edge.target}.`
+    if (target && !target.capabilities.provides.includes(edge.capability)) issues.push({
+      path: `graph.repairEdges.${index}.capability`,
+      message: `Repair Edge capability ${edge.capability} is not provided by target Loop ${edge.target}.`
     });
   });
   issues.push(...duplicateIssues(
-    config.graph.loopEdges.map((edge, index) => ({
-      id: `${edge.source}→${edge.target}:${edge.kind}:${edge.capability}`,
-      path: `graph.loopEdges.${index}.capability`
+    config.graph.transitions.map((transition, index) => ({
+      id: `${transition.source}:${transition.decision}:${transition.outcome}`,
+      path: `graph.transitions.${index}.outcome`
     })),
-    "Loop Edge route candidate"
+    "RunBook transition key"
   ));
+  if (loopIds.has(config.graph.startLoopId)) {
+    const reachable = getReachableProjectLoopGraph(
+      config,
+      config.graph.startLoopId,
+      config.orchestrator.repairRouter?.maxRepairDepth ?? 0
+    ).loopIds;
+    config.loops.forEach((loop, index) => {
+      if (!reachable.has(loop.id)) issues.push({
+        path: `loops.${index}.id`, message: `Loop is unreachable from graph.startLoopId: ${loop.id}.`
+      });
+    });
+    if (!config.graph.transitions.some((transition) => reachable.has(transition.source) && "runResult" in transition.target)) {
+      issues.push({ path: "graph.transitions", message: "Graph must contain a reachable DONE transition." });
+    }
+  }
   return issues;
 };
 
@@ -215,7 +246,9 @@ export const validateProjectExecutionResources = (
     path: issue.relativePath,
     message: issue.message
   }));
-  validateCompositionResources(config.orchestrator, "orchestrator", instructions, skills, issues);
+  if (config.orchestrator.repairRouter) validateCompositionResources(
+    config.orchestrator.repairRouter, "orchestrator.repairRouter", instructions, skills, issues
+  );
   config.loops.forEach((loop, loopIndex) => {
     loop.workflow.jobNodes.forEach((node, nodeIndex) => {
       if (isProjectProviderJobNode(node)) validateCompositionResources(

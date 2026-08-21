@@ -81,7 +81,8 @@ function rootRun(rootRunId: string): RootRunDetail {
     updatedAt: now,
     completedAt: now,
     executionSnapshot: {
-      version: 4,
+      version: 6,
+      rootKind: "loop",
       rootLoopId: loopId,
       project: {
         checkoutRoot: "/workspace/ballet",
@@ -89,16 +90,20 @@ function rootRun(rootRunId: string): RootRunDetail {
         configHash: "b".repeat(64),
         snapshotHash: "c".repeat(64)
       },
-      graph: { loopEdges: [] },
-      loops: [snapshot],
-      terminals: ["completed", "blocked", "failed"],
-      orchestrator: {
-        executionProfileId: "",
-        primaryInstructionId: "",
-        skillIds: [],
-        maxRepairDepth: 4,
-        maxRepairAttempts: 3
+      issueTracker: {
+        kind: "tk", testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+        orchestrationDirectory: ".tickets/orchestration", workDirectory: ".tickets/work"
       },
+      graph: {
+        id: "association-graph", name: "Association Graph", startLoopId: loopId,
+        transitions: [{
+          id: "complete", source: loopId, decision: "PASS", outcome: "success",
+          target: { runResult: "DONE" }, description: "Complete."
+        }],
+        repairEdges: []
+      },
+      loops: [snapshot],
+      orchestrator: { mode: "runbook", maxTransitions: 256 },
       theme: structuredClone(defaultLoopTheme),
       executionProfiles: [],
       runtimes: [],

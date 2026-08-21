@@ -26,6 +26,8 @@ export const runtimeSchemaInvariants = `
   CREATE INDEX idx_tasks_node ON execution_tasks(node_run_id, created_at);
   CREATE INDEX idx_events_cursor ON execution_events(task_id, id);
   CREATE INDEX idx_schedule_due ON loop_schedule_state(next_run_at);
+  CREATE INDEX idx_tracker_outbox_pending ON tracker_outbox(root_run_id, status, created_at);
+  CREATE INDEX idx_tracker_links_root ON tracker_links(root_run_id, store_kind, external_ref);
 
   CREATE TRIGGER state_revision_is_monotonic BEFORE INSERT ON state_revisions
   WHEN NEW.revision <> COALESCE((SELECT MAX(revision) + 1 FROM state_revisions WHERE root_run_id = NEW.root_run_id), 0)
@@ -38,7 +40,7 @@ export const runtimeSchemaInvariants = `
   BEFORE UPDATE OF provider, kind, root_run_id, node_run_id, spec_json, spec_hash ON execution_tasks
   BEGIN SELECT RAISE(ABORT, 'execution task specification is immutable'); END;
   CREATE TRIGGER root_run_execution_snapshot_is_immutable
-  BEFORE UPDATE OF target_id, source, worktree_path, branch, head_sha, config_hash, snapshot_hash, execution_snapshot_json ON root_runs
+  BEFORE UPDATE OF kind, target_id, source, worktree_path, branch, head_sha, config_hash, snapshot_hash, execution_snapshot_json ON root_runs
   BEGIN SELECT RAISE(ABORT, 'root run execution snapshot is immutable'); END;
   CREATE TRIGGER active_node_must_belong_to_job_run BEFORE UPDATE OF active_node_run_id ON job_runs
   WHEN NEW.active_node_run_id IS NOT NULL AND NOT EXISTS (

@@ -152,7 +152,9 @@ if (!Array.isArray(entries)
   || entries[0]?.permissions?.externalWrites !== false
   || entries[0]?.package?.capabilities?.accepts?.[0] !== "arc42:initiative.requested"
   || entries[0]?.package?.capabilities?.provides?.[0] !== "arc42:requirements.clarified"
-  || entries[0]?.package?.version !== 2
+  || entries[0]?.package?.version !== 3
+  || !Array.isArray(entries[0]?.package?.capabilities?.recommendedTransitions)
+  || !Array.isArray(entries[0]?.package?.capabilities?.recommendedRepairs)
   || entries[0]?.package?.loop?.workflow?.jobNodes?.length !== 2
   || entries[0]?.package?.loop?.workflow?.validationNodes?.length !== 2) {
   throw new Error("packaged Ballet server did not list the fixture Loop Library package");
@@ -174,20 +176,24 @@ const jobNode = loop?.workflow?.jobNodes?.find((node) => node.id === "review");
 const validationNode = loop?.workflow?.validationNodes?.find((node) => node.id === "review-validation");
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 12
+if (workspace.automation?.version !== 13
   || workspace.automation.loops.length !== 1
   || loop?.id !== "adr-review"
   || loop?.description !== "Review a project change and validate the review result."
   || loop?.capabilities?.accepts?.[0] !== "ballet:task.requested"
   || loop?.capabilities?.provides?.[0] !== "ballet:task.completed"
-  || !Array.isArray(workspace.automation.graph?.loopEdges)
-  || workspace.automation.graph.loopEdges.length !== 0
+  || workspace.automation.graph?.id !== "fixture-graph"
+  || workspace.automation.graph?.startLoopId !== "adr-review"
+  || !Array.isArray(workspace.automation.graph?.transitions)
+  || workspace.automation.graph.transitions.length !== 2
+  || !Array.isArray(workspace.automation.graph?.repairEdges)
+  || workspace.automation.graph.repairEdges.length !== 0
   || loop?.workflow?.startJobNodeId !== "review"
   || loop?.state?.description !== "Provider-neutral context shared by the review Workflow."
   || JSON.stringify(loop?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || workspace.automation.orchestrator?.executionProfileId !== expectedProfile.id
-  || workspace.automation.orchestrator?.primaryInstructionId !== "project:architect"
+  || workspace.automation.orchestrator?.mode !== "runbook"
+  || workspace.automation.orchestrator?.maxTransitions !== 256
   || jobNode?.description !== "Run and validate the project review."
   || jobNode?.type !== "agent"
   || jobNode?.task !== "Review the project changes and surface concrete risks."
@@ -222,7 +228,7 @@ if (workspace.automation?.version !== 12
   || workspace.loopTheme?.version !== 4
   || Object.hasOwn(workspace.loopTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.loopThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v12 Workflow fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v13 Graph/Workflow fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2

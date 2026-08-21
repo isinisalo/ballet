@@ -2,13 +2,13 @@ import { vi } from "vitest";
 import type {
   InstalledLoopModuleStatus,
   LoopModuleInstallPlan,
-  LoopModulePackageV2
+  LoopModulePackageV3
 } from "@shared/api/workspace-contracts";
 import type { LoopModuleActions } from "../src/workspace/automation/loops/LoopLibraryDialog";
 
-const modulePackage: LoopModulePackageV2 = {
+const modulePackage: LoopModulePackageV3 = {
   format: "ballet-loop-module",
-  version: 2,
+  version: 3,
   manifest: {
     id: "installed-loop", title: "Installed Loop", description: "Installed module.", version: "1.0.0", tags: []
   },
@@ -19,7 +19,7 @@ const modulePackage: LoopModulePackageV2 = {
   },
   capabilities: {
     requires: [], accepts: ["installed:task.requested"],
-    provides: ["installed:task.completed"], recommendedConnections: []
+    provides: ["installed:task.completed"], recommendedTransitions: [], recommendedRepairs: []
   },
   resources: [],
   loop: {

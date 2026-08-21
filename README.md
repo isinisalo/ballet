@@ -9,9 +9,10 @@ There is no account, pairing flow, remote daemon, device registry, or multi-proj
 1. `ballet` verifies that the current directory is exactly a Git checkout root with a HEAD commit.
 2. It creates checkout-local state under `.git/ballet`, chooses a free loopback port, and installs one uniquely named launchd job.
 3. The local process probes Codex and Copilot, serves the UI on `127.0.0.1`, schedules Loops, and persists Run state in SQLite.
-4. A Root Run resolves every reachable Loop, Workflow Job/Validation Node, Pass/Fail Edge, allowed project-global Loop Edge, ExecutionProfile, Project instruction, Project skill, the fixed System instruction, and the theme into one immutable snapshot before it queues a Job.
-5. Job, Validation, and Orchestrator Node Runs in that Root Run execute sequentially in the same worktree. Codex and Copilot each have a FIFO lane, so the two providers may run concurrently while one provider never runs two tasks at once.
-6. Successful roots are committed and cleaned up. Failed, cancelled, or interrupted roots retain their worktree for inspection.
+4. A Graph Root Run resolves the Graph, its start Loop, every reachable Loop, named transition, repair route, Workflow Node/Edge, ExecutionProfile and prompt resource into one immutable snapshot. A Loop Root Run snapshots only its isolated Loop and reachable repairs.
+5. Terminal Validation selects an allowed `decision`/`outcome` pair. The RunBook engine resolves the exact target from the snapshot; only a separate repair request invokes the optional agent repair-router and durable call/return path.
+6. Before work continues, the tracker outbox reconciles one orchestration epic for the Root Run and one child chore per Loop invocation. Job, Validation, and repair-router Node Runs then execute sequentially in the same worktree.
+7. Successful roots are committed and cleaned up. Failed, cancelled, or interrupted roots retain their worktree for inspection.
 
 Queued work survives a Ballet restart. Work that was running when the process exited is marked failed as interrupted and is not silently rerun.
 
@@ -19,7 +20,9 @@ Queued work survives a Ballet restart. Work that was running when the process ex
 
 Portable, version-controlled automation remains in the checkout:
 
-- `.ballet/project.json` — strict project configuration v12, containing only `version`, `executionProfiles`, `orchestrator`, `graph`, and `loops`; `graph.loopEdges` owns capability-routed peer topology, while each Loop owns `accepts`/`provides`, State definition, and one `ProjectWorkflow` with separate Job/Validation Nodes plus Pass/Fail Edges;
+- `.ballet/project.json` — strict project configuration v13 with `executionProfiles`, the pinned `issueTracker`, a `mode: runbook` Orchestrator, Graph `startLoopId`, named `transitions`, separate `repairEdges`, and 1–40 project-local Loops;
+- `.ballet/releases/STORY-RELEASE-MAP.md` — the ordered docs-as-code release/story map; implementation tasks are not duplicated here;
+- `.tickets/orchestration` and `.tickets/work` — worktree-local `tk` stores for Run tracking and implementation work;
 - `.ballet/theme.json` — the strict-v4 single project-wide Loop visualization theme;
 - `.ballet/instructions/**/*.md` — selectable Project primary instructions identified by frontmatter `id`;
 - `.ballet/loop-library/**/*.ballet-loop.json` — version-controlled one-Loop authoring packages listed by the local Loop Library;
@@ -29,14 +32,14 @@ Portable, version-controlled automation remains in the checkout:
 
 There is no top-level Agent execution entity. `agent` is a Job or Validation Node type, while `ExecutionProfile` is the only runtime authoring entity. Project instructions and skills are Node-selected resources; `.codex/agents` is not project configuration or a runtime source.
 
-`LoopModulePackageV2` is a portable authoring artifact, not a project-config field or runtime entity. `Add Loop` can inspect and materialize one package into a strict-v12 Loop plus namespaced project instructions and skills. Profile slots map to existing ExecutionProfiles during install; project-global `graph.loopEdges`, the Orchestrator and machine-local settings remain operator-owned. Packages carry capability metadata and one Workflow but never peer Loop IDs or authoritative routes. Root Runs snapshot only the materialized project resources.
+`LoopModulePackageV3` is a portable authoring artifact, not a project-config field or runtime entity. `Add Loop` can inspect and materialize one package into a strict-v13 Loop plus namespaced project instructions and skills. Profile slots map to existing ExecutionProfiles during install. `recommendedTransitions` and `recommendedRepairs` are advisory only; the package never names or silently installs an authoritative peer target. The DEPLOY package declares `externalWrites: "requires-human-authorization"`.
 
 Machine-local state belongs to this clone's Git directory and never appears in Git status:
 
 | Path | Contents |
 | --- | --- |
-| `.git/ballet/state.sqlite` | LocalDatabase schema v8: Root/Loop/Job/Node Runs, State revisions, repair continuations, execution tasks/events, and schedule state |
-| `.git/ballet/settings.json` | Provider command overrides and absolute read-only roots |
+| `.git/ballet/state.sqlite` | LocalDatabase schema v9: Root/Loop/Job/Node Runs, Graph orchestration state, State revisions, repair continuations, tracker outbox/links, execution tasks/events, and schedule state |
+| `.git/ballet/settings.json` | Provider and optional `tk` command overrides plus absolute read-only roots |
 | `.git/ballet/service.json` | Stable checkout service identity and loopback port |
 | `.git/ballet/instance-id` | Stable health-check identity for this clone |
 | `.git/ballet/worktrees/` | Root-Run worktrees, including retained failures |
@@ -48,31 +51,26 @@ The checkout-specific plist at `~/Library/LaunchAgents/ai.ballet.<checkout-hash>
 
 Humans and agents start from [`ARCHITECTURE.md`](ARCHITECTURE.md). It links the canonical twelve-section arc42 Template under `.ballet/arc42/`, persistent project status and handoff, traceability, method health, the shared State contract, accepted Goals/ADRs and `DESIGN.md`.
 
-The repository's default development Method is implemented as project-local Ballet Loops:
+The repository's default development Method is a five-Loop project-local RunBook:
 
 ```text
-arc42-clarify-requirements
-  → arc42-solution-strategy
-  → arc42-building-block-view
-  → arc42-runtime-deployment
-  → arc42-crosscutting-concepts
-  → arc42-architecture-decision
-  → arc42-communicate-document
-  → arc42-accompany-implementation
-  → arc42-analyze-evaluate
-  → completed
+DESIGN → PLAN → BUILD → DEPLOY → VERIFY → DONE
+           ↑       │                 │
+           └───────┴── more work ───┘
 ```
 
-This is a default path, not a waterfall. Validation describes a missing capability or outcome, the Orchestrator selects only a source-Loop-allowlisted repair target, and runtime returns to the requesting Validation Node through its persisted continuation. An ambiguous target yields `needs_input`; the first candidate is never a fallback. `arc42-continuous-learning` is a separate scheduled support Loop, and `release-validation` is an unchained support Loop.
+DESIGN runs twelve ordered Job/Validation pairs, one for each canonical arc42 section. PLAN selects the first eligible release from the Story/Release Map and materializes its epic, issues, acceptance references and dependencies in the work store. Each BUILD invocation handles one ready issue. DEPLOY pauses for exact human authorization before an external write, and VERIFY compares the deployed release with all twelve design sections, release acceptance and ticket evidence. Named failure outcomes route back to DESIGN, PLAN, BUILD or DEPLOY exactly as configured; VERIFY either selects more work or the explicit `DONE` transition.
+
+Ordinary RunBook routing never asks a model to select the target. A custom graph may additionally configure Repair Edges and an agent repair-router; those routes retain the durable Validation → repair Loop → same Validation LIFO return semantics. Ambiguous repair stays in `needs_input`.
 
 To start a new initiative:
 
 1. Copy `.ballet/arc42/initiatives/TEMPLATE/` to `.ballet/arc42/initiatives/<initiative-id>/`.
 2. Give BRIEF, PLAN, EVIDENCE and REVIEW unique stable frontmatter IDs and start their status as `draft`.
-3. Run `arc42-clarify-requirements` with the initiative ID and human-owned WHAT/WHY, priority and acceptance intent.
+3. Add or refine the planned release in the Story/Release Map and start the Graph target; DESIGN begins from section 01. An isolated DESIGN Loop Run is available for bounded authoring without Graph continuation.
 4. Stop for human input when intent, a top-quality priority/measure or another required decision is missing.
 
-Markdown contains long-lived project truth: accepted intent and decisions, architecture views, initiative plans/reviews and evidence references. Root Run State and the Runtime UI contain execution truth: the current bounded initiative/architecture/delivery/release/evaluation/handoff references, revision history, attempts, Repair Requests, routes and outcomes. State never copies full documents, logs or source diffs.
+Markdown contains long-lived project truth: accepted intent and decisions, twelve architecture views, the release map, initiative reviews and evidence references. `GraphEngineeringStateV1` contains only the selected release/map reference, active work issue and remaining count, target environment, deployment authorization/evidence references and verification result. `GraphOrchestrationStateV1` separately owns current Graph/Loop and transition/tracking references. Neither State copies documents, ticket bodies, logs or source diffs.
 
 Validate the complete project-local contract with:
 
@@ -82,13 +80,17 @@ npm run validate:arc42
 
 Human approval is required for new or changed WHAT/WHY, top-quality priority/acceptance measures, significant ADR acceptance, implementation acceptance before release, release/deploy/rollback or another external write, and changes to Loop topology, permissions, network access or automation instruction/skill behavior. Mechanical non-semantic link/index/format/lint fixes do not need a dedicated gate.
 
-The learning start Job runs weekly on Monday at 09:00 in `Europe/Helsinki`. Change `loops[arc42-continuous-learning].workflow.jobNodes[learning-authoritative-research].schedule` and its `startsOn` value in `.ballet/project.json` only as a reviewed automation-behavior change, then run `npm run validate:arc42`, tests, lint and build. Network stays enabled only for that research Job and explicitly authorized release evidence Nodes.
-
 Ballet does not merge or push Run results automatically, and the arc42 Method does not grant release, deploy or rollback permission.
 
 ## Install on macOS
 
-Ballet supports macOS `arm64` and `x64`. Install and authenticate at least one provider CLI first.
+Ballet supports macOS `arm64` and `x64`. Install and authenticate at least one provider CLI first. Every Run also requires the tested [`tk` revision `d778bb5`](https://github.com/h2oai/tk/tree/d778bb520ee526c314c26f2bb876447e0a19caa5):
+
+```bash
+go install github.com/lo5/tk@d778bb520ee526c314c26f2bb876447e0a19caa5
+```
+
+Keep the resulting `tk` executable on `PATH`, or configure its absolute path with `--tk-command`. Run preflight probes the required commands and validates strict JSONL, Markdown, parent, dependency, cycle and external-reference behavior in a temporary store. A missing or incompatible executable blocks the Run without mutating project tickets.
 
 ### Install the current checkout
 
@@ -144,7 +146,8 @@ If a provider executable is outside the launchd `PATH`, save its command for thi
 ```bash
 ballet \
   --codex-command /absolute/path/to/codex \
-  --copilot-command /absolute/path/to/copilot
+  --copilot-command /absolute/path/to/copilot \
+  --tk-command /absolute/path/to/tk
 ```
 
 Use `--no-open` when the browser should not open automatically. Ballet still starts when neither CLI is ready; the Runtime view and Run preflight show provider-specific installation or authentication repair instructions.
@@ -152,12 +155,17 @@ Use `--no-open` when the browser should not open automatically. Ballet still sta
 ## CLI reference
 
 ```text
-ballet [--codex-command <path>] [--copilot-command <path>] [--no-open]
+ballet [--codex-command <path>] [--copilot-command <path>] [--tk-command <path>] [--no-open]
 ballet stop
 ballet restart
 ballet status
 ballet logs [--lines N] [--follow]
 ballet update
+ballet tracker query
+ballet tracker ready [--release <epic-id>]
+ballet tracker claim --release <epic-id>
+ballet tracker upsert --external-ref <ref> --title <title> --type <type> [options]
+ballet tracker start|note|close|reopen ...
 ballet version
 ```
 
@@ -169,18 +177,18 @@ Different clones may run at the same time. Each has a path-derived service label
 
 The upper-left Ballet dropdown switches the application between **Configure** and **Run**.
 
-- Configure edits repository-backed project documents, Project instructions, Project skills, ExecutionProfiles, the single project Loop theme, Graph Loop Edges, Workflow Job/Validation Nodes, Pass/Fail Edges, and start-Job schedules.
-- Run opens the overview or a Loop target and shows durable Root Run, Loop Run, Job Run, Node Run, State revision, and provider-task evidence. External repairs are routed only through snapshotted repair Loop Edges and return to the requesting Validation Node through a persisted LIFO continuation.
+- Configure edits repository-backed project documents, Project instructions, Project skills, ExecutionProfiles, the single Loop theme, Graph name/start, named transitions, separate Repair Edges, Workflow Job/Validation Nodes, Pass/Fail Edges, and start-Job schedules.
+- Run offers one Graph target and each Loop as an isolated target. Graph Runs follow named transitions; explicit Loop and scheduled Job runs end after the selected Loop. Repairs use only snapshotted Repair Edges and return to the requesting Validation through a persisted LIFO continuation.
 
-Strict project configuration v12 stores one `ProjectWorkflow` per Loop. Every JobNode owns exactly one ValidationNode, and every ValidationNode owns exactly one PassEdge and one FailEdge. A PassEdge targets the next JobNode or the fixed Workflow `PASS` endpoint; a FailEdge targets the fixed Workflow `FAIL` endpoint. PASS and FAIL are not authorable or executable Nodes. Every Job is reachable from `startJobNodeId`, at least one PASS endpoint is reachable, and mutable State belongs only to the Root Run. Project-global Loop Edges continue to describe normal `flow` candidates and source-Loop-specific `repair` allowlists.
+Strict project configuration v13 stores one `ProjectWorkflow` per Loop. Every JobNode owns exactly one ValidationNode, and every ValidationNode owns exactly one PassEdge and one FailEdge. A PassEdge targets the next JobNode or fixed Workflow `PASS`; a FailEdge targets fixed Workflow `FAIL`. Every Job and Loop is reachable from its configured start, and a Graph has at least one reachable `DONE` path. Each `(source, decision, outcome)` transition key is unique. Ordinary transitions and capability-based Repair Edges are separate collections.
 
 A Loop has a required functional description and a State definition consisting of a description and JSON initial value. A manual or scheduled Root Run creates State revision 0 from the root Loop's initial value. A completed Job outcome may atomically commit a JSON Patch before its paired Validation; Validation `PASS` may do the same before its PassEdge is followed. Validation `FAIL` cannot patch State. Every accepted patch creates exactly one append-only revision with a hash, source Node Run and bounded patch evidence. An invalid or oversized patch rolls back the outcome transaction, and the UI never reconstructs State from event text.
 
-Job completion always moves to the paired ValidationNode. A Validation `FAIL` returns to the paired Job while its `maxRetries` budget remains; with the default 3 this means one initial Job execution plus three retries. The next FAIL follows the FailEdge, persists a target-free Repair Request and continuation, and invokes the Loop Orchestrator. The Orchestrator can select only a target described in the immutable snapshot and allowlisted by a source-specific repair Loop Edge. The target repair Loop shares the Root Run's canonical State. After repair Workflow PASS, runtime pops the persisted continuation and calls the original Validation again without rerunning its Job or resetting its retry count; a new FAIL escalates immediately. Nested repair returns in LIFO order under explicit depth, attempt and transition limits. Technical Job/Validation `blocked` or `failed` states terminate the Run without following FailEdge.
+Job completion always moves to the paired ValidationNode. A Validation `FAIL` returns to the paired Job while its `maxRetries` budget remains. At terminal Workflow PASS/FAIL in a Graph Run, Validation selects one allowed named outcome; runtime resolves the exact immutable transition and stops before transition 257. A terminal FAIL may instead create a target-free Repair Request, but cannot provide both a transition and repair request. The optional repair-router can select only a source-specific snapshotted Repair Edge. After repair Workflow PASS, runtime calls the original Validation again without rerunning its Job or resetting its retry count. Technical `blocked` or `failed` states terminate without following a RunBook transition.
 
-Provider-executed Job and Validation Nodes have a non-empty task, one `executionProfileId`, one `primaryInstructionId`, and set-semantic `skillIds`. Human Nodes have no execution composition, scheduled execution is available only to a Loop's starting JobNode, and Validation is never scheduled. ExecutionProfiles contain only ID, name, provider, model, reasoning effort, and network access. Provider commands and checkout-wide absolute `readOnlyRoots` are machine-local settings.
+Provider-executed Job and Validation Nodes have a non-empty task, one `executionProfileId`, one `primaryInstructionId`, and set-semantic `skillIds`. Human Nodes have no execution composition, scheduled execution is available only to a Loop's starting JobNode, and Validation is never scheduled. ExecutionProfiles contain only ID, name, provider, model, reasoning effort, and network access. Provider commands, `tkCommand`, and checkout-wide absolute `readOnlyRoots` are machine-local settings.
 
-Every provider prompt is composed in a deterministic five-section order: fixed System instruction, one Project primary instruction, selected Project skills sorted by UTF-8 ID, Task Envelope V5, and the role-specific structured output schema. Job, Validation, and Orchestrator use separate strict schemas. Ballet records the exact UTF-8 prompt and SHA-256 alongside execution spec version 7, composition version 6, envelope version/hash, Job/Workflow identity and role, profile snapshot, resource origin/ID/path/source hashes, and output-schema version 5/ID/hash. State is limited to 256 KiB, selected relevant history to 64 KiB, Task Envelope to 384 KiB, and the complete prompt to 512 KiB; semantic payloads are never silently truncated.
+Every provider prompt is composed in a deterministic five-section order: fixed System instruction, one Project primary instruction, selected Project skills sorted by UTF-8 ID, Task Envelope V6, and the role-specific structured output schema V6. A terminal Validation envelope contains the exact allowed RunBook transitions, and its output schema constrains outcomes per decision. Ballet records execution spec V8, composition V7, envelope/hash, Node identity, profile/resource provenance, and the exact output-schema hash. State is limited to 256 KiB, selected relevant history to 64 KiB, Task Envelope to 384 KiB, and the complete prompt to 512 KiB.
 
 The fixed read-only `system:execution-contract-v4` establishes only instruction authority, tool and permission limits, secret-handling boundaries, role-specific structured outcomes, the prohibition on returning hidden chain-of-thought, and the requirement to report checks and artifact references where the schema requires them. Project workflow procedures belong in `.ballet/project.json`, `.ballet/instructions/**`, and `.agents/skills/**`, never in this System instruction or platform-specific workflow code.
 
@@ -230,7 +238,8 @@ Human Job and Validation responses use the same strict role-specific outcomes as
 - Source code changes block a Run. Uncommitted `.ballet` files and `.agents/skills/**/SKILL.md` manifests are captured into the immutable Run snapshot instead.
 - Network access defaults to off and must be enabled explicitly in the selected ExecutionProfile.
 - A legacy `agentReadOnlyRoots` property in `.git/ballet/settings.json` blocks Run with an explicit remediation message. Ballet never silently drops or reinterprets those values; the current local settings contract uses only checkout-wide `readOnlyRoots`.
-- A provider outcome is validated against the immutable Node role and persisted canonically before the engine reads it back for control flow. Job completion advances only to its paired Validation. Validation PASS follows its PassEdge; FAIL returns to the paired Job while the retry budget remains and follows FailEdge to a durable Repair Request only after exhaustion. Orchestrator routes only to a snapshotted repair allowlist target, while the persisted continuation—not model output—determines the return Validation Node.
+- A provider outcome is validated against the immutable Node role and allowed terminal transition enum before control flow. Ordinary Graph routing uses exact snapshot data, not a provider-selected target. Repair routing uses only a snapshotted allowlist, while the persisted continuation—not model output—determines the return Validation Node.
+- `tk` commands run as argv arrays without a shell, only against configured stores inside the worktree, with timeout and output limits. Stable external references prevent duplicate Root Run, Loop invocation and release tickets across retries or restart.
 - Durable non-terminal console content is retained up to 1 MiB per task. Terminal protocol events remain available, and the UI exposes truncation state.
 - Cancellation terminalizes the active Root/Loop/composite/Node records and every open repair frame without reverting a committed State revision. On restart, queued work and pending repair continuations remain durable; an execution that was running is marked interrupted according to policy, and recovery resumes only from the last fully committed revision.
 
@@ -277,4 +286,4 @@ npx @google/design.md lint DESIGN.md
 git diff --check
 ```
 
-The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v12 fixture checkout, verifies its v2 Loop Module, ExecutionProfile, Workflow Job/Validation pair, Pass/Fail Edges and capabilities, Project instruction, Orchestrator, Graph routes, and strict-v4 theme through `GET /api/data`, checks the schema-v8 `.git/ballet/state.sqlite`, confirms Git remains clean, and exercises graceful shutdown.
+The native release smoke test additionally loads packaged `better-sqlite3`, starts the packaged server against a committed strict-v13 fixture checkout, verifies its V3 Loop Module, ExecutionProfile, Workflow pair, named Graph transition, separate repair policy and strict-v4 theme through `GET /api/data`, checks schema-v9 SQLite tables, confirms Git remains clean, and exercises graceful shutdown. The hermetic tracker suites do not replace a real pinned-`tk` smoke; when `tk` is unavailable, that omission is reported explicitly.

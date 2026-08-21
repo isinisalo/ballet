@@ -3,16 +3,19 @@ import {
   loopNodeSizes,
   loopNodeStyles,
   loopCapabilityPattern,
+  graphTransitionOutcomePattern,
+  maxGraphTransitions,
   maxLoopCapabilities,
   maxLoopCapabilityLength,
   maxJobRetriesLimit,
   maxProjectStateBytes,
+  maxProjectLoops,
   maxRepairAttemptsLimit,
   maxRepairDepthLimit,
   type ProjectAutomationConfig,
   type JsonValue
 } from "../domain/automation.js";
-import type { ExecutionProfile, ProjectConfiguration } from "../domain/projectConfig.js";
+import type { ExecutionProfile, ProjectConfiguration, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import {
   loopConnectionPointStyles,
   loopEdgeLineStyles,
@@ -244,39 +247,68 @@ const projectLoopSchema = z.object({
   }).strict()
 }).strict();
 const orchestratorComposition = {
-  executionProfileId: z.union([z.literal(""), executionProfileIdSchema]),
-  primaryInstructionId: z.union([z.literal(""), projectInstructionIdSchema]),
+  executionProfileId: executionProfileIdSchema,
+  primaryInstructionId: projectInstructionIdSchema,
   skillIds: executionComposition.skillIds
 };
-const orchestratorSchema = z.object({
+const repairRouterSchema = z.object({
   ...orchestratorComposition,
   maxRepairDepth: z.number().int().min(0).max(maxRepairDepthLimit),
   maxRepairAttempts: z.number().int().min(1).max(maxRepairAttemptsLimit)
 }).strict();
-const projectLoopEdgeSchema = z.object({
+const orchestratorSchema = z.object({
+  mode: z.literal("runbook"),
+  maxTransitions: z.number().int().min(1).max(maxGraphTransitions),
+  repairRouter: repairRouterSchema.optional()
+}).strict();
+const projectGraphTransitionSchema = z.object({
+  id: automationEdgeIdSchema,
+  source: kebabLoopIdSchema,
+  decision: z.enum(["PASS", "FAIL"]),
+  outcome: z.string().min(1).max(64).regex(graphTransitionOutcomePattern, "Outcome must be lowercase snake_case."),
+  target: z.union([
+    z.object({ loopId: kebabLoopIdSchema }).strict(),
+    z.object({ runResult: z.literal("DONE") }).strict()
+  ]),
+  description: automationDescriptionSchema
+}).strict();
+const projectRepairEdgeSchema = z.object({
   id: automationEdgeIdSchema,
   source: kebabLoopIdSchema,
   target: kebabLoopIdSchema,
-  kind: z.enum(["flow", "repair"]),
   capability: loopCapabilitySchema,
   description: automationDescriptionSchema
 }).strict();
 
 const graphSchema = z.object({
-  loopEdges: z.array(projectLoopEdgeSchema)
+  id: kebabLoopIdSchema,
+  name: z.string().trim().min(1).max(200),
+  startLoopId: z.union([kebabLoopIdSchema, z.literal("")]),
+  transitions: z.array(projectGraphTransitionSchema).max(maxGraphTransitions),
+  repairEdges: z.array(projectRepairEdgeSchema)
 }).strict();
 
+const trackerDirectorySchema = z.string()
+  .regex(/^\.tickets\/[a-z0-9]+(?:-[a-z0-9]+)*$/, "Tracker directory must be a direct child of .tickets.");
+export const projectIssueTrackerSchema = z.object({
+  kind: z.literal("tk"),
+  testedRevision: z.string().regex(/^[0-9a-f]{40}$/, "testedRevision must be a full lowercase Git commit SHA."),
+  orchestrationDirectory: trackerDirectorySchema,
+  workDirectory: trackerDirectorySchema
+}).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
+
 export const automationConfigSchema = z.object({
-  version: z.literal(12),
+  version: z.literal(13),
   orchestrator: orchestratorSchema,
   graph: graphSchema,
-  loops: z.array(projectLoopSchema)
+  loops: z.array(projectLoopSchema).max(maxProjectLoops)
 }).strict() satisfies z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(12),
+  version: z.literal(13),
   executionProfiles: z.array(executionProfileSchema),
+  issueTracker: projectIssueTrackerSchema,
   orchestrator: orchestratorSchema,
   graph: graphSchema,
-  loops: z.array(projectLoopSchema)
+  loops: z.array(projectLoopSchema).max(maxProjectLoops)
 }).strict().superRefine(validateProjectConfigSchema) satisfies z.ZodType<ProjectConfiguration>;

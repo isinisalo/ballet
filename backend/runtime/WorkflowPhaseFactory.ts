@@ -7,6 +7,7 @@ import type {
 } from "../../shared/domain/runtime.js";
 import type { TaskEnvelopeRepairReturn } from "../../shared/domain/taskEnvelope.js";
 import { LoopRunIntegrityError, LoopRunStateError } from "./LoopRunErrors.js";
+import { GraphRunStateStore } from "./GraphRunStateStore.js";
 import type { LoopRunStore } from "./LoopRunStore.js";
 import type { RootExecutionSnapshotStore } from "./RootExecutionSnapshotStore.js";
 import type { WorkflowProgressStore } from "./WorkflowProgressStore.js";
@@ -14,11 +15,16 @@ import { requireValidationNode } from "./WorkflowEngineSupport.js";
 import { assertJsonValue } from "./state/CanonicalJson.js";
 
 export class WorkflowPhaseFactory {
+  private readonly graphState: GraphRunStateStore;
+
   constructor(
+    connection: () => import("better-sqlite3").Database,
     private readonly loops: LoopRunStore,
     private readonly snapshots: RootExecutionSnapshotStore,
     private readonly progress: WorkflowProgressStore
-  ) {}
+  ) {
+    this.graphState = new GraphRunStateStore(connection);
+  }
 
   startRoot(
     rootRunId: string,
@@ -35,10 +41,8 @@ export class WorkflowPhaseFactory {
     return this.startInvocation(rootRunId, loop, source, 0, { input, schedule });
   }
 
-  startFlow(loop: ProjectLoop, request: OrchestrationRequest, input: JsonValue, revision: number) {
-    return this.startInvocation(request.rootRunId, loop, "flow", revision, {
-      input, orchestrationRequestId: request.orchestrationRequestId
-    });
+  startTransition(rootRunId: string, loop: ProjectLoop, input: JsonValue, revision: number) {
+    return this.startInvocation(rootRunId, loop, "transition", revision, { input });
   }
 
   startRepair(
@@ -145,6 +149,7 @@ export class WorkflowPhaseFactory {
       orchestrationRequestId: options.orchestrationRequestId,
       entryStateRevision: revision, nestingDepth: options.nestingDepth ?? 0
     });
+    this.graphState.bindInvocation(rootRunId, loop.id, run.loopRunId);
     const jobRun = this.loops.createJobRun({
       rootRunId, loopRunId: run.loopRunId, loopId: loop.id,
       jobNodeId: job.id, jobAttempt: 1, stateRevisionBefore: revision

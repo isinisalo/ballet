@@ -22,7 +22,7 @@ export class LocalRunTargetService {
     const profiles = new Map(data.executionProfiles.map((profile) => [profile.id, profile]));
     const globalAutomationIssues = data.automationIssues.filter((issue) =>
       !isNodeResourceReferenceIssue(issue.path));
-    const loops = data.automation.loops.map((loop): RunTarget => {
+    const issuesFor = (loopId: string, rootKind: "graph" | "loop"): RunTarget["issues"] => {
       const issues: RunTarget["issues"] = [
         ...globalAutomationIssues.map((issue) => ({
           code: "invalid_config" as const,
@@ -41,8 +41,8 @@ export class LocalRunTargetService {
         }))
       ];
       if (globalAutomationIssues.length === 0) {
-        issues.push(...compositionIssuesForLoop(data, loop.id));
-        for (const reference of reachableProfileReferences(data, loop.id)) {
+        issues.push(...compositionIssuesForLoop(data, loopId, rootKind));
+        for (const reference of reachableProfileReferences(data, loopId, rootKind)) {
           const profile = profiles.get(reference.executionProfileId);
           const configuration = profile ? configurations[profile.id] : undefined;
           if (!profile || !configuration) {
@@ -65,26 +65,43 @@ export class LocalRunTargetService {
           })));
         }
       }
-      return target(this.roots, loop.id, loop.description, issues);
-    });
-    return { loops };
+      return issues;
+    };
+    const loops = data.automation.loops.map((loop): RunTarget => target(
+      this.roots, "loop", loop.id, loop.id, loop.description, issuesFor(loop.id, "loop")
+    ));
+    const hasStart = data.automation.loops.some(({ id }) => id === data.automation.graph.startLoopId);
+    const graphIssues = hasStart
+      ? issuesFor(data.automation.graph.startLoopId, "graph")
+      : [{ code: "invalid_config" as const, message: "Graph start Loop does not exist." }];
+    const graph = target(
+      this.roots,
+      "graph",
+      data.automation.graph.id,
+      data.automation.graph.name,
+      "Run the immutable Graph Engineering RunBook from its configured start Loop.",
+      graphIssues
+    );
+    return { graph, loops };
   }
 }
 
 const target = (
   roots: RootRunStore,
+  kind: RunTarget["kind"],
   id: string,
+  name: string,
   description: string | undefined,
   issues: RunTarget["issues"]
 ): RunTarget => ({
-  kind: "loop",
+  kind,
   id,
-  name: id,
+  name,
   description,
   ready: issues.length === 0,
   issues,
-  activeRootRunId: roots.active("loop", id)?.rootRunId,
-  latestRootRunId: roots.latest("loop", id)?.rootRunId
+  activeRootRunId: roots.active(kind, id)?.rootRunId,
+  latestRootRunId: roots.latest(kind, id)?.rootRunId
 });
 
 const isNodeResourceReferenceIssue = (path: string): boolean =>

@@ -43,7 +43,7 @@ export class LocalServerService {
     this.fetchImpl = options.fetch ?? fetch;
   }
 
-  async ensureStarted(commands: { codexCommand?: string; copilotCommand?: string } = {}): Promise<ServiceState> {
+  async ensureStarted(commands: { codexCommand?: string; copilotCommand?: string; tkCommand?: string } = {}): Promise<ServiceState> {
     let state = await loadOrCreateServiceState(this.options.project);
     const { settings, commandOverridesChanged } = await this.prepareSettings(commands);
     if (await this.reuseOrStopExisting(state, commandOverridesChanged)) return state;
@@ -64,11 +64,13 @@ export class LocalServerService {
   private async prepareSettings(commands: {
     codexCommand?: string;
     copilotCommand?: string;
+    tkCommand?: string;
   }): Promise<{ settings: LocalSettings; commandOverridesChanged: boolean }> {
     const existing = await loadLocalSettings(this.options.project);
     const changed = (commands.codexCommand !== undefined && commands.codexCommand !== existing.codexCommand)
       || (commands.copilotCommand !== undefined && commands.copilotCommand !== existing.copilotCommand);
-    if (!changed) return { settings: existing, commandOverridesChanged: false };
+    const tkChanged = commands.tkCommand !== undefined && commands.tkCommand !== existing.tkCommand;
+    if (!changed && !tkChanged) return { settings: existing, commandOverridesChanged: false };
     return {
       settings: await updateProviderCommands(this.options.project, commands),
       commandOverridesChanged: true
@@ -119,7 +121,7 @@ export class LocalServerService {
     throw new Error("Ballet exhausted its local startup attempts.");
   }
 
-  async restart(commands: { codexCommand?: string; copilotCommand?: string } = {}, timeoutMs = 90_000): Promise<ServiceState> {
+  async restart(commands: { codexCommand?: string; copilotCommand?: string; tkCommand?: string } = {}, timeoutMs = 90_000): Promise<ServiceState> {
     await this.stopGracefully(timeoutMs);
     return this.ensureStarted(commands);
   }

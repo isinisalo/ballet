@@ -6,7 +6,9 @@ import type { ProjectAutomationConfig } from "../../shared/domain/automation.js"
 import { RuntimeDatabase } from "../runtime-db.js";
 import { AutomationService } from "../services/AutomationService.js";
 import { MarkdownStore } from "../store.js";
-import { testExecutionProfile, testJobPair, testLoop, testOrchestrator } from "./v12TestConfig.js";
+import {
+  testExecutionProfile, testJobPair, testLoop, testRunbookOrchestrator
+} from "./v13TestConfig.js";
 
 const roots: string[] = [];
 const stores: MarkdownStore[] = [];
@@ -68,7 +70,13 @@ const createProject = async (): Promise<string> => {
   await writeFile(path.join(root, ".ballet", "project.md"), "---\nid: mutation-queue\nname: Mutation queue\n---\n", "utf8");
   await writeFile(path.join(root, ".ballet", "project.json"), JSON.stringify({
     ...config(),
-    executionProfiles: [testExecutionProfile]
+    executionProfiles: [testExecutionProfile],
+    issueTracker: {
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
+    }
   }, null, 2), "utf8");
   await writeFile(
     path.join(root, ".ballet", "instructions", "architect.md"),
@@ -84,9 +92,22 @@ const createProject = async (): Promise<string> => {
 };
 
 const config = (): ProjectAutomationConfig => ({
-  version: 12,
-  orchestrator: testOrchestrator(),
-  graph: { loopEdges: [] },
+  version: 13,
+  orchestrator: testRunbookOrchestrator(),
+  graph: {
+    id: "test-graph", name: "Test Graph", startLoopId: "first-loop",
+    transitions: [
+      {
+        id: "first-second", source: "first-loop", decision: "PASS", outcome: "success",
+        target: { loopId: "second-loop" }, description: "Continue to the second Loop."
+      },
+      {
+        id: "second-done", source: "second-loop", decision: "PASS", outcome: "success",
+        target: { runResult: "DONE" }, description: "Finish the Graph."
+      }
+    ],
+    repairEdges: []
+  },
   loops: [
     testLoop("first-loop", testJobPair("first-job")),
     testLoop("second-loop", testJobPair("second-job"))

@@ -3,8 +3,8 @@ id: ballet-goals-summary
 title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
-updatedAt: '2026-08-20'
-version: 8
+updatedAt: '2026-08-21'
+version: 9
 tags:
   - yhteenveto
   - tavoitteet
@@ -26,7 +26,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 1. **Määritellään työ** repositoryssä: Goalit, ADR:t, arc42-arkkitehtuuri, Loopit, Workflow't, Job/Validation-nodet, Pass/Fail Edget, ExecutionProfilet, instructionit, skillsit ja teema.
 2. **Koostetaan provider-tehtävä** deterministisesti System-ohjeesta, primary instructionista, valituista skillseistä, roolikohtaisesta Task Envelopesta ja tulosskeemasta.
-3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; Job valmistuu paired Validationiin, PASS jatkaa Workflow'ta ja retryrajan jälkeinen FAIL eskaloituu Loop Orchestratorin allowlistattuun korjaukseen.
+3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; terminal Validation valitsee sallitun päätös/outcome-parin ja RunBook reitittää exact immutable snapshot -transitioniin. Repair call/return säilyy tästä erillisenä.
 4. **Seurataan ajoa** selainkäyttöliittymästä: tila, konsolitapahtumat, hyväksytty/hylätty jatkopolku, virheet ja finalisointi.
 5. **Suojataan aktiivinen checkout**: onnistunut työ commitoidaan Run-branchille ja siivotaan, muu worktree säilytetään tutkittavaksi. Ballet ei mergeä eikä pushaa automaattisesti.
 
@@ -37,20 +37,20 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 | React/Vite-käyttöliittymä | Configure- ja Run-työtilat, URL-ohjatut Graph Engineering / Workflow Engineering -authoring-näkymät, editorit sekä runtime- ja Run-näkymät |
 | Paikallinen Express-palvelu | Loopback-API, validointi, orkestrointi, ajastus ja tapahtumavirrat |
 | Provider-adapterit | Codex CLI ja GitHub Copilot CLI yhteisen tehtävä-, tapahtuma- ja tulosmallin takana |
-| SQLite-tila | Root Runien, Loop/Job/Validation-roolikohtaisten Runien, State-revisioiden, jonojen, tapahtumien ja ajastusten kestävä paikallinen historia |
+| SQLite-tila | Root Runien, Graph/Loop/Job/Validation-roolikohtaisten Runien, State-revisioiden, jonojen, tapahtumien, tracker-outboxin ja ajastusten kestävä paikallinen historia |
 | Git-eristys | Root Run -kohtainen branch ja worktree, snapshot, commitointi ja epäonnistumisten säilytys |
 | Checkout-CLI | `ballet`, `stop`, `restart`, `status`, `logs`, `update` ja `version` sekä launchd-elinkaari |
 
 ## Nykytila tämän repositoryn perusteella
 
-- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v12** -skeemaa.
-- Projektissa on **13 hyväksyttyä Goalia** ja **20 ADR:ää**. ADR-020 supersedoi rajatusti ADR-015:n composite WorkLoopNode -mallin ja ADR-018:n Loop Engineering -nimen/reitin; Graph-, State-, Orchestrator-, Loop Module- ja project/platform-rajat säilyvät.
-- Paikallinen Loop Library, yhden Loopin v2 package/install/export ja content-derived provenance on toteutettu ilman runtime-aikaista package-riippuvuutta.
-- Toteutettu strict-v12 authoring-UI erottaa project-global Graph Engineeringin ja selected-Loop-only Workflow Engineeringin; Context-, compatibility-, numeric level- ja `view=loop`-reitit puuttuvat tuotantokoodista.
-- Kaikki cross-Loop-flow- ja repair-valinnat kulkevat immutable snapshotin allowlist/capability-evidenssiä käyttävän Orchestrator-dispatchin kautta. Graph Engineeringin erillinen visuaalinen Orchestrator-control-node on vielä pending.
-- Balletin oma kehitysautomaatio käyttää arc42 Templatea ja 6+1 Method -Loopia sekä erillistä, ketjuttamatonta `release-validation`-tukilooppia.
-- Konfiguraatiossa on **20 JobNodea**, **20 yksinomaisesti paritettua ValidationNodea**, **6 Human Validation -porttia**, **6 Codex-ExecutionProfilea** ja viikoittainen continuous-learning-schedule.
-- Project-local menettelyt on jaettu **10 arc42-skilliin**; execution composition ei enää käytä `migrated-*`-instructioneita.
+- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v13** -skeemaa.
+- Projektissa on **14 hyväksyttyä Goalia** ja 22 ADR-recordia, joista 20 on accepted ja kaksi superseded. ADR-022 omistaa nykyisen RunBook-rajan ja säilyttää aiempien päätösten historian.
+- Paikallinen Loop Library sisältää **14 V3-pakettia**: viisi Graph Engineering -moduulia ja yhdeksän geneeristä moduulia. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
+- Graph Engineering näyttää yhden Orchestrator-control-noden, kompaktit Loop-kortit, DONE-terminalin ja päätös+outcome-labeloidut transitionit. Workflow Engineeringin suojattu avaruusteema säilyy selected-Loop-editorina.
+- Tavallinen cross-Loop-flow on exact `(source, decision, outcome)` -RunBook-reititys. Agenttipohjaista Orchestrator-valintaa käytetään vain custom repair-edgeihin.
+- Balletin oletusgraafi on DESIGN → PLAN → BUILD → DEPLOY → VERIFY, yhteensä **5 Loopia**, **17 JobNodea**, **17 ValidationNodea**, **18 transitionia** ja **0 oletus-repair-edgeä**. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
+- Project-local `GraphEngineeringStateV1`, erillinen runtime `GraphOrchestrationStateV1`, Story/Release Map ja kaksi `tk`-storea erottavat bounded coordinationin, reitityksen, toimitusjärjestyksen ja toteutustaskit.
+- Current hard cut on snapshot/envelope/outcome V6, composition V7, ExecutionSpec V8, runtime DB V9 ja Loop Module Package V3.
 - Koodissa ovat sekä Codex- että Copilot-adapterit, scheduler, provider-kohtaiset FIFO-jonot, SQLite-palautuminen, Git-worktree-eristys ja macOS-jakelutyökalut.
 - Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja Loop-graafin.
 
@@ -58,10 +58,10 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 **Todentamatta end-to-end:**
 
-- `graph-and-loop-engineering`-initiative on draft: v11-domain/schema/snapshot/module/runtime sekä authoring routing- ja Loop Engineering -osat on toteutettu ja paikallisesti todennettu; Graphin visualisoinnin Orchestrator-control-node ja ihmisacceptance ovat pending.
-- `workflow-engineering`-initiative on draft: strict-v12/v2-domain-, runtime-, persistence-, API-, UI- ja repository-data-muutos on toteutettu teknisesti; lopulliset gatet ja desktop/narrow-ihmisacceptance ovat pending.
-- Ensimmäistä arc42-initiativea ei ole vielä viety clarify → structures → concepts → communicate → implementation → evaluate -polun läpi.
-- Method-healthin runtime-baselinet ja scheduled learning -ajon evidenssi puuttuvat ensimmäiseen pilottiin asti.
+- `graph-engineering-runbook`-initiative on draft: strict-v13/V3/DB9-toteutus on koossa, mutta final gatejen, browser-QA:n ja ihmisacceptancen evidenssi viimeistellään ennen acceptancea.
+- Ensimmäistä viiden Loopin RunBookia ei ole vielä ajettu tuotantokaltaisena end-to-end-pilottina.
+- Method-healthin runtime-, transition-, repair- ja tracker-baselinet puuttuvat ensimmäiseen pilottiin asti.
+- Pinnatun `tk`-revision live-smoke riippuu paikallisesta prerequisite-asennuksesta; hermetic fake-CLI-testit eivät korvaa sitä.
 - Konfiguraatiossa ei ole Copilot-ExecutionProfilea tai Copilot-Nodea, vaikka platform-adapteri on toteutettu.
 - Tässä checkoutissa ei ole Git-release-tagia; release/deploy/rollback edellyttää aina erillisen ihmisvaltuutuksen.
 
@@ -80,4 +80,4 @@ Balletin vahvin idea ei ole “agenttien määrä”, vaan **todennettava suorit
 
 `versionhallittu intentio → immutable snapshot → eristetty työtila → strukturoitu tulos → pysyvä evidenssi`
 
-Seuraava hyväksyntäraja on `workflow-engineering`-initiativen `EVID-015`-ketjun teknisten gatejen ja desktop/narrow-ihmisreview'n katselmointi. Menetelmäterveyden erillinen seuraava kypsyysaskel säilyy rajattuna pilottina Root Loopilla `arc42-clarify-requirements` ennen erikseen päätettävää alpha-julkaisua.
+Seuraava hyväksyntäraja on `graph-engineering-runbook`-initiativen `EVID-016`–`EVID-018`-ketju: final gatet, Graphin desktop/narrow-QA, Workflow-regressio ja projektin omistajan visual review. Seuraava menetelmäkypsyysaskel on rajattu viiden Loopin end-to-end-pilotti ennen erikseen päätettävää alpha-julkaisua.

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addJobPair,
-  addLoopEdge,
+  addGraphTransition,
+  addRepairEdge,
   canRemoveJobPair,
   changeJobNodeType,
   changeValidationNodeType,
@@ -11,18 +12,20 @@ import {
   nextJobNodeId,
   removeJobPair,
   removeLoopAtIndex,
-  removeLoopEdge,
+  removeGraphTransition,
+  removeRepairEdge,
   reorderJobNodes,
   replaceJobNode,
   replaceValidationNode,
   updateLoopAtIndex,
-  updateLoopEdge,
+  updateGraphTransition,
+  updateRepairEdge,
   updateOrchestrator,
   updatePassEdgeTarget
 } from "../src/workspace/automation/loops/loopEditorState";
 import { workflowAutomation, workflowLoop } from "./workflowFixtures";
 
-describe("strict-v12 Workflow Engineering drafts", () => {
+describe("strict-v13 Workflow Engineering drafts", () => {
   it("creates separate Job and Validation drafts without runtime state", () => {
     const loop = createLoopDraft();
     const job = createJobNodeDraft();
@@ -82,17 +85,36 @@ describe("strict-v12 Workflow Engineering drafts", () => {
     expect(nextJobNodeId(workflowAutomation(workflowLoop("new-loop")), createLoopDraft())).toBe("new-loop-job");
   });
 
-  it("updates Graph Edges and Orchestrator without changing Workflow ownership", () => {
+  it("updates RunBook transitions, Repair Edges, and Orchestrator without changing Workflow ownership", () => {
     const first = workflowLoop();
     const second = workflowLoop("repair-loop");
     const config = workflowAutomation(first, second);
-    const added = addLoopEdge(config, first.id);
-    const edge = added.graph.loopEdges[0]!;
-    const repaired = updateLoopEdge(added, edge.id, { ...edge, kind: "repair", capability: "test:loop.transfer" });
-    const orchestrated = updateOrchestrator(repaired, { ...repaired.orchestrator, maxRepairDepth: 2 });
-    expect(orchestrated.graph.loopEdges[0]).toMatchObject({ source: first.id, target: second.id, kind: "repair" });
-    expect(orchestrated.orchestrator.maxRepairDepth).toBe(2);
-    expect(removeLoopEdge(orchestrated, edge.id).graph.loopEdges).toEqual([]);
+    const withoutRoutes = {
+      ...config,
+      graph: { ...config.graph, transitions: [], repairEdges: [] }
+    };
+    const withTransition = addGraphTransition(withoutRoutes, first.id);
+    const transition = withTransition.graph.transitions[0]!;
+    const updatedTransition = updateGraphTransition(withTransition, transition.id, {
+      ...transition, decision: "FAIL", outcome: "invalid_plan", target: { loopId: second.id }
+    });
+    const withRepair = addRepairEdge(updatedTransition, first.id);
+    const repair = withRepair.graph.repairEdges[0]!;
+    const repaired = updateRepairEdge(withRepair, repair.id, {
+      ...repair, target: second.id, capability: "test:loop.transfer"
+    });
+    const orchestrated = updateOrchestrator(repaired, {
+      mode: "runbook", maxTransitions: 128,
+      repairRouter: {
+        executionProfileId: "codex-test", primaryInstructionId: "project:architect",
+        skillIds: [], maxRepairDepth: 2, maxRepairAttempts: 3
+      }
+    });
+    expect(orchestrated.graph.transitions[0]).toMatchObject({ source: first.id, decision: "FAIL", outcome: "invalid_plan", target: { loopId: second.id } });
+    expect(orchestrated.graph.repairEdges[0]).toMatchObject({ source: first.id, target: second.id, capability: "test:loop.transfer" });
+    expect(orchestrated.orchestrator.repairRouter?.maxRepairDepth).toBe(2);
+    expect(removeGraphTransition(orchestrated, transition.id).graph.transitions).toEqual([]);
+    expect(removeRepairEdge(orchestrated, repair.id).graph.repairEdges).toEqual([]);
     const renamed = updateLoopAtIndex(config, 0, { ...first, id: "renamed-loop" });
     expect(removeLoopAtIndex(renamed, 1).loops.map(({ id }) => id)).toEqual(["renamed-loop"]);
   });

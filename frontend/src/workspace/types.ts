@@ -25,7 +25,7 @@ export interface RouteState {
   automationEntityId?: string;
   automationView?: EngineeringView;
   automationRouteIssue?: "invalid-view" | "missing-loop-id" | "non-canonical-graph";
-  runTargetKind?: "loop";
+  runTargetKind?: "graph" | "loop";
   runTargetId?: string;
   rootRunId?: string;
 }
@@ -64,6 +64,9 @@ export const emptyData: AppData = {
     logsPath: ""
   },
   runtimeConfigurationIssues: [],
-  runTargets: { loops: [] },
+  runTargets: {
+    graph: { kind: "graph", id: "", name: "Graph", ready: false, issues: [] },
+    loops: []
+  },
   projectDocumentTree: []
 };

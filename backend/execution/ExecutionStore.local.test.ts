@@ -193,7 +193,7 @@ describe("ExecutionStore outcome contracts", () => {
     fixture.insertRoot("root-1", "task");
     const invalid = specification("task", "root-1");
     invalid.evidence.outputSchema = validationNodeOutcomeJsonSchema;
-    invalid.evidence.outputSchemaId = "validation-node-outcome-v5";
+    invalid.evidence.outputSchemaId = "validation-node-outcome-v6";
     invalid.evidence.outputSchemaSha256 = sha256(canonicalJson(validationNodeOutcomeJsonSchema));
     expect(() => fixture.store.create(invalid)).toThrow(/output schema evidence/);
     fixture.close();

@@ -3,8 +3,8 @@ id: arc42-section-10
 title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 10
+updatedAt: '2026-08-21'
+version: 12
 tags:
   - arc42
   - quality
@@ -20,7 +20,7 @@ Tämä osio määrittää arkkitehtuurin suunnitteluun, hyväksymiseen ja evalua
 
 ## Tila
 
-QS-001–QS-010 sekä niiden prioriteetit perustuvat hyväksyttyihin Goaleihin ja `goal-009`:n valtuutukseen. Käyttäjä hyväksyi 2026-08-17 QS-011–QS-013:n ja 2026-08-19 QS-014:n prioriteetin 1. `goal-013`:n acceptance intent ja käyttäjän 2026-08-20 päätösvaltuutus tekevät QS-015:stä prioriteetin 1 strict-v12 Workflow -acceptance-rajan. Evidenssistatus on erillinen: pending implementation tai verification ei ole onnistumisväite.
+QS-001–QS-015 säilyttävät hyväksytyn laatuintention ja historiallisen evidenssin. `goal-014`:n acceptance intent ja käyttäjän 2026-08-20 päätösvaltuutus tekevät QS-016–QS-018:sta prioriteetin 1 strict-v13 RunBook-, visual stability- ja tracker-acceptance-rajat. QS-016 on paikallisesti verified; QS-017:n tekninen/browser-evidenssi sekä QS-018:n hermetic evidenssi ovat läpäisseet. Ihmisen visual verdict ja pinnatun oikean `tk`:n live-smoke säilyvät erillisinä pending-rajoina.
 
 ## Laatupuu
 
@@ -45,6 +45,9 @@ flowchart TD
   usability --> q13["QS-013 Run projection"]
   integrity --> q14["QS-014 Graph/Loop v11"]
   integrity --> q15["QS-015 Workflow v12"]
+  integrity --> q16["QS-016 RunBook determinismi"]
+  usability --> q17["QS-017 Graph/Workflow vakaus"]
+  recovery --> q18["QS-018 tk reconciliation"]
 ```
 
 Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voivat estää toiminnon, vaikka käytettävyys kärsisi. UI:n ymmärrettävyys ei oikeuta keksittyä runtime-telemetriaa.
@@ -69,6 +72,9 @@ Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voi
 | QS-013 | goal-007 | Operaattori tarkastaa aktiivista, repairissa olevaa, palannutta ja finalisoitua Runia sekä vastaa Human Nodeen. | Run mission control paikallisessa selaimessa immutable snapshotin ja canonical persistencen päällä. | BB-001, BB-002, BB-005, RT-010, CON-005 | Johda position, role, profile, attempt, revision, repair, return ja finalization vain snapshotista/read storesta; älä keksi telemetriaa. | View-model/panel-testit osoittavat 100 % nimetyistä kentistä canonical DTO -lähteeseen; provider-tekstistä johdettuja state-kenttiä on 0; UI näyttää 0 keksittyä prosenttia, ETA:a tai elapsed-arvoa; repair/return/human/finalization-fixtureiden expected projectionit läpäisevät. | 1 | EVID-013 | verified |
 | QS-014 | goal-012 | Operaattori authoroi project-global graphin tai avaa yhden Loopin, ja runtime kohtaa nolla, yhden tai usean flow/repair route candidaten. | Strict-v11 config, immutable Root Run snapshot ja paikallinen selain desktop/narrow-viewportissa. | BB-001, BB-003–BB-006, BB-009, RT-011, CON-002, CON-005 | Näytä täsmälleen Graph Engineering / Loop Engineering, validoi jokainen cross-Loop-valinta graph-allowlistilla ja capabilityllä sekä pysähdy ambiguityssa tai ihmisvaltuutuksessa `needs_input`-tilaan. | V11 parseri hylkää 100 % v10-, unknown-, silent-default- ja dual-write-fixtureistä; Context/numeric route/legacy-mallin aktiivisia polkuja on 0; Graph-projektiossa on täsmälleen yksi LoopNode per ProjectLoop ja yksi Orchestrator-control sekä 0 sisäistä Work/Validation-nodea; Loop-projektiossa on 0 project-global route/control-nodea; runtime-testit osoittavat zero-flow completionin, kaikki flow/repair-dispatchit Orchestratorin kautta, capability/allowlist-rejectionin, ambiguity/permission `needs_input`-tilan, repair-returnin samaan Validationiin ja flow framejen määrän 0. | 1 | EVID-014 | technical implementation passed GLE-EVID-002–008; human acceptance pending |
 | QS-015 | goal-013 | Repositoryn Loop authoroidaan tai suoritetaan, Validation palauttaa PASS/FAIL-tuloksen, palvelu avaa runtime-kannan tai käyttäjä navigoi selected-Loop-näkymään. | Strict-v12 config, v2 module, v5 snapshot/envelope/outcome, v7/v6 execution, SQLite v8 ja paikallinen selain desktop/narrow-viewportissa. | BB-001, BB-003–BB-006, BB-009, RT-002, RT-003, RT-011, CON-002, CON-005, CON-008 | Säilytä 1:1 Job/Validation-paritus ja exact Pass/Fail Edget; suorita ensimmäinen Job + kolme retryä, eskaloi neljäs FAIL, palaa repairista samaan Validationiin ja projisoi Workflow-canvasille yksi Job-artwork per pari sekä vain persisted Edget. | Parseri hylkää 100 % v11/v1/unknown/invalid-pairing/edge/reachability-fixtureistä; aktiivisia `WorkLoopNode`, `WorkNode`, `LOCAL_RETRY`, `ORCHESTRATOR_REPAIR`, `view=loop` tai `work_loop_node_runs` -polkuja on 0; runtime-testit osoittavat Job→Validation, PASS→Job/PASS, kolme retryä, neljännen FAIL-eskaloinnin, same-Validation repair-returnin ilman Job rerunia/retry resetiä, technical failure bypassin sekä State/restart/cancellation/recoveryn; UI-testit osoittavat atomisen parin create/delete-guardin, erilliset editorit, canvasilla vain JobNodet ja persisted Edget, edge-geometriat vain `straight` tai `smoothstep`, nolla endpoint-nodea/validate/retry-viivaa, canonical URL/back-forwardin, keyboard/a11y:n ja desktop/narrow-layoutin; v7-kanta failaa suljetusti täsmäohjeella. | 1 | EVID-015 | technical implementation, ADR-021 canvas correction and final gates passed; human visual acceptance pending |
+| QS-016 | goal-014 | Graph Run käynnistyy, terminal Validation palauttaa minkä tahansa sallitun 18 reitin päätös/outcome-parin, graphia muutetaan kesken Runin tai transition-raja saavutetaan. | Strict-v13 config, v6 immutable snapshot/envelope/outcome, v7/v8 composition/execution ja SQLite v9; Graph-, isolated- ja scheduled-root-fixturet. | BB-003–BB-006, BB-009, RT-003, RT-012, CON-002, CON-009 | Reititä exact snapshot-transitioniin ilman kohteen provider-päättelyä, finalisoi vain eksplisiittisestä DONEsta, pidä isolated/scheduled-ajot Graphin ulkopuolella ja säilytä repair call/return erillisenä. | Schema-testit läpäisevät 1/5/40 Loopin validit fixturet ja hylkäävät 100 % missing start/unreachable/duplicate key/no DONE/invalid outcome/transition-repair confusion -fixtureistä; runtime-matriisi todentaa kaikki 18 transitionia, checkout-muutoksen vaikutuksen 0 käynnissä olevaan Runiin, transition 257:n eston, DONE-finalisoinnin, isolated/scheduled continuationien määrän 0 ja repair returnin samaan Validationiin. | 1 | EVID-016 | verified locally |
+| QS-017 | goal-007, goal-014 | Operaattori authoroi tai tarkastaa 1, 5 tai 40 Loopin Graphia desktop- ja narrow-viewportissa ja avaa Loopin Workflow Engineeringiin. | Paikallinen selain, strict-v13 config ja suojattu Workflow-canvas. | BB-001, BB-002, RT-010, RT-012, CON-005, CON-009 | Näytä Graph pelkistettynä deterministic layered -korttikaaviona ja säilytä Workflow Engineeringin avaruusteema sekä authoring-semantics muuttumattomina. | 1/5/40 layoutissa on 0 päällekkäistä Loop-korttia; pan/zoom säilyy eikä automaattinen fit pienennä tekstiä lukukelvottomaksi; jokainen edge-label sisältää decision+outcomen ja accessible namen; cycles/back routes ovat deterministisiä; desktop/narrow testit läpäisevät ilman page overflow'ta; Workflow regression QA osoittaa saman gridin, artworkit/koot, glows, amber-ID:t, mint-edget, connection pointit ja vain straight- tai smoothstep-geometriat. | 1 | EVID-017 | technical/browser verified; human visual verdict pending |
+| QS-018 | goal-006, goal-014 | Graph Run kohtaa puuttuvan/epäyhteensopivan `tk`:n, timeoutin, malformed outputin, invalidin store-graphin, osittaisen kirjoituksen, restartin/cancelin tai BUILD-claimin. | Runtime DB v9, hermetic fake CLI ja optional pinned live `tk` Run-worktreessä. | BB-004, BB-005, BB-010, RT-009, RT-013, DEP-002, DEP-004, CON-010 | Estä Run ennen epätäydellistä sovitusta, säilytä yksi external-ref/linkki restartien yli ja rajaa agentti work-storeen sekä yksi claim yhtä BUILD invocationia kohti. | Hermetic matriisi läpäisee success/timeout/malformed Markdown/JSONL/duplicate external-ref/dangling parent/dependency/cycle/partial write/restart/cancel/reconciliation -tapaukset; failed preflight jonottaa 0 provider-tehtävää; partial/restart tuottaa 1 ticketin per external-ref; pending outboxin aikana seuraavia transitioneja on 0; BUILD claimaa 0 tai 1 issuea invocationissa; live-smoke-status raportoidaan erikseen. | 1 | EVID-018 | hermetic verified; pinned live smoke pending |
 <!-- quality-scenarios:end -->
 
 ## Priorisoinnin tulkinta
@@ -83,11 +89,11 @@ Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot; [
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019` ja `adr-020`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-017`, `adr-018`, `adr-019`, `adr-020`, `adr-021` ja `adr-022`.
 
 ## Evidenssi
 
-EVID-001–EVID-015 ratkaistaan TRACEABILITYssa. EVID-011–EVID-013 on merkitty verifiediksi 2026-08-17 ajettujen nimettyjen testien ja conformance-katselmoinnin jälkeen. EVID-014 säilyttää v11-historian, ja EVID-015 kerää nykyisen strict-v12 Workflow -hard cutin teknisen ja ihmisacceptance-evidenssin. Pending- tai failed-evidenssiä ei käsitellä onnistumisena.
+EVID-001–EVID-018 ratkaistaan TRACEABILITYssa. EVID-014 säilyttää v11-historian ja EVID-015 strict-v12 Workflow -hard cutin evidenssin. EVID-016 on paikallisesti verified, EVID-017:n technical/browser-osuus on verified ja EVID-018:n hermetic-osuus on verified. Puuttuvia ihmis- tai live-smoke-osuuksia ei käsitellä onnistumisina.
 
 ## Avoimet kysymykset
 

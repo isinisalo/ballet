@@ -29,7 +29,7 @@ export interface RepairRequest {
   completedAt?: string;
 }
 
-export type OrchestrationRequestKind = "flow" | "repair";
+export type OrchestrationRequestKind = "repair";
 export type OrchestrationRequestStatus =
   | "pending" | "waiting_for_input" | "routed" | "dispatched" | "failed" | "cancelled";
 
@@ -110,7 +110,7 @@ export interface RepairResult {
 export type ControlFlowEventKind =
   | "job_completed" | "job_needs_input" | "job_terminal"
   | "validation_pass" | "validation_fail_retry" | "validation_fail_escalated" | "validation_terminal"
-  | "repair_call" | "repair_return" | "repair_terminal" | "flow_transition"
+  | "repair_call" | "repair_return" | "repair_terminal" | "graph_transition"
   | "orchestrator_terminal" | "root_cancelled" | "root_terminal" | "execution_interrupted";
 
 export interface ControlFlowEvent {

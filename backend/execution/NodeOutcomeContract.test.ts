@@ -29,6 +29,10 @@ describe("role-specific Node outcome contracts", () => {
     },
     {
       role: "validation", state: "completed", decision: "FAIL", summary: "Retry.", evidence: {}, checks,
+      feedback: "Correct the value.", expectedCorrection: "Set it to one."
+    },
+    {
+      role: "validation", state: "completed", decision: "FAIL", summary: "Repair.", evidence: {}, checks,
       feedback: "Correct the value.", expectedCorrection: "Set it to one.",
       escalation: { reason: "Validation failed.", requestedCapability: "repair structured state", evidenceRefs: [] }
     },
@@ -60,10 +64,6 @@ describe("role-specific Node outcome contracts", () => {
   });
 
   it.each([
-    ["FAIL without escalation", validationNodeOutcomeSchema, {
-      role: "validation", state: "completed", decision: "FAIL", summary: "No escalation.", evidence: {}, checks,
-      feedback: "x", expectedCorrection: "y"
-    }],
     ["PASS with escalation", validationNodeOutcomeSchema, {
       role: "validation", state: "completed", decision: "PASS", summary: "Contradiction.", evidence: {}, checks,
       escalation: { reason: "x", requestedCapability: "y", evidenceRefs: [] }
@@ -73,6 +73,11 @@ describe("role-specific Node outcome contracts", () => {
       feedback: "x", expectedCorrection: "y",
       escalation: { reason: "x", requestedCapability: "y", evidenceRefs: [] },
       statePatch: [{ op: "add", path: "/invalid", value: true }]
+    }],
+    ["FAIL with both transition and repair", validationNodeOutcomeSchema, {
+      role: "validation", state: "completed", decision: "FAIL", summary: "Contradiction.", evidence: {}, checks,
+      feedback: "x", expectedCorrection: "y", transitionOutcome: "invalid_plan",
+      escalation: { reason: "x", requestedCapability: "repair structured state", evidenceRefs: [] }
     }],
     ["Repair Request with provider-selected target", validationNodeOutcomeSchema, {
       role: "validation", state: "completed", decision: "FAIL", summary: "Invalid target selection.",

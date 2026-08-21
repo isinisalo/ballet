@@ -34,14 +34,23 @@ export const workflowLoop = (id = "main-loop"): ProjectLoop => ({
 });
 
 export const workflowAutomation = (...loops: ProjectLoop[]): ProjectAutomationConfig => ({
-  version: 12,
-  orchestrator: {
-    executionProfileId: "codex-test",
-    primaryInstructionId: "project:architect",
-    skillIds: [],
-    maxRepairDepth: 4,
-    maxRepairAttempts: 3
-  },
-  graph: { loopEdges: [] },
+  version: 13,
+  orchestrator: { mode: "runbook", maxTransitions: 256 },
+  graph: graphFor(loops.length > 0 ? loops : [workflowLoop()]),
   loops: loops.length > 0 ? loops : [workflowLoop()]
+});
+
+const graphFor = (loops: ProjectLoop[]): ProjectAutomationConfig["graph"] => ({
+  id: "test-graph",
+  name: "Test Graph",
+  startLoopId: loops[0]?.id ?? "",
+  transitions: loops.flatMap((loop, index) => [{
+    id: `${loop.id}-success`, source: loop.id, decision: "PASS" as const, outcome: "success",
+    target: index < loops.length - 1 ? { loopId: loops[index + 1]!.id } : { runResult: "DONE" as const },
+    description: `Continue from ${loop.id}.`
+  }, {
+    id: `${loop.id}-failure`, source: loop.id, decision: "FAIL" as const, outcome: "failure",
+    target: { loopId: loop.id }, description: `Retry ${loop.id}.`
+  }]),
+  repairEdges: []
 });

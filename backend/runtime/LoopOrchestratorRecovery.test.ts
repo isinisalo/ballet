@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RuntimeDatabase } from "../runtime-db.js";
-import { testJobPair, testLoop } from "../tests/v12TestConfig.js";
+import { testJobPair, testLoop } from "../tests/v13TestConfig.js";
 import {
   activeNode, completeActiveLoop, createOrchestrationHarness,
   requestExternalRepair, routeRepair, validationPass
@@ -11,8 +11,8 @@ describe("LoopOrchestrator nesting and limits", () => {
     const repairA = testLoop("repair-a", testJobPair("repair-a-job"));
     const repairB = testLoop("repair-b", testJobPair("repair-b-job"));
     const harness = await createOrchestrationHarness({ targets: [repairA, repairB], edges: [
-      { id: "caller-a", source: "caller-loop", target: "repair-a", kind: "repair", capability: "test:loop.transfer", description: "Caller to A." },
-      { id: "a-b", source: "repair-a", target: "repair-b", kind: "repair", capability: "test:loop.transfer", description: "A to B." }
+      { id: "caller-a", source: "caller-loop", target: "repair-a", capability: "test:loop.transfer", description: "Caller to A." },
+      { id: "a-b", source: "repair-a", target: "repair-b", capability: "test:loop.transfer", description: "A to B." }
     ] });
     const { runtime } = harness;
     runtime.startLoopRun("root-run");
@@ -247,8 +247,8 @@ describe("LoopOrchestrator interruption and cancellation recovery", () => {
     const repairA = testLoop("repair-a", testJobPair("repair-a-job"));
     const repairB = testLoop("repair-b", testJobPair("repair-b-job"));
     const harness = await createOrchestrationHarness({ targets: [repairA, repairB], edges: [
-      { id: "caller-a", source: "caller-loop", target: "repair-a", kind: "repair", capability: "test:loop.transfer", description: "Caller to A." },
-      { id: "a-b", source: "repair-a", target: "repair-b", kind: "repair", capability: "test:loop.transfer", description: "A to B." }
+      { id: "caller-a", source: "caller-loop", target: "repair-a", capability: "test:loop.transfer", description: "Caller to A." },
+      { id: "a-b", source: "repair-a", target: "repair-b", capability: "test:loop.transfer", description: "A to B." }
     ] });
     const { runtime } = harness;
     runtime.startLoopRun("root-run");

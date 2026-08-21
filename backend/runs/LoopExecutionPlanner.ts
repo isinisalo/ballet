@@ -11,6 +11,7 @@ import { ProjectConfigurationRepository } from "../project-config/ProjectConfigu
 import { LoopRunNotFoundError, LoopRunStateError } from "../runtime/LoopRunErrors.js";
 import { rootExecutionSnapshotSchema } from "../runtime/RootExecutionSnapshotSchema.js";
 import { validateState } from "../runtime/state/StatePatch.js";
+import { TkTracker } from "../tracker/TkTracker.js";
 import { preflightExecutionPrompts } from "./LoopExecutionPreflight.js";
 import {
   providerCompositionsForLoops,
@@ -23,16 +24,29 @@ export class LoopExecutionPlanner {
 
   constructor(
     private readonly configurations: RuntimeConfigurationService,
-    private readonly runtime: LocalRuntimeService
-  ) {}
+    private readonly runtime: LocalRuntimeService,
+    tracker: string | Pick<TkTracker, "preflight"> = "tk"
+  ) {
+    this.tracker = typeof tracker === "string" ? new TkTracker(tracker) : tracker;
+  }
+
+  private readonly tracker: Pick<TkTracker, "preflight">;
 
   async create(
     workspace: PreparedRootWorkspace,
-    rootLoopId: string,
+    rootKind: "graph" | "loop",
+    targetId: string,
     runInput = ""
   ): Promise<RootExecutionSnapshot> {
     void runInput;
     const config = this.loadConfiguration(workspace.path);
+    try {
+      await this.tracker.preflight(workspace.path, config.issueTracker);
+    } catch (error) {
+      throw new LoopRunStateError(
+        `Issue tracker failed preflight: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
     const automation = automationOf(config);
     const issues = validateProjectAutomationConfig(automation, config.executionProfiles);
     if (issues.length > 0) {
@@ -45,7 +59,11 @@ export class LoopExecutionPlanner {
       throw new LoopRunStateError(`Loop theme is invalid at ${issue.path}: ${issue.message}`);
     }
 
-    const graph = reachableExecutionGraph(config, rootLoopId);
+    if (rootKind === "graph" && targetId !== config.graph.id) {
+      throw new LoopRunNotFoundError(`Graph ${targetId} was not found.`);
+    }
+    const rootLoopId = rootKind === "graph" ? config.graph.startLoopId : targetId;
+    const graph = reachableExecutionGraph(config, rootLoopId, rootKind);
     const rootLoop = graph.loops.find((loop) => loop.id === rootLoopId);
     if (!rootLoop) throw new LoopRunNotFoundError(`Root Loop ${rootLoopId} was not found.`);
     graph.loops.forEach((loop) => validateState(loop.state.initial));
@@ -53,7 +71,7 @@ export class LoopExecutionPlanner {
     const nodeCompositions = providerCompositionsForLoops(graph.loops);
     const orchestrator = normalizeOrchestrator(config.orchestrator);
     const compositions = [
-      { id: "orchestrator", ...orchestrator },
+      ...(orchestrator.repairRouter ? [{ id: "orchestrator", ...orchestrator.repairRouter }] : []),
       ...nodeCompositions.map(({ id, composition }) => ({ id, ...composition }))
     ];
     const profilesById = new Map(config.executionProfiles.map((profile) => [profile.id, profile]));
@@ -63,7 +81,8 @@ export class LoopExecutionPlanner {
     const runtimes = await this.preflightRuntimes(executionProfiles);
 
     const snapshot = rootExecutionSnapshotSchema.parse({
-      version: 5,
+      version: 6,
+      rootKind,
       rootLoopId,
       project: {
         checkoutRoot: workspace.path,
@@ -72,6 +91,7 @@ export class LoopExecutionPlanner {
         snapshotHash: workspace.snapshotHash
       },
       orchestrator,
+      issueTracker: config.issueTracker,
       graph: graph.graph,
       loops: graph.loops,
       theme: theme.theme,
@@ -90,7 +110,7 @@ export class LoopExecutionPlanner {
     const issue = loaded.issues[0];
     throw new LoopRunStateError(issue
       ? `Project configuration is invalid at ${issue.path}: ${issue.message}`
-      : "The prepared Run workspace has no valid strict v12 project configuration.");
+      : "The prepared Run workspace has no valid strict v13 project configuration.");
   }
 
   private async preflightRuntimes(
@@ -120,14 +140,17 @@ export class LoopExecutionPlanner {
 }
 
 const automationOf = (config: ProjectConfiguration): ProjectAutomationConfig => ({
-  version: 12,
+  version: 13,
   orchestrator: config.orchestrator,
   graph: config.graph,
   loops: config.loops
 });
 const normalizeOrchestrator = (orchestrator: ProjectLoopOrchestrator): ProjectLoopOrchestrator => ({
-  ...orchestrator,
-  skillIds: [...orchestrator.skillIds].sort(compareUtf8)
+  mode: "runbook",
+  maxTransitions: orchestrator.maxTransitions,
+  ...(orchestrator.repairRouter ? {
+    repairRouter: { ...orchestrator.repairRouter, skillIds: [...orchestrator.repairRouter.skillIds].sort(compareUtf8) }
+  } : {})
 });
 const requireProfile = (
   profiles: ReadonlyMap<string, ExecutionProfile>,

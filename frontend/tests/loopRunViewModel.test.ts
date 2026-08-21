@@ -53,18 +53,25 @@ describe("loopRunViewModel", () => {
     root.executionSnapshot.loops.push(repairLoop);
     root.loopRuns.push(repairDetails);
     root.current = { ...root.current, loopRunId: repairDetails.loopRunId, loopId: repairLoop.id };
-    const liveConfig = { ...automation, graph: { loopEdges: [{
-      id: "mutable-edge", source: loop.id, target: repairLoop.id, kind: "flow" as const,
-      capability: "test:loop.transfer", description: "Mutable edge."
-    }] } };
-    root.executionSnapshot.graph.loopEdges = [{
-      id: "repair-edge", source: loop.id, target: repairLoop.id, kind: "repair",
+    const liveConfig = {
+      ...automation,
+      graph: {
+        ...automation.graph,
+        transitions: [{
+          id: "mutable-edge", source: loop.id, decision: "PASS" as const, outcome: "success",
+          target: { loopId: repairLoop.id }, description: "Mutable transition."
+        }],
+        repairEdges: []
+      }
+    };
+    root.executionSnapshot.graph.repairEdges = [{
+      id: "repair-edge", source: loop.id, target: repairLoop.id,
       capability: "test:loop.transfer", description: "Snapshotted allowlist."
     }];
 
     const view = resolveLoopRunView(liveConfig, loop, [], defaultLoopTheme, repairDetails, root);
     expect(view.canvasLoop.id).toBe("repair-loop");
-    expect(view.canvasConfig.graph.loopEdges).toEqual(root.executionSnapshot.graph.loopEdges);
+    expect(view.canvasConfig.graph.repairEdges).toEqual(root.executionSnapshot.graph.repairEdges);
   });
 });
 
@@ -95,11 +102,16 @@ const rootDetail = (details: LoopRunDetails): RootRunDetail => ({
     jobRunId: "composite", jobNodeId: "job", nodeRunId: "work-node", nodeRole: "job"
   },
   executionSnapshot: {
-    version: 5,
+    version: 6,
+    rootKind: "loop",
     rootLoopId: loop.id,
     project: { checkoutRoot: "/workspace", headSha: "a".repeat(40), configHash: "b".repeat(64), snapshotHash: "c".repeat(64) },
     orchestrator: automation.orchestrator,
-    graph: { loopEdges: [] }, loops: [loop],
+    issueTracker: {
+      kind: "tk", testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration", workDirectory: ".tickets/work"
+    },
+    graph: structuredClone(automation.graph), loops: [loop],
     theme: defaultLoopTheme, executionProfiles: [], runtimes: [], resources: [], createdAt: timestamp
   },
   loopRuns: [details],

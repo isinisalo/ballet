@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Panel } from "@/components/shared/workspace-ui";
 import { toErrorMessage } from "@/lib/errors";
 import type { RootRunSummary, RunTarget } from "@shared/api/workspace-contracts";
-import { runLoopPath } from "../routing";
+import { runGraphPath, runLoopPath } from "../routing";
 import type { RunDashboardState } from "./useRunDashboard";
 import { runApi } from "./runApi";
 import { RootRunCard } from "./RootRunCard";
@@ -13,7 +13,9 @@ import { RunTargetCard } from "./RunTargetCard";
 export function RunOverview({ dashboard, navigate }: { dashboard: RunDashboardState; navigate: (path: string) => void }) {
   const [pending, setPending] = useState("");
   const [actionError, setActionError] = useState("");
-  const openTarget = (target: RunTarget, rootRunId = target.activeRootRunId) => navigate(runLoopPath(target.id, rootRunId));
+  const openTarget = (target: RunTarget, rootRunId = target.activeRootRunId) => navigate(
+    target.kind === "graph" ? runGraphPath(target.id, rootRunId) : runLoopPath(target.id, rootRunId)
+  );
   const start = async (target: RunTarget) => {
     setPending(`${target.kind}:${target.id}`);
     setActionError("");
@@ -37,6 +39,7 @@ export function RunOverview({ dashboard, navigate }: { dashboard: RunDashboardSt
     <Panel title="Run Overview" icon={<Play />} contentClassName="grid gap-0 p-0" action={<span className="font-mono text-[0.62rem] text-muted-foreground">stream: {dashboard.streamStatus}</span>}>
       {dashboard.error || actionError ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{actionError || dashboard.error}</AlertDescription></Alert> : null}
       <RunListSection title="Active root runs" icon={<Activity />} empty={dashboard.loading ? "Loading active runs…" : "No active runs."} runs={dashboard.active} pending={pending} navigate={navigate} onCancel={cancel} />
+      <TargetSection title="Configured Graph" targets={[dashboard.targets.graph]} pending={pending} onOpen={openTarget} onStart={start} />
       <TargetSection title="Configured Loops" targets={dashboard.targets.loops} pending={pending} onOpen={openTarget} onStart={start} />
       <RunListSection title="Recent runs" icon={<History />} empty={dashboard.loading ? "Loading recent runs…" : "No recent runs."} runs={dashboard.recent} pending={pending} navigate={navigate} />
     </Panel>

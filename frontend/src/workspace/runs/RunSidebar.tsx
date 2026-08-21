@@ -8,7 +8,7 @@ import {
   SidebarMenuSubItem
 } from "@/components/ui/sidebar";
 import type { RouteState } from "../types";
-import { runLoopPath, runOverviewPath } from "../routing";
+import { runGraphPath, runLoopPath, runOverviewPath } from "../routing";
 import { SidebarNavLinkItem } from "../layout/SidebarNavLinkItem";
 import type { RunDashboardState } from "./useRunDashboard";
 import { runSummaryPath } from "./runPresentation";
@@ -33,6 +33,11 @@ export function RunSidebar({ route, dashboard, navigate }: {
             <span className="ml-auto text-muted-foreground">{run.status}</span>
           </SidebarNavLinkItem>
         ))}
+      </RunSection>
+      <RunSection label="Graph" icon={<Route />} empty="No Graph.">
+        <SidebarNavLinkItem path={runGraphPath(dashboard.targets.graph.id, dashboard.targets.graph.activeRootRunId)} isActive={route.runTargetKind === "graph" && route.runTargetId === dashboard.targets.graph.id} navigate={navigate} className="h-7 min-w-0">
+          <ReadinessDot ready={dashboard.targets.graph.ready} active={Boolean(dashboard.targets.graph.activeRootRunId)} /><span className="truncate font-mono text-[0.68rem]">{dashboard.targets.graph.name}</span>
+        </SidebarNavLinkItem>
       </RunSection>
       <RunSection label="Loops" icon={<Route />} empty="No Loops.">
         {dashboard.targets.loops.map((target) => (

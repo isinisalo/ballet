@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { automationConfigSchema, executionProfileSchema, loopThemeSchema } from "../../shared/api/workspace-schemas.js";
+import {
+  automationConfigSchema, executionProfileSchema, loopThemeSchema, projectIssueTrackerSchema
+} from "../../shared/api/workspace-schemas.js";
 import {
   getReachableProjectLoopGraph,
   getReachableProjectJobNodeIds
@@ -28,7 +30,8 @@ const resourceSchema = z.object({
 }).strict();
 
 export const rootExecutionSnapshotSchema = z.object({
-  version: z.literal(5),
+  version: z.literal(6),
+  rootKind: z.enum(["graph", "loop"]),
   rootLoopId: z.string(),
   project: z.object({
     checkoutRoot: z.string(),
@@ -37,6 +40,7 @@ export const rootExecutionSnapshotSchema = z.object({
     snapshotHash: sha256Schema
   }).strict(),
   orchestrator: automationConfigSchema.shape.orchestrator,
+  issueTracker: projectIssueTrackerSchema,
   loops: automationConfigSchema.shape.loops,
   graph: automationConfigSchema.shape.graph,
   theme: loopThemeSchema,
@@ -48,10 +52,24 @@ export const rootExecutionSnapshotSchema = z.object({
   resources: z.array(resourceSchema),
   createdAt: z.string()
 }).strict().superRefine((snapshot, context) => {
+  const validationGraph = snapshot.rootKind === "graph" ? snapshot.graph : {
+    ...snapshot.graph,
+    startLoopId: snapshot.rootLoopId,
+    transitions: snapshot.loops.flatMap((loop) => ([
+      {
+        id: `snapshot-${loop.id}-pass`, source: loop.id, decision: "PASS" as const,
+        outcome: "isolated", target: { runResult: "DONE" as const }, description: "Isolated snapshot validation."
+      },
+      {
+        id: `snapshot-${loop.id}-fail`, source: loop.id, decision: "FAIL" as const,
+        outcome: "isolated", target: { runResult: "DONE" as const }, description: "Isolated snapshot validation."
+      }
+    ]))
+  };
   const automationIssues = validateProjectAutomationConfig({
-    version: 12,
+    version: 13,
     orchestrator: snapshot.orchestrator,
-    graph: snapshot.graph,
+    graph: validationGraph,
     loops: snapshot.loops
   }, snapshot.executionProfiles);
   automationIssues.forEach((issue) => context.addIssue({
@@ -73,18 +91,26 @@ export const rootExecutionSnapshotSchema = z.object({
       message: `Loop ${loop.id} contains a JobNode that is not reachable by PassEdges.`
     });
   });
-  snapshot.graph.loopEdges.forEach((edge, edgeIndex) => {
+  snapshot.graph.transitions.forEach((transition, edgeIndex) => {
+    if (!loopIds.has(transition.source)
+      || ("loopId" in transition.target && !loopIds.has(transition.target.loopId))) context.addIssue({
+      code: "custom",
+      path: ["graph", "transitions", edgeIndex],
+      message: `Transition ${transition.id} has an endpoint outside the execution snapshot.`
+    });
+  });
+  snapshot.graph.repairEdges.forEach((edge, edgeIndex) => {
     if (!loopIds.has(edge.source) || !loopIds.has(edge.target)) context.addIssue({
       code: "custom",
-      path: ["graph", "loopEdges", edgeIndex],
-      message: `Loop Edge ${edge.id} has an endpoint outside the execution snapshot.`
+      path: ["graph", "repairEdges", edgeIndex],
+      message: `Repair Edge ${edge.id} has an endpoint outside the execution snapshot.`
     });
   });
   if (loopIds.has(snapshot.rootLoopId)) {
     const reachable = getReachableProjectLoopGraph(
       snapshot,
       snapshot.rootLoopId,
-      snapshot.orchestrator.maxRepairDepth
+      snapshot.orchestrator.repairRouter?.maxRepairDepth ?? 0
     );
     snapshot.loops.forEach((loop, loopIndex) => {
       if (!reachable.loopIds.has(loop.id)) context.addIssue({

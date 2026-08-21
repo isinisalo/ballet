@@ -2,6 +2,7 @@ import type { JsonValue, ProjectGraph, ProjectLoop, ProjectLoopOrchestrator } fr
 import type { LoopTheme } from "./loopThemes.js";
 import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
 import type { ExecutionProfile } from "./projectConfig.js";
+import type { ProjectIssueTrackerConfig } from "./projectConfig.js";
 import type { CanonicalNodeOutcome, NodeRunRole } from "./runtime.js";
 
 export type {
@@ -46,10 +47,12 @@ export interface ExecutionRuntimeBinding {
 }
 
 export interface RootExecutionSnapshot {
-  version: 5;
+  version: 6;
+  rootKind: "graph" | "loop";
   rootLoopId: string;
   project: ExecutionProjectSnapshot;
   orchestrator: ProjectLoopOrchestrator;
+  issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;
   loops: ProjectLoop[];
   theme: LoopTheme;
@@ -63,7 +66,7 @@ export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content
 
 /** Attempt-specific evidence. The exact composed prompt and output schema are immutable. */
 export interface ExecutionPromptEvidence {
-  compositionVersion: 6;
+  compositionVersion: 7;
   loopId: string;
   jobNodeId?: string;
   workflowNodeId?: string;
@@ -73,13 +76,13 @@ export interface ExecutionPromptEvidence {
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
-  taskEnvelopeVersion: 5;
+  taskEnvelopeVersion: 6;
   taskEnvelopeSha256: string;
-  outputSchemaVersion: 5;
+  outputSchemaVersion: 6;
   outputSchemaId:
-    | "job-node-outcome-v5"
-    | "validation-node-outcome-v5"
-    | "orchestrator-node-outcome-v5";
+    | "job-node-outcome-v6"
+    | "validation-node-outcome-v6"
+    | "orchestrator-node-outcome-v6";
   outputSchema: { [key: string]: JsonValue };
   outputSchemaSha256: string;
 }
@@ -88,7 +91,7 @@ export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" 
 export type ExecutionTaskKind = "node_execution";
 
 export interface ExecutionSpec {
-  version: 7;
+  version: 8;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;

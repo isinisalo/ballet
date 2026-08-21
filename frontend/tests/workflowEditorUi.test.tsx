@@ -26,7 +26,7 @@ const workspace = (): AppData => ({
   runtime: localRuntime()
 });
 
-describe("strict-v12 Workflow Engineering editor", () => {
+describe("strict-v13 Workflow Engineering editor", () => {
   it("creates a Loop with separate Job/Validation Nodes and explicit PASS/FAIL Edges", async () => {
     const user = userEvent.setup();
     const saveAutomation = vi.fn(async (config) => config);
@@ -56,7 +56,7 @@ describe("strict-v12 Workflow Engineering editor", () => {
     await user.click(screen.getByRole("button", { name: "Save Loop" }));
     await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
     const saved = saveAutomation.mock.calls[0]?.[0];
-    expect(saved).toMatchObject({ version: 12 });
+    expect(saved).toMatchObject({ version: 13 });
     expect(saved?.loops.find((loop) => loop.id === "new-loop")?.workflow).toMatchObject({
       startJobNodeId: "new-loop-job",
       jobNodes: [expect.objectContaining({ id: "new-loop-job", type: "human", maxRetries: 3 })],
@@ -85,7 +85,7 @@ describe("strict-v12 Workflow Engineering editor", () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
     render(<AutomationView data={workspace()} view="graph" saveAutomation={vi.fn(async (value) => value)} navigate={navigate} setNavigationBlocker={vi.fn()} />);
-    const node = screen.getByRole("button", { name: /Custom Loop existing-loop.*1 Jobs/ });
+    const node = screen.getByRole("button", { name: /Loop EXISTING-LOOP, ID existing-loop.*1 Jobs/ });
     await user.click(node);
     expect(screen.getByRole("button", { name: "Open Workflow Engineering" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Open Workflow Engineering" }));
@@ -109,9 +109,9 @@ describe("strict-v12 Workflow Engineering editor", () => {
     expect(screen.queryByRole("option", { name: "Scheduled" })).not.toBeInTheDocument();
   });
 
-  it("updates explicit Orchestrator limits from Graph Engineering", () => {
+  it("updates the explicit RunBook transition limit from Graph Engineering", () => {
     render(<AutomationView data={workspace()} view="graph" saveAutomation={vi.fn(async (value) => value)} navigate={vi.fn()} setNavigationBlocker={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Maximum repair depth"), { target: { value: "7" } });
+    fireEvent.change(screen.getByLabelText("Maximum transitions"), { target: { value: "128" } });
     expect(screen.getByRole("button", { name: "Save graph" })).toBeEnabled();
   });
 });

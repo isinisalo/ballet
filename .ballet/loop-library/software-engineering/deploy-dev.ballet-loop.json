@@ -6,7 +6,8 @@
     "provides": [
       "deployment:dev.completed"
     ],
-    "recommendedConnections": [],
+    "recommendedTransitions": [],
+    "recommendedRepairs": [],
     "requires": []
   },
   "format": "ballet-loop-module",
@@ -80,7 +81,7 @@
     "version": "1.0.0"
   },
   "permissions": {
-    "externalWrites": false,
+    "externalWrites": "requires-human-authorization",
     "network": "forbidden"
   },
   "profileSlots": [],
@@ -106,5 +107,5 @@
     ],
     "version": "1.0.0"
   },
-  "version": 2
+  "version": 3
 }

@@ -5,7 +5,7 @@ const nullableInteger = z.number().int().nullable();
 
 export const loopRunRowSchema = z.object({
   loop_run_id: z.string(), root_run_id: z.string(), loop_id: z.string(), parent_loop_run_id: nullableString,
-  source: z.enum(["manual", "flow", "repair", "schedule"]),
+  source: z.enum(["manual", "transition", "repair", "schedule"]),
   status: z.enum(["queued", "running", "waiting_for_input", "completed", "blocked", "failed", "cancelled"]),
   input_json: nullableString, orchestration_request_id: nullableString,
   repair_request_id: nullableString, orchestration_frame_id: nullableString,
@@ -56,7 +56,7 @@ export const repairRequestRowSchema = z.object({
 }).strict();
 
 export const orchestrationRequestRowSchema = z.object({
-  orchestration_request_id: z.string(), root_run_id: z.string(), kind: z.enum(["flow", "repair"]),
+  orchestration_request_id: z.string(), root_run_id: z.string(), kind: z.literal("repair"),
   source_loop_run_id: z.string(), source_loop_id: z.string(), source_node_run_id: z.string(),
   state_revision_at_request: z.number().int(), completion_summary: z.string(),
   completion_evidence_json: z.string(), requested_capability: nullableString,
@@ -86,7 +86,7 @@ export const repairResultRowSchema = z.object({
 
 export const orchestratorRouteRowSchema = z.object({
   route_id: z.string(), root_run_id: z.string(), orchestration_request_id: z.string(),
-  kind: z.enum(["flow", "repair"]), repair_request_id: nullableString,
+  kind: z.literal("repair"), repair_request_id: nullableString,
   orchestrator_node_run_id: z.string(), loop_edge_id: z.string(), source_loop_id: z.string(),
   target_loop_id: z.string(), route_evidence_json: nullableString, created_at: z.string()
 }).strict();
@@ -96,7 +96,7 @@ export const controlFlowEventRowSchema = z.object({
   kind: z.enum([
     "job_completed", "job_needs_input", "job_terminal", "validation_pass",
     "validation_fail_retry", "validation_fail_escalated", "validation_terminal", "repair_call",
-    "repair_return", "repair_terminal", "flow_transition", "orchestrator_terminal",
+    "repair_return", "repair_terminal", "graph_transition", "orchestrator_terminal",
     "root_cancelled", "root_terminal", "execution_interrupted"
   ]),
   state_revision: z.number().int(), source_loop_run_id: nullableString,

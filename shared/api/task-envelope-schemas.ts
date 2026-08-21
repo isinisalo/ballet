@@ -40,7 +40,7 @@ const historyEntrySchema = z.object({
 const relevantHistorySchema = z.array(historyEntrySchema).max(8);
 
 const commonProviderFields = {
-  version: z.literal(5),
+  version: z.literal(6),
   run: providerRunIdentitySchema,
   loop: loopIdentitySchema,
   jobNode: workflowNodeIdentitySchema,
@@ -51,7 +51,7 @@ const commonProviderFields = {
   relevantHistory: relevantHistorySchema
 };
 
-export const jobTaskEnvelopeV5Schema = z.object({
+export const jobTaskEnvelopeV6Schema = z.object({
   role: z.literal("job"),
   ...commonProviderFields,
   previousValidationFeedback: z.object({
@@ -90,12 +90,22 @@ export const taskEnvelopeRepairReturnSchema = z.object({
   }).strict()
 }).strict();
 
-export const validationTaskEnvelopeV5Schema = z.object({
+export const validationTaskEnvelopeV6Schema = z.object({
   role: z.literal("validation"),
   ...commonProviderFields,
   validationNode: workflowNodeIdentitySchema,
   jobOutcome: jobCompletedOutcomeSchema,
-  repairReturn: taskEnvelopeRepairReturnSchema.optional()
+  repairReturn: taskEnvelopeRepairReturnSchema.optional(),
+  allowedTransitions: z.array(z.object({
+    id: identifier,
+    decision: z.enum(["PASS", "FAIL"]),
+    outcome: z.string().regex(/^[a-z][a-z0-9_]*$/).max(64),
+    target: z.union([
+      z.object({ loopId: identifier }).strict(),
+      z.object({ runResult: z.literal("DONE") }).strict()
+    ]),
+    description: nonEmptyText
+  }).strict()).max(256)
 }).strict();
 
 const targetLoopSchema = z.object({
@@ -106,7 +116,7 @@ const targetLoopSchema = z.object({
     provides: z.array(nonEmptyText).max(64)
   }).strict(),
   route: z.object({
-    kind: z.enum(["flow", "repair"]),
+    kind: z.literal("repair"),
     capability: nonEmptyText,
     description: nonEmptyText
   }).strict()
@@ -114,7 +124,7 @@ const targetLoopSchema = z.object({
 
 const orchestrationRequestSchema = z.object({
   id: identifier,
-  kind: z.enum(["flow", "repair"]),
+  kind: z.literal("repair"),
   sourceLoopId: identifier,
   sourceLoopRunId: identifier,
   sourceNodeRunId: identifier,
@@ -125,8 +135,8 @@ const orchestrationRequestSchema = z.object({
   expectedOutcome: z.json().optional()
 }).strict();
 
-export const orchestratorTaskEnvelopeV5Schema = z.object({
-  version: z.literal(5),
+export const orchestratorTaskEnvelopeV6Schema = z.object({
+  version: z.literal(6),
   role: z.literal("orchestrator"),
   run: orchestratorRunIdentitySchema,
   loop: loopIdentitySchema,
@@ -138,8 +148,8 @@ export const orchestratorTaskEnvelopeV5Schema = z.object({
   relevantHistory: relevantHistorySchema
 }).strict();
 
-export const taskEnvelopeV5Schema = z.union([
-  jobTaskEnvelopeV5Schema,
-  validationTaskEnvelopeV5Schema,
-  orchestratorTaskEnvelopeV5Schema
+export const taskEnvelopeV6Schema = z.union([
+  jobTaskEnvelopeV6Schema,
+  validationTaskEnvelopeV6Schema,
+  orchestratorTaskEnvelopeV6Schema
 ]);

@@ -28,6 +28,7 @@ interface ServerOptions {
   port: number;
   codexCommand?: string;
   copilotCommand?: string;
+  tkCommand?: string;
   webDist?: string;
 }
 
@@ -40,7 +41,7 @@ function parseServerOptions(args: string[]): ServerOptions {
     values.set(key.slice(2), value);
   }
   for (const key of values.keys()) {
-    if (!["root", "state-root", "port", "codex-command", "copilot-command", "web-dist"].includes(key)) {
+    if (!["root", "state-root", "port", "codex-command", "copilot-command", "tk-command", "web-dist"].includes(key)) {
       throw new Error(`Unknown internal server option --${key}.`);
     }
   }
@@ -54,6 +55,7 @@ function parseServerOptions(args: string[]): ServerOptions {
     root, stateRoot, port,
     codexCommand: values.get("codex-command"),
     copilotCommand: values.get("copilot-command"),
+    tkCommand: values.get("tk-command"),
     webDist: values.get("web-dist") ?? process.env.BALLET_WEB_DIST
   };
 }
