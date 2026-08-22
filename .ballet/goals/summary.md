@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-22'
-version: 12
+version: 13
 tags:
   - yhteenveto
   - tavoitteet
@@ -26,7 +26,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 1. **Määritellään työ** repositoryssä: Goalit, ADR:t, arc42-arkkitehtuuri, Graph, GraphNodet, aggregate JobNodet, Work/Validation-lapset, scoped orchestrator/repair-candidatet, ExecutionProfilet, instructionit, skillsit ja canvas-teema.
 2. **Koostetaan provider-tehtävä** deterministisesti System-ohjeesta, primary instructionista, valituista skillseistä, roolikohtaisesta Task Envelopesta ja tulosskeemasta.
-3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; Graph- ja Graph Node -orchestratorit valitsevat tasojen välisen dispatchin immutable snapshotin strict enumista. Work→Validation ja bounded retry ovat Job Noden sisäisiä invariantteja, ja Repair palaa samaan Validationiin.
+3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; Graph käyttää explicit `agent_v1`- tai `ssp_v1`-strategiaa ja Graph Node -orchestrator valitsee Job-tason dispatchin immutable snapshotista. Work→Validation ja bounded retry ovat Job Noden sisäisiä invariantteja, ja Repair palaa samaan Validationiin.
 4. **Seurataan ajoa** selainkäyttöliittymästä: tila, konsolitapahtumat, hyväksytty/hylätty jatkopolku, virheet ja finalisointi.
 5. **Suojataan aktiivinen checkout**: onnistunut työ commitoidaan Run-branchille ja siivotaan, muu worktree säilytetään tutkittavaksi. Ballet ei mergeä eikä pushaa automaattisesti.
 
@@ -35,24 +35,24 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 | Osa | Tehtävä |
 | --- | --- |
 | React/Vite-käyttöliittymä | Configure- ja Run-työtilat, URL-ohjatut Graph Engineering / Graph Node / Job Node -authoring-näkymät, inspectorit sekä runtime- ja Run-näkymät |
-| Paikallinen Express-palvelu | Loopback-API, validointi, scoped agent routing ja tapahtumavirrat |
+| Paikallinen Express-palvelu | Loopback-API, validointi, scoped agent routing, pure SSP policy ja tapahtumavirrat |
 | Provider-adapterit | Codex CLI ja GitHub Copilot CLI yhteisen tehtävä-, tapahtuma- ja tulosmallin takana |
-| SQLite-tila | Root Runien, GraphNode/JobNode-invocationien, work/validation/scoped-orchestrator/repair-roolien, State-revisioiden, routing-evidenssin, jonojen, tapahtumien ja tracker-outboxin kestävä paikallinen historia |
+| SQLite-tila | Root Runien, GraphNode/JobNode-invocationien, work/validation/scoped-orchestrator/repair-roolien, State-revisioiden, agent-routing- ja SSP decision/observation -evidenssin, jonojen, tapahtumien ja tracker-outboxin kestävä paikallinen historia |
 | Git-eristys | Root Run -kohtainen branch ja worktree, snapshot, commitointi ja epäonnistumisten säilytys |
 | Checkout-CLI | `ballet`, `stop`, `restart`, `status`, `logs`, `update` ja `version` sekä launchd-elinkaari |
 
 ## Nykytila tämän repositoryn perusteella
 
-- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v14** -skeemaa.
-- Projektissa on **15 hyväksyttyä Goalia** ja 26 ADR-recordia, joista ADR-026 on draft. ADR-023 omistaa kolmitasoisen domain/routing-rajan ja ADR-025 Job Node -authoringin industrial flow -projektion; aiempien päätösten historia säilyy.
-- `goal-016` ja `adr-026` ovat draft finite SSP/SMDP Graph-policy -ehdotuksia. Ne eivät vielä muuta accepted Goalien määrää, strict-v14-runtimea tai nykyistä agent routingia.
+- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v15** -skeemaa.
+- Projektissa on **16 hyväksyttyä Goalia** ja 26 ADR-recordia. ADR-026 hyväksyy Graph-scopeen explicit finite SSP/SMDP -strategian; ADR-023 omistaa säilyvän kolmitasoisen domain/GraphNode-routing-rajan ja ADR-025 Job Node -authoringin industrial flow -projektion.
+- `agent_v1` säilyttää Graph-scope LLM-routingin. `ssp_v1` käyttää snapshottattua finite Decision Modelia, hard admissibilityä ja deterministic proper-policy value iterationia ilman strategiafallbackia.
 - Paikallinen Graph Node Library sisältää **14 V4-pakettia**. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
 - Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat ilman PASS/FAIL-endpointteja. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat ilman PASS/FAIL-endpointteja. Job Node näyttää Work/Validationin deterministic industrial flow'ssa, read-only result/retry/orchestrator/exit-rakenteen ja disabled Next job -placeholderin; runtime routing ei muutu.
-- Tavallinen tasojen välinen flow on scoped agent routing immutable snapshotin strict candidate-enumista. Providerin foreign target vaikuttaa nolla kertaa; bounded Repair käsittelee poikkeuksen ennen ihmiseskalaatiota.
+- Graph-tason flow valitaan explicit strategiasta. `agent_v1` käyttää scoped agent routingia; `ssp_v1` laskee Q/V-evidenssin vain hard-admissible GraphNodeille. Providerin foreign target vaikuttaa nolla kertaa; bounded Repair käsittelee GraphNode-scope poikkeuksen ennen ihmiseskalaatiota.
 - Balletin oletusgraafissa on **5 GraphNodea** ja **17 aggregate JobNodea**, joilla on erilliset Work/Validation-lapset. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
-- Current hard cut on snapshot/envelope/outcome V7, composition V8, ExecutionSpec V9, runtime DB V10 ja Graph Node Module Package V4.
+- Current hard cut on Snapshot V8, envelope/outcome V7, composition V8, ExecutionSpec V9, runtime DB V11 ja Graph Node Module Package V4.
 - Koodissa ovat sekä Codex- että Copilot-adapterit, provider-kohtaiset FIFO-jonot, SQLite-palautuminen, Git-worktree-eristys ja macOS-jakelutyökalut. Schedule-domainia tai standalone JobNode Runia ei ole.
-- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja strict-v14 GraphNode-graafin.
+- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja strict-v15 GraphNode/strategy-graafin.
 
 ## Mitä puuttuu tai ei vielä näy käytössä?
 

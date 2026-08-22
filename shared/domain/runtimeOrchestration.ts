@@ -1,5 +1,9 @@
 import type { JsonValue, NodeResult } from "./automation.js";
 import type { CanonicalNodeOutcome, OrchestrationScope } from "./runtime.js";
+export type {
+  PolicyDecisionRecordV1,
+  PolicyOptionObservationV1
+} from "./decisionModel.js";
 
 export type RoutingRequestKind = "start" | "continuation" | "repair";
 export type RoutingRequestStatus = "pending" | "waiting_for_input" | "decided" | "dispatched" | "failed" | "cancelled";
@@ -86,6 +90,7 @@ export interface RepairResult {
 
 export type ControlFlowEventKind =
   | "orchestrator_requested" | "orchestrator_decided" | "orchestrator_invalid"
+  | "policy_decided" | "policy_invalid" | "policy_observed"
   | "graph_node_dispatched" | "job_node_dispatched" | "work_completed"
   | "validation_pass" | "validation_fail_retry" | "validation_fail_repair"
   | "repair_dispatched" | "repair_return" | "repair_escalated"

@@ -55,7 +55,9 @@ export const validateProjectExecutionResources = (
       issues.push({ path: `${path}.primaryInstructionId`, message: `Instruction must not name peer node ${peerId}; routing belongs to the Orchestrator.` });
     }
   };
-  check(config.graph.orchestrator, "graph.orchestrator");
+  if (config.graph.strategy.kind === "agent_v1") {
+    check(config.graph.strategy.orchestrator, "graph.strategy.orchestrator");
+  }
   if (config.graph.repairNode) check(config.graph.repairNode, "graph.repairNode", config.graph.graphNodes.map((node) => node.id));
   config.graph.graphNodes.forEach((graphNode, graphNodeIndex) => validateGraphNodeResources(
     graphNode,

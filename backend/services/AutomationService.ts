@@ -66,7 +66,8 @@ export class AutomationService {
 }
 
 const compositions = (graph: ProjectAutomationConfig["graph"]): Array<{ path: string; composition: ProjectExecutionComposition }> => [
-  { path: "graph.orchestrator", composition: graph.orchestrator },
+  ...(graph.strategy.kind === "agent_v1"
+    ? [{ path: "graph.strategy.orchestrator", composition: graph.strategy.orchestrator }] : []),
   ...(graph.repairNode ? [{ path: "graph.repairNode", composition: graph.repairNode }] : []),
   ...graph.graphNodes.flatMap((graphNode) => [
     { path: `${graphNode.id}.orchestrator`, composition: graphNode.orchestrator },

@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 19
+version: 20
 tags:
   - arc42
   - traceability
@@ -15,11 +15,11 @@ tags:
 
 ## Tarkoitus
 
-Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-015` / `REQ-001`–`REQ-015` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
+Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-016` / `REQ-001`–`REQ-016` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
 
 ## Tila
 
-Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/historical-ketjut. QS-021 on draft goal-016/adr-026 policy-ketju; sen päätös- ja implementation-evidenssi pysyy pending-tilassa.
+Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/historical-ketjut. QS-021 on hyväksytty goal-016/adr-026 policy-ketju; generic core on toteutettu ja full projection/benchmark/pilot pysyvät pending-tilassa.
 
 ## Trace-matriisi
 
@@ -46,7 +46,7 @@ Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/his
 | goal-014 / REQ-014 | QS-018 | adr-022 / CON-010 | BB-004 / BB-005 / BB-010 | RT-013 / DEP-002 / DEP-004 | TEST-018 | EVID-018 | hermetic verified; pinned live smoke pending |
 | goal-015 / REQ-015 | QS-019 | adr-023 / CON-002 / CON-003 / CON-011 | BB-003–BB-006 / BB-009 / BB-010 | RT-014 / RT-015 / DEP-002 | TEST-019 | EVID-019 | technical/conformance passed; live provider pilot open |
 | goal-015 / REQ-015 | QS-020 | adr-023 / adr-025 / CON-005 / CON-011 | BB-001 / BB-002 / BB-009 | RT-014 / DEP-001 | TEST-020 | EVID-020 | ADR-025 automated/browser/installed-app evidence passed; human visual verdict pending |
-| goal-002 / REQ-002; goal-006 / REQ-006; goal-007 / REQ-007; goal-016 / REQ-016 | QS-021 | adr-026 / CON-012 | BB-003–BB-005 / BB-011 | RT-009 / RT-010 / RT-016 / DEP-001 / DEP-002 | TEST-021 | EVID-021 | draft architecture complete; human decision and implementation evidence pending |
+| goal-002 / REQ-002; goal-006 / REQ-006; goal-007 / REQ-007; goal-016 / REQ-016 | QS-021 | adr-026 / CON-012 | BB-003–BB-005 / BB-011 | RT-009 / RT-010 / RT-016 / DEP-001 / DEP-002 | TEST-021 | EVID-021 | accepted generic core passed; full projection, max-bound benchmark, cancel-race stress and pilot pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -73,7 +73,7 @@ Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/his
 | TEST-018 | Hermetic `tk`-matriisi: success, timeout, malformed JSONL/Markdown, duplicate external-ref, dangling parent/dependency, cycle, partial write, restart, cancel, reconciliation ja yksi BUILD claim invocationissa; live smoke raportoidaan erikseen. | tracker/runtime suites + optional pinned `tk` smoke |
 | TEST-019 | Strict-v14/v4/v7/v8/v9/v10 schema-, snapshot-, composition-, runtime-, persistence- ja Graph Node Module -matriisi: scoped start/continuation/repair-enumit, Graph/GraphNode dispatch, Work→Validation, bounded retry, Luna orchestrator invalid-target retry, local Sol Repair, Graph-eskalaatio, same-Validation LIFO-return, State patch, depth/attempt/transition-rajat, restart/cancel/no-duplicate, v9 fail-closed, kaikkien 14 paketin roundtrip/provenance/mapping ja active legacy/platform-boundary -haut. | `three-level-graph-node-engineering` backend/shared/module suites + final gates |
 | TEST-020 | Kolmen canonical authoring-routen ja kahden Run-routen projection/UI/browser-matriisi: Graph/Graph Node planet/multi-ring -regressio, Job industrial flow'n pure layout/ghost/retry/interaction-semantics, inspector/Sheet, active Run -lukot, keyboard/a11y, reduced motion sekä 1440×900/390×844 overflow/visual QA. | frontend suites + browser QA + human visual review |
-| TEST-021 | Proposed strict-v15/v8/v11 SSP/SMDP-matriisi: decision feature/state/schema, arbitrary GraphNode metamorphic fixtures, hard admissibility/authorization, exact ppm/microcost validation, proper-policy/MEC, Bellman convergence/tie/numeric/time/size bounds, snapshot/hash, atomic decision/dispatch/observation, restart/cancel/no-duplicate, explicit agent/ssp no-fallback, Configure/Run source-of-truth projections, 1/5/40 UI ja platform-name coupling audit. | `stochastic-policy-orchestration` shared/backend/frontend/conformance suites |
+| TEST-021 | Strict-v15/v8/v11 SSP/SMDP-matriisi: decision feature/state/schema, arbitrary GraphNode metamorphic fixtures, hard admissibility/authorization, exact ppm/microcost validation, proper-policy analysis, Bellman convergence/tie/numeric/time/size bounds, snapshot/hash, atomic decision/dispatch/observation, restart/no-duplicate, explicit agent/ssp no-fallback, strategy-aware Configure/Run evidence, 1/5/40 schema ja platform-name coupling audit. Full rollout UI, cancel-race stress ja max-bound benchmark raportoidaan erikseen. | `stochastic-policy-orchestration` shared/backend/frontend/conformance suites |
 
 ## Evidenssikatalogi
 
@@ -99,7 +99,7 @@ Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/his
 | EVID-018 | Tracker adapter/outbox/reconciliation/fault-matrix verified hermetic; pinnattu live-smoke pending, koska `tk` puuttuu PATHista. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-002/006/007 |
 | EVID-019 | Strict-v14 Graph/GraphNode/JobNode-domainin, agent routing/repairin, compositionin, SQLite v10:n ja 14 Graph Node Module v4 -paketin tekninen/conformance-evidenssi. | `.ballet/arc42/initiatives/three-level-graph-node-engineering/EVIDENCE.md`; TGNE-EVID-001–003/005 |
 | EVID-020 | Graph/Graph Node -avaruuscanvasien ja Job industrial flow -canvasin route-, a11y-, layout-, desktop/narrow-browser- ja ihmisvisual-evidenssi. | `.ballet/arc42/initiatives/three-level-graph-node-engineering/EVIDENCE.md`; `.ballet/arc42/initiatives/job-node-industrial-flow-canvas/EVIDENCE.md` |
-| EVID-021 | Draft finite SSP/SMDP Graph-policy architecture, human decision ja myöhempi TEST-021 implementation/pilot-evidenssi. | `.ballet/arc42/initiatives/stochastic-policy-orchestration/EVIDENCE.md`; SPO-EVID-000–006 pending |
+| EVID-021 | Accepted finite SSP/SMDP Graph-policy architecture, human decision, TEST-021 generic core -evidenssi sekä avoimet projection/benchmark/pilot-rajat. | `.ballet/arc42/initiatives/stochastic-policy-orchestration/EVIDENCE.md`; SPO-EVID-000–006 |
 
 ## Ketjun tulkinta
 
@@ -111,11 +111,11 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-023` ja `adr-025` sekä historiallisten ketjujen ADR-017/020/021/022.
+`adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025` ja `adr-026` sekä historiallisten ketjujen ADR-017/020/021/022.
 
 ## Evidenssi
 
-Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 14 Goal/REQ-parien kattavuuden.
+Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 16 Goal/REQ-parien kattavuuden.
 
 ## Avoimet kysymykset
 

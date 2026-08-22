@@ -13,6 +13,8 @@ import type {
   RootFinalizationReport,
   RoutingDecision,
   RoutingRequest,
+  PolicyDecisionRecordV1,
+  PolicyOptionObservationV1,
   RuntimePreflightIssue,
   ValidationNodeOutcome,
   WorkNodeOutcome
@@ -59,6 +61,8 @@ export interface RootRunOrchestrationProjection {
   decisions: RoutingDecision[];
   pendingRequest?: RoutingRequest;
   selectedDecision?: RoutingDecision;
+  policyDecisions: PolicyDecisionRecordV1[];
+  policyObservations: PolicyOptionObservationV1[];
 }
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";

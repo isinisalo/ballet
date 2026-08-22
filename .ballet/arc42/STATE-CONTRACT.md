@@ -3,8 +3,8 @@ id: arc42-state-contract-v1
 title: GraphEngineeringStateV1-sopimus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-21'
-version: 5
+updatedAt: '2026-08-22'
+version: 6
 tags:
   - arc42
   - state
@@ -19,7 +19,7 @@ Tämä tiedosto määrittää viiden Graph Engineering -Loopin rajatun jaetun pr
 
 ## Tila
 
-`GraphEngineeringStateV1` on accepted päätöksellä `adr-022`. Sama rakenteellinen alkuarvo on materialisoitu DESIGN-, PLAN-, BUILD-, DEPLOY- ja VERIFY-Looppien Stateen. `GraphOrchestrationStateV1` on erillinen runtime-tyyppi Root Runin reititysfaktoille; sitä ei kopioida tähän project Stateen.
+`GraphEngineeringStateV1` on accepted päätöksellä `adr-022`. Sama rakenteellinen alkuarvo on materialisoitu project-local GraphNodejen State-sopimukseen. Runtime routing facts ja `DecisionStateV1` ovat erillisiä: policy projisoi vain konfiguroidut bounded JSON Pointer -arvot tästä Statesta eikä kopioi tai patchaa Decision Statea tähän sopimukseen.
 
 ## Alkuarvo
 
@@ -73,7 +73,7 @@ DESIGN päivittää omat 12 kanonista arc42-osiotaan eikä kopioi niitä Stateen
 
 ## Runtime- ja tracker-raja
 
-`GraphOrchestrationStateV1` omistaa graph/start/current Loop -viitteet, viimeisimmän transitionin, transition countin, DONE-tuloksen ja ulkoisen run-seurannan viitteet. SQLite v9 omistaa runtime- ja outbox-totuuden. `.tickets/orchestration` ja `.tickets/work` omistavat ticketit. `GraphEngineeringStateV1` säilyttää näihin vain bounded references -viitteet.
+SQLite v11 omistaa runtime-, policy decision/observation- ja outbox-totuuden. `DecisionStateV1` johdetaan jokaisessa SSP decision epochissa snapshotatusta feature-määrittelystä, canonical runtime-faktoista, current State revisionista ja authorization-faktoista. `.tickets/orchestration` ja `.tickets/work` omistavat ticketit. `GraphEngineeringStateV1` säilyttää näihin vain bounded references -viitteet.
 
 ## Kanoniset lähteet
 
@@ -81,11 +81,11 @@ DESIGN päivittää omat 12 kanonista arc42-osiotaan eikä kopioi niitä Stateen
 
 ## Relevantit päätökset
 
-`adr-006`, `adr-011`, `adr-015` ja `adr-022`.
+`adr-006`, `adr-011`, `adr-015`, `adr-022` ja `adr-026`.
 
 ## Evidenssi
 
-`npm run validate:arc42` vertaa jokaisen oletus-Loopin initial valuea rakenteellisesti tämän tiedoston JSON-markeriin. Runtime-, State patch- ja tracker-testit todentavat omistajuusrajat; `EVID-016` ja `EVID-018` indeksoivat tulokset.
+`npm run validate:arc42` vertaa oletus-GraphNodejen initial valuea rakenteellisesti tämän tiedoston JSON-markeriin. Runtime-, State patch-, policy projection- ja tracker-testit todentavat omistajuusrajat; `EVID-016`, `EVID-018` ja `EVID-021` indeksoivat tulokset.
 
 ## Avoimet kysymykset
 

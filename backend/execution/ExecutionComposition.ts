@@ -104,7 +104,13 @@ const resolveComposition = (
 ): ProjectExecutionComposition & { id: string } => {
   const graphNode = resolveGraphNode(snapshot, envelope);
   if (envelope.role === "orchestrator") {
-    return envelope.scope === "graph" ? snapshot.graph.orchestrator : requireGraphNode(graphNode).orchestrator;
+    if (envelope.scope === "graph") {
+      if (snapshot.graph.strategy.kind !== "agent_v1") throw new ExecutionCompositionError(
+        "missing_resource", "SSP Graph scope has no agent orchestrator composition."
+      );
+      return snapshot.graph.strategy.orchestrator;
+    }
+    return requireGraphNode(graphNode).orchestrator;
   }
   if (envelope.role === "repair") {
     const repair = envelope.scope === "graph" ? snapshot.graph.repairNode : requireGraphNode(graphNode).repairNode;
@@ -155,7 +161,11 @@ const assertCandidateSet = (
   graphNode: ProjectGraphNode | undefined,
   envelope: Extract<TaskEnvelopeV7, { role: "orchestrator" }>
 ): void => {
-  const routing = envelope.scope === "graph" ? snapshot.graph.orchestrator.routing : requireGraphNode(graphNode).orchestrator.routing;
+  const routing = envelope.scope === "graph"
+    ? snapshot.graph.strategy.kind === "agent_v1" ? snapshot.graph.strategy.orchestrator.routing
+      : undefined
+    : requireGraphNode(graphNode).orchestrator.routing;
+  if (!routing) throw new ExecutionCompositionError("missing_resource", "SSP Graph scope cannot produce an agent routing envelope.");
   const rule = envelope.request.kind === "start"
     ? routing.start
     : envelope.request.kind === "continuation"

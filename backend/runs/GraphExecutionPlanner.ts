@@ -8,6 +8,7 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import { resolveExecutionResources } from "../execution/ExecutionResourceCatalog.js";
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { GraphRunStateError } from "../runtime/GraphRunErrors.js";
+import { capabilityGraphSha256, decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
 
 export class GraphExecutionPlanner {
   constructor(
@@ -22,7 +23,7 @@ export class GraphExecutionPlanner {
   ): Promise<RootExecutionSnapshot> {
     const loaded = new ProjectConfigurationRepository().load(workspace.path);
     if (!loaded.config || loaded.issues.length > 0) {
-      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v14 is unavailable.");
+      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v15 is unavailable.");
     }
     const selected = kind === "graph"
       ? loaded.config.graph.graphNodes
@@ -55,7 +56,7 @@ export class GraphExecutionPlanner {
     const theme = await new CanvasThemeRepository().load(workspace.path);
     if (theme.issues.length > 0) throw new GraphRunStateError(theme.issues[0]!.message);
     return {
-      version: 7,
+      version: 8,
       rootKind: kind,
       ...(kind === "graph_node" ? { rootGraphNodeId: targetId } : {}),
       project: {
@@ -66,6 +67,12 @@ export class GraphExecutionPlanner {
       },
       issueTracker: structuredClone(loaded.config.issueTracker),
       graph,
+      graphDecision: graph.strategy.kind === "ssp_v1" ? {
+        strategyKind: "ssp_v1",
+        modelVersion: graph.strategy.model.version,
+        modelSha256: decisionModelSha256(graph.strategy.model),
+        capabilityGraphSha256: capabilityGraphSha256(graph.strategy.capabilityGraph)
+      } : { strategyKind: "agent_v1" },
       theme: theme.theme,
       executionProfiles: structuredClone(profiles),
       runtimes,
@@ -76,7 +83,8 @@ export class GraphExecutionPlanner {
 }
 
 const collectCompositions = (graph: ProjectGraph): Array<ProjectExecutionComposition & { id: string }> => {
-  const result: Array<ProjectExecutionComposition & { id: string }> = [graph.orchestrator];
+  const result: Array<ProjectExecutionComposition & { id: string }> = graph.strategy.kind === "agent_v1"
+    ? [graph.strategy.orchestrator] : [];
   if (graph.repairNode) result.push(graph.repairNode);
   for (const graphNode of graph.graphNodes) {
     result.push(graphNode.orchestrator);

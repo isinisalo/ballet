@@ -133,9 +133,9 @@ export class RootRunStore {
 }
 
 const assertSnapshot = (value: RootExecutionSnapshot): RootExecutionSnapshot => {
-  if (value.version !== 7 || !["graph","graph_node"].includes(value.rootKind)
+  if (value.version !== 8 || !["graph","graph_node"].includes(value.rootKind)
     || !value.graph || !Array.isArray(value.graph.graphNodes)) {
-    throw new Error("Root execution snapshot v7 is invalid.");
+    throw new Error("Root execution snapshot v8 is invalid.");
   }
   return structuredClone(value);
 };

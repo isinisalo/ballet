@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -86,7 +86,9 @@
         }
       }
     },
-    "orchestrator": {
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
       "id": "graph-orchestrator",
       "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
       "nodeStyle": "luna",
@@ -295,6 +297,7 @@
           }
         ],
         "repair": []
+      }
       }
     },
     "repairNode": {

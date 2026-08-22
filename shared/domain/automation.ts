@@ -1,4 +1,4 @@
-export const projectConfigurationVersion = 14 as const;
+export const projectConfigurationVersion = 15 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxJobRetriesLimit = 100;
 export const maxProjectGraphNodes = 40;
@@ -188,7 +188,7 @@ export interface ProjectGraph {
   id: string;
   name: string;
   state: ProjectStateDefinition;
-  orchestrator: ProjectOrchestrator<ProjectGraphRouteTarget>;
+  strategy: import("./decisionModel.js").ProjectGraphDecisionStrategyV1;
   repairNode?: ProjectRepairNode;
   graphNodes: ProjectGraphNode[];
 }
@@ -221,7 +221,10 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
     id: "graph-engineering",
     name: "Graph Engineering",
     state: { description: "Shared immutable-snapshot Graph state.", initial: {} },
-    orchestrator: defaultProjectOrchestrator<ProjectGraphRouteTarget>(),
+    strategy: {
+      kind: "agent_v1",
+      orchestrator: defaultProjectOrchestrator<ProjectGraphRouteTarget>()
+    },
     graphNodes: []
   }
 });

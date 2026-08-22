@@ -1,7 +1,7 @@
 ---
 id: adr-026
 title: Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa
-status: draft
+status: accepted
 createdAt: '2026-08-22T00:00:00.000Z'
 updatedAt: '2026-08-22T00:00:00.000Z'
 tags:
@@ -9,14 +9,14 @@ tags:
   - policy
   - ssp
   - smdp
-version: 1
+version: 2
 ---
 
 # Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa
 
 ## Status ja päätöstarve
 
-Tämä ADR on draft eikä muuta hyväksyttyä strict-v14-runtimea. Hyväksyttynä se supersedoisi `adr-023`:sta vain Graph-scopeen kuuluvan väitteen, että tavallisen seuraavan GraphNoden valitsee aina LLM-orchestrator. Kolmitasoinen domain, käyttäjän määrittelemät GraphNodet, GraphNode-scope, Job-invariantit, State, snapshot, repair, worktree, tracker ja ihmisvaltuutus säilyvät.
+Projektin omistaja hyväksyi tämän ADR:n ja sen strategy-, proper-policy-, solver-bound- sekä strict v15/v8/v11 -päätökset 2026-08-22. ADR supersedoi `adr-023`:sta vain Graph-scopeen kuuluvan väitteen, että tavallisen seuraavan GraphNoden valitsee aina LLM-orchestrator. Kolmitasoinen domain, käyttäjän määrittelemät GraphNodet, GraphNode-scope, Job-invariantit, State, snapshot, repair, worktree, tracker ja ihmisvaltuutus säilyvät.
 
 ## Konteksti
 
@@ -26,13 +26,13 @@ Tarvitaan geneerinen Graph-scope, jossa käyttäjän GraphNode on SMDP Option, G
 
 ## Päätösajurit
 
-- `goal-002`, `goal-006`, `goal-007`, draft `goal-016` / `REQ-016` ja `QS-021`.
+- `goal-002`, `goal-006`, `goal-007`, `goal-016` / `REQ-016` ja `QS-021`.
 - Immutable snapshot, deterministic reproducibility, inspectable decisions ja restart-safe evidence.
 - Hard safety/control invariants erotetaan reward/cost-mallista.
 - 1–40 user-defined GraphNodea ilman schema- tai platform-haaraa nodejen nimille.
 - Ensimmäinen versio on rajattu, finite ja implementation-ready ilman learning-järjestelmää.
 
-## Ehdotettu päätös
+## Päätös
 
 ### Yksi orchestration runtime, kaksi eksplisiittistä Graph-strategiaa
 
@@ -43,7 +43,7 @@ Graph konfiguroi täsmälleen yhden strategian:
 
 Strategia on snapshottava discriminated union, ei fallback-ketju. `ssp_v1`-virhe ei kutsu `agent_v1`:tä, ja `agent_v1` ei käytä SSP-arvoja piiloprompttina. GraphNode-scope säilyy ensimmäisessä toteutuksessa `agent_v1`-strategialla.
 
-Suositeltu pre-production strict cut on project config v15, Root Snapshot v8 ja SQLite v11. Graph Node Module v4 sekä provider Task Envelope/outcome v7, composition v8 ja ExecutionSpec v9 säilyvät, koska Decision Model on Graph-global eikä ensimmäinen slice lisää provider-roolia. Tarkat versionumerot vaativat ihmisapprovalin.
+Pre-production strict cut on project config v15, Root Snapshot v8 ja SQLite v11. Graph Node Module v4 sekä provider Task Envelope/outcome v7, composition v8 ja ExecutionSpec v9 säilyvät, koska Decision Model on Graph-global eikä ensimmäinen slice lisää provider-roolia.
 
 ### Capability Graph
 
@@ -190,6 +190,6 @@ Hylätty ensimmäisestä versiosta. Execution Graph kerää samplet, mutta learn
 
 ## Evidenssi ja review trigger
 
-Trace on draft `goal-016` / `REQ-016`, `QS-021`, `adr-026`, `CON-012`, `BB-011`, `RT-016`, `TEST-021`, `EVID-021` ja initiative `stochastic-policy-orchestration`.
+Trace on `goal-016` / `REQ-016`, `QS-021`, `adr-026`, `CON-012`, `BB-011`, `RT-016`, `TEST-021`, `EVID-021` ja initiative `stochastic-policy-orchestration`.
 
-ADR arvioidaan ennen hyväksymistä erityisesti proper-policy/failure-semanticsista, strategy coexistence -rajasta, fixed-point-esityksistä, solver-boundsista ja strict version cutista. Hyväksymisen jälkeen uusi ADR vaaditaan multi-costille, online learningille, POMDP-stateen, recursive Job-solverille, probability-autoupdatelle tai active snapshot -mallin muuttamiselle.
+ADR hyväksyttiin proper-policy/failure-semanticsin, strategy coexistence -rajan, fixed-point-esitysten, solver-boundsien ja strict version cutin osalta. Uusi ADR vaaditaan multi-costille, online learningille, POMDP-stateen, recursive Job-solverille, probability-autoupdatelle tai active snapshot -mallin muuttamiselle.

@@ -160,6 +160,35 @@ export const routingDecisionSchema = z.object({
   action: z.enum(["dispatch", "complete", "delegate_repair", "needs_input"]), selectedTarget: z.string().optional(),
   result: z.enum(["PASS", "FAIL"]).optional(), reason: z.string(), valid: z.boolean(), createdAt: timestamp
 }).strict();
+const decisionStateSchema = z.object({
+  stateId: z.string(), features: z.record(z.string(), z.string()), featureVectorSha256: z.string(),
+  sourceStateRevision: z.number().int().min(0), evidenceRefs: z.array(z.string())
+}).strict();
+const excludedDecisionActionSchema = z.object({
+  graphNodeId: z.string(),
+  reasonCode: z.enum(["outside_snapshot", "outside_capability_graph", "outside_state_model", "guard_denied"])
+}).strict();
+const policyActionValueSchema = z.object({ graphNodeId: z.string(), qMicros: z.number().finite() }).strict();
+export const policyDecisionRecordSchema = z.object({
+  policyDecisionId: z.string(), rootRunId: z.string(), epoch: z.number().int().min(1),
+  epochKind: z.enum(["start", "continuation"]), previousGraphNodeInvocationId: z.string().optional(),
+  state: decisionStateSchema.optional(), admissibleActionIds: z.array(z.string()),
+  excludedActions: z.array(excludedDecisionActionSchema), selectedGraphNodeId: z.string().optional(),
+  actionValues: z.array(policyActionValueSchema), stateValueMicros: z.number().finite().optional(),
+  tiedActionIds: z.array(z.string()), solverStatus: z.enum([
+    "converged", "policy_model_invalid", "policy_goal_unreachable", "policy_no_proper_policy",
+    "policy_not_converged", "terminal", "decision_state_invalid"
+  ]), solverAlgorithm: z.literal("ssp_value_iteration_v1"), iterations: z.number().int().min(0),
+  residual: z.number().finite().min(0), epsilon: z.number().finite().positive(), modelVersion: z.literal(1), modelSha256: z.string(),
+  policySha256: z.string().optional(), snapshotSha256: z.string(), message: z.string().optional(), createdAt: timestamp
+}).strict();
+export const policyOptionObservationSchema = z.object({
+  policyObservationId: z.string(), rootRunId: z.string(), policyDecisionId: z.string(),
+  graphNodeInvocationId: z.string(), stateBefore: decisionStateSchema, action: z.string(),
+  configuredExpectedCostMicros: z.number().int().positive(), actualCostMicros: z.number().int().min(0).optional(),
+  verifiedOutcome: z.enum(["PASS", "FAIL"]), stateAfter: decisionStateSchema.optional(),
+  durationMillis: z.number().int().min(0), modelSha256: z.string(), snapshotSha256: z.string(), createdAt: timestamp
+}).strict();
 export const repairRequestSchema = z.object({
   repairRequestId: z.string(), rootRunId: z.string(), scope: z.enum(["graph", "graph_node"]),
   graphNodeId: z.string().optional(), requesterNodeRunId: z.string(), requesterJobNodeInvocationId: z.string().optional(),
@@ -182,7 +211,8 @@ export const repairResultSchema = z.object({
 }).strict();
 export const rootRunOrchestrationProjectionSchema = z.object({
   requests: z.array(routingRequestSchema), decisions: z.array(routingDecisionSchema),
-  pendingRequest: routingRequestSchema.optional(), selectedDecision: routingDecisionSchema.optional()
+  pendingRequest: routingRequestSchema.optional(), selectedDecision: routingDecisionSchema.optional(),
+  policyDecisions: z.array(policyDecisionRecordSchema), policyObservations: z.array(policyOptionObservationSchema)
 }).strict();
 export const rootRunRepairProjectionSchema = z.object({
   requests: z.array(repairRequestSchema), frames: z.array(repairFrameSchema), results: z.array(repairResultSchema),
@@ -190,7 +220,8 @@ export const rootRunRepairProjectionSchema = z.object({
 }).strict();
 export const controlFlowEventSchema = z.object({
   id: z.number().int(), rootRunId: z.string(), sequence: z.number().int(),
-  kind: z.enum(["orchestrator_requested", "orchestrator_decided", "orchestrator_invalid", "graph_node_dispatched",
+  kind: z.enum(["orchestrator_requested", "orchestrator_decided", "orchestrator_invalid",
+    "policy_decided", "policy_invalid", "policy_observed", "graph_node_dispatched",
     "job_node_dispatched", "work_completed", "validation_pass", "validation_fail_retry", "validation_fail_repair",
     "repair_dispatched", "repair_return", "repair_escalated", "root_needs_input", "root_cancelled", "root_terminal", "execution_interrupted"]),
   stateRevision: z.number().int().min(0), graphNodeInvocationId: z.string().optional(),

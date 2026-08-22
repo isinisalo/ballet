@@ -238,7 +238,7 @@ if (!parsedConfig.success) {
   for (const issue of parsedConfig.error.issues) addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`);
 } else {
   config = parsedConfig.data;
-  const automation = { version: 14, graph: config.graph };
+  const automation = { version: 15, graph: config.graph };
   for (const issue of validateProjectAutomationConfig(automation, config.executionProfiles)) addIssue(`Automation ${issue.path}: ${issue.message}`);
   const resources = await loadProjectResources(root);
   for (const issue of resources.issues) addIssue(`Resource ${issue.relativePath}: ${issue.message}`);
@@ -248,7 +248,9 @@ if (!parsedConfig.success) {
   if (JSON.stringify(graphNodeIds) !== JSON.stringify(expectedGraphNodeIds)) {
     addIssue(`Default GraphNode order mismatch: ${graphNodeIds.join(", ")}`);
   }
-  const startTargets = config.graph.orchestrator.routing.start.candidates.map(({ target }) => (
+  if (config.graph.strategy.kind !== "agent_v1") addIssue("Default Graph must retain explicit agent_v1 strategy until project data authors an SSP model.");
+  const graphOrchestrator = config.graph.strategy.kind === "agent_v1" ? config.graph.strategy.orchestrator : undefined;
+  const startTargets = (graphOrchestrator?.routing.start.candidates ?? []).map(({ target }) => (
     "graphNodeId" in target ? target.graphNodeId : `terminal:${target.terminal}`
   ));
   if (JSON.stringify(startTargets) !== JSON.stringify(["design"])) {
@@ -283,7 +285,7 @@ if (!parsedConfig.success) {
     if (profile.networkAccess) addIssue(`Network-on profile used outside allowlist: ${location}.`);
     if (expectedModel && profile.model !== expectedModel) addIssue(`${location} must use ${expectedModel}, received ${profile.model}.`);
   };
-  validateComposition(config.graph.orchestrator, "graph/orchestrator", "gpt-5.6-luna");
+  if (graphOrchestrator) validateComposition(graphOrchestrator, "graph/strategy/orchestrator", "gpt-5.6-luna");
   if (!config.graph.repairNode) addIssue("Default Graph must define a Repair Node.");
   else validateComposition(config.graph.repairNode, "graph/repair", "gpt-5.6-sol");
   for (const graphNode of config.graph.graphNodes) {
@@ -336,8 +338,8 @@ if (issues.length > 0) {
   const graphNodes = config?.graph.graphNodes.length ?? 0;
   const jobs = config?.graph.graphNodes.reduce((total, graphNode) => total + graphNode.jobNodes.length, 0) ?? 0;
   const candidateRules = config
-    ? config.graph.orchestrator.routing.continuation.length
-      + config.graph.orchestrator.routing.repair.length
+    ? (config.graph.strategy.kind === "agent_v1" ? config.graph.strategy.orchestrator.routing.continuation.length
+      + config.graph.strategy.orchestrator.routing.repair.length : 0)
       + config.graph.graphNodes.reduce((total, graphNode) => total
         + graphNode.orchestrator.routing.continuation.length
         + graphNode.orchestrator.routing.repair.length, 0)

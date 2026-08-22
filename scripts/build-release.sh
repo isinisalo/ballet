@@ -176,7 +176,7 @@ const workNode = jobNode?.workNode;
 const validationNode = jobNode?.validationNode;
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 14
+if (workspace.automation?.version !== 15
   || workspace.automation.graph?.graphNodes?.length !== 1
   || graphNode?.id !== "review-node"
   || graphNode?.description !== "Review the fixture project."
@@ -186,8 +186,9 @@ if (workspace.automation?.version !== 14
   || workspace.automation.graph?.state?.description !== "Provider-neutral context shared by the fixture Graph."
   || JSON.stringify(workspace.automation.graph?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || workspace.automation.graph?.orchestrator?.id !== "fixture-graph-orchestrator"
-  || workspace.automation.graph?.orchestrator?.maxTransitions !== 256
+  || workspace.automation.graph?.strategy?.kind !== "agent_v1"
+  || workspace.automation.graph?.strategy?.orchestrator?.id !== "fixture-graph-orchestrator"
+  || workspace.automation.graph?.strategy?.orchestrator?.maxTransitions !== 256
   || jobNode?.description !== "Run and validate the fixture review."
   || jobNode?.capabilities?.accepts?.length !== 0
   || jobNode?.capabilities?.provides?.length !== 0
@@ -214,7 +215,7 @@ if (workspace.automation?.version !== 14
   || workspace.canvasTheme?.version !== 4
   || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.canvasThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v14 Graph/Graph Node fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v15 Graph/Graph Node fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
@@ -230,7 +231,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "10") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 10`);
+if (version !== "11") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 11`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
   git -C "$SMOKE_ROOT/project" status --short >&2

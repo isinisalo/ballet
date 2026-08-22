@@ -28,7 +28,17 @@ export function automationInspectorModel(
       description: config.graph.state.description, locked
     };
     if (selection === "repair" && config.graph.repairNode) return repairModel(config.graph.repairNode, "Graph Repair Node", locked);
-    return orchestratorModel(config.graph.orchestrator, "Graph Orchestrator", locked);
+    return config.graph.strategy.kind === "agent_v1"
+      ? orchestratorModel(config.graph.strategy.orchestrator, "Graph Orchestrator", locked)
+      : {
+          key: `SSP Policy:${config.graph.strategy.id}`, role: "SSP Policy", title: config.graph.strategy.description,
+          id: config.graph.strategy.id, description: config.graph.strategy.description,
+          nodeStyle: config.graph.strategy.nodeStyle, nodeSize: config.graph.strategy.nodeSize,
+          candidates: config.graph.strategy.capabilityGraph.actions.map((action) => ({
+            label: action.graphNodeId,
+            values: action.guards.length ? action.guards.map((guard) => `${guard.featureId}=${guard.allowedValues.join("|")}`) : ["admissible"]
+          })), locked
+        };
   }
   if (!graphNode) return undefined;
   if (level === "graph_node") {
@@ -55,9 +65,16 @@ export function updateAutomationSelection(
     if (selection === "settings") return {
       ...config, graph: { ...config.graph, state: { ...config.graph.state, description: String(value) } }
     };
-    const key = selection === "repair" ? "repairNode" : "orchestrator";
-    const node = config.graph[key];
-    return node ? { ...config, graph: { ...config.graph, [key]: { ...node, [field]: value } } } : config;
+    if (selection === "repair") {
+      const node = config.graph.repairNode;
+      return node ? { ...config, graph: { ...config.graph, repairNode: { ...node, [field]: value } } } : config;
+    }
+    const strategy = config.graph.strategy;
+    return strategy.kind === "agent_v1"
+      ? { ...config, graph: { ...config.graph, strategy: {
+          kind: "agent_v1", orchestrator: { ...strategy.orchestrator, [field]: value }
+        } } }
+      : { ...config, graph: { ...config.graph, strategy: { ...strategy, [field]: value } } };
   }
   const graphNodeIndex = config.graph.graphNodes.findIndex((node) => node.id === graphNodeId);
   if (graphNodeIndex < 0) return config;

@@ -24,6 +24,7 @@ import {
 import type { ExecutionProfile, ProjectConfiguration, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 import { validateProjectConfigSchema } from "./project-config-schema-validation.js";
+import { capabilityGraphSchema, sspDecisionModelSchema } from "./decision-model-schemas.js";
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -199,6 +200,15 @@ const orchestratorSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
   maxRouteAttempts: z.number().int().min(1).max(maxRouteAttemptsLimit),
   routing: routingSchema(target)
 }).strict();
+const graphStrategySchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("agent_v1"), orchestrator: orchestratorSchema(graphTargetSchema) }).strict(),
+  z.object({
+    kind: z.literal("ssp_v1"), ...appearanceFields,
+    id: entityIdSchema, description: descriptionSchema,
+    capabilityGraph: capabilityGraphSchema,
+    model: sspDecisionModelSchema
+  }).strict()
+]);
 const repairNodeSchema = z.object({
   ...appearanceFields,
   ...compositionFields,
@@ -229,7 +239,7 @@ const graphSchema = z.object({
   id: entityIdSchema,
   name: z.string().trim().min(1).max(200),
   state: z.object({ description: descriptionSchema, initial: initialStateSchema }).strict(),
-  orchestrator: orchestratorSchema(graphTargetSchema),
+  strategy: graphStrategySchema,
   repairNode: repairNodeSchema.optional(),
   graphNodes: z.array(graphNodeSchema).min(1).max(maxProjectGraphNodes)
 }).strict();
@@ -244,12 +254,12 @@ export const projectIssueTrackerSchema = z.object({
 }).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
 
 export const automationConfigSchema = z.object({
-  version: z.literal(14),
+  version: z.literal(15),
   graph: graphSchema
 }).strict() as z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(14),
+  version: z.literal(15),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
   graph: graphSchema

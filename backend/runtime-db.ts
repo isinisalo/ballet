@@ -1,3 +1,4 @@
+// Transaction coordinator kept centralized so State, control-flow, repair, policy evidence, and dispatch share one SQLite commit boundary; algorithms and policy storage live in dedicated modules.
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import type {
@@ -9,7 +10,7 @@ import type {
   CanonicalNodeOutcome, ControlFlowEvent, GraphNodeInvocation, GraphNodeInvocationDetails,
   GraphStateRevisionMetadata, JobNodeInvocation, NodeRun, OrchestrationScope, RepairFrame,
   RepairNodeOutcome, RepairRequest, RepairResult, RootExecutionSnapshot, RoutingDecision,
-  RoutingRequest, ValidationNodeOutcome
+  RoutingRequest, ValidationNodeOutcome, PolicyDecisionRecordV1, PolicyOptionObservationV1
 } from "../shared/domain/runtime.js";
 import type {
   RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection
@@ -21,6 +22,9 @@ import {
 import { RuntimeDbConnection, isPatchedSqliteVersion } from "./runtime/RuntimeDbConnection.js";
 import { applyStatePatch } from "./runtime/state/StatePatch.js";
 import { jsonSha256, parseJsonValue } from "./runtime/state/CanonicalJson.js";
+import { evaluatePolicyDecision } from "./policy/PolicyRuntime.js";
+import { projectDecisionState } from "./policy/DecisionStateProjector.js";
+import { PolicyEvidenceStore } from "./policy/PolicyEvidenceStore.js";
 
 export { isPatchedSqliteVersion };
 
@@ -28,22 +32,29 @@ type DbRow = Record<string, unknown>;
 
 export class RuntimeDatabase {
   private readonly manager: RuntimeDbConnection;
-  constructor(dbPath: string) { this.manager = new RuntimeDbConnection(dbPath); }
+  private readonly policyEvidence: PolicyEvidenceStore;
+  constructor(dbPath: string) {
+    this.manager = new RuntimeDbConnection(dbPath);
+    this.policyEvidence = new PolicyEvidenceStore(() => this.connection());
+  }
   close(): void { this.manager.close(); }
   connection(): Database.Database { return this.manager.connection(); }
 
   initializeRoot(rootRunId: string): void {
-    const snapshot = this.snapshot(rootRunId);
-    const root = this.rootRow(rootRunId);
-    this.connection().prepare("UPDATE root_runs SET status = 'running', updated_at = ? WHERE root_run_id = ?")
-      .run(now(), rootRunId);
-    if (root.kind === "graph") {
-      this.requestOrchestrator(rootRunId, "graph", "start", undefined, undefined, undefined, {});
-      return;
-    }
-    const graphNode = requireGraphNode(snapshot, String(root.target_id));
-    const invocation = this.createGraphNodeInvocation(rootRunId, graphNode, "root", undefined, 0);
-    this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
+    this.connection().transaction(() => {
+      const snapshot = this.snapshot(rootRunId);
+      const root = this.rootRow(rootRunId);
+      this.connection().prepare("UPDATE root_runs SET status = 'running', updated_at = ? WHERE root_run_id = ?")
+        .run(now(), rootRunId);
+      if (root.kind === "graph") {
+        if (snapshot.graph.strategy.kind === "ssp_v1") this.requestPolicyDecision(rootRunId);
+        else this.requestOrchestrator(rootRunId, "graph", "start", undefined, undefined, undefined, {});
+        return;
+      }
+      const graphNode = requireGraphNode(snapshot, String(root.target_id));
+      const invocation = this.createGraphNodeInvocation(rootRunId, graphNode, "root", undefined, 0);
+      this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
+    })();
   }
 
   activeGraphNodeIds(): Set<string> {
@@ -236,7 +247,7 @@ export class RuntimeDatabase {
         : Boolean(graphNode?.repairNode || snapshot.graph.repairNode);
       return {
         ...base, role: "orchestrator", task: request.scope === "graph"
-          ? snapshot.graph.orchestrator.description : graphNode!.orchestrator.description,
+          ? requireAgentGraphStrategy(snapshot).orchestrator.description : graphNode!.orchestrator.description,
         scope: request.scope, ...(graphNode ? { graphNode: identity(graphNode) } : {}),
         request: {
           id: request.routingRequestId, kind: request.kind, sourceChildId: request.sourceChildId,
@@ -291,7 +302,9 @@ export class RuntimeDatabase {
     return {
       requests, decisions,
       pendingRequest: [...requests].reverse().find(({ status }) => ["pending","waiting_for_input"].includes(status)),
-      selectedDecision: [...decisions].reverse().find(({ valid }) => valid)
+      selectedDecision: [...decisions].reverse().find(({ valid }) => valid),
+      policyDecisions: this.policyEvidence.listDecisions(rootRunId),
+      policyObservations: this.policyEvidence.listObservations(rootRunId)
     };
   }
 
@@ -374,7 +387,7 @@ export class RuntimeDatabase {
     const graphNode = request.graphNodeId ? requireGraphNode(snapshot, request.graphNodeId) : undefined;
     const repairDefinition = request.scope === "graph" ? snapshot.graph.repairNode : graphNode?.repairNode ?? snapshot.graph.repairNode;
     const maxAttempts = request.scope === "graph"
-      ? snapshot.graph.orchestrator.maxRouteAttempts : graphNode!.orchestrator.maxRouteAttempts;
+      ? requireAgentGraphStrategy(snapshot).orchestrator.maxRouteAttempts : graphNode!.orchestrator.maxRouteAttempts;
     const resolution = resolveOrchestratorOutcome({
       outcome, candidateKeys: request.candidateKeys, attempt: request.attempt,
       maxAttempts: Math.min(3, maxAttempts), repairAvailable: Boolean(repairDefinition)
@@ -491,6 +504,9 @@ export class RuntimeDatabase {
       }, request.sourceNodeRunId ?? "");
     } else if (root.kind === "graph_node") {
       this.terminalize(rootRunId, result === "PASS" ? "completed" : "failed", outcome);
+    } else if (this.snapshot(rootRunId).graph.strategy.kind === "ssp_v1") {
+      this.recordPolicyObservation(rootRunId, invocation, result);
+      this.requestPolicyDecision(rootRunId, invocation, result);
     } else {
       this.requestOrchestrator(rootRunId, "graph", "continuation", undefined, invocation.graphNodeId, result, {});
     }
@@ -512,7 +528,7 @@ export class RuntimeDatabase {
     const graphNode = scope === "graph_node"
       ? requireGraphNode(snapshot, invocation?.graphNodeId ?? this.rootRow(rootRunId).target_id as string)
       : undefined;
-    const orchestrator = scope === "graph" ? snapshot.graph.orchestrator : graphNode!.orchestrator;
+    const orchestrator = scope === "graph" ? requireAgentGraphStrategy(snapshot).orchestrator : graphNode!.orchestrator;
     const candidates = ruleCandidates(
       orchestrator.routing as Parameters<typeof ruleCandidates>[0],
       kind, sourceChildId, result, requestedCapability
@@ -588,16 +604,17 @@ export class RuntimeDatabase {
     graphNode: ProjectGraphNode,
     source: GraphNodeInvocation["source"],
     parent: string | undefined,
-    depth: number
+    depth: number,
+    policyDecisionId?: string
   ): GraphNodeInvocation {
     const id = randomUUID();
     const at = now();
     this.connection().prepare(`
       INSERT INTO graph_node_invocations (
         graph_node_invocation_id, root_run_id, graph_node_id, parent_graph_node_invocation_id,
-        source, status, snapshot_json, entry_state_revision, nesting_depth, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?)
-    `).run(id, rootRunId, graphNode.id, parent ?? null, source, JSON.stringify(graphNode),
+        policy_decision_id, source, status, snapshot_json, entry_state_revision, nesting_depth, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'running', ?, ?, ?, ?, ?)
+    `).run(id, rootRunId, graphNode.id, parent ?? null, policyDecisionId ?? null, source, JSON.stringify(graphNode),
       this.stateRevision(rootRunId), Math.min(3, depth), at, at);
     this.connection().prepare(`
       UPDATE root_runs SET active_graph_node_invocation_id = ?, status = 'running', updated_at = ?
@@ -816,6 +833,125 @@ export class RuntimeDatabase {
       decision.result ?? null, decision.reason, decision.valid ? 1 : 0, decision.createdAt);
   }
 
+  private requestPolicyDecision(
+    rootRunId: string,
+    previousInvocation?: GraphNodeInvocation,
+    previousResult?: NodeResult
+  ): void {
+    const snapshot = this.snapshot(rootRunId);
+    if (snapshot.graph.strategy.kind !== "ssp_v1" || !snapshot.graphDecision.modelSha256) {
+      throw new Error("Root snapshot has no SSP decision strategy.");
+    }
+    const epoch = Number((this.connection().prepare(
+      "SELECT COUNT(*) count FROM policy_decisions WHERE root_run_id = ?"
+    ).get(rootRunId) as DbRow).count) + 1;
+    const evaluation = evaluatePolicyDecision({
+      strategy: snapshot.graph.strategy,
+      context: this.policyProjectionContext(rootRunId, previousInvocation, previousResult),
+      snapshotGraphNodeIds: snapshot.graph.graphNodes.map(({ id }) => id),
+      modelSha256: snapshot.graphDecision.modelSha256
+    });
+    const solution = evaluation.solution;
+    const decision: PolicyDecisionRecordV1 = {
+      policyDecisionId: randomUUID(), rootRunId, epoch,
+      epochKind: previousInvocation ? "continuation" : "start",
+      previousGraphNodeInvocationId: previousInvocation?.graphNodeInvocationId,
+      state: evaluation.state,
+      admissibleActionIds: evaluation.admissible.actionIds,
+      excludedActions: evaluation.admissible.excludedActions,
+      selectedGraphNodeId: solution?.selectedActionId,
+      actionValues: solution?.actionValues ?? [],
+      stateValueMicros: solution?.stateValueMicros,
+      tiedActionIds: solution?.tiedActionIds ?? [],
+      solverStatus: evaluation.status,
+      solverAlgorithm: "ssp_value_iteration_v1",
+      iterations: solution?.iterations ?? 0,
+      residual: solution?.residual ?? 0,
+      epsilon: snapshot.graph.strategy.model.solver.epsilon,
+      modelVersion: snapshot.graph.strategy.model.version,
+      modelSha256: snapshot.graphDecision.modelSha256,
+      policySha256: solution?.policySha256,
+      snapshotSha256: snapshot.project.snapshotHash,
+      message: evaluation.message,
+      createdAt: now()
+    };
+    this.policyEvidence.insertDecision(decision);
+    if (evaluation.terminal) {
+      this.event(rootRunId, "policy_decided", {});
+      this.terminalizePolicy(rootRunId, evaluation.terminal);
+      return;
+    }
+    if (evaluation.status !== "converged" || !decision.selectedGraphNodeId) {
+      this.event(rootRunId, "policy_invalid", {});
+      this.pausePolicy(rootRunId, evaluation.status, evaluation.message ?? "SSP policy did not produce an action.");
+      return;
+    }
+    const graphNode = requireGraphNode(snapshot, decision.selectedGraphNodeId);
+    const invocation = this.createGraphNodeInvocation(rootRunId, graphNode, "orchestrator", undefined, 0, decision.policyDecisionId);
+    this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
+    this.event(rootRunId, "policy_decided", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+    this.event(rootRunId, "graph_node_dispatched", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+  }
+
+  private recordPolicyObservation(rootRunId: string, invocation: GraphNodeInvocation, result: NodeResult): void {
+    if (!invocation.policyDecisionId) throw new Error("SSP Graph Node invocation has no policy decision reference.");
+    const snapshot = this.snapshot(rootRunId);
+    if (snapshot.graph.strategy.kind !== "ssp_v1" || !snapshot.graphDecision.modelSha256) return;
+    const decision = this.policyEvidence.requireDecision(invocation.policyDecisionId);
+    if (!decision.state) throw new Error("Dispatched policy decision has no Decision State.");
+    const configured = snapshot.graph.strategy.model.stateActions.find((row) =>
+      row.stateId === decision.state!.stateId && row.graphNodeId === invocation.graphNodeId);
+    if (!configured) throw new Error("Dispatched policy action is absent from the immutable Decision Model.");
+    let stateAfter;
+    try {
+      stateAfter = projectDecisionState(snapshot.graph.strategy.model,
+        this.policyProjectionContext(rootRunId, invocation, result));
+    } catch { /* The following decision attempt persists the exact projection failure. */ }
+    const observation: PolicyOptionObservationV1 = {
+      policyObservationId: randomUUID(), rootRunId, policyDecisionId: decision.policyDecisionId,
+      graphNodeInvocationId: invocation.graphNodeInvocationId, stateBefore: decision.state,
+      action: invocation.graphNodeId, configuredExpectedCostMicros: configured.expectedCostMicros,
+      verifiedOutcome: result, stateAfter,
+      durationMillis: Math.max(0, Date.parse(now()) - Date.parse(invocation.createdAt)),
+      modelSha256: snapshot.graphDecision.modelSha256,
+      snapshotSha256: snapshot.project.snapshotHash,
+      createdAt: now()
+    };
+    this.policyEvidence.insertObservation(observation);
+    this.event(rootRunId, "policy_observed", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+  }
+
+  private policyProjectionContext(rootRunId: string, invocation?: GraphNodeInvocation, result?: NodeResult) {
+    return {
+      epochKind: invocation ? "continuation" as const : "start" as const,
+      previousGraphNodeId: invocation?.graphNodeId,
+      previousGraphNodeResult: result,
+      graphNodeInvocationCount: Number((this.connection().prepare(
+        "SELECT COUNT(*) count FROM graph_node_invocations WHERE root_run_id = ?"
+      ).get(rootRunId) as DbRow).count),
+      stateRevision: this.stateRevision(rootRunId), projectState: this.currentState(rootRunId),
+      authorizationFacts: this.currentState(rootRunId),
+      evidenceRefs: [`graph-state:${this.stateRevision(rootRunId)}`,
+        ...(invocation ? [`graph-node-invocation:${invocation.graphNodeInvocationId}`] : [])]
+    };
+  }
+
+  private terminalizePolicy(rootRunId: string, terminal: "success" | "failure" | "blocked"): void {
+    const result = terminal === "success" ? "PASS" : "FAIL";
+    this.terminalize(rootRunId, terminal === "success" ? "completed" : terminal === "failure" ? "failed" : "blocked", {
+      role: "orchestrator", state: "completed", action: "complete",
+      summary: `SSP policy reached ${terminal}.`, result, reason: "Explicit Decision Model terminal state."
+    });
+  }
+
+  private pausePolicy(rootRunId: string, code: string, message: string): void {
+    this.connection().prepare(`
+      UPDATE root_runs SET status = 'waiting_for_input', error_code = ?, error_message = ?,
+        active_node_run_id = NULL, active_graph_node_invocation_id = NULL, updated_at = ? WHERE root_run_id = ?
+    `).run(code, message, now(), rootRunId);
+    this.event(rootRunId, "root_needs_input", {});
+  }
+
   private applyPatch(rootRunId: string, sourceNodeRunId: string, patch: unknown, outcome: CanonicalNodeOutcome): void {
     const current = this.currentState(rootRunId);
     const applied = applyStatePatch(current, patch);
@@ -881,7 +1017,7 @@ export class RuntimeDatabase {
   private snapshot(rootRunId: string): RootExecutionSnapshot {
     const source = String(this.rootRow(rootRunId).execution_snapshot_json);
     const value = JSON.parse(source) as RootExecutionSnapshot;
-    if (value.version !== 7) throw new Error("Persisted Root snapshot is not v7.");
+    if (value.version !== 8) throw new Error("Persisted Root snapshot is not v8.");
     return value;
   }
   private rootRow(rootRunId: string): DbRow {
@@ -1036,6 +1172,10 @@ const requireGraphNode = (snapshot: RootExecutionSnapshot, id: string): ProjectG
   if (!node) throw new Error(`Graph Node ${id} is outside the immutable snapshot.`);
   return node;
 };
+const requireAgentGraphStrategy = (snapshot: RootExecutionSnapshot) => {
+  if (snapshot.graph.strategy.kind !== "agent_v1") throw new Error("Graph scope is not configured for agent routing.");
+  return snapshot.graph.strategy;
+};
 const requireJob = (graphNode: ProjectGraphNode | undefined, id: string | undefined): ProjectJobNode => {
   const job = graphNode?.jobNodes.find((candidate) => candidate.id === id);
   if (!job) throw new Error(`Job Node ${String(id)} is outside the immutable snapshot.`);
@@ -1071,6 +1211,7 @@ const mapNodeRun = (row: DbRow): NodeRun => ({
 const mapGraphNodeInvocation = (row: DbRow): GraphNodeInvocation => ({
   graphNodeInvocationId: String(row.graph_node_invocation_id), graphNodeId: String(row.graph_node_id),
   rootRunId: String(row.root_run_id), parentGraphNodeInvocationId: optional(row.parent_graph_node_invocation_id),
+  policyDecisionId: optional(row.policy_decision_id),
   source: row.source as GraphNodeInvocation["source"], status: row.status as GraphNodeInvocation["status"],
   input: json(row.input_json), snapshot: JSON.parse(String(row.snapshot_json)) as ProjectGraphNode,
   entryStateRevision: Number(row.entry_state_revision),

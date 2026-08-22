@@ -40,12 +40,18 @@ export interface ExecutionResourceSnapshot {
 export interface ExecutionRuntimeBinding { executionProfileId: string; runtime: ExecutionRuntimeSnapshot; }
 
 export interface RootExecutionSnapshot {
-  version: 7;
+  version: 8;
   rootKind: "graph" | "graph_node";
   rootGraphNodeId?: string;
   project: ExecutionProjectSnapshot;
   issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;
+  graphDecision: {
+    strategyKind: "agent_v1" | "ssp_v1";
+    modelVersion?: 1;
+    modelSha256?: string;
+    capabilityGraphSha256?: string;
+  };
   theme: CanvasTheme;
   executionProfiles: ExecutionProfile[];
   runtimes: ExecutionRuntimeBinding[];

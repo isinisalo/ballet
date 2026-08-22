@@ -172,6 +172,7 @@ export interface GraphNodeInvocation {
   graphNodeId: string;
   rootRunId: string;
   parentGraphNodeInvocationId?: string;
+  policyDecisionId?: string;
   source: "orchestrator" | "repair" | "root";
   status: InvocationStatus;
   input?: JsonValue;

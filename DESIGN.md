@@ -161,7 +161,7 @@ The visual system combines Modern Minimalism with Technical Industrialism. Dark 
 
 ## Implementation Status Boundary
 
-The active baseline is strict project config v14, Graph Node Module v4, Root Snapshot v7, Task Envelope and role outcome v7, composition v8, ExecutionSpec v9 and SQLite v10. There are no legacy readers, route aliases, dual writes, schedule UI or standalone JobNode Run.
+The active baseline is strict project config v15, Graph Node Module v4, Root Snapshot v8, Task Envelope and role outcome v7, composition v8, ExecutionSpec v9 and SQLite v11. Graph scope uses an explicit `agent_v1` or `ssp_v1` strategy without fallback. There are no legacy readers, route aliases, dual writes, schedule UI or standalone JobNode Run.
 
 Authoring has exactly three canonical URL-owned levels:
 
@@ -243,7 +243,7 @@ All three canvases use the same dark 24px technical grid, existing color tokens,
 
 ## Inspectors & Authoring
 
-- Orchestrator inspector exposes identity, scope, explicit ExecutionProfile, primary instruction, skills, limits and authored start/continuation/repair candidate rules.
+- Graph strategy inspector exposes the protected Luna hub identity and either `agent_v1` composition/candidate rules or `ssp_v1` Capability Graph membership. Graph Node Orchestrator inspectors retain explicit ExecutionProfile, primary instruction, skills, limits and authored start/continuation/repair candidate rules.
 - Repair inspector exposes explicit ExecutionProfile, instruction, skills, attempt/depth limits and bounded outcomes. It never presents expanded permission or active-snapshot mutation controls.
 - Work inspector exposes agent/human type, task, appearance, explicit profile/instruction/skills and capability/State contract.
 - Validation inspector exposes criteria, appearance, explicit composition and PASS/FAIL contract. FAIL repair input contains no target ID.

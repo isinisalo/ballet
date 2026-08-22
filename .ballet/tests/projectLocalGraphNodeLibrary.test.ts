@@ -12,15 +12,17 @@ import type { RuntimeDatabaseProvider } from "../../backend/services/RuntimeData
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("project-local Graph Engineering v14", () => {
+describe("project-local Graph Engineering v15", () => {
   it("contains five Graph Nodes and 17 aggregate Job Nodes with Luna/Sol agents", async () => {
     const config = projectConfigSchema.parse(JSON.parse(await readFile(".ballet/project.json", "utf8")));
-    expect(config.version).toBe(14);
+    expect(config.version).toBe(15);
     expect(config.graph.graphNodes.map(({ id }) => id)).toEqual(["design","plan","build","deploy","verify"]);
     expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)).toHaveLength(17);
     expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)
       .every((job) => job.workNode && job.validationNode)).toBe(true);
-    expect(config.graph.orchestrator).toMatchObject({
+    expect(config.graph.strategy.kind).toBe("agent_v1");
+    if (config.graph.strategy.kind !== "agent_v1") throw new Error("Expected agent strategy.");
+    expect(config.graph.strategy.orchestrator).toMatchObject({
       nodeStyle: "luna",
       executionProfileId: "codex-gpt-5-6-luna-medium-network-off",
       maxRouteAttempts: 3,
@@ -117,7 +119,7 @@ const emptyProject = async (requiredKeys: string[]): Promise<string> => {
     writeFile(path.join(root, `.ballet/instructions/${id}.md`),
       `---\nid: ${id}\ntitle: ${id}\n---\nOperate only inside the immutable candidate set.\n`)));
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 14,
+    version: 15,
     executionProfiles: [
       { id: "luna", name: "Luna", provider: "codex", model: "gpt-5.6-luna", reasoningEffort: "medium", networkAccess: false },
       { id: "sol", name: "Sol", provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "medium", networkAccess: false }
@@ -129,10 +131,10 @@ const emptyProject = async (requiredKeys: string[]): Promise<string> => {
     graph: {
       id: "test-graph", name: "Test Graph",
       state: { description: "Test state", initial: Object.fromEntries(requiredKeys.map((key) => [key, null])) },
-      orchestrator: orchestrator("global", "global-orch", [
+      strategy: { kind: "agent_v1", orchestrator: orchestrator("global", "global-orch", [
         { target: { graphNodeId: "placeholder" }, description: "Placeholder" },
         terminal("PASS"), terminal("FAIL")
-      ], "placeholder"),
+      ], "placeholder") },
       repairNode: repair("global-repair", "global-repair"),
       graphNodes: [{
         id: "placeholder", description: "Placeholder", nodeStyle: "vector-planet", nodeSize: "medium",

@@ -1,5 +1,5 @@
 {
-  "version": 14,
+  "version": 15,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -23,7 +23,9 @@
       "description": "Provider-neutral context shared by the fixture Graph.",
       "initial": {}
     },
-    "orchestrator": {
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
       "id": "fixture-graph-orchestrator",
       "description": "Route the fixture Graph from its Graph Node to a terminal.",
       "nodeStyle": "luna",
@@ -74,6 +76,7 @@
           }
         ],
         "repair": []
+      }
       }
     },
     "graphNodes": [

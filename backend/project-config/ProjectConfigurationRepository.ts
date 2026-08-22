@@ -23,6 +23,7 @@ import {
   type ProjectConfigurationIssue
 } from "../../shared/domain/projectConfig.js";
 import { ExecutionProfileConflictError, ExecutionProfileNotFoundError } from "./ExecutionProfileErrors.js";
+import { normalizeGraphStrategy } from "./ProjectConfigurationNormalization.js";
 
 export interface ProjectConfigurationLoadResult {
   path: string;
@@ -74,14 +75,14 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version !== 14) return {
+    if (isRecord(value) && value.version !== 15) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 14 is required; version ${String(value.version)} is not supported.`
+        `Strict project config version 15 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -96,7 +97,7 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config,
-      version: 14,
+      version: 15,
       graph: automation.graph,
     });
     this.write(root, config);
@@ -111,7 +112,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 14,
+      version: 15,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -126,7 +127,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 14,
+      version: 15,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -140,7 +141,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 14,
+      version: 15,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -174,7 +175,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 14,
+  version: 15,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,
@@ -189,7 +190,7 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
   graph: {
     ...config.graph,
     state: { ...config.graph.state, initial: structuredClone(config.graph.state.initial) },
-    orchestrator: normalizeComposition(config.graph.orchestrator),
+    strategy: normalizeGraphStrategy(config.graph.strategy, normalizeComposition),
     ...(config.graph.repairNode ? { repairNode: normalizeComposition(config.graph.repairNode) } : {}),
     graphNodes: config.graph.graphNodes.map((graphNode) => ({
       ...graphNode,

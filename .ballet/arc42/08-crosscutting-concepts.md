@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 14
+version: 15
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-012 on draft finite policy boundary; se ei korvaa CON-011:n active strict-v14-semanticsia ennen `adr-026`-hyväksyntää.
+CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-012 on hyväksytty ja toteutettu finite policy boundary; se täydentää CON-011:n säilyviä GraphNode/Job/repair-invariantteja strict-v15-baselinessa.
 
 ## Konseptikartta
 
@@ -36,7 +36,7 @@ CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CO
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
 | CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää parent-orchestratorin vain read-only-junctionina. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
-| CON-012 | Draft finite policy boundary: Capability Graph omistaa possible actions/hard topology; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa explicit transitions/cost/terminals; policy solver tuottaa Q/V/actionin; Policy Projection on derived read-only rollout ja Execution Graph factual samples. Hard controls poistavat actionin `A(s)`:stä, probabilityt eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011 | QS-002, QS-012, QS-013, QS-021 | draft ADR-026, proposed config v15/snapshot v8/SQLite v11, RT-016 |
+| CON-012 | Finite policy boundary: Capability Graph omistaa possible actions/hard topology; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa explicit transitions/cost/terminals; policy solver tuottaa Q/V/actionin; Policy Projection on derived read-only evidence ja Execution Graph factual samples. Hard controls poistavat actionin `A(s)`:stä, probabilityt eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011 | QS-002, QS-012, QS-013, QS-021 | ADR-026, config v15/snapshot v8/SQLite v11, RT-016 |
 
 ## Turvallisuus ja auktorisointi
 
@@ -80,7 +80,7 @@ Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logi
 
 Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Scoped orchestratorin allowed target enum tulee samasta immutable snapshotista kuin runtime-validointi; providerin target-teksti ei voi laajentaa joukkoa. Graph Node Module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
 
-Draft CON-012 laajentaa saman provenance-periaatteen Decision Modeliin: canonical feature/state/action/transition/cost/terminal/solver JSON tuottaa model hashin. Stable ID -järjestys, fixed-point input, compensated successor summation, epsilon, iteration count, residual ja policy hash ovat decision evidenceä. Execution observation viittaa model hashin mutta ei kirjoita modelia.
+CON-012 laajentaa saman provenance-periaatteen Decision Modeliin: canonical feature/state/action/transition/cost/terminal/solver JSON tuottaa model hashin. Stable ID -järjestys, fixed-point input, compensated successor summation, epsilon, iteration count, residual ja policy hash ovat decision evidenceä. Execution observation viittaa model hashiin mutta ei kirjoita modelia.
 
 ## Evidenssi, observability ja tietoluokitus
 
@@ -117,10 +117,10 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää strict-v14-skeemaa: graph omistaa yhteisen Staten, globaalin orchestrator/repairin ja 1–40 GraphNodea; GraphNode omistaa paikallisen orchestrator/repairin ja aggregate JobNodet.
-- V14-toteutus ei säilytä Loop/Workflow/schedule/Edge/start-ID-readereita, reittialiaksia, dual-writeä tai silent defaultia.
+- `.ballet/project.json` käyttää strict-v15-skeemaa: graph omistaa yhteisen Staten, explicit `agent_v1 | ssp_v1` -strategian ja 1–40 GraphNodea; GraphNode omistaa paikallisen orchestrator/repairin ja aggregate JobNodet.
+- V15-toteutus ei säilytä v14-readeria, Loop/Workflow/schedule/Edge/start-ID-readereita, reittialiaksia, dual-writeä tai silent defaultia.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
-- SQLite schema v10 käyttää GraphNode-/JobNode-invocationeja sekä scoped orchestrator/repair request/decision/frame -evidenssiä. V9-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
+- SQLite schema v11 käyttää GraphNode-/JobNode-invocationeja, scoped orchestrator/repair request/decision/frame -evidenssiä sekä append-only policy decision/option observation -evidenssiä. V10-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
 
@@ -130,13 +130,13 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025`; draft `adr-026`.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025` ja `adr-026`.
 
 ## Evidenssi
 
 Konseptit mapittuvat BB-, RT-, DEP- ja QS-tunnisteisiin. TRACEABILITY nimeää testit ja evidenssit; tämän dokumentaatiotyön conformance review tarkistaa, ettei kuvaus väitä runtime-sopimuksen muutosta.
 
-CON-012:n TEST-021/EVID-021 pysyy pending-tilassa.
+CON-012:n generic core -evidenssi on TEST-021/EVID-021:ssa; full projection/pilot-evidenssi pysyy avoimena.
 
 ## Avoimet kysymykset
 

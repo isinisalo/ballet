@@ -1,10 +1,10 @@
 ---
 id: stochastic-policy-orchestration-plan
 title: Stochastic Policy Orchestration PLAN
-status: draft
+status: accepted
 createdAt: '2026-08-22'
 updatedAt: '2026-08-22'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Toteutusta edeltävä ihmisportti
 
-`goal-016`, `adr-026`, `QS-021`-prioriteetti/mitta ja SPO-OQ-001–004 ratkaistaan ennen yhtäkään implementation-stepiä. Suositeltu strict cut on project config v15, Root Snapshot v8 ja SQLite v11. Graph Node Module v4, Task Envelope/outcome v7, composition v8 ja ExecutionSpec v9 pysyvät ensimmäisessä sliceissä ennallaan, koska Decision State käyttää vain deterministic canonical feature sourceja eikä lisää provider-tehtävää.
+Projektin omistaja hyväksyi `goal-016`:n, `adr-026`:n, `QS-021`-prioriteetin/mitan ja SPO-OQ-001–004:n 2026-08-22. Strict cut on project config v15, Root Snapshot v8 ja SQLite v11. Graph Node Module v4, Task Envelope/outcome v7, composition v8 ja ExecutionSpec v9 pysyvät ensimmäisessä sliceissä ennallaan, koska Decision State käyttää vain deterministic canonical feature sourceja eikä lisää provider-tehtävää.
 
 ## Proposed domain contract
 
@@ -99,7 +99,7 @@ Primary fixture käyttää `discover`, `prototype`, `security-check`, `package`,
 
 ## Migration ja legacy removal
 
-Hyväksyttynä muutos on pre-production strict cut. V14-config ja DB10-kanta jäävät koskemattomiksi ja startup antaa archive/remediation-ohjeen; readeria, aliasia tai dual-writeä ei lisätä. Existing `routing_requests/decisions` joko generalisoidaan uudelle decision epoch -sopimukselle tai korvataan v11:ssä; rinnakkaista canonical decision storea ei jätetä. `agent_v1` on intentional strategy, ei legacy fallback.
+Muutos on pre-production strict cut. V14-config ja DB10-kanta jäävät koskemattomiksi ja startup antaa archive/remediation-ohjeen; readeria, aliasia tai dual-writeä ei lisätä. Existing `routing_requests/decisions` säilyvät vain explicit `agent_v1`-evidenssinä ja v11:n `policy_decisions` / `policy_option_observations` vain `ssp_v1`-evidenssinä. `agent_v1` on intentional strategy, ei legacy fallback.
 
 ## Portit
 
@@ -107,4 +107,4 @@ Hyväksyttynä muutos on pre-production strict cut. V14-config ja DB10-kanta jä
 
 ## Non-goals ja pysähtymisehto
 
-Automatic learning, multi-cost, classifier LLM, GraphNode-scope policy, release/deploy/merge/push ja active snapshot model mutation eivät kuulu sliceen. Implementation pysähtyy `needs_input`-tilaan, jos SPO-OQ-001–004 tai priority-1-mitta jää hyväksymättä.
+Automatic learning, multi-cost, classifier LLM, GraphNode-scope policy, release/deploy/merge/push ja active snapshot model mutation eivät kuulu sliceen. Invalidi Decision State/model/policy pysähtyy `needs_input`-tilaan ilman strategiafallbackia.

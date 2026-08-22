@@ -1,9 +1,9 @@
-export const localDatabaseSchemaVersion = 10;
+export const localDatabaseSchemaVersion = 11;
 
 export const localDatabaseTableNames = [
   "control_flow_events", "execution_events", "execution_tasks", "graph_node_invocations",
   "graph_state_revisions", "job_node_invocations", "metadata", "node_runs",
-  "repair_frames", "repair_requests", "repair_results", "root_runs",
+  "policy_decisions", "policy_option_observations", "repair_frames", "repair_requests", "repair_results", "root_runs",
   "routing_decisions", "routing_requests", "tracker_links", "tracker_outbox"
 ] as const;
 
@@ -42,6 +42,7 @@ export const runtimeSchema = `
   CREATE TABLE graph_node_invocations (
     graph_node_invocation_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     graph_node_id TEXT NOT NULL, parent_graph_node_invocation_id TEXT REFERENCES graph_node_invocations(graph_node_invocation_id),
+    policy_decision_id TEXT,
     source TEXT NOT NULL CHECK (source IN ('orchestrator','repair','root')),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
     input_json TEXT, snapshot_json TEXT NOT NULL, entry_state_revision INTEGER NOT NULL, completion_state_revision INTEGER,
@@ -94,6 +95,30 @@ export const runtimeSchema = `
     valid INTEGER NOT NULL CHECK (valid IN (0,1)), created_at TEXT NOT NULL
   );
 
+  CREATE TABLE policy_decisions (
+    policy_decision_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    epoch INTEGER NOT NULL CHECK (epoch >= 1), epoch_kind TEXT NOT NULL CHECK (epoch_kind IN ('start','continuation')),
+    previous_graph_node_invocation_id TEXT, state_json TEXT, admissible_action_ids_json TEXT NOT NULL,
+    excluded_actions_json TEXT NOT NULL, selected_graph_node_id TEXT, action_values_json TEXT NOT NULL,
+    state_value_micros REAL, tied_action_ids_json TEXT NOT NULL, solver_status TEXT NOT NULL,
+    solver_algorithm TEXT NOT NULL CHECK (solver_algorithm = 'ssp_value_iteration_v1'), iterations INTEGER NOT NULL,
+    residual REAL NOT NULL, epsilon REAL NOT NULL, model_version INTEGER NOT NULL CHECK (model_version = 1),
+    model_sha256 TEXT NOT NULL, policy_sha256 TEXT,
+    snapshot_sha256 TEXT NOT NULL, message TEXT, created_at TEXT NOT NULL,
+    UNIQUE (root_run_id, epoch)
+  );
+
+  CREATE TABLE policy_option_observations (
+    policy_observation_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    policy_decision_id TEXT NOT NULL REFERENCES policy_decisions(policy_decision_id),
+    graph_node_invocation_id TEXT NOT NULL REFERENCES graph_node_invocations(graph_node_invocation_id),
+    state_before_json TEXT NOT NULL, action TEXT NOT NULL, configured_expected_cost_micros INTEGER NOT NULL,
+    actual_cost_micros INTEGER, verified_outcome TEXT NOT NULL CHECK (verified_outcome IN ('PASS','FAIL')),
+    state_after_json TEXT, duration_millis INTEGER NOT NULL CHECK (duration_millis >= 0),
+    model_sha256 TEXT NOT NULL, snapshot_sha256 TEXT NOT NULL, created_at TEXT NOT NULL,
+    UNIQUE (graph_node_invocation_id)
+  );
+
   CREATE TABLE repair_requests (
     repair_request_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     scope TEXT NOT NULL CHECK (scope IN ('graph','graph_node')), graph_node_id TEXT, requester_node_run_id TEXT NOT NULL,
@@ -124,7 +149,8 @@ export const runtimeSchema = `
   CREATE TABLE control_flow_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     sequence INTEGER NOT NULL, kind TEXT NOT NULL CHECK (kind IN (
-      'orchestrator_requested','orchestrator_decided','orchestrator_invalid','graph_node_dispatched','job_node_dispatched',
+      'orchestrator_requested','orchestrator_decided','orchestrator_invalid','policy_decided','policy_invalid','policy_observed',
+      'graph_node_dispatched','job_node_dispatched',
       'work_completed','validation_pass','validation_fail_retry','validation_fail_repair','repair_dispatched',
       'repair_return','repair_escalated','root_needs_input','root_cancelled','root_terminal','execution_interrupted'
     )), state_revision INTEGER NOT NULL, graph_node_invocation_id TEXT, job_node_invocation_id TEXT,
@@ -170,5 +196,7 @@ export const runtimeSchema = `
   CREATE INDEX node_runs_root_idx ON node_runs(root_run_id, created_at);
   CREATE INDEX execution_tasks_status_idx ON execution_tasks(status, provider, created_at);
   CREATE INDEX routing_requests_root_idx ON routing_requests(root_run_id, created_at);
+  CREATE INDEX policy_decisions_root_idx ON policy_decisions(root_run_id, epoch);
+  CREATE INDEX policy_observations_root_idx ON policy_option_observations(root_run_id, created_at);
   CREATE INDEX repair_frames_root_idx ON repair_frames(root_run_id, created_at);
 `;

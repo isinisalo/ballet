@@ -1,7 +1,7 @@
 ---
 id: goal-016
 title: Geneerinen SSP/SMDP-policyorkestrointi
-status: draft
+status: accepted
 createdAt: '2026-08-22T00:00:00.000Z'
 updatedAt: '2026-08-22T00:00:00.000Z'
 tags:
@@ -9,7 +9,7 @@ tags:
   - policy
   - ssp
   - smdp
-version: 1
+version: 2
 ---
 
 # Geneerinen SSP/SMDP-policyorkestrointi
@@ -47,7 +47,7 @@ Tavoitteen hyväksymisraja on `QS-021`: täysin project-agnostinen fixture käyt
 
 ## Ihmispäätökset
 
-Tämä Goal on draft. Projektin omistajan pitää hyväksyä ennen toteutusta:
+Projektin omistaja hyväksyi 2026-08-22 toteutustehtävän yhteydessä:
 
 1. explicit `agent_v1 | ssp_v1` -strategiaraja;
 2. proper-policy-vaatimus ja failure/blocked-terminalien ääretön SSP-arvo;
@@ -56,4 +56,4 @@ Tämä Goal on draft. Projektin omistajan pitää hyväksyä ennen toteutusta:
 
 ## Todentaminen
 
-`TEST-021` kattaa schema-, state projection-, admissibility-, solver-, snapshot-, persistence-, restart-, Run projection- ja arbitrary GraphNode -matriisin. `EVID-021` pysyy pending-tilassa, kunnes hyväksytty ADR ja toteutus tuottavat konkreettisen evidenssin.
+`TEST-021` kattaa schema-, state projection-, admissibility-, solver-, snapshot-, persistence-, restart-, Run projection- ja arbitrary GraphNode -matriisin. `EVID-021` indeksoi toteutuksesta ja porteista saadun konkreettisen evidenssin.

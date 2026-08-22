@@ -88,15 +88,15 @@ const appData = (): AppData => ({
 });
 
 const automation = (): ProjectAutomationConfig => ({
-  version: 14,
+  version: 15,
   graph: {
     id: "graph", name: "Graph", state: { description: "Shared state.", initial: {} },
-    orchestrator: {
+    strategy: { kind: "agent_v1", orchestrator: {
       id: "graph-orchestrator", description: "Routes Graph Nodes.", nodeStyle: "luna", nodeSize: "medium",
       executionProfileId: "luna-medium", primaryInstructionId: "project:graph", skillIds: [],
       maxTransitions: 256, maxRouteAttempts: 3,
       routing: { start: { id: "graph-start", candidates: [{ target: { graphNodeId: "graph-node" }, description: "Start graph node." }] }, continuation: [], repair: [] }
-    },
+    } },
     graphNodes: [{
       id: "graph-node", description: "Graph Node", nodeStyle: "terra", nodeSize: "medium",
       capabilities: { accepts: [], provides: [] }, stateContract: { description: "Uses shared state." },

@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 12
+version: 13
 tags:
   - arc42
   - glossary
@@ -19,26 +19,26 @@ Tämä osio määrittää project-, authoring-, runtime-, tracker-, provider-, p
 
 ## Tila
 
-Active accepted baseline on strict-v14 `Graph → GraphNode → JobNode → Work/Validation`, Graph Node Module v4, Root Snapshot v7 ja SQLite v10. Alla erikseen merkitty policy-sanasto on draft `adr-026`:n terminologiaa eikä toteutettua runtimea. Strict-v13/Loop/Workflow/RunBook-termit säilyvät historiallisena audit trailina eivätkä ole current domainin nimiä.
+Active accepted baseline on strict-v15 `Graph → GraphNode → JobNode → Work/Validation`, explicit `agent_v1 | ssp_v1`, Graph Node Module v4, Root Snapshot v8 ja SQLite v11. Strict-v13/Loop/Workflow/RunBook-termit säilyvät historiallisena audit trailina eivätkä ole current domainin nimiä.
 
-## Active strict-v14 ja draft policy -termit
+## Active strict-v15 ja policy-termit
 
 | Termi | Status | Määritelmä |
 | --- | --- | --- |
 | Graph | accepted | Project-global user-authored automation boundary, joka omistaa yhteisen Staten, Graph Orchestratorin/Repair Noden ja 1–40 GraphNodea. |
-| GraphNode | accepted | User-defined, stable-ID:llä viitattu capability ja runtime invocation boundary. Default-projektin nodejen nimet eivät ole platform primitivejä. Draft SMDP-mallissa yksi GraphNode on yksi Option/action. |
+| GraphNode | accepted | User-defined, stable-ID:llä viitattu capability ja runtime invocation boundary. Default-projektin nodejen nimet eivät ole platform primitivejä. SMDP-mallissa yksi GraphNode on yksi Option/action. |
 | JobNode | accepted | GraphNoden aggregate child, joka omistaa täsmälleen yhden WorkNoden, yhden ValidationNoden ja bounded retryn. |
-| Capability Graph | draft | Repository-backed Graph/GraphNode-topologia ja hard candidate/admissibility metadata: mitä Optioneita voidaan ylipäänsä aloittaa. Ei probability-, cost- tai execution history -lähde. |
-| Decision Model | draft | Snapshotattava finite state/action/transition/cost/terminal/solver-konfiguraatio, josta SSP-policy ratkaistaan. Project truth, ei runtime observationista automaattisesti muuttuva malli. |
-| Decision State | draft | Decision epochissa canonical factseista johdettu bounded finite feature vector + state ID/hash. Ei sama asia kuin arbitrary project State eikä itsenäisesti patchattava workflow state. |
-| Decision epoch | draft | Graph-scope ennen ensimmäistä GraphNodea ja jokaisen GraphNode Optionin terminaalin jälkeen; runtime projisoi Staten ja valitsee/terminoi policyn perusteella. |
-| Admissible action set `A(s)` | draft | Snapshot-, candidate-, model-, permission-, human authorization- ja lifecycle-rajojen leikkaus. Poissuljettu action ei saa Q-arvoa. |
-| Option | draft | GraphNode temporaalisesti laajennettuna actionina: initiation set tulee hard admissibilitystä, internal policy GraphNode/Job-runtimesta ja termination canonical GraphNode outcome -rajasta. |
-| SSP goal | draft | Explicit absorbing `success` Decision State, jonka arvo on 0. `failure` ja `blocked` ovat explicit non-goal terminaleja, eivät halpoja actioneita. |
-| Proper policy | draft | Policy, joka saavuttaa success-terminalin probabilityllä 1 jokaisesta sallitusta nonterminal lähtötilasta. Failure/blocked tai suljettu non-goal recurrent class tekee policysta improperin. |
-| Policy Projection | draft | Current Decision Statesta johdettu bounded read-only rollout branch/cumulative probabilityineen. Ei Current Plan, workflow source of truth tai dispatch authority. |
-| Execution Graph | draft | Persistoitu factual option trajectory ja samplet `(state_before, action, cost/observations, outcome, state_after)` model/snapshot refs -viitteineen. Ei muuta Decision Modelia automaattisesti. |
-| `agent_v1` / `ssp_v1` | draft | Eksplisiittiset Graph-strategiat. Ensimmäinen käyttää current LLM candidate routingia, toinen Bellman SSP-policya; niiden välillä ei ole fallbackia. |
+| Capability Graph | accepted | Repository-backed Graph/GraphNode-topologia ja hard candidate/admissibility metadata: mitä Optioneita voidaan ylipäänsä aloittaa. Ei probability-, cost- tai execution history -lähde. |
+| Decision Model | accepted | Snapshotattava finite state/action/transition/cost/terminal/solver-konfiguraatio, josta SSP-policy ratkaistaan. Project truth, ei runtime observationista automaattisesti muuttuva malli. |
+| Decision State | accepted | Decision epochissa canonical factseista johdettu bounded finite feature vector + state ID/hash. Ei sama asia kuin arbitrary project State eikä itsenäisesti patchattava workflow state. |
+| Decision epoch | accepted | Graph-scope ennen ensimmäistä GraphNodea ja jokaisen GraphNode Optionin terminaalin jälkeen; runtime projisoi Staten ja valitsee/terminoi policyn perusteella. |
+| Admissible action set `A(s)` | accepted | Snapshot-, candidate-, model-, permission-, human authorization- ja lifecycle-rajojen leikkaus. Poissuljettu action ei saa Q-arvoa. |
+| Option | accepted | GraphNode temporaalisesti laajennettuna actionina: initiation set tulee hard admissibilitystä, internal policy GraphNode/Job-runtimesta ja termination canonical GraphNode outcome -rajasta. |
+| SSP goal | accepted | Explicit absorbing `success` Decision State, jonka arvo on 0. `failure` ja `blocked` ovat explicit non-goal terminaleja, eivät halpoja actioneita. |
+| Proper policy | accepted | Policy, joka saavuttaa success-terminalin probabilityllä 1 jokaisesta sallitusta nonterminal lähtötilasta. Failure/blocked tai suljettu non-goal recurrent class tekee policysta improperin. |
+| Policy Projection | partial implementation | Persisted decision/observation evidence on read-only Run DTO:ssa; täysi bounded branch/cumulative probability rollout kuuluu seuraavaan sliceen. Ei Current Plan, workflow source of truth tai dispatch authority. |
+| Execution Graph | accepted | Persistoitu factual option trajectory ja samplet `(state_before, action, cost/observations, outcome, state_after)` model/snapshot refs -viitteineen. Ei muuta Decision Modelia automaattisesti. |
+| `agent_v1` / `ssp_v1` | accepted | Eksplisiittiset Graph-strategiat. Ensimmäinen käyttää current LLM candidate routingia, toinen Bellman SSP-policya; niiden välillä ei ole fallbackia. |
 
 ## Historiallinen strict-v13 project ja authoring
 
@@ -102,7 +102,7 @@ Active accepted baseline on strict-v14 `Graph → GraphNode → JobNode → Work
 | Preflight | Tilapäisessä hakemistossa tehtävä capability-, JSONL/Markdown-, parent-, dependency-, cycle- ja external-ref-validointi ennen Runia. |
 | Canonical persistence | SQLiteen atomisesti commitoitu runtime-, State-, outcome-, control- ja tracker-intent-totuus. Ticket-store ei korvaa runtime-ohjausta. |
 | Machine-local runtime state | `.git/ballet`-hakemiston SQLite-, worktree- ja lifecycle-data, jota ei versionhallita project truthina. |
-| Runtime DB v9 | Nykyinen strict runtime schema. Vanha kanta jätetään koskemattomaksi ja käynnistys antaa archive/remediation-ohjeen. |
+| Runtime DB v11 | Nykyinen strict runtime schema. V10-kanta jätetään koskemattomaksi ja käynnistys antaa archive/remediation-ohjeen. |
 
 ## Provider ja versionoidut sopimukset
 
@@ -110,7 +110,7 @@ Active accepted baseline on strict-v14 `Graph → GraphNode → JobNode → Work
 | --- | --- |
 | Execution composition | Tavutasoinen järjestys System → primary instruction → vakaasti järjestetyt skillit → Task Envelope → role/output schema. |
 | Strict output schema | Roolikohtainen koneellisesti validoitava tulosmuoto, jonka läpäisy tarvitaan ennen canonical outcomea. |
-| Current runtime cut | Root Snapshot V6, Task Envelope V6, outcome schema V6, prompt composition V7, ExecutionSpec V8 ja runtime DB V9. |
+| Current runtime cut | Project Config V15, Root Snapshot V8, Task Envelope/outcome V7, prompt composition V8, ExecutionSpec V9, Graph Node Module V4 ja runtime DB V11. |
 | Provider adapter | Portti, joka mapittaa canonical execution taskin provider-protokollaan ja normalisoi tapahtumat muuttamatta runtime-semanticsia. |
 | No fallback | Puuttuva tai invalidi model/profile/provider/resource/tracker pysäyttää tehtävän eikä vaihdu hiljaisesti vaihtoehtoon. |
 
@@ -142,11 +142,11 @@ Hyväksytyt Goalit/ADR:t, shared domain -sopimukset, `.ballet/project.json`, STA
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021`, `adr-022` ja `adr-023`; draft `adr-026`.
+`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021`, `adr-022`, `adr-023` ja `adr-026`.
 
 ## Evidenssi
 
-Accepted active termit esiintyvät strict-v14 project configissa, shared contracts -rajapinnoissa ja runtime/persistencessä. Draft policy-termit traceutuvat ADR-026/QS-021/RT-016:een; niillä ei ole implementation-evidenssiä.
+Accepted active termit esiintyvät strict-v15 project configissa, shared contracts -rajapinnoissa ja runtime/persistencessä. Policy-termit traceutuvat ADR-026/QS-021/RT-016:een ja niiden generic core -evidenssi EVID-021:een.
 
 ## Avoimet kysymykset
 

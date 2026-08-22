@@ -4,7 +4,7 @@ title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 12
+version: 13
 tags:
   - arc42
   - solution-strategy
@@ -19,7 +19,7 @@ Tämä osio kokoaa perustavat ratkaisut, joilla Ballet vastaa Goaleihin, laatuta
 
 ## Tila
 
-STRAT-001–STRAT-011 säilyvät historiallisen ja nykyisen arkkitehtuurin strategioina. STRAT-012 on draft-ehdotus finite SSP/SMDP -policyorkestrointiin eikä muuta accepted strict-v14-runtimea ennen `goal-016` / `adr-026`-ihmisarviota.
+STRAT-001–STRAT-011 säilyvät historiallisen ja nykyisen arkkitehtuurin strategioina. STRAT-012 on hyväksytty ja toteutettu finite SSP/SMDP -policyorkestroinnin core strict-v15-runtimeen.
 
 ## Strategiat ja jäljitettävyys
 
@@ -36,7 +36,7 @@ STRAT-001–STRAT-011 säilyvät historiallisen ja nykyisen arkkitehtuurin strat
 | STRAT-009 | Strict-v11 graph erottaa project-global Graph Engineeringin selected-Loop-only Loop Engineeringistä ja ohjaa kaikki cross-Loop-flow/repair-valinnat snapshotattujen route-candidatejen sekä capabilityjen kautta Orchestratorille. | goal-012 / REQ-012 | QS-014 | adr-018 | V11 hard cut on poistanut Context/numeric-route/compatibility-polut; ambiguity tai ihmisvaltuutus tuottaa `needs_input`, ja UI projisoi yhden Orchestrator-control-noden, persisted policyt ja canonical Run -evidenssin ilman client-owned topologiaa. |
 | STRAT-010 | Strict-v12/v2 korvaa selected-Loop-compositen `ProjectWorkflow`-mallilla, jossa Job/Validation-paritus, Pass/Fail Edget ja retry/repair-siirtymät ovat eksplisiittisiä ja validoitavia. | goal-013 / REQ-013 | QS-015 | adr-020 | Aktiivisia WorkLoopNode/WorkNode/mode/view=loop-polkuja on 0; Workflow PASS käynnistää vasta sen jälkeen Orchestrator-ohjatun Graph flow'n, ja v7-kanta failaa suljetusti. |
 | STRAT-011 | Strict-v13/v3 erottaa named RunBook-transitionit repair call/returnista, reitittää tavallisen flow'n exact immutable snapshot -avaimella ja sovittaa Graph Runin kahteen worktree-local `tk`-storeen transactional outboxilla. | goal-014 / REQ-014 | QS-016–QS-018 | adr-022 | Repositoryn oletusdata on viisi Loopia, 18 transitionia ja 12 DESIGN Jobia; platform tukee geneerisesti 1–40 Loopia, flow-targetin provider-valintoja on 0 ja pending tracker-intent estää etenemisen. |
-| STRAT-012 | Draft: Graph valitsee explicit `agent_v1`- tai `ssp_v1`-strategian. SSP erottaa finite Decision Staten project Statesta, käsittelee GraphNodea SMDP Optionina, muodostaa hard admissible action -joukon ja ratkaisee proper policyn snapshotatusta transition/cost/terminal-mallista. | goal-002, goal-006, goal-016 / REQ-002, REQ-006, REQ-016 | QS-021 | draft adr-026 | Sama snapshot/state tuottaa saman ordered Q/V/policy-evidenssin; invalidi/improper/non-convergent-malli dispatchaa 0 actionia eikä fallbackaa LLM-strategiaan. |
+| STRAT-012 | Graph valitsee explicit `agent_v1`- tai `ssp_v1`-strategian. SSP erottaa finite Decision Staten project Statesta, käsittelee GraphNodea SMDP Optionina, muodostaa hard admissible action -joukon ja ratkaisee proper policyn snapshotatusta transition/cost/terminal-mallista. | goal-002, goal-006, goal-016 / REQ-002, REQ-006, REQ-016 | QS-021 | adr-026 | Sama snapshot/state tuottaa saman ordered Q/V/policy-evidenssin; invalidi/improper/non-convergent-malli dispatchaa 0 actionia eikä fallbackaa LLM-strategiaan. |
 
 ## Keskeiset trade-offit
 
@@ -52,7 +52,7 @@ STRAT-001–STRAT-011 säilyvät historiallisen ja nykyisen arkkitehtuurin strat
 | V11 hard cut | Graph-, capability-, runtime- ja UI-semanttiikalle jää yksi strict totuus ilman compatibility-matriisia. | Domain, snapshot, persistence, API, module-data ja UI on muutettava yhdessä ennen acceptancea. |
 | V12 Workflow hard cut | Job/Validation-rakenne, Pass/Fail-reitit ja UI vastaavat samaa mallia ilman composite- tai mode-semanttiikkaa. | Repository-data ja SQLite-skeema muuttuvat koordinoidusti; v7-kanta arkistoidaan ennen uuden kannan luontia. |
 | V13 RunBook hard cut | Tavallinen Graph-flow on exact, snapshotattu ja ilman agenttireititystä; tracker-vaikutus sovitetaan ennen etenemistä. | Koko contract/runtime/module/config/UI-testipinta muuttuu kerralla, ja pinnattu `tk` on Graph Runin paikallinen prerequisite. |
-| Draft SSP proper-policy + scalar cost | Success objective, probabilityt, costit ja action values ovat standardisti tarkastettavia; hard constraints pysyvät `A(s)`:ssä. | Project ownerin pitää authoroida bounded state abstraction ja explicit priors/costit; malli, joka ei saavuta successia almost surely, failaa suljetusti. |
+| SSP proper-policy + scalar cost | Success objective, probabilityt, costit ja action values ovat standardisti tarkastettavia; hard constraints pysyvät `A(s)`:ssä. | Project ownerin pitää authoroida bounded state abstraction ja explicit priors/costit; malli, joka ei saavuta successia almost surely, failaa suljetusti. |
 
 ## Arkkitehtuurin toteutusjärjestys
 
@@ -64,13 +64,13 @@ Hyväksytyt ADR:t omistavat päätökset; tämä osio omistaa niiden strategisen
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-009`, `adr-011`–`adr-023`; draft `adr-026`.
+`adr-001`–`adr-003`, `adr-005`–`adr-009`, `adr-011`–`adr-023` ja `adr-026`.
 
 ## Evidenssi
 
 Nykyinen lähdekoodi toteuttaa STRAT-011:n muutospintaa. `validate:arc42` tarkastaa STRAT-006:n rakenteen ja strict-v13 Workflow/Graph/transition/repair-sopimuksen. Module-testit todentavat STRAT-008:n V3-materialisointirajan. STRAT-009/010:n historiallinen evidenssi säilyy `EVID-014/015`:ssä; STRAT-011:n todellinen tulos indeksoidaan `EVID-016`–`EVID-018`:ssa ja `graph-engineering-runbook/EVIDENCE.md`:ssä.
 
-STRAT-012:lla on vain architecture evidence. `EVID-021` ja implementation-evidenssi pysyvät pending-tilassa.
+STRAT-012:n generic core -evidenssi on `EVID-021` / SPO-EVID-000–006:ssa. Täysi editor/projection, rajabenchmark ja tuotantokaltainen pilotti pysyvät avoimina.
 
 ## Avoimet kysymykset
 

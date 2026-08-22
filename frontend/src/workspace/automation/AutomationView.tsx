@@ -63,7 +63,8 @@ export function AutomationView({ data, level, graphNodeId, jobNodeId, saveAutoma
         {data.automationIssues.length ? <Alert variant="destructive" className="m-3 mb-0"><AlertDescription>{data.automationIssues[0]?.message}</AlertDescription></Alert> : null}
         <div className="flex min-h-0 min-w-0 flex-1">
           {level === "graph" ? <SpaceEngineeringCanvas
-            hub={canvasNode(draft.graph.orchestrator, "Graph Orchestrator", graphRunActive)}
+            hub={canvasNode(draft.graph.strategy.kind === "agent_v1"
+              ? draft.graph.strategy.orchestrator : draft.graph.strategy, "Graph Orchestrator", graphRunActive)}
             repair={draft.graph.repairNode ? canvasNode(draft.graph.repairNode, "Repair Node", graphRunActive) : undefined}
             children={draft.graph.graphNodes.map((node) => canvasNode(node, "Graph Node", graphNodeRunActive && node.id === graphNodeId))}
             onHub={() => setSelection("orchestrator")}

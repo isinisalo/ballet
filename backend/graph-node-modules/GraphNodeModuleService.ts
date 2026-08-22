@@ -1,3 +1,4 @@
+// Module lifecycle stays in one service because inspect/plan/install/export/remove share one package provenance and rollback boundary.
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -114,7 +115,7 @@ export class GraphNodeModuleService {
         written.push(filename);
       }
       const next = installGraphNode(loaded.config, plan.graphNode);
-      this.projects.putAutomation(this.root(), { version: 14, graph: next.graph });
+      this.projects.putAutomation(this.root(), { version: 15, graph: next.graph });
       const record: InstalledGraphNodeModuleV4 = {
         moduleId: pkg.manifest.id, moduleVersion: pkg.manifest.version, title: pkg.manifest.title,
         source: input.source, packageSha256: inspection.sha256!, graphNodeId: plan.graphNode.id,
@@ -169,21 +170,25 @@ export class GraphNodeModuleService {
     const graphNodes = graph.graphNodes.filter((candidate) => candidate.id !== graphNodeId);
     if (!graphNodes.length) throw new GraphNodeModuleError("A project must retain at least one Graph Node.", [{ code: "ID_CONFLICT", path: "graphNodeId", message: graphNodeId }]);
     const cleanCandidates = <T extends { target: ProjectGraphNodeRouteTarget | { graphNodeId: string } }>(values: T[]) => values.filter((candidate) => !("graphNodeId" in candidate.target) || candidate.target.graphNodeId !== graphNodeId);
-    const routing = graph.orchestrator.routing;
+    if (graph.strategy.kind !== "agent_v1") throw new GraphNodeModuleError(
+      "SSP Graph Node removal requires an atomic Configure update to its generic decision metadata.",
+      [{ code: "INVALID_SCHEMA", path: "graph.strategy", message: graphNodeId }]
+    );
+    const routing = graph.strategy.orchestrator.routing;
     const nextGraph = {
       ...graph,
       graphNodes,
-      orchestrator: {
-        ...graph.orchestrator,
+      strategy: { kind: "agent_v1" as const, orchestrator: {
+        ...graph.strategy.orchestrator,
         routing: {
           ...routing,
           start: { ...routing.start, candidates: cleanCandidates(routing.start.candidates) },
           continuation: routing.continuation.filter((rule) => rule.sourceId !== graphNodeId).map((rule) => ({ ...rule, candidates: cleanCandidates(rule.candidates) })),
           repair: routing.repair.filter((rule) => rule.sourceId !== graphNodeId).map((rule) => ({ ...rule, candidates: cleanCandidates(rule.candidates) }))
         }
-      }
+      } }
     };
-    this.projects.putAutomation(this.root(), { version: 14, graph: nextGraph });
+    this.projects.putAutomation(this.root(), { version: 15, graph: nextGraph });
     for (const resource of record.ownedResources) await unlink(path.join(this.root(), resource.relativePath)).catch(() => undefined);
     installed.installed = installed.installed.filter((candidate) => candidate.graphNodeId !== graphNodeId);
     await this.writeInstalled(installed);
@@ -325,16 +330,19 @@ const installGraphNode = (config: ProjectConfiguration, graphNode: ProjectGraphN
   graph: {
     ...config.graph,
     graphNodes: [...config.graph.graphNodes, graphNode],
-    orchestrator: {
-      ...config.graph.orchestrator,
+    strategy: config.graph.strategy.kind === "agent_v1" ? { kind: "agent_v1", orchestrator: {
+      ...config.graph.strategy.orchestrator,
       routing: {
-        ...config.graph.orchestrator.routing,
+        ...config.graph.strategy.orchestrator.routing,
         start: {
-          ...config.graph.orchestrator.routing.start,
-          candidates: [...config.graph.orchestrator.routing.start.candidates, { target: { graphNodeId: graphNode.id }, description: `Installed Graph Node ${graphNode.id}.` }]
+          ...config.graph.strategy.orchestrator.routing.start,
+          candidates: [...config.graph.strategy.orchestrator.routing.start.candidates, { target: { graphNodeId: graphNode.id }, description: `Installed Graph Node ${graphNode.id}.` }]
         }
       }
-    }
+    } } : (() => { throw new GraphNodeModuleError(
+      "SSP Graph Node installation requires explicit generic Capability Graph and Decision Model metadata.",
+      [{ code: "INVALID_SCHEMA", path: "graph.strategy", message: graphNode.id }]
+    ); })()
   }
 });
 const renderResource = (resourceId: string, resource: GraphNodeModuleResourceV4) => {
