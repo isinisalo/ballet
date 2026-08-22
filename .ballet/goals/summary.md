@@ -44,9 +44,9 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Nykytila tämän repositoryn perusteella
 
 - Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v14** -skeemaa.
-- Projektissa on **15 hyväksyttyä Goalia** ja 23 ADR-recordia. ADR-023 omistaa nykyisen kolmitasoisen domain/routing/canvas-rajan ja säilyttää aiempien päätösten historian.
+- Projektissa on **15 hyväksyttyä Goalia** ja 24 ADR-recordia. ADR-023 omistaa kolmitasoisen domain/routing-rajan ja ADR-024 täsmentää nykyisen canvas-projektion; aiempien päätösten historia säilyy.
 - Paikallinen Graph Node Library sisältää **14 V4-pakettia**. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
-- Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat. Job Node näyttää Work/Validation-planeetat, validate/retryn ja PASS/FAIL-terminalit.
+- Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat ilman PASS/FAIL-endpointteja. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat ilman PASS/FAIL-endpointteja. Job Node näyttää Work/Validation-planeetat sekä validate/retryn ilman PASS/FAIL-terminaaleja; PASS/FAIL säilyy Validation- ja runtime-sopimuksessa.
 - Tavallinen tasojen välinen flow on scoped agent routing immutable snapshotin strict candidate-enumista. Providerin foreign target vaikuttaa nolla kertaa; bounded Repair käsittelee poikkeuksen ennen ihmiseskalaatiota.
 - Balletin oletusgraafissa on **5 GraphNodea** ja **17 aggregate JobNodea**, joilla on erilliset Work/Validation-lapset. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
 - Current hard cut on snapshot/envelope/outcome V7, composition V8, ExecutionSpec V9, runtime DB V10 ja Graph Node Module Package V4.

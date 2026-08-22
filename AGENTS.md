@@ -15,7 +15,7 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 ## Kolmitasoisen Graph Node Engineeringin visuaalinen vakaus
 
 - Graph Engineering-, Graph Node- ja Job Node -canvasien avaruusteema on suojattu visuaalinen sopimus. Säilytä tumma 24 px tekninen ruudukko, planeettamaiset artworkit ja niiden konfiguroidut koot/tyylit, reasoning glow't, amber-ID-labelit, ohuet 1.5 px mintunväriset spoket/yhteydet, kirkkaat yhteyspisteet sekä reduced-motion-tuki.
-- Graph Engineering näyttää vain globaalin Luna Orchestratorin, valinnaisen Sol Repair Noden, GraphNode-planeetat ja kiinteät PASS/FAIL-connection pointit. Graph Node näyttää vain valitun Graph Noden Luna Orchestratorin, valinnaisen Sol Repair Noden, sen JobNode-planeetat ja terminaalit. Job Node näyttää vain aggregate Jobin Work- ja Validation-planeetat, mintun validate-yhteyden, amber-retryn ja PASS/FAIL-terminalit. Foreign-scope-nodeja ei näytetä.
+- Graph Engineering näyttää vain globaalin Luna Orchestratorin, valinnaisen Sol Repair Noden ja GraphNode-planeetat ilman PASS/FAIL-endpointteja. Graph Node näyttää vain valitun Graph Noden Luna Orchestratorin, valinnaisen Sol Repair Noden ja sen JobNode-planeetat ilman PASS/FAIL-endpointteja. Job Node näyttää vain aggregate Jobin Work- ja Validation-planeetat sekä mintun validate-yhteyden ja amber-retryn ilman PASS/FAIL-terminaaleja. PASS/FAIL säilyy domain- ja runtime-tuloksena, mutta sitä ei piirretä millekään näistä canvaseista. Foreign-scope-nodeja ei näytetä.
 - Graph- ja Graph Node -spoket kuvaavat authoroitujen candidate-sääntöjen sallittua membershipiä, eivät child-to-child Edgejä tai runtime-tuloksia. Work→Validation ja retry ovat ainoat kiinteät Job Node -canvasin sisäiset yhteydet.
 - Käytä deterministic multi-ring -layoutia, pan/zoomia ja kiinteää minimitekstikokoa. Hyväksymisfixturet ovat 1/5/40 GraphNodea ja 1/17/64 JobNodea; tavoite on nolla node-overlapia, nolla sivutason vaakaylivuotoa ja nolla leikattua ydintoimintoa desktop- ja narrow-viewporteissa.
 - Domain-, runtime-, schema-, reititys- tai terminologiamuutos ei oikeuta vaihtamaan avaruusteemaa tai lisäämään uutta shape-/palette-kieltä. Jos pakollinen semantiikka, saavutettavuus tai todistettu käytettävyysvika vaatii muutoksen, kirjaa perustelu, päivitä tarvittaessa `DESIGN.md` ja liitä desktop/narrow ennen/jälkeen-selain-QA.
@@ -61,3 +61,5 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - Tuote ei ole vielä tuotannossa, joten älä jätä legacy koodia, kun teet uusia ominaisuuksia tai muutat jo olemassa olevia ominaisuuksia. En halua, että koodiin jää painolastia.
 - Jos näet legacy koodia, pyri siivoamaan ne pois.
 - Pyri aina löytämään yksinkertainen ratkaisu, kunnioittaen clean code and clean architecture periaatteita.
+- Varmista lopuksi, että `make latest` menee onnituneesti läpi.
+- Varmista lopuksi, että `ballet` käynnistyy onnistuneesti. (vanhoja tietokantoja ei tarvitse säilyttää.)

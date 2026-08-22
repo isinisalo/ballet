@@ -19,7 +19,7 @@ const node = (id: string, role = "Graph Node"): SpaceCanvasNode => ({
 });
 
 describe("three-level engineering canvases", () => {
-  it("keeps the hub, repair, terminals and children in the Graph scope", async () => {
+  it("keeps the hub, repair and children in the Graph scope without result endpoints", async () => {
     const user = userEvent.setup();
     const openHub = vi.fn();
     const openRepair = vi.fn();
@@ -40,8 +40,8 @@ describe("three-level engineering canvases", () => {
     expect(openHub).toHaveBeenCalledOnce();
     expect(openRepair).toHaveBeenCalledOnce();
     expect(openChild).toHaveBeenCalledWith("build");
-    expect(screen.getByText("PASS")).toBeInTheDocument();
-    expect(screen.getByText("FAIL")).toBeInTheDocument();
+    expect(screen.queryByText("PASS")).not.toBeInTheDocument();
+    expect(screen.queryByText("FAIL")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Work Node/ })).not.toBeInTheDocument();
   });
 
@@ -63,8 +63,8 @@ describe("three-level engineering canvases", () => {
     expect(openValidation).toHaveBeenCalledOnce();
     expect(screen.getByText("VALIDATE")).toBeInTheDocument();
     expect(screen.getByText("RETRY")).toBeInTheDocument();
-    expect(screen.getByText("PASS")).toBeInTheDocument();
-    expect(screen.getByText("FAIL")).toBeInTheDocument();
+    expect(screen.queryByText("PASS")).not.toBeInTheDocument();
+    expect(screen.queryByText("FAIL")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Orchestrator/ })).not.toBeInTheDocument();
   });
 

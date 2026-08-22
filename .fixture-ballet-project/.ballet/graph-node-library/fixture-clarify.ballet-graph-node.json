@@ -1,0 +1,153 @@
+{
+  "format": "ballet-graph-node-module",
+  "version": 4,
+  "manifest": {
+    "id": "fixture-clarify",
+    "title": "Clarify requirements",
+    "description": "Clarify the fixture requirements.",
+    "version": "1.0.0",
+    "category": "fixture",
+    "tags": [
+      "fixture"
+    ]
+  },
+  "permissions": {
+    "network": "forbidden",
+    "externalWrites": false
+  },
+  "profileSlots": [
+    {
+      "key": "slot-1",
+      "title": "Codex GPT-5.6 Luna · Medium · Network off",
+      "description": "Compatible fixture profile.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "fixture-state",
+    "version": "1.0.0",
+    "description": "Bounded fixture state.",
+    "requiredKeys": []
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "fixture:requirements.requested"
+    ],
+    "provides": [
+      "fixture:requirements.clarified"
+    ],
+    "recommendedGraphRoutes": []
+  },
+  "resources": [
+    {
+      "kind": "instruction",
+      "key": "orchestrator",
+      "title": "Fixture Orchestrator",
+      "metadata": {},
+      "body": "Route only within the immutable fixture candidate set.\n"
+    }
+  ],
+  "graphNode": {
+    "key": "fixture-clarify",
+    "description": "Clarify the fixture requirements.",
+    "nodeStyle": "terra",
+    "nodeSize": "medium",
+    "capabilities": {
+      "accepts": [
+        "fixture:requirements.requested"
+      ],
+      "provides": [
+        "fixture:requirements.clarified"
+      ]
+    },
+    "stateContract": {
+      "description": "Bounded fixture state."
+    },
+    "orchestrator": {
+      "key": "orchestrator",
+      "description": "Select one fixture Job Node or terminal.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "profileSlot": "slot-1",
+      "primaryInstruction": "orchestrator",
+      "skills": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "key": "fixture-start",
+          "candidates": [
+            {
+              "target": {
+                "jobNode": "clarify"
+              },
+              "description": "Start the fixture Job Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "key": "clarify-pass",
+            "sourceJobNode": "clarify",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Complete the fixture Graph Node."
+              }
+            ]
+          },
+          {
+            "key": "clarify-fail",
+            "sourceJobNode": "clarify",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Fail the fixture Graph Node."
+              }
+            ]
+          }
+        ],
+        "repair": []
+      }
+    },
+    "jobNodes": [
+      {
+        "key": "clarify",
+        "description": "Clarify the fixture requirements.",
+        "nodeStyle": "terra",
+        "nodeSize": "medium",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "key": "clarify-work",
+          "type": "human",
+          "description": "Perform the fixture clarification.",
+          "task": "Clarify the fixture requirements.",
+          "nodeStyle": "terra",
+          "nodeSize": "medium"
+        },
+        "validationNode": {
+          "key": "clarify-validation",
+          "type": "human",
+          "description": "Validate the fixture clarification.",
+          "task": "Validate the fixture requirements.",
+          "nodeStyle": "luna",
+          "nodeSize": "small"
+        }
+      }
+    ]
+  }
+}

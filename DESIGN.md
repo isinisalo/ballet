@@ -31,7 +31,6 @@ colors:
   tertiary-container: '#ca8100'
   on-tertiary-container: '#3e2400'
   canvas-flow: '#76d4ca'
-  canvas-connection-point: '#e3fffb'
   space-void: '#08090b'
   luna-surface: '#87cdbc'
   luna-highlight: '#b9eee1'
@@ -178,7 +177,7 @@ The palette is dark-only. Do not expose light/system theme until this document c
 
 - **Primary / Electric Blue:** primary commands, selected navigation and focused fields.
 - **Secondary / Emerald:** running Work/Validation, PASS, healthy state and go-forward semantics.
-- **Canvas Flow / Mint:** all thin candidate spokelines and the fixed Work→Validation link. Use the brighter connection-point token for orbs. Always pair color with exact icon/text.
+- **Canvas Flow / Mint:** all thin candidate spokelines and the fixed Work→Validation link. Always pair connection semantics with exact icon/text where a connection is rendered.
 - **Tertiary / Amber:** IDs, warnings, queued/human-wait states, retry and repair attention.
 - **Error:** FAIL, blocked/failed Runs, invalid config and destructive actions only.
 - **Surfaces:** application `#0c0e11`, primary panels `#111316`, sidebar/compact headers `#1a1c1f`, elevated interactive surfaces `#1e2023`/`#282a2d`, subtle borders `#414755`.
@@ -205,14 +204,14 @@ Use Inter for interface text and Geist for identifiers, target enums, paths, tim
 
 ## Protected Three-Level Space Canvas Contract
 
-All three canvases use the same protected visual language: a dark 24px technical grid, code-native planet artwork, configured independent sizes/styles, restrained reasoning glow, amber exact-ID labels, thin 1.5px mint connections, bright connection points and static semantic highlights under `prefers-reduced-motion`.
+All three canvases use the same protected visual language: a dark 24px technical grid, code-native planet artwork, configured independent sizes/styles, restrained reasoning glow, amber exact-ID labels, thin 1.5px mint connections and static semantic highlights under `prefers-reduced-motion`. PASS/FAIL result endpoints are not rendered on these canvases.
 
 ### Graph Engineering
 
 - Center one globally scoped Luna Orchestrator artwork.
 - Show the optional Sol Repair Node visibly connected to the Orchestrator.
 - Arrange only GraphNode planets around the hub.
-- Show fixed PASS/FAIL connection points.
+- Do not render PASS/FAIL labels, connection points or endpoint spokes.
 - Spokes represent membership in authored start/continuation/repair candidate rules. They are not child-to-child Edges or runtime outcomes.
 - Activating a GraphNode navigates directly to its Graph Node route. Selecting Orchestrator or Repair opens the inspector.
 
@@ -220,7 +219,7 @@ All three canvases use the same protected visual language: a dark 24px technical
 
 - Center the selected GraphNode's Luna Orchestrator and show its optional Sol Repair Node.
 - Arrange only that GraphNode's JobNode planets around the hub; render zero peer/foreign GraphNodes or foreign Jobs.
-- Show PASS/FAIL connection points and candidate membership spokes.
+- Do not render PASS/FAIL labels, connection points or endpoint spokes; retain candidate membership spokes.
 - Activating a JobNode navigates directly to its Job Node route.
 
 ### Job Node
@@ -228,7 +227,7 @@ All three canvases use the same protected visual language: a dark 24px technical
 - Render separate Work and Validation planets with their own configured artwork.
 - Draw Work→Validation as a fixed mint validate link.
 - Draw Validation FAIL retry→Work as a fixed amber retry route and label its bounded retry semantics.
-- Show PASS/FAIL terminals as connection points, not executable nodes.
+- Do not render PASS/FAIL terminal labels, points or endpoint spokes.
 - Work and Validation selection open their settings/instructions. Job aggregate settings open from a compact header command.
 
 ## Canvas Layout & Interaction

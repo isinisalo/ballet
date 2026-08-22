@@ -31,7 +31,6 @@ export function SpaceEngineeringCanvas({ hub, repair, children, onHub, onRepair,
   const dragRef = useRef<{ x: number; y: number; left: number; top: number }>();
   const hubPoint = { x: layout.width / 2, y: layout.height / 2 };
   const repairPoint = { x: hubPoint.x + 130, y: hubPoint.y + 92 };
-  const terminalX = layout.width - 80;
   useCenterOnResize(scrollRef, layout.width, layout.height);
   const pointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
@@ -68,14 +67,10 @@ export function SpaceEngineeringCanvas({ hub, repair, children, onHub, onRepair,
             <svg className="pointer-events-none absolute inset-0" width={layout.width} height={layout.height} aria-hidden="true">
               {layout.nodes.map((node) => <line key={node.id} className="space-spoke" x1={hubPoint.x} y1={hubPoint.y} x2={node.x} y2={node.y} />)}
               {repair ? <line className="space-spoke space-spoke--repair" x1={hubPoint.x} y1={hubPoint.y} x2={repairPoint.x} y2={repairPoint.y} /> : null}
-              <line className="space-spoke" x1={hubPoint.x} y1={hubPoint.y} x2={terminalX} y2={hubPoint.y - 38} />
-              <line className="space-spoke" x1={hubPoint.x} y1={hubPoint.y} x2={terminalX} y2={hubPoint.y + 38} />
             </svg>
             <CanvasNodeButton node={hub} point={hubPoint} onClick={onHub} />
             {repair ? <CanvasNodeButton node={repair} point={repairPoint} onClick={() => onRepair?.()} /> : null}
             {layout.nodes.map((node) => <CanvasNodeButton key={node.id} node={node} point={node} onClick={() => onChild(node.id)} />)}
-            <div className="space-terminal" style={{ left: terminalX, top: hubPoint.y - 38 }}>PASS</div>
-            <div className="space-terminal" style={{ left: terminalX, top: hubPoint.y + 38 }}>FAIL</div>
           </div>
         </div>
       </div>
@@ -105,15 +100,11 @@ export function JobEngineeringCanvas({ work, validation, onWork, onValidation }:
           </defs>
           <line className="space-spoke" x1={workPoint.x + 52} y1={workPoint.y} x2={validationPoint.x - 52} y2={validationPoint.y} markerEnd="url(#mint-arrow)" />
           <path d={`M ${validationPoint.x} ${validationPoint.y + 62} C ${validationPoint.x} 430, ${workPoint.x} 430, ${workPoint.x} ${workPoint.y + 62}`} fill="none" stroke="var(--tertiary)" strokeWidth="1.5" strokeDasharray="8 7" markerEnd="url(#amber-arrow)" />
-          <line className="space-spoke" x1={validationPoint.x + 52} y1={validationPoint.y} x2={795} y2={235} />
-          <line className="space-spoke" x1={validationPoint.x + 52} y1={validationPoint.y} x2={795} y2={305} />
         </svg>
         <CanvasNodeButton node={work} point={workPoint} onClick={onWork} />
         <CanvasNodeButton node={validation} point={validationPoint} onClick={onValidation} />
         <div className="absolute font-mono text-[0.65rem] text-secondary" style={{ left: 428, top: 244 }}>VALIDATE</div>
         <div className="absolute font-mono text-[0.65rem] text-tertiary" style={{ left: 410, top: 410 }}>RETRY</div>
-        <div className="space-terminal" style={{ left: 830, top: 235 }}>PASS</div>
-        <div className="space-terminal" style={{ left: 830, top: 305 }}>FAIL</div>
       </div>
     </div>
   );

@@ -136,9 +136,9 @@ curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/data" -o "$SMOKE_ROOT/workspace.js
   printf 'packaged Ballet server could not load the fixture workspace\n' >&2
   exit 1
 }
-curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/loop-modules/library" -o "$SMOKE_ROOT/loop-library.json" || {
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/graph-node-modules/library" -o "$SMOKE_ROOT/graph-node-library.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
-  printf 'packaged Ballet server could not list the fixture Loop Library\n' >&2
+  printf 'packaged Ballet server could not list the fixture Graph Node Module library\n' >&2
   exit 1
 }
 "$RUNTIME/node" -e '
@@ -146,70 +146,56 @@ const fs = require("node:fs");
 const entries = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 if (!Array.isArray(entries)
   || entries.length !== 1
-  || entries[0]?.source !== ".ballet/loop-library/fixture-clarify.ballet-loop.json"
+  || entries[0]?.source !== ".ballet/graph-node-library/fixture-clarify.ballet-graph-node.json"
   || entries[0]?.valid !== true
   || entries[0]?.manifest?.title !== "Clarify requirements"
   || entries[0]?.permissions?.externalWrites !== false
-  || entries[0]?.package?.capabilities?.accepts?.[0] !== "arc42:initiative.requested"
-  || entries[0]?.package?.capabilities?.provides?.[0] !== "arc42:requirements.clarified"
-  || entries[0]?.package?.version !== 3
-  || !Array.isArray(entries[0]?.package?.capabilities?.recommendedTransitions)
-  || !Array.isArray(entries[0]?.package?.capabilities?.recommendedRepairs)
-  || entries[0]?.package?.loop?.workflow?.jobNodes?.length !== 2
-  || entries[0]?.package?.loop?.workflow?.validationNodes?.length !== 2) {
-  throw new Error("packaged Ballet server did not list the fixture Loop Library package");
+  || entries[0]?.package?.format !== "ballet-graph-node-module"
+  || entries[0]?.package?.version !== 4
+  || entries[0]?.package?.capabilities?.accepts?.[0] !== "fixture:requirements.requested"
+  || entries[0]?.package?.capabilities?.provides?.[0] !== "fixture:requirements.clarified"
+  || entries[0]?.package?.graphNode?.jobNodes?.length !== 1
+  || entries[0]?.package?.graphNode?.jobNodes?.[0]?.key !== "clarify") {
+  throw new Error("packaged Ballet server did not list the fixture Graph Node Module package");
 }
-' "$SMOKE_ROOT/loop-library.json"
+' "$SMOKE_ROOT/graph-node-library.json"
 "$RUNTIME/node" -e '
 const fs = require("node:fs");
 const workspace = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 const expectedProfile = {
-  id: "codex-gpt-5-6-luna-high-network-off",
-  name: "Codex GPT-5.6 Luna · High · Network off",
+  id: "codex-gpt-5-6-luna-medium-network-off",
+  name: "Codex GPT-5.6 Luna · Medium · Network off",
   provider: "codex",
   model: "gpt-5.6-luna",
-  reasoningEffort: "high",
+  reasoningEffort: "medium",
   networkAccess: false
 };
-const loop = workspace.automation?.loops?.[0];
-const jobNode = loop?.workflow?.jobNodes?.find((node) => node.id === "review");
-const validationNode = loop?.workflow?.validationNodes?.find((node) => node.id === "review-validation");
+const graphNode = workspace.automation?.graph?.graphNodes?.[0];
+const jobNode = graphNode?.jobNodes?.find((node) => node.id === "review-job");
+const workNode = jobNode?.workNode;
+const validationNode = jobNode?.validationNode;
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 13
-  || workspace.automation.loops.length !== 1
-  || loop?.id !== "adr-review"
-  || loop?.description !== "Review a project change and validate the review result."
-  || loop?.capabilities?.accepts?.[0] !== "ballet:task.requested"
-  || loop?.capabilities?.provides?.[0] !== "ballet:task.completed"
+if (workspace.automation?.version !== 14
+  || workspace.automation.graph?.graphNodes?.length !== 1
+  || graphNode?.id !== "review-node"
+  || graphNode?.description !== "Review the fixture project."
+  || graphNode?.capabilities?.accepts?.[0] !== "fixture:review.requested"
+  || graphNode?.capabilities?.provides?.[0] !== "fixture:review.completed"
   || workspace.automation.graph?.id !== "fixture-graph"
-  || workspace.automation.graph?.startLoopId !== "adr-review"
-  || !Array.isArray(workspace.automation.graph?.transitions)
-  || workspace.automation.graph.transitions.length !== 2
-  || !Array.isArray(workspace.automation.graph?.repairEdges)
-  || workspace.automation.graph.repairEdges.length !== 0
-  || loop?.workflow?.startJobNodeId !== "review"
-  || loop?.state?.description !== "Provider-neutral context shared by the review Workflow."
-  || JSON.stringify(loop?.state?.initial) !== "{}"
+  || workspace.automation.graph?.state?.description !== "Provider-neutral context shared by the fixture Graph."
+  || JSON.stringify(workspace.automation.graph?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || workspace.automation.orchestrator?.mode !== "runbook"
-  || workspace.automation.orchestrator?.maxTransitions !== 256
-  || jobNode?.description !== "Run and validate the project review."
-  || jobNode?.type !== "agent"
-  || jobNode?.task !== "Review the project changes and surface concrete risks."
-  || jobNode?.executionProfileId !== expectedProfile.id
-  || jobNode?.primaryInstructionId !== "project:reviewer"
-  || !Array.isArray(jobNode?.skillIds)
-  || jobNode.skillIds.length !== 0
-  || jobNode?.validationNodeId !== "review-validation"
+  || workspace.automation.graph?.orchestrator?.id !== "fixture-graph-orchestrator"
+  || workspace.automation.graph?.orchestrator?.maxTransitions !== 256
+  || jobNode?.description !== "Run and validate the fixture review."
+  || jobNode?.capabilities?.accepts?.length !== 0
+  || jobNode?.capabilities?.provides?.length !== 0
   || jobNode?.maxRetries !== 3
-  || validationNode?.type !== "agent"
-  || validationNode?.task !== "Confirm that the review is complete and actionable."
-  || loop?.workflow?.passEdges?.[0]?.sourceValidationNodeId !== "review-validation"
-  || loop?.workflow?.passEdges?.[0]?.target?.workflowResult !== "PASS"
-  || loop?.workflow?.failEdges?.[0]?.sourceValidationNodeId !== "review-validation"
-  || loop?.workflow?.failEdges?.[0]?.target?.workflowResult !== "FAIL"
-  || Object.hasOwn(jobNode, "state")
+  || workNode?.type !== "human"
+  || workNode?.task !== "Review the fixture project and surface concrete risks."
+  || validationNode?.type !== "human"
+  || validationNode?.task !== "Confirm that the fixture review is complete and actionable."
   || workspace.instructions?.length !== 2
   || architect?.valid !== true
   || architect?.relativePath !== ".ballet/instructions/architect.md"
@@ -225,10 +211,10 @@ if (workspace.automation?.version !== 13
   || reviewer?.sizeBytes !== 49
   || workspace.resourceIssues?.length !== 0
   || workspace.automationIssues?.length !== 0
-  || workspace.loopTheme?.version !== 4
-  || Object.hasOwn(workspace.loopTheme?.node ?? {}, "showAgentAvatarInNode")
-  || workspace.loopThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v13 Graph/Workflow fixture workspace");
+  || workspace.canvasTheme?.version !== 4
+  || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
+  || workspace.canvasThemeIssues?.length !== 0) {
+  throw new Error("packaged Ballet server did not load the strict v14 Graph/Graph Node fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
@@ -239,6 +225,13 @@ if (workspace.automation?.version !== 13
   printf 'packaged Ballet server did not create checkout-local state.sqlite\n' >&2
   exit 1
 }
+"$RUNTIME/node" -e '
+const Database = require("better-sqlite3");
+const database = new Database(process.argv[1], { readonly: true });
+const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
+database.close();
+if (version !== "10") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 10`);
+' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
   git -C "$SMOKE_ROOT/project" status --short >&2
   printf 'packaged Ballet server dirtied the fixture checkout\n' >&2

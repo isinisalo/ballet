@@ -82,7 +82,6 @@
   --section-heading: var(--ballet-on-surface-variant);
   --divider-strong: var(--ballet-outline-variant);
   --canvas-flow: #76d4ca;
-  --canvas-connection-point: #e3fffb;
   --chart-1: #adc6ff;
   --chart-2: #4edea3;
   --chart-3: #ffb95f;
@@ -212,27 +211,6 @@ body {
 .space-spoke--repair {
   stroke: var(--tertiary);
   stroke-dasharray: 5 7;
-}
-
-.space-terminal {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: var(--muted-foreground);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  transform: translate(-50%, -50%);
-}
-
-.space-terminal::before {
-  width: 0.75rem;
-  height: 0.75rem;
-  border: 1px solid var(--canvas-connection-point);
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--canvas-connection-point) 22%, var(--background));
-  box-shadow: 0 0 8px var(--canvas-connection-point);
-  content: "";
 }
 
 @keyframes space-node-pulse {

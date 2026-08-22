@@ -1,12 +1,12 @@
 {
-  "version": 13,
+  "version": 14,
   "executionProfiles": [
     {
-      "id": "codex-gpt-5-6-luna-high-network-off",
-      "name": "Codex GPT-5.6 Luna · High · Network off",
+      "id": "codex-gpt-5-6-luna-medium-network-off",
+      "name": "Codex GPT-5.6 Luna · Medium · Network off",
       "provider": "codex",
       "model": "gpt-5.6-luna",
-      "reasoningEffort": "high",
+      "reasoningEffort": "medium",
       "networkAccess": false
     }
   ],
@@ -16,99 +16,166 @@
     "orchestrationDirectory": ".tickets/orchestration",
     "workDirectory": ".tickets/work"
   },
-  "orchestrator": {
-    "mode": "runbook",
-    "maxTransitions": 256
-  },
   "graph": {
     "id": "fixture-graph",
     "name": "Fixture Graph",
-    "startLoopId": "adr-review",
-    "transitions": [
-      {
-        "id": "adr-review-success",
-        "source": "adr-review",
-        "decision": "PASS",
-        "outcome": "success",
-        "target": { "runResult": "DONE" },
-        "description": "Complete the fixture Graph."
-      },
-      {
-        "id": "adr-review-failure",
-        "source": "adr-review",
-        "decision": "FAIL",
-        "outcome": "failure",
-        "target": { "loopId": "adr-review" },
-        "description": "Retry the fixture Loop."
-      }
-    ],
-    "repairEdges": []
-  },
-  "loops": [
-    {
-      "id": "adr-review",
-      "description": "Review a project change and validate the review result.",
-      "state": {
-      "description": "Provider-neutral context shared by the review Workflow.",
-        "initial": {}
-      },
-      "capabilities": {
-        "accepts": [
-          "ballet:task.requested"
+    "state": {
+      "description": "Provider-neutral context shared by the fixture Graph.",
+      "initial": {}
+    },
+    "orchestrator": {
+      "id": "fixture-graph-orchestrator",
+      "description": "Route the fixture Graph from its Graph Node to a terminal.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+      "primaryInstructionId": "project:reviewer",
+      "skillIds": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "id": "fixture-graph-start",
+          "candidates": [
+            {
+              "target": {
+                "graphNodeId": "review-node"
+              },
+              "description": "Start the fixture Graph at its review Graph Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "id": "review-node-pass",
+            "sourceId": "review-node",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Complete the fixture Graph after a passing review."
+              }
+            ]
+          },
+          {
+            "id": "review-node-fail",
+            "sourceId": "review-node",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "End the fixture Graph after a failed review."
+              }
+            ]
+          }
         ],
-        "provides": [
-          "ballet:task.completed"
-        ]
-      },
-      "workflow": {
-        "startJobNodeId": "review",
+        "repair": []
+      }
+    },
+    "graphNodes": [
+      {
+        "id": "review-node",
+        "description": "Review the fixture project.",
+        "nodeStyle": "terra",
+        "nodeSize": "medium",
+        "capabilities": {
+          "accepts": [
+            "fixture:review.requested"
+          ],
+          "provides": [
+            "fixture:review.completed"
+          ]
+        },
+        "stateContract": {
+          "description": "Bounded fixture review references."
+        },
+        "orchestrator": {
+          "id": "review-node-orchestrator",
+          "description": "Route the fixture review Job Node to a terminal.",
+          "nodeStyle": "luna",
+          "nodeSize": "medium",
+          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+          "primaryInstructionId": "project:reviewer",
+          "skillIds": [],
+          "maxTransitions": 256,
+          "maxRouteAttempts": 3,
+          "routing": {
+            "start": {
+              "id": "review-node-start",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNodeId": "review-job"
+                  },
+                  "description": "Start the fixture review Job Node."
+                }
+              ]
+            },
+            "continuation": [
+              {
+                "id": "review-job-pass",
+                "sourceId": "review-job",
+                "result": "PASS",
+                "candidates": [
+                  {
+                    "target": {
+                      "terminal": "PASS"
+                    },
+                    "description": "Complete the fixture review."
+                  }
+                ]
+              },
+              {
+                "id": "review-job-fail",
+                "sourceId": "review-job",
+                "result": "FAIL",
+                "candidates": [
+                  {
+                    "target": {
+                      "terminal": "FAIL"
+                    },
+                    "description": "Fail the fixture review."
+                  }
+                ]
+              }
+            ],
+            "repair": []
+          }
+        },
         "jobNodes": [
           {
-            "id": "review",
-            "description": "Run and validate the project review.",
-            "validationNodeId": "review-validation",
-            "maxRetries": 3,
-            "type": "agent",
-            "task": "Review the project changes and surface concrete risks.",
-            "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
-            "primaryInstructionId": "project:reviewer",
-            "skillIds": [],
+            "id": "review-job",
+            "description": "Run and validate the fixture review.",
             "nodeStyle": "terra",
-            "nodeSize": "medium"
-          }
-        ],
-        "validationNodes": [
-          {
-            "id": "review-validation",
-            "description": "Validate Run and validate the project review.",
-            "type": "agent",
-            "task": "Confirm that the review is complete and actionable.",
-            "executionProfileId": "codex-gpt-5-6-luna-high-network-off",
-            "primaryInstructionId": "project:reviewer",
-            "skillIds": [],
-            "nodeStyle": "luna",
-            "nodeSize": "small"
-          }
-        ],
-        "passEdges": [
-          {
-            "id": "review-ok",
-            "sourceValidationNodeId": "review-validation",
-            "target": {
-              "workflowResult": "PASS"
-            }
-          }
-        ],
-        "failEdges": [
-          {
-            "id": "review-fail",
-            "sourceValidationNodeId": "review-validation",
-            "target": {
-              "workflowResult": "FAIL"
+            "nodeSize": "medium",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "maxRetries": 3,
+            "workNode": {
+              "id": "review-work",
+              "type": "human",
+              "description": "Perform the fixture review.",
+              "task": "Review the fixture project and surface concrete risks.",
+              "nodeStyle": "terra",
+              "nodeSize": "medium"
+            },
+            "validationNode": {
+              "id": "review-validation",
+              "type": "human",
+              "description": "Validate the fixture review.",
+              "task": "Confirm that the fixture review is complete and actionable.",
+              "nodeStyle": "luna",
+              "nodeSize": "small"
             }
           }
         ]
       }
-    }
-  ]
+    ]
+  }
 }

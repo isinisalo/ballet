@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023:n strict-v14 Graph/GraphNode/JobNode-domain, scoped agent routing, bounded Repair Node ja kolmitasoinen avaruuscanvas ovat accepted käyttäjän eksplisiittisen toteutusvaltuutuksen perusteella. ADR-023 supersedoi ADR-016/018/020/021/022:n Loop-, kaksinäkymä-, Edge-, schedule- ja deterministic RunBook -osuudet mutta säilyttää State-, snapshot-, worktree-, ihmisvaltuutus-, tracker/outbox- ja repair call/return -invariantit.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023:n strict-v14 Graph/GraphNode/JobNode-domain, scoped agent routing ja bounded Repair Node sekä ADR-024:n kolmitasoisen canvas-projektion tarkennus ovat accepted käyttäjän eksplisiittisen toteutusvaltuutuksen perusteella. ADR-023 supersedoi ADR-016/018/020/021/022:n Loop-, kaksinäkymä-, Edge-, schedule- ja deterministic RunBook -osuudet mutta säilyttää State-, snapshot-, worktree-, ihmisvaltuutus-, tracker/outbox- ja repair call/return -invariantit.
 
 ## Päätösindeksi
 
@@ -48,6 +48,7 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023:n strict-v14 Graph
 | adr-021 | accepted | Workflow Engineering canvas projection | [Workflow-canvas projisoi Validationin JobNoden sisään](../adr/adr-021-workflow-canvas-job-projektio.md) |
 | adr-022 | accepted | Strict-v13 named Graph RunBook, tracker reconciliation and five-Loop project default | [Deterministinen Graph Engineering RunBook ja kaksistoreinen tk-sovitus](../adr/adr-022-deterministinen-graph-engineering-runbook.md) |
 | adr-023 | accepted | Strict-v14 three-level Graph Node domain, scoped agent routing and bounded repair | [Kolmitasoinen Graph Node -domain ja agenttiohjattu reititys](../adr/adr-023-three-level-graph-node-orchestration.md) |
+| adr-024 | accepted | PASS/FAIL-result endpointsien canvas-projektio | [PASS/FAIL-result endpointsien canvas-projektio](../adr/adr-024-pass-fail-canvas-projektio.md) |
 
 ## Supersession-suhteet
 
@@ -93,6 +94,10 @@ adr-019:n repositoryn yksi arc42-output per Loop -oletusgranulariteetti
 adr-016/018/020/021/022:n aktiivinen Loop/Workflow/Edge/RunBook-raja
         └── osittain superseded by ──▶ adr-023
             State, immutable snapshot, worktree, ihmisvaltuutus, tracker/outbox ja repair call/return säilyvät
+
+adr-023:n PASS/FAIL-result endpointit kolmella authoring-canvaksella
+        └── osittain superseded by ──▶ adr-024
+            PASS/FAIL säilyy domain- ja runtime-tuloksena, mutta result-endpointteja ei piirretä
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -113,6 +118,7 @@ adr-016/018/020/021/022:n aktiivinen Loop/Workflow/Edge/RunBook-raja
 | adr-020, `ProjectWorkflow`, Pass/Fail Edget ja schedule | adr-023 | Aggregate JobNode omistaa Work/Validation-lapset ja bounded retryn; tasojen välinen dispatch kuuluu orchestratorille. Erilliset roolit, State patch, technical failure ja same-Validation-return säilyvät. |
 | adr-021, Validationin sisäinen Job-only canvas-projektio | adr-023 | Job Node -taso näyttää erilliset Work/Validation-planeetat ja fixed validate/retry-yhteydet. Avaruusteeman tokenit, artworkit, glow, amber-ID:t ja mint-yhteydet säilyvät. |
 | adr-022, exact named RunBook ja strict-v13/v3/v9 | adr-023 | Scoped agent routing strict candidate-enumista, Graph/GraphNode Runeista ja v14/v4/v10-versioista korvaa start/transitions/repairEdges/scheduled-run-rajan. Bounded State, snapshot, tracker/outbox, worktree, ihmisvaltuutus ja repair call/return säilyvät. |
+| adr-023, PASS/FAIL-result endpointit kolmella authoring-canvaksella | adr-024 | Graph Engineering-, Graph Node- ja Job Node -canvasit eivät piirrä PASS/FAIL-tekstejä, yhteyspisteitä tai endpoint-viivoja. Validation-, domain-, runtime- ja inspector-sopimukset säilyvät. |
 
 ## Päätösten käyttö
 
