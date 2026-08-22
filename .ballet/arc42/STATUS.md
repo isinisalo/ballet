@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 25
+version: 26
 tags:
   - arc42
   - status
@@ -21,22 +21,22 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 
 - `goal-001`–`goal-016` ovat accepted.
 - `goal-016`, `adr-026` ja `QS-021` hyväksyvät Graph-scopeen explicit `agent_v1 | ssp_v1` -strategian, proper-policy-semanticsin, fixed-point mallin ja v15/v8/v11 strict cutin.
-- `adr-023` omistaa säilyvän Graph/GraphNode/JobNode-domainin, GraphNode-scope agent routingin ja bounded Repair Noden. `adr-025` omistaa Job Node -authoringin industrial flow -projektion; Graph/Graph Node -avaruuscanvasit säilyvät.
+- `adr-023` omistaa säilyvän Graph/GraphNode/JobNode-domainin, GraphNode-scope agent routingin ja bounded Repair Noden. `adr-025` ja review-tilainen `adr-027` omistavat Job Node -authoringin industrial flow -projektion; Graph/Graph Node -avaruuscanvasit säilyvät.
 - Nykyinen hard cut on Project Config v15, Graph Node Module v4, Root Snapshot v8, Task Envelope/Outcome v7, composition v8, ExecutionSpec v9 ja SQLite v11. Compatibility-lukijoita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
 - Oletusprojekti sisältää viisi GraphNodea ja 17 aggregate JobNodea, joilla jokaisella on erillinen Work- ja Validation-lapsi. Viiden Graph Noden nimet ja arc42-/release-menettely ovat project-local-dataa.
 - Oletusprojekti käyttää Graph-scope `agent_v1`:ssä Luna/medium/network-off-profiilia; viisi paikallista GraphNode-orchestratoria käyttävät samaa profiilia ja globaalilla sekä jokaisella Graph Nodella on explicit Sol/medium/network-off Repair Node. `ssp_v1` ei kutsu Graph LLM:ää. Platform ei hardkoodaa malleja eikä GraphNode-nimiä eikä tee fallbackia.
 - Julkiset Run-rajat ovat Graph Run ja GraphNode Run. Standalone JobNode Run ja schedule on poistettu. GraphNode Run käyttää Graph-tasoa vain repair-eskalaatioon.
 - Canonical authoring-reitit ovat `/automation/graph`, `/automation/graph/nodes/:graphNodeId` ja `/automation/graph/nodes/:graphNodeId/jobs/:jobNodeId`; Run-reitit ovat `/run/graphs/:graphId` ja `/run/graph-nodes/:graphNodeId`.
-- Kaikki kolme canvasia käyttävät suojattua 24 px gridia ja samoja tokeneita. Graph/Graph Node käyttävät planet/multi-ring/spoke-kieltä; Job Node käyttää deterministic industrial flow'ta, jossa vain Work/Validation ovat valittavia ja Next job on disabled ghost.
+- Kaikki kolme canvasia käyttävät suojattua 24 px gridia ja samoja tokeneita. Graph/Graph Node käyttävät planet/multi-ring/spoke-kieltä; Job Node käyttää deterministic industrial flow'ta, jossa exact Work/Validation ID -kortit, Pass?/Retry?-junctionit, Retry count -ghost ja Continue/Escalate-ympyrät ovat näkyviä, mutta vain Work/Validation ovat valittavia.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat edelleen täsmällisen ihmisvaltuutuksen.
 
 ## Toteutettu fakta, evidenssi ja avoin riski
 
 | Luokka | Nykytila |
 | --- | --- |
-| Hyväksytty päätös | `goal-015` / `adr-023` määrittää kolmitasoisen domain/GraphNode-runtime-rajan, `adr-025` Job industrial flow -projektion ja `goal-016` / `adr-026` Graph strategy/policy -rajan. State-, snapshot-, worktree-, tracker/outbox-, ihmisvaltuutus- ja same-Validation repair-return -invariantit säilyvät. |
+| Hyväksytty päätös | `goal-015` / `adr-023` määrittää kolmitasoisen domain/GraphNode-runtime-rajan, `adr-025` ja review-tilainen `adr-027` Job industrial flow -projektion ja `goal-016` / `adr-026` Graph strategy/policy -rajan. State-, snapshot-, worktree-, tracker/outbox-, ihmisvaltuutus- ja same-Validation repair-return -invariantit säilyvät. |
 | Toteutettu fakta | Strict v15 domain/config, Snapshot v8, SQLite v11, agent/SSP strategy union, pure Decision State/admissibility/solver, append-only policy evidence, Graph/GraphNode Run services, 14 v4-pakettia ja kolme canonical routea löytyvät työpuusta. |
-| Paikallinen evidenssi | Aiempi TGNE-EVID-001–005 säilyy Graph/Graph Node -baseline-evidenssinä. ADR-025:n unit/component/integration-, full gate-, desktop/narrow-browser- ja installed-app-evidenssi on passed ja indeksoitu `job-node-industrial-flow-canvas`-initiativeen. |
+| Paikallinen evidenssi | Aiempi TGNE-EVID-001–005 säilyy Graph/Graph Node -baseline-evidenssinä. ADR-025/027:n unit/component/integration-, full gate-, desktop/narrow-browser- ja installed-app-evidenssi on kerätty ja indeksoitu `job-node-industrial-flow-canvas`-initiativeen. |
 | Avoin riski | Uuden Job-flow'n ihmisvisual verdict ja ensimmäinen tuotantokaltainen Luna/Sol-pilotti puuttuvat. Ne eivät valtuuta releasea tai external writea. |
 | Policy core | `stochastic-policy-orchestration` toteuttaa Capability Graph / Decision Model / Execution Graph -rajan, bounded Decision Staten, GraphNode Optionin, hard `A(s)`:n, explicit priors/costit, proper-policy value iterationin, structured Configure-editorin, bounded Policy Projectionin ja factual Run-trajectoryn. |
 | Policy evidence | SPO-EVID-000–006: human approval, arbitrary/full-rename schema, bounded sources, hard guard, solver, immutable snapshot, atomic SQLite evidence, outcome deviation, restart, full editor/projection sekä desktop/narrow browser QA. Max-bound/cross-host, human calibration/usability, cancel-race ja pilot ovat review-rajalla. |
@@ -47,7 +47,7 @@ Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY
 
 ## Relevantit päätökset
 
-`goal-015`, `goal-016`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025` ja `adr-026`.
+`goal-015`, `goal-016`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`, `adr-026` ja `adr-027`.
 
 ## Evidenssi
 

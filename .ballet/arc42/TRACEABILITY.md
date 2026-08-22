@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 21
+version: 22
 tags:
   - arc42
   - traceability
@@ -45,7 +45,7 @@ Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/his
 | goal-014 / REQ-014 | QS-017 | adr-021 / adr-022 / CON-005 / CON-009 | BB-001 / BB-002 / BB-009 | RT-010 / RT-012 / DEP-001 | TEST-017 | EVID-017 | technical/browser verified; human visual acceptance pending |
 | goal-014 / REQ-014 | QS-018 | adr-022 / CON-010 | BB-004 / BB-005 / BB-010 | RT-013 / DEP-002 / DEP-004 | TEST-018 | EVID-018 | hermetic verified; pinned live smoke pending |
 | goal-015 / REQ-015 | QS-019 | adr-023 / CON-002 / CON-003 / CON-011 | BB-003–BB-006 / BB-009 / BB-010 | RT-014 / RT-015 / DEP-002 | TEST-019 | EVID-019 | technical/conformance passed; live provider pilot open |
-| goal-015 / REQ-015 | QS-020 | adr-023 / adr-025 / CON-005 / CON-011 | BB-001 / BB-002 / BB-009 | RT-014 / DEP-001 | TEST-020 | EVID-020 | ADR-025 automated/browser/installed-app evidence passed; human visual verdict pending |
+| goal-015 / REQ-015 | QS-020 | adr-023 / adr-025 / adr-027 / CON-005 / CON-011 | BB-001 / BB-002 / BB-009 | RT-014 / DEP-001 | TEST-020 | EVID-020 | ADR-025/027 automated/browser/installed-app evidence passed; human visual verdict pending |
 | goal-002 / REQ-002; goal-006 / REQ-006; goal-007 / REQ-007; goal-016 / REQ-016 | QS-021 | adr-026 / CON-012 | BB-003–BB-005 / BB-011 | RT-009 / RT-010 / RT-016 / DEP-001 / DEP-002 | TEST-021 | EVID-021 | accepted generic core passed; full projection, max-bound benchmark, cancel-race stress and pilot pending |
 <!-- traceability:end -->
 
@@ -111,7 +111,7 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025` ja `adr-026` sekä historiallisten ketjujen ADR-017/020/021/022.
+`adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`, `adr-026` ja `adr-027` sekä historiallisten ketjujen ADR-017/020/021/022.
 
 ## Evidenssi
 

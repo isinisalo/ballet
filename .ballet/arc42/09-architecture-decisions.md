@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 18
+version: 19
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023/025:n domain/runtime/canvas-invariantit ja ADR-026:n Graph-scope explicit SSP/SMDP-policystrategia ovat active baseline.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023:n domain/runtime-invariantit, ADR-025/027:n Job Node -canvaspäätökset ja ADR-026:n Graph-scope explicit SSP/SMDP-policystrategia ovat active baseline; ADR-027 on review-tilassa.
 
 ## Päätösindeksi
 
@@ -51,6 +51,7 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023/025:n domain/runti
 | adr-024 | accepted | PASS/FAIL-result endpointsien canvas-projektio | [PASS/FAIL-result endpointsien canvas-projektio](../adr/adr-024-pass-fail-canvas-projektio.md) |
 | adr-025 | accepted | Job Node industrial flow -authoring-projektio | [Job Node authoring käyttää industrial flow -projektiota](../adr/adr-025-job-node-industrial-flow-canvas.md) |
 | adr-026 | accepted | Graph-scope finite SSP/SMDP policy strategy | [Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa](../adr/adr-026-stochastic-ssp-smdp-policy-orchestration.md) |
+| adr-027 | review | Job Node flow labels and terminal markers | [Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä](../adr/adr-027-job-node-flow-terminal-markers.md) |
 
 ## Supersession-suhteet
 
@@ -105,6 +106,10 @@ adr-023/024:n Job Node -planet/result-projektio
         └── osittain superseded by ──▶ adr-025
             Graph/Graph Node säilyvät ennallaan; Job käyttää read-only industrial flow -projektiota
 
+adr-025:n Job Node -flow'n näkyvät label-, terminal- ja parent-scope-reference-elementit
+        └── osittain superseded by ──▶ adr-027
+            exact Work/Validation ID -kortit, Pass?/Retry?-junctionit, Retry count -ghost sekä Continue/Escalate-ympyrät; runtime- ja routing-invariantit säilyvät
+
 adr-023:n Graph-scope LLM-only routing
         └── osittain superseded by ──▶ adr-026
             explicit agent_v1 | ssp_v1; GraphNode/Job/repair/snapshot/worktree-invariantit säilyvät
@@ -130,6 +135,7 @@ adr-023:n Graph-scope LLM-only routing
 | adr-022, exact named RunBook ja strict-v13/v3/v9 | adr-023 | Scoped agent routing strict candidate-enumista, Graph/GraphNode Runeista ja v14/v4/v10-versioista korvaa start/transitions/repairEdges/scheduled-run-rajan. Bounded State, snapshot, tracker/outbox, worktree, ihmisvaltuutus ja repair call/return säilyvät. |
 | adr-023, PASS/FAIL-result endpointit kolmella authoring-canvaksella | adr-024 | Graph Engineering-, Graph Node- ja Job Node -canvasit eivät piirrä PASS/FAIL-tekstejä, yhteyspisteitä tai endpoint-viivoja. Validation-, domain-, runtime- ja inspector-sopimukset säilyvät. |
 | adr-023/024, Job Node -planet-projektio ja result-tekstikielto | adr-025 | Job Node projisoi Work/Validationin industrial flow -kortteina sekä näyttää read-only result/retry/orchestrator/exit-rakenteen; Graph/Graph Node -planetit ja ADR-024:n result-raja säilyvät. Runtime routing ja versiot eivät muutu. |
+| adr-025, Job Node -flow'n näkyvät label-, terminal- ja parent-scope-reference-elementit | adr-027 | Job Node näyttää exact Work/Validation ID:t, Pass?/Retry?-junctionit, Retry count -ghostin sekä Continue/Escalate-ympyrät; Graph Node Orchestrator ja Next job eivät renderöidy. Runtime-, candidate-, config-, API-, module-, snapshot- ja persistence-sopimukset säilyvät. |
 | adr-023, Graph-scope LLM-only routing | adr-026 | Graph valitsee explicit `agent_v1 | ssp_v1`; SSP käyttää bounded Decision Statea, GraphNode Optioneita, hard admissibilityä, explicit transition/cost/terminal-mallia ja proper-policy solveria. GraphNode-scope, Job-invariantit ja repair säilyvät. |
 
 ## Päätösten käyttö

@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 17
+version: 18
 tags:
   - arc42
   - building-blocks
@@ -73,7 +73,7 @@ flowchart LR
 | Workspace route state | Jäsentää canonical Configure/Run-reitit, breadcrumbin ja browser back/forwardin. | URL omistaa aktiivisen Graph-, GraphNode- tai JobNode-scopen; inspector selection on ephemeral. | `frontend/src/workspace/routing.ts`, `WorkspaceRouteOutlet.tsx` |
 | Graph Engineering | Projisoi globaalin Luna Orchestratorin, optional Sol Repair Noden, GraphNode-planeetat ja candidate-spoket ilman result-endpointteja. | Sisältää 0 Job/Work/Validation-nodea. | `AutomationView.tsx`, `EngineeringShell.tsx`, `SpaceEngineeringCanvas.tsx` |
 | Graph Node | Projisoi vain valitun Graph Noden orchestratorin, repairin ja JobNode-planeetat. | Sisältää 0 peer-GraphNodea ja 0 toisen Graph Noden Jobia. | `EngineeringShell.tsx`, `SpaceEngineeringCanvas.tsx` |
-| Job Node | Projisoi Start/Work/Validation/result/retry/orchestrator/Next job/Done/Escalate -industrial flow'n. | Vain Work/Validation ovat valittavia; Next job on disabled ghost ja muut flow-merkit read-only. Runtime routing ei muutu. | `JobFlowCanvas.tsx`, `jobFlowProjection.ts`, `EngineeringInspector.tsx` |
+| Job Node | Projisoi Start/Work ID/Validation ID/Pass?/Retry?/Retry count/Continue/Escalate -industrial flow'n. Pass?/Retry? sekä Continue/Escalate ovat omilla yhteisillä tasoillaan. | Vain Work/Validation ovat valittavia; Retry count on vasemmalla leijuva visuaalinen ghost ja retry-edge kiertää sen suoraan Workiin. Graph Node Orchestrator omistaa runtime routingin, mutta sitä ei renderöidä Job-canvasissa. | `JobFlowCanvas.tsx`, `jobFlowProjection.ts`, `EngineeringInspector.tsx` |
 | Inspector/Sheet | Näyttää orchestrator-, repair-, Work-, Validation- tai Job-asetukset ja instructionit. | 22–24rem desktop inspector; narrow-viewportissa sama sisältö Sheetissä. | `EngineeringInspector.tsx`, `EngineeringShell.tsx` |
 
 Kaikki canvasit käyttävät tummaa 24 px gridia ja reduced-motionia. Graph/Graph Node säilyttävät project theme -planet-artworkit, reasoning glow'n, amber-ID:t, 1.5 px mint-spoket, connection pointit ja deterministic multi-ring/pan/zoom-layoutin 1/5/40 GraphNode- sekä 1/17/64 JobNode-fixtureille. Job käyttää deterministic wide/narrow-flow-layoutia, jossa normal/retry/fail-yhteydet ja ghost/read-only-tilat ovat eksplisiittisiä. Spoke kuvaa authoroidun candidate-säännön membershipiä; Job-flow ei kirjoita candidatea.
@@ -112,11 +112,11 @@ Kaikki canvasit käyttävät tummaa 24 px gridia ja reduced-motionia. Graph/Grap
 
 ## Kanoniset lähteet
 
-Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-023` omistaa säilyvän domain/runtime-vastuurajan, `adr-025` Job-canvasprojektion, `adr-026` BB-011:n, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
+Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-023` omistaa säilyvän domain/runtime-vastuurajan, `adr-025` ja `adr-027` Job-canvasprojektion, `adr-026` BB-011:n, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025` ja `adr-026`.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-027` ja `adr-026`.
 
 ## Evidenssi
 

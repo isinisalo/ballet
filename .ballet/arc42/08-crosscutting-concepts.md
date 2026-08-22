@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 15
+version: 16
 tags:
   - arc42
   - concepts
@@ -35,7 +35,7 @@ CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CO
 | CON-008 | Workflow structural integrity: jokainen Job omistaa yhden Validationin, jokaisella Validationilla on yksi PassEdge ja FailEdge, Jobit ovat saavutettavia ja vähintään yksi PASS-tulos saavutetaan; validate/retry ovat kiinteitä runtime-siirtymiä. Canvas projisoi parin yhdeksi Job-artworkiksi ja vain persisted Edget. | BB-001, BB-003–BB-006, BB-009 | QS-003, QS-009, QS-015 | ADR-020, ADR-021, project/workflow schema, Workflow runtime ja canvas |
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
-| CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää parent-orchestratorin vain read-only-junctionina. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
+| CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää Work/Validation-, retry- ja terminaalimerkit; Graph Node Orchestrator omistaa routingin ilman Job-canvasin parent-junctionia. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, ADR-027, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
 | CON-012 | Finite policy boundary: Capability Graph omistaa possible actions/hard topology; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa explicit transitions/cost/terminals; policy solver tuottaa Q/V/actionin; Policy Projection on derived read-only evidence ja Execution Graph factual samples. Hard controls poistavat actionin `A(s)`:stä, probabilityt eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011 | QS-002, QS-012, QS-013, QS-021 | ADR-026, config v15/snapshot v8/SQLite v11, RT-016 |
 
 ## Turvallisuus ja auktorisointi
@@ -106,8 +106,8 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 ## UI:n totuusperiaate
 
 - `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
-- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | job_node`: Graph Engineering näyttää globaalin Orchestratorin/Repairin ja vain GraphNode-planeetat; Graph Node näyttää paikallisen Orchestratorin/Repairin ja vain parentin JobNode-planeetat; Job Node näyttää Work/Validationin industrial flow'ssa sekä read-only entry/result/retry/orchestrator/exit-rakenteen.
-- Job-flow'n `Next job` on aina disabled placeholder, read-only Orchestrator näyttää exact ID:n ja vain Work/Validation avaavat inspectorin. Nämä elementit eivät ole candidate-, topology- tai runtime-kirjoituksia.
+- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | job_node`: Graph Engineering näyttää globaalin Orchestratorin/Repairin ja vain GraphNode-planeetat; Graph Node näyttää paikallisen Orchestratorin/Repairin ja vain parentin JobNode-planeetat; Job Node näyttää Work/Validation ID -kortit, samalla tasolla olevat Pass?/Retry?-junctionit, vasemmalla leijuvan Retry count -ghostin ja samalla tasolla olevat Continue/Escalate-terminaalimerkit.
+- Job-flow ei renderöi Next job -targetia eikä Graph Node Orchestrator -junctionia. Vain Work/Validation avaavat inspectorin; kaikki muut merkit ovat ei-interaktiivisia eivätkä ole candidate-, topology- tai runtime-kirjoituksia.
 - Spoke kuvaa authoroidun candidate-jäsenyyden, ei child-to-child Edgeä. Layout tai valinta ei omista topologiaa eikä foreign-scope-nodea näytetä.
 - Run-projektio näyttää Graph- tai GraphNode-Rootin immutable snapshotin ja canonical positionin ilman standalone JobNode Runia.
 - Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
@@ -130,7 +130,7 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025` ja `adr-026`.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-027` ja `adr-026`.
 
 ## Evidenssi
 

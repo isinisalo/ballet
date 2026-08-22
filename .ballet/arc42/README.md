@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 16
+version: 17
 tags:
   - arc42
   - architecture
@@ -58,7 +58,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Workflow Engineering initiative](initiatives/workflow-engineering/BRIEF.md): accepted `goal-013` / `adr-020` / `adr-021` -päätösrajan draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju; strict-v12/v2-tekninen evidenssi ja Job-only canvas-korjaus arvioidaan erikseen, final gate ja ihmisacceptance ovat pending.
 - [Graph Engineering RunBook initiative](initiatives/graph-engineering-runbook/BRIEF.md): accepted `goal-014` / `adr-022` -rajan strict-v13/V3-, tracker-, viiden Loopin data-, Graph UI- ja conformance-evidenssi.
 - [Three-level Graph Node Engineering initiative](initiatives/three-level-graph-node-engineering/BRIEF.md): accepted `goal-015` / `adr-023` -rajan strict-v14/V4/V10-, scoped routing/repair-, kolmen canvasin ja conformance-evidenssi.
-- [Job Node industrial flow canvas initiative](initiatives/job-node-industrial-flow-canvas/BRIEF.md): accepted `adr-025` -päätöksen bounded UI-, a11y-, desktop/narrow- ja conformance-evidenssi ilman runtime-sopimusmuutosta.
+- [Job Node industrial flow canvas initiative](initiatives/job-node-industrial-flow-canvas/BRIEF.md): accepted `adr-025` ja review-tilaisen `adr-027`:n bounded UI-, a11y-, desktop/narrow- ja conformance-evidenssi ilman runtime-sopimusmuutosta.
 - [Stochastic Policy Orchestration initiative](initiatives/stochastic-policy-orchestration/BRIEF.md): accepted `goal-016` / `adr-026` finite SSP/SMDP Graph-policy; core implementation evidence on kerätty ja projection/pilot/conformance ovat review-rajalla.
 
 ## Kanoninen omistajuus
@@ -80,7 +80,7 @@ Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `
 
 ## Relevantit päätökset
 
-`goal-009`–`goal-016`, `adr-011`, `adr-013`–`adr-016`, `adr-023`, `adr-025` ja `adr-026`.
+`goal-009`–`goal-016`, `adr-011`, `adr-013`–`adr-016`, `adr-023`, `adr-025`–`adr-027` ja `adr-026`.
 
 ## Evidenssi
 

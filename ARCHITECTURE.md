@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 17
+version: 18
 tags:
   - architecture
   - arc42
@@ -27,7 +27,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - Nykyinen baseline on strict project config v15, Graph Node Module v4, Root Execution Snapshot v8, Task Envelope / node outcome v7, ExecutionSpec v9 / composition v8 ja SQLite schema v11. Compatibility-readereita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
 - `ProjectGraphNode` omistaa scoped orchestrator/repairin ja aggregate JobNodet. JobNode omistaa Work/Validation-lapset ja bounded retryn. Globaali ja paikalliset orchestratorit käyttävät project-datan Luna/medium/network-off-profiilia; Repair Nodet Sol/medium/network-off-profiilia. Platform ei hardkoodaa mallia eikä tee fallbackia.
 - `agent_v1` kutsuu Graph Orchestratoria Graph Runin alussa ja GraphNode-tulosten jälkeen. `ssp_v1` projisoi samoissa decision epocheissa bounded Decision Staten, muodostaa hard `A(s)`:n ja ratkaisee snapshottatun finite proper SSP-policyn. Molemmat käyttävät Graph Node Orchestratoria GraphNode-ajon sisällä; Work→Validation, retry ja bounded same-Validation repair säilyvät.
-- Authoring-UI käyttää kolmea canonical canvas-routea: Graph Engineering ja Graph Node säilyttävät planet/multi-ring-avaruusprojektion, Job Node käyttää ADR-025:n industrial flow -projektiota. URL omistaa hierarkian ja browser historyn; Job-flow ei muuta runtime routingia.
+- Authoring-UI käyttää kolmea canonical canvas-routea: Graph Engineering ja Graph Node säilyttävät planet/multi-ring-avaruusprojektion, Job Node käyttää ADR-025:n ja sitä täsmentävän ADR-027:n industrial flow -projektiota. URL omistaa hierarkian ja browser historyn; Job-flow ei muuta runtime routingia.
 - Root Runin Graph/GraphNode-projektio ja live inspector tulevat canonical snapshot/persistencestä eivätkä muodosta uutta control statea. Standalone JobNode Run ja schedule eivät kuulu aktiiviseen malliin.
 - `comprehensive-arc42-documentation` on draft-initiative, kunnes projektin omistaja arvioi sen EVIDENCE/REVIEW-ketjun.
 
@@ -54,7 +54,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Relevantit päätökset
 
-`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` säilyttää State-, repair- ja continuation-invariantit. `adr-016` säilyttää package trust/materialisointi -periaatteen. `adr-023` omistaa nykyisen domain-, routing-, repair-, version- ja module-rajan; `adr-025` omistaa Job Node -canvasin industrial flow -projektion muuttamatta näitä runtime-invariantteja.
+`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` säilyttää State-, repair- ja continuation-invariantit. `adr-016` säilyttää package trust/materialisointi -periaatteen. `adr-023` omistaa nykyisen domain-, routing-, repair-, version- ja module-rajan; `adr-025` ja `adr-027` omistavat Job Node -canvasin industrial flow -projektion muuttamatta näitä runtime-invariantteja.
 
 ## Evidenssi
 

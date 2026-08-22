@@ -113,7 +113,6 @@ export function AutomationView({ data, level, graphNodeId, jobNodeId, saveAutoma
             onChild={(id) => navigate(automationJobNodePath(graphNode.id, id))}
           /> : level === "job_node" && graphNode && jobNode ? <JobFlowCanvas
             job={jobNode}
-            orchestratorId={graphNode.orchestrator.id}
             selected={selection === "work" || selection === "validation" ? selection : undefined}
             locked={graphNodeRunActive}
             onWork={() => setSelection("work")}

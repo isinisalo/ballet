@@ -19,11 +19,11 @@ describe("Automation Job flow integration", () => {
       setNavigationBlocker={vi.fn()}
     />);
 
-    await user.click(screen.getByRole("button", { name: "Take action, Work Node · work" }));
+    await user.click(screen.getByRole("button", { name: "Work Node, work" }));
     const workInspector = screen.getByRole("complementary", { name: "Take action inspector" });
     expect(within(workInspector).getByText("Work Node · work")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Verify Result, Validation Node · validation" }));
+    await user.click(screen.getByRole("button", { name: "Validation Node, validation" }));
     const validationInspector = screen.getByRole("complementary", { name: "Verify Result inspector" });
     expect(within(validationInspector).getByText("Validation Node · validation")).toBeInTheDocument();
   });
@@ -41,7 +41,7 @@ describe("Automation Job flow integration", () => {
       setNavigationBlocker={vi.fn()}
     />);
 
-    await user.click(screen.getByRole("button", { name: "Take action, Work Node · work" }));
+    await user.click(screen.getByRole("button", { name: "Work Node, work" }));
     expect(await screen.findByRole("button", { name: "Close" })).toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Take action inspector" })).not.toBeInTheDocument();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
@@ -61,7 +61,7 @@ describe("Automation Job flow integration", () => {
       setNavigationBlocker={vi.fn()}
     />);
 
-    await user.click(screen.getByRole("button", { name: /Take action, Work Node · work/ }));
+    await user.click(screen.getByRole("button", { name: /Work Node, work/ }));
     const inspector = screen.getByRole("complementary", { name: "Take action inspector" });
     expect(within(inspector).getByText("Locked while an active Run uses this snapshot.")).toBeInTheDocument();
     expect(within(inspector).getByLabelText("Description")).toBeDisabled();

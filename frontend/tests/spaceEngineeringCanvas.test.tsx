@@ -52,15 +52,14 @@ describe("three-level engineering canvases", () => {
     const openValidation = vi.fn();
     render(<JobFlowCanvas
       job={jobNode()}
-      orchestratorId="graph-node-orchestrator"
       selected="work"
       locked={false}
       onWork={openWork}
       onValidation={openValidation}
     />);
 
-    const work = screen.getByRole("button", { name: "Take action, Work Node · work" });
-    const validation = screen.getByRole("button", { name: "Verify Result, Validation Node · validation" });
+    const work = screen.getByRole("button", { name: "Work Node, work" });
+    const validation = screen.getByRole("button", { name: "Validation Node, validation" });
     expect(work).toHaveAttribute("aria-pressed", "true");
     await user.tab();
     expect(work).toHaveFocus();
@@ -71,12 +70,20 @@ describe("three-level engineering canvases", () => {
 
     expect(openWork).toHaveBeenCalledOnce();
     expect(openValidation).toHaveBeenCalledOnce();
-    expect(screen.getByLabelText("Start, Job entry")).toBeInTheDocument();
-    expect(screen.getByLabelText("Graph Node Orchestrator, graph-node-orchestrator")).toBeInTheDocument();
-    expect(screen.getByLabelText("Next job, Not configured")).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByLabelText("Done, Complete Graph Node · PASS")).toBeInTheDocument();
-    expect(screen.getByLabelText("Escalate, Graph Node Orchestrator")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Next job|Done|Escalate|Orchestrator/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Start")).toBeInTheDocument();
+    expect(screen.getByLabelText("Retry count 2")).toBeInTheDocument();
+    expect(screen.getByText("Retry count 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Pass?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Retry?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Continue")).toBeInTheDocument();
+    expect(screen.getByLabelText("Escalate")).toBeInTheDocument();
+    expect(screen.queryByText("Take action")).not.toBeInTheDocument();
+    expect(screen.queryByText("Verify Result")).not.toBeInTheDocument();
+    expect(screen.queryByText("Graph Node Orchestrator")).not.toBeInTheDocument();
+    expect(screen.queryByText("Next job")).not.toBeInTheDocument();
+    expect(screen.queryByText("Done")).not.toBeInTheDocument();
+    expect(screen.queryByText("PASS / FAIL")).not.toBeInTheDocument();
+    expect(screen.queryByText("Retries left?")).not.toBeInTheDocument();
     expect(screen.queryByText("Human gate")).not.toBeInTheDocument();
   });
 

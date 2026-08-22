@@ -4,7 +4,7 @@ title: Job Node industrial flow canvas PLAN
 status: draft
 createdAt: '2026-08-22'
 updatedAt: '2026-08-22'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -15,10 +15,10 @@ tags:
 
 | Step ID | Goal/REQ | QS | ADR/CON | BB | RT/DEP | Files/interfaces | Test/monitor | Completion evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| jnifc-step-001 | goal-015 / REQ-015 | QS-020 | adr-025 / CON-005 | BB-001 | DEP-001 | pure Job flow projection and shared Work/Validation schema exports | projection unit tests | JNIFC-EVID-001 |
-| jnifc-step-002 | goal-015 / REQ-015 | QS-020 | adr-025 / CON-005 / CON-011 | BB-001 | RT-014 | Job flow renderer, selection, inspector/Sheet and token CSS | component/integration tests | JNIFC-EVID-002 |
-| jnifc-step-003 | goal-015 / REQ-015 | QS-020 | adr-025 / CON-005 | BB-001 / BB-008 | DESIGN, AGENTS, ADR and arc42 trace | arc42/design/conformance checks | JNIFC-EVID-003 |
-| jnifc-step-004 | goal-015 / REQ-015 | QS-020 | adr-025 / CON-005 | BB-001 / BB-002 | desktop/narrow browser, full gates and installed app smoke | browser QA + build/install/status | JNIFC-EVID-004 |
+| jnifc-step-001 | goal-015 / REQ-015 | QS-020 | adr-025 / adr-027 / CON-005 | BB-001 | DEP-001 | pure Job flow projection, exact ID labels, aligned junctions and direct retry edge | projection unit tests | JNIFC-EVID-001 / JNIFC-EVID-005 |
+| jnifc-step-002 | goal-015 / REQ-015 | QS-020 | adr-025 / adr-027 / CON-005 / CON-011 | BB-001 | RT-014 | Job flow renderer, visible ID-only cards, selection, inspector/Sheet and token CSS | component/integration tests | JNIFC-EVID-002 / JNIFC-EVID-005 |
+| jnifc-step-003 | goal-015 / REQ-015 | QS-020 | adr-025 / adr-027 / CON-005 | BB-001 / BB-008 | DESIGN, ADR and arc42 trace | arc42/design/conformance checks | JNIFC-EVID-003 / JNIFC-EVID-005 |
+| jnifc-step-004 | goal-015 / REQ-015 | QS-020 | adr-025 / adr-027 / CON-005 | BB-001 / BB-002 | desktop/narrow browser, full gates and installed app smoke | browser QA + build/install/status | JNIFC-EVID-004 / JNIFC-EVID-005 |
 
 ## Järjestys ja yhteensopivuus
 

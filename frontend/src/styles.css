@@ -334,6 +334,15 @@ body {
   white-space: nowrap;
 }
 
+.job-flow-card--action .job-flow-copy strong {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .job-flow-copy small {
   overflow: hidden;
   color: var(--muted-foreground);
@@ -344,11 +353,33 @@ body {
   white-space: nowrap;
 }
 
-.job-flow-card--start { width: 7rem; border-color: color-mix(in srgb, var(--primary) 58%, var(--divider-strong)); }
-.job-flow-card--orchestrator { width: 11rem; min-height: 4.5rem; border-color: color-mix(in srgb, var(--canvas-flow) 56%, var(--divider-strong)); }
-.job-flow-card--escalate { border-color: color-mix(in srgb, var(--destructive) 68%, var(--divider-strong)); }
-.job-flow-card--done { border-color: color-mix(in srgb, var(--secondary) 68%, var(--divider-strong)); }
-.job-flow-card--ghost {
+.job-flow-card--start,
+.job-flow-card--escalate,
+.job-flow-card--continue {
+  width: 4rem;
+  height: 4rem;
+  min-height: 4rem;
+  padding: 0;
+  border-radius: 9999px;
+}
+
+.job-flow-card--start {
+  border-color: color-mix(in srgb, var(--primary) 58%, var(--divider-strong));
+  background: color-mix(in srgb, var(--primary) 20%, var(--card));
+}
+
+.job-flow-card--escalate {
+  border-color: color-mix(in srgb, var(--destructive) 68%, var(--divider-strong));
+  background: color-mix(in srgb, var(--destructive) 18%, var(--card));
+}
+
+.job-flow-card--continue {
+  border-color: color-mix(in srgb, var(--secondary) 68%, var(--divider-strong));
+  background: color-mix(in srgb, var(--secondary) 18%, var(--card));
+}
+
+.job-flow-card--retry-count {
+  width: 8rem;
   border-style: dashed;
   border-color: var(--outline);
   background: var(--ballet-surface-lowest);
@@ -394,10 +425,11 @@ body {
 
 .job-flow-edge[data-dashed="true"] { stroke-dasharray: 7 6; }
 .job-flow-edge--flow { stroke: var(--canvas-flow); }
-.job-flow-edge--retry { stroke: var(--tertiary); }
+.job-flow-edge--retry { stroke: var(--canvas-flow); }
 .job-flow-edge--fail { stroke: var(--destructive); }
+.job-flow-edge--neutral { stroke: var(--outline); }
 .job-flow-marker--flow { fill: var(--canvas-flow); }
-.job-flow-marker--retry { fill: var(--tertiary); }
+.job-flow-marker--retry { fill: var(--canvas-flow); }
 .job-flow-marker--fail { fill: var(--destructive); }
 
 .job-flow-edge-label {
@@ -408,7 +440,7 @@ body {
 }
 
 .job-flow-edge-label--flow { fill: var(--secondary); }
-.job-flow-edge-label--retry { fill: var(--tertiary); }
+.job-flow-edge-label--retry { fill: var(--canvas-flow); }
 .job-flow-edge-label--fail { fill: var(--destructive); }
 
 @keyframes space-node-pulse {
