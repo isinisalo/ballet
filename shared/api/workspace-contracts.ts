@@ -1,309 +1,131 @@
-// This is the single frontend/backend contract barrel. Keeping the related
-// domain exports here avoids duplicate DTO shapes in the application layers.
 export {
   controlFlowEventSchema,
-  loopStateRevisionMetadataSchema,
-  orchestrationFrameSchema,
-  orchestrationRequestSchema,
-  orchestratorRouteSchema,
+  graphStateRevisionMetadataSchema,
+  nodeRunResponseBodySchema,
+  repairFrameSchema,
   repairRequestSchema,
   repairResultSchema,
-  respondToNodeRunBodySchema,
   rootRunListQuerySchema,
   rootRunOrchestrationProjectionSchema,
   rootRunRepairProjectionSchema,
-  rootRunReturnDestinationSchema,
   rootRunStateProjectionSchema,
+  routingDecisionSchema,
+  routingRequestSchema,
   validationNodeOutcomeSchema,
-  jobNodeOutcomeSchema,
+  workNodeOutcomeSchema,
   workspaceInvalidationEventSchema
 } from "./runtime-schemas.js";
+
 import type {
-  JsonValue,
-  WorkflowResult,
-  ProjectAutomationConfig,
-  ProjectAutomationIssue,
-  ProjectAgentValidationNode,
-  ProjectAgentJobNode,
-  ProjectExecutionComposition,
-  ProjectGraph,
-  ProjectHumanValidationNode,
-  ProjectHumanJobNode,
-  ProjectLoop,
-  ProjectLoopCapabilities,
-  ProjectGraphTransition,
-  ProjectRepairEdge,
-  ProjectLoopOrchestrator,
-  ProjectLoopRepairRouter,
-  ProjectLoopState,
-  ProjectNodeAppearance,
-  ProjectFailEdge,
-  ProjectJobNode,
-  ProjectPassEdge,
-  ProjectPassEdgeTarget,
-  ProjectProviderJobNode,
-  ProjectScheduledJobNode,
-  ProjectValidationNode,
-  ProjectWorkflow,
-  ReachableProjectLoopGraph,
-  LoopNodeSize,
-  LoopNodeSizeDefinition,
-  LoopNodeStyle,
-  LoopNodeStyleDefinition,
-  LoopNodeStyleGroup,
-  ProjectOnceJobSchedule,
-  ProjectRecurringJobSchedule,
-  ProjectScheduleCadence,
-  ProjectScheduleWeekday,
-  ProjectJobSchedule
+  CanvasNodeSize, CanvasNodeSizeDefinition, CanvasNodeStyle, CanvasNodeStyleDefinition, CanvasNodeStyleGroup,
+  JsonValue, NodeResult, ProjectAgentValidationNode, ProjectAgentWorkNode, ProjectAutomationConfig,
+  ProjectAutomationIssue, ProjectCandidateRouting, ProjectContinuationCandidateRule, ProjectExecutionComposition,
+  ProjectGraph, ProjectGraphNode, ProjectGraphNodeRouteTarget, ProjectGraphRouteTarget, ProjectHumanValidationNode,
+  ProjectHumanWorkNode, ProjectJobNode, ProjectNodeAppearance, ProjectNodeCapabilities, ProjectOrchestrator,
+  ProjectRepairCandidateRule, ProjectRepairNode, ProjectRouteCandidate, ProjectStartCandidateRule,
+  ProjectStateContract, ProjectStateDefinition, ProjectValidationNode, ProjectWorkNode
 } from "../domain/automation.js";
-import type {
-  LoopConnectionPointStyle,
-  LoopEdgeLineStyle,
-  LoopTheme,
-  LoopThemeIssue
-} from "../domain/loopThemes.js";
-import type {
-  MarkdownDocument,
-  Project,
-  ProjectDocumentTreeNode,
-  ProjectInstruction,
-  ProjectResourceIssue,
-  Skill
-} from "../domain/documents.js";
+import type { CanvasConnectionLineStyle, CanvasConnectionPointStyle, CanvasTheme, CanvasThemeIssue } from "../domain/canvasTheme.js";
+import type { MarkdownDocument, Project, ProjectDocumentTreeNode, ProjectInstruction, ProjectResourceIssue, Skill } from "../domain/documents.js";
 import type { ExecutionProfile, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import type {
-  CanonicalNodeOutcome,
-  ControlFlowEvent,
-  ExecutionEvent,
-  ExecutionEventPage,
-  ExecutionPolicy,
-  ExecutionProjectSnapshot,
-  ExecutionResourceEvidence,
-  ExecutionRuntimeSnapshot,
-  ExecutionSpec,
-  ExecutionTask,
-  LocalProviderStatus,
-  LocalRuntime,
-  LoopRun,
-  LoopRunDetails,
-  LoopRunStatus,
-  LoopStateRevision,
-  LoopStateRevisionMetadata,
-  LoopRuntimePreflight,
-  LoopScheduleState,
-  NodeRun,
-  NodeRunRole,
-  NodeRunStatus,
-  OrchestrationFrame,
-  OrchestrationRequest,
-  OrchestratorRoute,
-  OrchestratorNodeOutcome,
-  RepairRequest,
-  RepairResult,
-  RunCheck,
-  RootRun,
-  RootExecutionSnapshot,
-  RuntimeConfigurationIssue,
-  RuntimePreflightIssue,
-  RuntimeProvider,
-  StatePatch,
-  ValidationNodeOutcome,
-  JobNodeOutcome,
-  JobRun
+  CanonicalNodeOutcome, ControlFlowEvent, ExecutionEvent, ExecutionEventPage, ExecutionPolicy,
+  ExecutionProjectSnapshot, ExecutionResourceEvidence, ExecutionRuntimeSnapshot, ExecutionSpec, ExecutionTask,
+  GraphNodeInvocation, GraphNodeInvocationDetails, GraphNodeRuntimePreflight, GraphStateRevision,
+  GraphStateRevisionMetadata, JobNodeInvocation, LocalProviderStatus, LocalRuntime, NodeRun, NodeRunRole,
+  NodeRunStatus, OrchestrationScope, OrchestratorNodeOutcome, RepairFrame, RepairNodeOutcome, RepairRequest,
+  RepairResult, RootExecutionSnapshot, RootRun, RoutingDecision, RoutingRequest, RunCheck,
+  RuntimeConfigurationIssue, RuntimePreflightIssue, RuntimeProvider, StatePatch, ValidationNodeOutcome, WorkNodeOutcome
 } from "../domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV6,
-  TaskEnvelopeHistoryEntry,
-  TaskEnvelopeLoopIdentity,
-  TaskEnvelopeOrchestrationRequest,
-  TaskEnvelopeProviderRunIdentity,
-  TaskEnvelopeRepairRequest,
-  TaskEnvelopeRepairReturn,
-  TaskEnvelopeResumeContext,
-  TaskEnvelopeRunIdentity,
-  TaskEnvelopeState,
-  TaskEnvelopeRouteCandidate,
-  TaskEnvelopeV6,
-  TaskEnvelopeWorkflowNodeIdentity,
-  ValidationTaskEnvelopeV6,
-  JobTaskEnvelopeV6
+  OrchestratorTaskEnvelopeV7, RepairTaskEnvelopeV7, TaskEnvelopeHistoryEntry, TaskEnvelopeNodeIdentity,
+  TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate, TaskEnvelopeRunIdentity, TaskEnvelopeState,
+  TaskEnvelopeV7, ValidationTaskEnvelopeV7, WorkTaskEnvelopeV7
 } from "../domain/taskEnvelope.js";
 import type {
-  BalletMode,
-  DashboardRunStatus,
-  GraphOrchestrationStateV1,
-  RootRunDetail,
-  RootRunRepairProjection,
-  RootRunOrchestrationProjection,
-  RootRunReturnDestination,
-  RootRunStateProjection,
-  RootRunKind,
-  RootRunListResponse,
-  RootRunListState,
-  RootRunSource,
-  RootRunSummary,
-  RunTarget,
-  RunTargetIssue,
-  RunTargetsResponse,
-  RespondToNodeRunRequest,
-  StartRootRunRequest,
-  WorkspaceInvalidationEvent,
-  WorkspaceInvalidationInput
+  BalletMode, DashboardRunStatus, RespondToNodeRunRequest, RootRunDetail, RootRunKind, RootRunListResponse,
+  RootRunListState, RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection,
+  RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, StartRootRunRequest,
+  WorkspaceInvalidationEvent, WorkspaceInvalidationInput
 } from "../domain/runs.js";
 import type {
-  InstalledLoopModuleStatus,
-  LoopModuleExportResult,
-  LoopModuleInspection,
-  LoopModuleInstallPlan,
-  LoopModuleLibraryEntry,
-  LoopModulePackageV3
-} from "../domain/loopModules.js";
+  GraphNodeModuleExportResult, GraphNodeModuleInspection, GraphNodeModuleInstallPlan,
+  GraphNodeModuleLibraryEntry, GraphNodeModulePackageV4, InstalledGraphNodeModuleStatus
+} from "../domain/graphNodeModules.js";
 
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
 export type ProjectDocumentSaveRequest = Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">;
-
 export interface WorkspaceDataDto {
   project: Project;
   executionProfiles: ExecutionProfile[];
   instructions: ProjectInstruction[];
   skills: Skill[];
   resourceIssues: ProjectResourceIssue[];
-  loopRuns: LoopRunDetails[];
+  graphNodeInvocations: GraphNodeInvocationDetails[];
   activeRootRuns: RootRun[];
-  orchestratorRoutes: OrchestratorRoute[];
-  scheduleStates: LoopScheduleState[];
+  routingDecisions: RoutingDecision[];
   automation: ProjectAutomationConfig;
   automationIssues: ProjectAutomationIssue[];
-  loopTheme: LoopTheme;
-  loopThemeIssues: LoopThemeIssue[];
+  canvasTheme: CanvasTheme;
+  canvasThemeIssues: CanvasThemeIssue[];
   runtime: LocalRuntime;
   runtimeConfigurationIssues: RuntimeConfigurationIssue[];
   runTargets: RunTargetsResponse;
   projectDocumentTree?: ProjectDocumentTreeNode[];
 }
-
 export type WorkspaceCollectionName = "skills";
-type ServerManagedEntityField =
-  | "relativePath"
-  | "slug"
-  | "errors"
-  | "projectId"
-  | "origin"
-  | "valid"
-  | "sourceSha256"
-  | "contentSha256"
-  | "sizeBytes";
+type ServerManagedEntityField = "relativePath" | "slug" | "errors" | "projectId" | "origin" | "valid" | "sourceSha256" | "contentSha256" | "sizeBytes";
 export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
 export type ExecutionProfileSaveRequest = Omit<ExecutionProfile, "id">;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
-export type LoopModuleInspectRequest = { package: unknown; source?: string };
-export type LoopModuleInstallPlanRequest = { package: unknown; source: string; profileMappings?: Record<string, string> };
-export type LoopModuleInstallCommitRequest = LoopModuleInstallPlanRequest & { expectedPlanHash: string };
-export type LoopModuleExportRequest = {
-  loopId: string;
-  title?: string;
-  description?: string;
-  version?: string;
-  category?: string;
-  tags?: string[];
+export type GraphNodeModuleInspectRequest = { package: unknown; source?: string };
+export type GraphNodeModuleInstallPlanRequest = { package: unknown; source: string; profileMappings?: Record<string, string> };
+export type GraphNodeModuleInstallCommitRequest = GraphNodeModuleInstallPlanRequest & { expectedPlanHash: string };
+export type GraphNodeModuleExportRequest = {
+  graphNodeId: string; title?: string; description?: string; version?: string; category?: string; tags?: string[];
 };
-
-export type WorkspaceSaveRequestByCollection = {
-  skills: SkillSaveRequest;
-};
-export type WorkspaceSaveResponseByCollection = {
-  [K in WorkspaceCollectionName]: WorkspaceDataDto[K][number];
-};
-
+export type WorkspaceSaveRequestByCollection = { skills: SkillSaveRequest };
+export type WorkspaceSaveResponseByCollection = { [K in WorkspaceCollectionName]: WorkspaceDataDto[K][number] };
 export type AppData = WorkspaceDataDto;
 export type CollectionName = WorkspaceCollectionName;
 
 export {
-  clockTimePattern,
-  defaultLoopNodeSize,
-  defaultLoopNodeStyle,
-  defaultProjectAutomationConfig,
-  defaultProjectLoopOrchestrator,
-  getProjectGraphTransitions,
-  getProjectRepairEdges,
-  getProjectFailEdges,
-  getProjectPassEdges,
-  getProjectPassTargetJobId,
-  getProjectValidationNode,
-  getReachableProjectLoopGraph,
-  getReachableProjectLoopIds,
-  getReachableProjectJobNodeIds,
-  hasReachableProjectWorkflowPass,
-  isCalendarDate,
-  isIanaTimeZone,
-  isProjectAgentValidationNode,
-  isProjectHumanValidationNode,
-  isProjectHumanJobNode,
-  isAllowedProjectRepairRoute,
-  isProjectProviderJobNode,
-  isProjectScheduledJobNode,
-  loopNodeSizes,
-  loopNodeSizeCatalog,
-  loopNodeStyleCatalog,
-  loopNodeStyles,
-  maxJobRetriesLimit,
-  maxLoopCapabilities,
-  maxLoopCapabilityLength,
-  maxProjectStateBytes,
-  maxRepairAttemptsLimit,
-  maxRepairDepthLimit,
-  projectConfigurationVersion,
-  resolveProjectWorkflowStartJob,
-  workflowResults
+  canvasNodeSizes, canvasNodeSizeCatalog, canvasNodeStyleCatalog, canvasNodeStyles,
+  defaultCanvasNodeSize, defaultCanvasNodeStyle, defaultProjectAutomationConfig, defaultProjectOrchestrator,
+  isProjectAgentValidationNode, isProjectAgentWorkNode, isProjectHumanValidationNode, isProjectHumanWorkNode,
+  maxGraphNodeJobNodes, maxJobRetriesLimit, maxNodeCapabilities, maxNodeCapabilityLength,
+  maxOrchestratorTransitions, maxProjectGraphNodes, maxProjectStateBytes, maxRepairAttemptsLimit,
+  maxRepairDepthLimit, maxRouteAttemptsLimit, nodeResults, projectConfigurationVersion, routeTargetKey
 } from "../domain/automation.js";
-export { defaultLoopTheme } from "../domain/loopThemes.js";
-export {
-  maxControlFlowTransitions, maxReadStatePatchEvidenceBytes, maxReadStateRevisionMetadata,
-  maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations
-} from "../domain/runtime.js";
-export {
-  maxOrchestrationRequestEnvelopeBytes, maxRelevantHistoryBytes, maxRelevantHistoryEntries,
-  maxResumeContextBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion
-} from "../domain/taskEnvelope.js";
+export { defaultCanvasTheme } from "../domain/canvasTheme.js";
+export { maxControlFlowTransitions, maxReadStatePatchEvidenceBytes, maxReadStateRevisionMetadata, maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations } from "../domain/runtime.js";
+export { maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxResumeContextBytes, maxRoutingRequestEnvelopeBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion } from "../domain/taskEnvelope.js";
 export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
-export { loopModulePackageV3Schema } from "./loop-module-schemas.js";
+export { graphNodeModulePackageV4Schema } from "./graph-node-module-schemas.js";
 
 export type {
-  MarkdownDocument, Project, ProjectInstruction, ProjectResourceIssue, ExecutionProfile,
-  JsonValue, WorkflowResult, ProjectAutomationConfig, ProjectAutomationIssue, ProjectDocumentTreeNode,
-  ProjectAgentValidationNode, ProjectAgentJobNode, ProjectExecutionComposition, ProjectHumanValidationNode, ProjectHumanJobNode,
-  ProjectGraph, ProjectLoop, ProjectLoopCapabilities, ProjectGraphTransition, ProjectRepairEdge,
-  ProjectLoopOrchestrator, ProjectLoopRepairRouter, ProjectLoopState, ProjectIssueTrackerConfig,
-  ProjectNodeAppearance, ProjectFailEdge, ProjectJobNode, ProjectPassEdge, ProjectPassEdgeTarget,
-  ProjectProviderJobNode, ProjectScheduledJobNode, ProjectValidationNode, ProjectWorkflow, ReachableProjectLoopGraph,
-  LoopNodeSize, LoopNodeSizeDefinition, LoopNodeStyle, LoopNodeStyleDefinition, LoopNodeStyleGroup,
-  LoopTheme, LoopThemeIssue,
-  LoopEdgeLineStyle, LoopConnectionPointStyle, ProjectOnceJobSchedule, ProjectRecurringJobSchedule,
-  ProjectScheduleCadence, ProjectScheduleWeekday, ProjectJobSchedule, LoopRun, LoopRunDetails, LoopRunStatus,
-  LoopScheduleState, LoopRuntimePreflight,
-  CanonicalNodeOutcome, ControlFlowEvent, LoopStateRevision, LoopStateRevisionMetadata, NodeRun, NodeRunRole, NodeRunStatus,
-  OrchestrationFrame, OrchestrationRequest, OrchestratorNodeOutcome, OrchestratorRoute, RepairRequest, RepairResult, RootRun, RunCheck,
-  StatePatch, ValidationNodeOutcome, JobRun, JobNodeOutcome,
-  OrchestratorTaskEnvelopeV6, TaskEnvelopeHistoryEntry, TaskEnvelopeLoopIdentity,
-  TaskEnvelopeOrchestrationRequest, TaskEnvelopeProviderRunIdentity, TaskEnvelopeRepairRequest,
-  TaskEnvelopeRepairReturn, TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate,
-  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV6,
-  TaskEnvelopeWorkflowNodeIdentity,
-  ValidationTaskEnvelopeV6, JobTaskEnvelopeV6,
-  ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot,
-  ExecutionResourceEvidence, RootExecutionSnapshot, ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask,
-  LocalProviderStatus, LocalRuntime, RuntimeProvider, RuntimePreflightIssue, RuntimeConfigurationIssue,
-  BalletMode, DashboardRunStatus, GraphOrchestrationStateV1, RootRunDetail, RootRunOrchestrationProjection, RootRunRepairProjection, RootRunReturnDestination,
-  RootRunStateProjection, RootRunKind, RootRunListResponse, RootRunListState,
-  RootRunSource, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest, StartRootRunRequest,
-  WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill
-};
-export type {
-  InstalledLoopModuleStatus,
-  LoopModuleExportResult,
-  LoopModuleInspection,
-  LoopModuleInstallPlan,
-  LoopModuleLibraryEntry,
-  LoopModulePackageV3
+  MarkdownDocument, Project, ProjectInstruction, ProjectResourceIssue, ExecutionProfile, JsonValue, NodeResult,
+  ProjectAutomationConfig, ProjectAutomationIssue, ProjectDocumentTreeNode, ProjectAgentValidationNode,
+  ProjectAgentWorkNode, ProjectCandidateRouting, ProjectContinuationCandidateRule, ProjectExecutionComposition,
+  ProjectGraph, ProjectGraphNode, ProjectGraphNodeRouteTarget, ProjectGraphRouteTarget, ProjectHumanValidationNode,
+  ProjectHumanWorkNode, ProjectIssueTrackerConfig, ProjectJobNode, ProjectNodeAppearance, ProjectNodeCapabilities,
+  ProjectOrchestrator, ProjectRepairCandidateRule, ProjectRepairNode, ProjectRouteCandidate, ProjectStartCandidateRule,
+  ProjectStateContract, ProjectStateDefinition, ProjectValidationNode, ProjectWorkNode,
+  CanvasNodeSize, CanvasNodeSizeDefinition, CanvasNodeStyle, CanvasNodeStyleDefinition, CanvasNodeStyleGroup,
+  CanvasTheme, CanvasThemeIssue, CanvasConnectionLineStyle, CanvasConnectionPointStyle,
+  CanonicalNodeOutcome, ControlFlowEvent, GraphStateRevision, GraphStateRevisionMetadata, NodeRun, NodeRunRole,
+  NodeRunStatus, OrchestrationScope, OrchestratorNodeOutcome, RepairNodeOutcome, RepairRequest, RepairResult,
+  RepairFrame, RootRun, RoutingDecision, RoutingRequest, RunCheck, StatePatch, ValidationNodeOutcome, WorkNodeOutcome,
+  GraphNodeInvocation, GraphNodeInvocationDetails, JobNodeInvocation, GraphNodeRuntimePreflight,
+  ExecutionPolicy, ExecutionProjectSnapshot, ExecutionRuntimeSnapshot, ExecutionResourceEvidence, RootExecutionSnapshot,
+  ExecutionEvent, ExecutionEventPage, ExecutionSpec, ExecutionTask, LocalProviderStatus, LocalRuntime, RuntimeProvider,
+  RuntimePreflightIssue, RuntimeConfigurationIssue, BalletMode, DashboardRunStatus, RootRunDetail,
+  RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection, RootRunKind, RootRunListResponse,
+  RootRunListState, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest,
+  StartRootRunRequest, WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill,
+  TaskEnvelopeHistoryEntry, TaskEnvelopeNodeIdentity, TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate,
+  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV7, WorkTaskEnvelopeV7, ValidationTaskEnvelopeV7,
+  OrchestratorTaskEnvelopeV7, RepairTaskEnvelopeV7,
+  InstalledGraphNodeModuleStatus, GraphNodeModuleExportResult, GraphNodeModuleInspection,
+  GraphNodeModuleInstallPlan, GraphNodeModuleLibraryEntry, GraphNodeModulePackageV4
 };

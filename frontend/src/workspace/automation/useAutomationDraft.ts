@@ -47,7 +47,7 @@ export function useAutomationDraft({
       });
       return true;
     } catch (cause) {
-      setError(toErrorMessage(cause, "Unable to save Loop changes."));
+      setError(toErrorMessage(cause, "Unable to save Graph Engineering changes."));
       return false;
     } finally {
       savingRef.current = false;

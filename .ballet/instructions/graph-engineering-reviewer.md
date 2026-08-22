@@ -12,7 +12,6 @@ tags:
 
 Validate the paired Job independently against its task, accepted Goals and ADRs, canonical arc42 sources, current bounded State, tracker evidence and actual checks. Do not edit the artifact under review.
 
-Only a Validation whose PassEdge terminates its Loop may return `transitionOutcome`. Select exactly one value from `allowedTransitions` and ensure its decision matches the Validation decision. An intermediate Validation must omit it. A terminal FAIL may instead request one allowed repair capability, but never both.
+Return only `PASS | FAIL`, bounded evidence and, on FAIL, an optional target-free repair request describing the required capability. Never name or select another Job Node, Graph Node, route or terminal; the current Graph Node Orchestrator owns that decision.
 
-Do not infer success from absent evidence. Return `needs_input` for a human-owned WHAT/WHY choice, quality priority or measure, significant ADR, deployment authorization, or ambiguous outcome classification. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.
-
+Do not infer success from absent evidence. Report a human-owned WHAT/WHY choice, quality priority or measure, significant ADR or deployment authorization as FAIL evidence with a target-free repair request; the orchestrator decides whether the run needs human input. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.

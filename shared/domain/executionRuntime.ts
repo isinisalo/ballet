@@ -1,15 +1,13 @@
-import type { JsonValue, ProjectGraph, ProjectLoop, ProjectLoopOrchestrator } from "./automation.js";
-import type { LoopTheme } from "./loopThemes.js";
+import type { JsonValue, ProjectGraph } from "./automation.js";
+import type { CanvasTheme } from "./canvasTheme.js";
 import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
-import type { ExecutionProfile } from "./projectConfig.js";
-import type { ProjectIssueTrackerConfig } from "./projectConfig.js";
-import type { CanonicalNodeOutcome, NodeRunRole } from "./runtime.js";
+import type { ExecutionProfile, ProjectIssueTrackerConfig } from "./projectConfig.js";
+import type { CanonicalNodeOutcome, NodeRunRole, OrchestrationScope } from "./runtime.js";
 
 export type {
   ExecutionPolicy, LocalCheckoutStatus, LocalProviderHealth, LocalProviderStatus,
   LocalRuntime, ResolvedExecutionProfile, RuntimeAuthStatus, RuntimeCapabilities,
-  RuntimeConfigurationIssue, RuntimeModelCapability, RuntimePolicyCapabilities,
-  RuntimeProvider
+  RuntimeConfigurationIssue, RuntimeModelCapability, RuntimePolicyCapabilities, RuntimeProvider
 } from "./localRuntime.js";
 
 export interface ExecutionRuntimeSnapshot {
@@ -31,7 +29,6 @@ export interface ExecutionProjectSnapshot {
 
 export type ExecutionResourceOrigin = "system" | "project";
 export type ExecutionResourceKind = "system" | "primary" | "skill";
-
 export interface ExecutionResourceSnapshot {
   kind: ExecutionResourceKind;
   origin: ExecutionResourceOrigin;
@@ -40,22 +37,16 @@ export interface ExecutionResourceSnapshot {
   sourceSha256: string;
   content: string;
 }
-
-export interface ExecutionRuntimeBinding {
-  executionProfileId: string;
-  runtime: ExecutionRuntimeSnapshot;
-}
+export interface ExecutionRuntimeBinding { executionProfileId: string; runtime: ExecutionRuntimeSnapshot; }
 
 export interface RootExecutionSnapshot {
-  version: 6;
-  rootKind: "graph" | "loop";
-  rootLoopId: string;
+  version: 7;
+  rootKind: "graph" | "graph_node";
+  rootGraphNodeId?: string;
   project: ExecutionProjectSnapshot;
-  orchestrator: ProjectLoopOrchestrator;
   issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;
-  loops: ProjectLoop[];
-  theme: LoopTheme;
+  theme: CanvasTheme;
   executionProfiles: ExecutionProfile[];
   runtimes: ExecutionRuntimeBinding[];
   resources: ExecutionResourceSnapshot[];
@@ -63,40 +54,38 @@ export interface RootExecutionSnapshot {
 }
 
 export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content">;
-
-/** Attempt-specific evidence. The exact composed prompt and output schema are immutable. */
 export interface ExecutionPromptEvidence {
-  compositionVersion: 7;
-  loopId: string;
+  compositionVersion: 8;
+  graphNodeId?: string;
   jobNodeId?: string;
-  workflowNodeId?: string;
   nodeRole: NodeRunRole;
+  orchestrationScope?: OrchestrationScope;
   nodeDefinitionId: string;
   executionProfile: ExecutionProfile;
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
-  taskEnvelopeVersion: 6;
+  taskEnvelopeVersion: 7;
   taskEnvelopeSha256: string;
-  outputSchemaVersion: 6;
+  outputSchemaVersion: 7;
   outputSchemaId:
-    | "job-node-outcome-v6"
-    | "validation-node-outcome-v6"
-    | "orchestrator-node-outcome-v6";
-  outputSchema: { [key: string]: JsonValue };
+    | "work-node-outcome-v7"
+    | "validation-node-outcome-v7"
+    | "orchestrator-node-outcome-v7"
+    | "repair-node-outcome-v7";
+  outputSchema: Record<string, JsonValue>;
   outputSchemaSha256: string;
 }
 
 export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type ExecutionTaskKind = "node_execution";
-
 export interface ExecutionSpec {
-  version: 8;
+  version: 9;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;
-  loopRunId: string;
-  jobRunId?: string;
+  graphNodeInvocationId?: string;
+  jobNodeInvocationId?: string;
   nodeRunId: string;
   evidence: ExecutionPromptEvidence;
   runtime: ExecutionRuntimeSnapshot;
@@ -121,11 +110,8 @@ export interface ExecutionTask {
 }
 
 export type ExecutionEventSource = "ballet" | RuntimeProvider;
-export type ExecutionEventKind =
-  | "system" | "think" | "agent" | "command" | "output" | "file"
-  | "tool" | "info" | "warn" | "error";
+export type ExecutionEventKind = "system" | "think" | "agent" | "command" | "output" | "file" | "tool" | "info" | "warn" | "error";
 export type ExecutionEventPhase = "started" | "delta" | "completed";
-
 export interface ExecutionEvent {
   id: number;
   taskId: string;
@@ -141,14 +127,7 @@ export interface ExecutionEvent {
   terminal: boolean;
   createdAt: string;
 }
-
-export interface ExecutionEventPage {
-  entries: ExecutionEvent[];
-  lastId: number;
-  hasMore: boolean;
-  truncated: boolean;
-}
-
+export interface ExecutionEventPage { entries: ExecutionEvent[]; lastId: number; hasMore: boolean; truncated: boolean; }
 export interface RootFinalizationReport {
   success: boolean;
   retained: boolean;
@@ -158,19 +137,16 @@ export interface RootFinalizationReport {
   changedFiles: string[];
   snapshotHash: string;
 }
-
 export interface RuntimePreflightIssue {
   nodeId?: string;
   nodeRole?: NodeRunRole;
   executionProfileId?: string;
-  code:
-    | "auth_required" | "backend_unhealthy" | "model_unavailable"
-    | "reasoning_unavailable" | "policy_unsupported" | "invalid_runtime_config"
-    | "dirty_checkout" | "missing_resource" | "invalid_resource" | "prompt_too_large";
+  code: "auth_required" | "backend_unhealthy" | "model_unavailable" | "reasoning_unavailable"
+    | "policy_unsupported" | "invalid_runtime_config" | "dirty_checkout" | "missing_resource"
+    | "invalid_resource" | "prompt_too_large";
   message: string;
 }
-
-export interface LoopRuntimePreflight {
+export interface GraphNodeRuntimePreflight {
   ok: boolean;
   issues: RuntimePreflightIssue[];
   snapshots: Array<{

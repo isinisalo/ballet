@@ -1,155 +1,55 @@
 import { z } from "zod";
-import { canonicalNodeOutcomeSchema, jobCompletedOutcomeSchema } from "./runtime-schemas.js";
+import { workNodeOutcomeSchema } from "./runtime-schemas.js";
 
-const boundedText = z.string().max(20_000);
-const nonEmptyText = boundedText.trim().min(1);
-const identifier = z.string().trim().min(1).max(200);
-const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
-
-const providerRunIdentitySchema = z.object({
-  rootRunId: identifier,
-  loopRunId: identifier,
-  nodeRunId: identifier,
-  jobRunId: identifier
+const text = z.string().max(20_000);
+const nonEmpty = text.trim().min(1);
+const id = z.string().trim().min(1).max(200);
+const identity = z.object({ id, description: nonEmpty }).strict();
+const run = z.object({
+  rootRunId: id,
+  graphNodeInvocationId: id.optional(),
+  jobNodeInvocationId: id.optional(),
+  nodeRunId: id
 }).strict();
-const orchestratorRunIdentitySchema = z.object({
-  rootRunId: identifier,
-  loopRunId: identifier,
-  nodeRunId: identifier
-}).strict();
-const loopIdentitySchema = z.object({ id: identifier, description: nonEmptyText }).strict();
-const workflowNodeIdentitySchema = z.object({ id: identifier, description: nonEmptyText }).strict();
-const stateSchema = z.object({
-  revision: z.number().int().nonnegative(),
-  value: z.json(),
-  sha256
-}).strict();
-const resumeSchema = z.object({
-  question: nonEmptyText,
-  context: boundedText,
-  response: nonEmptyText
-}).strict();
-const historyEntrySchema = z.object({
-  sequence: z.number().int().nonnegative(),
-  nodeRunId: identifier,
-  role: z.enum(["job", "validation", "orchestrator"]),
+const state = z.object({ revision: z.number().int().nonnegative(), value: z.json(), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict();
+const resume = z.object({ question: nonEmpty, context: text, response: nonEmpty }).strict();
+const history = z.array(z.object({
+  sequence: z.number().int().nonnegative(), nodeRunId: id,
+  role: z.enum(["work", "validation", "orchestrator", "repair"]),
   state: z.enum(["completed", "needs_input", "blocked", "failed"]),
-  summary: boundedText,
-  stateRevision: z.number().int().nonnegative()
+  summary: text, stateRevision: z.number().int().nonnegative()
+}).strict()).max(8);
+const base = { version: z.literal(7), run, task: nonEmpty, state, resume: resume.optional(), relevantHistory: history };
+const candidate = z.object({ key: id, description: nonEmpty }).strict();
+
+export const workTaskEnvelopeV7Schema = z.object({
+  ...base, role: z.literal("work"), graphNode: identity, jobNode: identity, workNode: identity,
+  workAttempt: z.number().int().min(1).max(101),
+  previousValidationFeedback: z.object({ feedback: nonEmpty, expectedCorrection: nonEmpty }).strict().optional()
 }).strict();
-const relevantHistorySchema = z.array(historyEntrySchema).max(8);
-
-const commonProviderFields = {
-  version: z.literal(6),
-  run: providerRunIdentitySchema,
-  loop: loopIdentitySchema,
-  jobNode: workflowNodeIdentitySchema,
-  task: nonEmptyText,
-  state: stateSchema,
-  jobAttempt: z.number().int().min(1).max(101),
-  resume: resumeSchema.optional(),
-  relevantHistory: relevantHistorySchema
-};
-
-export const jobTaskEnvelopeV6Schema = z.object({
-  role: z.literal("job"),
-  ...commonProviderFields,
-  previousValidationFeedback: z.object({
-    feedback: nonEmptyText,
-    expectedCorrection: nonEmptyText
+export const validationTaskEnvelopeV7Schema = z.object({
+  ...base, role: z.literal("validation"), graphNode: identity, jobNode: identity, validationNode: identity,
+  workAttempt: z.number().int().min(1).max(101), workOutcome: workNodeOutcomeSchema,
+  repairReturn: z.object({
+    repairRequestId: id, repairResultId: id, stateRevision: z.number().int().nonnegative(), summary: nonEmpty
   }).strict().optional()
 }).strict();
-
-const repairRequestFields = {
-  id: identifier,
-  requesterLoopRunId: identifier,
-  requesterJobRunId: identifier,
-  requesterValidationNodeRunId: identifier,
-  attempt: z.number().int().min(1).max(100),
-  validationSummary: nonEmptyText,
-  reason: nonEmptyText,
-  evidence: z.json().optional(),
-  stateRevisionAtRequest: z.number().int().nonnegative(),
-  nestingDepth: z.number().int().nonnegative().max(32)
-};
-export const taskEnvelopeRepairRequestSchema = z.union([
-  z.object({ ...repairRequestFields, requestedCapability: nonEmptyText }).strict(),
-  z.object({ ...repairRequestFields, requestedOutcome: z.json() }).strict()
-]);
-
-export const taskEnvelopeRepairReturnSchema = z.object({
-  repairRequest: taskEnvelopeRepairRequestSchema,
-  repairResult: z.object({
-    id: identifier,
-    frameId: identifier,
-    targetLoopRunId: identifier,
-    targetLoopId: identifier,
-    stateRevision: z.number().int().nonnegative(),
-    outcome: canonicalNodeOutcomeSchema.optional(),
-    summary: nonEmptyText
-  }).strict()
-}).strict();
-
-export const validationTaskEnvelopeV6Schema = z.object({
-  role: z.literal("validation"),
-  ...commonProviderFields,
-  validationNode: workflowNodeIdentitySchema,
-  jobOutcome: jobCompletedOutcomeSchema,
-  repairReturn: taskEnvelopeRepairReturnSchema.optional(),
-  allowedTransitions: z.array(z.object({
-    id: identifier,
-    decision: z.enum(["PASS", "FAIL"]),
-    outcome: z.string().regex(/^[a-z][a-z0-9_]*$/).max(64),
-    target: z.union([
-      z.object({ loopId: identifier }).strict(),
-      z.object({ runResult: z.literal("DONE") }).strict()
-    ]),
-    description: nonEmptyText
-  }).strict()).max(256)
-}).strict();
-
-const targetLoopSchema = z.object({
-  id: identifier,
-  description: nonEmptyText,
-  capabilities: z.object({
-    accepts: z.array(nonEmptyText).max(64),
-    provides: z.array(nonEmptyText).max(64)
+export const orchestratorTaskEnvelopeV7Schema = z.object({
+  ...base, role: z.literal("orchestrator"), scope: z.enum(["graph", "graph_node"]), graphNode: identity.optional(),
+  request: z.object({
+    id, kind: z.enum(["start", "continuation", "repair"]), sourceChildId: id.optional(),
+    result: z.enum(["PASS", "FAIL"]).optional(), requestedCapability: nonEmpty.optional(), evidence: z.json()
   }).strict(),
-  route: z.object({
-    kind: z.literal("repair"),
-    capability: nonEmptyText,
-    description: nonEmptyText
-  }).strict()
+  allowedCandidates: z.array(candidate).max(256), repairAvailable: z.boolean()
 }).strict();
-
-const orchestrationRequestSchema = z.object({
-  id: identifier,
-  kind: z.literal("repair"),
-  sourceLoopId: identifier,
-  sourceLoopRunId: identifier,
-  sourceNodeRunId: identifier,
-  stateRevisionAtRequest: z.number().int().nonnegative(),
-  completionSummary: boundedText,
-  completionEvidence: z.json(),
-  requestedCapability: nonEmptyText.optional(),
-  expectedOutcome: z.json().optional()
+export const repairTaskEnvelopeV7Schema = z.object({
+  ...base, role: z.literal("repair"), scope: z.enum(["graph", "graph_node"]), graphNode: identity.optional(),
+  request: z.object({
+    id, reason: nonEmpty, requestedCapability: nonEmpty.optional(), evidence: z.json(),
+    returnValidationNodeId: id, attempt: z.number().int().min(1).max(100), depth: z.number().int().min(0).max(100)
+  }).strict(),
+  allowedCandidates: z.array(candidate).max(256), parentEscalationAvailable: z.boolean()
 }).strict();
-
-export const orchestratorTaskEnvelopeV6Schema = z.object({
-  version: z.literal(6),
-  role: z.literal("orchestrator"),
-  run: orchestratorRunIdentitySchema,
-  loop: loopIdentitySchema,
-  task: nonEmptyText,
-  state: stateSchema,
-  orchestrationRequest: orchestrationRequestSchema,
-  allowedCandidates: z.array(targetLoopSchema).max(100),
-  resume: resumeSchema.optional(),
-  relevantHistory: relevantHistorySchema
-}).strict();
-
-export const taskEnvelopeV6Schema = z.union([
-  jobTaskEnvelopeV6Schema,
-  validationTaskEnvelopeV6Schema,
-  orchestratorTaskEnvelopeV6Schema
+export const taskEnvelopeV7Schema = z.discriminatedUnion("role", [
+  workTaskEnvelopeV7Schema, validationTaskEnvelopeV7Schema, orchestratorTaskEnvelopeV7Schema, repairTaskEnvelopeV7Schema
 ]);

@@ -3,8 +3,8 @@ id: arc42-section-08
 title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 11
+updatedAt: '2026-08-22'
+version: 12
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-008 säilyvät hyväksytyn arkkitehtuurin yhteisinä konsepteina. CON-009 kokoaa exact named RunBook -determinismin ja CON-010 `tk`-sovituksen fail-closed-idempotenssin usean rakennusosan yhteiseksi strict-v13-rajaksi; `QS-016`–`QS-018`-evidenssi on pending.
+CON-001–CON-010 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-011 kokoaa strict-v14:n scoped agent routing-, bounded repair-, immutable candidate- ja kolmitasoisen UI-scope-sopimuksen usean rakennusosan yhteiseksi rajaksi. `QS-019`–`QS-020`-evidenssi indeksoidaan uuteen initiative-ketjuun.
 
 ## Konseptikartta
 
@@ -35,6 +35,7 @@ CON-001–CON-008 säilyvät hyväksytyn arkkitehtuurin yhteisinä konsepteina. 
 | CON-008 | Workflow structural integrity: jokainen Job omistaa yhden Validationin, jokaisella Validationilla on yksi PassEdge ja FailEdge, Jobit ovat saavutettavia ja vähintään yksi PASS-tulos saavutetaan; validate/retry ovat kiinteitä runtime-siirtymiä. Canvas projisoi parin yhdeksi Job-artworkiksi ja vain persisted Edget. | BB-001, BB-003–BB-006, BB-009 | QS-003, QS-009, QS-015 | ADR-020, ADR-021, project/workflow schema, Workflow runtime ja canvas |
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
+| CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Kolme canvasia projisoivat vain oman scopensa. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
 
 ## Turvallisuus ja auktorisointi
 
@@ -53,11 +54,11 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 
 | Raja | Validointi | Virheen muoto | Sivuvaikutus |
 | --- | --- | --- | --- |
-| Project config/resources | Strict-v13 Workflow/graph/transitions/repairs ilman v12 readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
+| Project config/resources | Strict-v14 Graph/GraphNode/JobNode/candidate-rakenne ilman legacy-readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
 | HTTP/API | Shared request/response schema ja application precondition. | 4xx odotetulle inputille, 5xx vain odottamattomalle virheelle. | Service-transaktio ei ala malformed-inputilla. |
 | Composition | Profiili, instructionit, skillit, order, envelope ja output schema. | `ExecutionCompositionError` tai vastaava blocking outcome. | Nolla jonotettua taskia ja nolla fallbackia. |
 | Runtime outcome | Roolikohtainen strict schema, current revision ja rajat. | Failed/needs_input/interrupted/terminal outcome. | Vain atomisesti commitoitu fakta näkyy. |
-| Loop module | Koko, UTF-8, strict schema, canonical hash, conflict, stale plan ja active Run. | Domain issue -lista. | Config-last ja rollback; ei puuttuvia referenssejä. |
+| Graph Node module | Koko, UTF-8, strict v4 schema, canonical hash, explicit mapping, peer-target-kielto, conflict, stale plan ja active Run. | Domain issue -lista. | Config-last ja rollback; ei puuttuvia referenssejä. |
 | `tk` adapteri | Capability probe, strict JSONL/Markdown, external-ref, parent/dependency, cycle, cwd/store, timeout ja output limit. | Preflight issue tai pending/error outbox. | Root Run/provider/transition ei etene; ulkoinen osittainen vaikutus sovitetaan Resume/startupissa. |
 | UI projection | Shared DTO ja exhaustive presentation mapping. | Unknown/explicit unavailable; ei arvattua tilaa. | Display-only; canonical data ei muutu. |
 
@@ -75,7 +76,7 @@ Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logi
 
 ## Determinismi ja provenance
 
-Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Terminal Validationin allowed transition enum tulee samasta immutable snapshotista kuin runtime-reititys. Loop module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
+Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Scoped orchestratorin allowed target enum tulee samasta immutable snapshotista kuin runtime-validointi; providerin target-teksti ei voi laajentaa joukkoa. Graph Node Module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
 
 ## Evidenssi, observability ja tietoluokitus
 
@@ -101,18 +102,19 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 ## UI:n totuusperiaate
 
 - `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
-- Aktiiviset authoring-projektiot ovat vain `graph | workflow`: Graph Engineering näyttää deterministic layered -layoutissa compact `ProjectLoop`→`LoopNode`-projektiot, yhden Orchestrator-controlin, DONE-terminalin sekä persisted transition/repair-yhteydet exact decision+outcome-labelilla. Workflow Engineering näyttää vain valitun Loopin suojatut Job-artworkit ja persisted Pass/Fail Edget. Paired Validationin tila kuuluu Job-artworkiin, terminaalitulokset eivät ole nodeja ja client layout/selection ei omista topologiaa.
-- Mission kokoaa nykyisen tavoitteen ja aktiivisen polun; All Loops näyttää immutable snapshotin koko topologian.
+- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | job_node`: Graph Engineering näyttää globaalin Orchestratorin/Repairin ja vain GraphNode-planeetat; Graph Node näyttää paikallisen Orchestratorin/Repairin ja vain parentin JobNode-planeetat; Job Node näyttää vain Work/Validation-planeetat, fixed validate/retry-polut ja PASS/FAIL-terminalit.
+- Spoke kuvaa authoroidun candidate-jäsenyyden, ei child-to-child Edgeä. Layout tai valinta ei omista topologiaa eikä foreign-scope-nodea näytetä.
+- Run-projektio näyttää Graph- tai GraphNode-Rootin immutable snapshotin ja canonical positionin ilman standalone JobNode Runia.
 - Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
 - Visuaalinen artwork, orbit, glow tai reittikorostus auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
 - Prosenttia, ETA:a, elapsed-telemetriaa tai provider-tekstistä pääteltyä statusta ei esitetä, ellei tuleva kanoninen sopimus ja ADR sitä erikseen määritä.
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää strict-v13-skeemaa: Loop omistaa `ProjectWorkflow`-rakenteen ja capabilityt; graph omistaa `startLoopId`:n sekä erilliset `transitions`- ja `repairEdges`-kokoelmat.
-- V13-toteutus ei säilytä v12-parseria, `loopEdges`-compatibility-readeria, dual-writeä tai silent defaultia.
+- `.ballet/project.json` käyttää strict-v14-skeemaa: graph omistaa yhteisen Staten, globaalin orchestrator/repairin ja 1–40 GraphNodea; GraphNode omistaa paikallisen orchestrator/repairin ja aggregate JobNodet.
+- V14-toteutus ei säilytä Loop/Workflow/schedule/Edge/start-ID-readereita, reittialiaksia, dual-writeä tai silent defaultia.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
-- SQLite schema v9 lisää Graph-state- ja tracker outbox/link -taulut. V8-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
+- SQLite schema v10 käyttää GraphNode-/JobNode-invocationeja sekä scoped orchestrator/repair request/decision/frame -evidenssiä. V9-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
 
@@ -122,7 +124,7 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008` ja `adr-011`–`adr-022`.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016` ja `adr-023` sekä ADR-023:n säilyttämät aiemmat invariantit.
 
 ## Evidenssi
 

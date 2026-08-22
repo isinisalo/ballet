@@ -1,14 +1,14 @@
 import path from "node:path";
 import type { AppData } from "../../shared/api/workspace-contracts.js";
 import { defaultProjectAutomationConfig } from "../../shared/domain/automation.js";
-import { defaultLoopTheme } from "../../shared/domain/loopThemes.js";
+import { defaultCanvasTheme } from "../../shared/domain/canvasTheme.js";
 import { loadBalletProject, loadBalletProjectTree } from "../markdown.js";
 import { projectFromDocument } from "./documentMappers.js";
 import { loadProjectResources } from "./projectResourceCatalog.js";
 
 export type WorkspaceContentData = Omit<AppData,
-  "runtime" | "runtimeConfigurationIssues" | "runTargets" | "loopRuns" | "activeRootRuns"
-  | "orchestratorRoutes" | "scheduleStates">;
+  "runtime" | "runtimeConfigurationIssues" | "runTargets" | "graphNodeInvocations" | "activeRootRuns"
+  | "routingDecisions">;
 
 export const loadMarkdownAppData = async (root: string): Promise<WorkspaceContentData> => {
   const [projectDocs, projectDocumentTree, resources] = await Promise.all([
@@ -29,8 +29,8 @@ export const loadMarkdownAppData = async (root: string): Promise<WorkspaceConten
     resourceIssues: resources.issues,
     automation: defaultProjectAutomationConfig(),
     automationIssues: [],
-    loopTheme: structuredClone(defaultLoopTheme),
-    loopThemeIssues: [],
+    canvasTheme: structuredClone(defaultCanvasTheme),
+    canvasThemeIssues: [],
     projectDocumentTree
   };
 };

@@ -25,7 +25,7 @@ export const runTrackerCli = async (
     const issue = loaded.issues[0];
     throw new Error(issue
       ? `Project configuration is invalid at ${issue.path}: ${issue.message}`
-      : "Project has no strict v13 configuration.");
+      : "Project has no strict v14 configuration.");
   }
   const settings = await new LocalSettingsRepository(project.settingsPath).load();
   const handler = trackerActions[action];

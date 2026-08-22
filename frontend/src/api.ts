@@ -3,17 +3,17 @@ import type {
   CollectionName,
   ExecutionProfile,
   ExecutionProfileSaveRequest,
-  LoopTheme,
+  CanvasTheme,
   ProjectAutomationConfig,
-  InstalledLoopModuleStatus,
-  LoopModuleExportRequest,
-  LoopModuleExportResult,
-  LoopModuleInspectRequest,
-  LoopModuleInspection,
-  LoopModuleInstallCommitRequest,
-  LoopModuleInstallPlan,
-  LoopModuleInstallPlanRequest,
-  LoopModuleLibraryEntry,
+  InstalledGraphNodeModuleStatus,
+  GraphNodeModuleExportRequest,
+  GraphNodeModuleExportResult,
+  GraphNodeModuleInspectRequest,
+  GraphNodeModuleInspection,
+  GraphNodeModuleInstallCommitRequest,
+  GraphNodeModuleInstallPlan,
+  GraphNodeModuleInstallPlanRequest,
+  GraphNodeModuleLibraryEntry,
   WorkspaceSaveRequestByCollection
 } from "@shared/api/workspace-contracts";
 import type { MarkdownDocument } from "@shared/api/workspace-contracts";
@@ -38,20 +38,20 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(config)
     }),
-  listLoopModuleLibrary: () => request<LoopModuleLibraryEntry[]>("/api/loop-modules/library"),
-  inspectLoopModule: (input: LoopModuleInspectRequest) =>
-    request<LoopModuleInspection>("/api/loop-modules/inspect", { method: "POST", body: JSON.stringify(input) }),
-  planLoopModuleInstall: (input: LoopModuleInstallPlanRequest) =>
-    request<LoopModuleInstallPlan>("/api/loop-modules/install-plan", { method: "POST", body: JSON.stringify(input) }),
-  installLoopModule: (input: LoopModuleInstallCommitRequest) =>
-    request<InstalledLoopModuleStatus>("/api/loop-modules/install", { method: "POST", body: JSON.stringify(input) }),
-  exportLoopModule: (input: LoopModuleExportRequest) =>
-    request<LoopModuleExportResult>("/api/loop-modules/export", { method: "POST", body: JSON.stringify(input) }),
-  loopModuleStatuses: () => request<InstalledLoopModuleStatus[]>("/api/loop-modules/status"),
-  removeInstalledLoopModule: (loopId: string) =>
-    request<void>(`/api/loop-modules/installed/${encodeURIComponent(loopId)}`, { method: "DELETE" }),
-  updateLoopTheme: (theme: LoopTheme) =>
-    request<LoopTheme>("/api/loop-theme", {
+  listGraphNodeModuleLibrary: () => request<GraphNodeModuleLibraryEntry[]>("/api/graph-node-modules/library"),
+  inspectGraphNodeModule: (input: GraphNodeModuleInspectRequest) =>
+    request<GraphNodeModuleInspection>("/api/graph-node-modules/inspect", { method: "POST", body: JSON.stringify(input) }),
+  planGraphNodeModuleInstall: (input: GraphNodeModuleInstallPlanRequest) =>
+    request<GraphNodeModuleInstallPlan>("/api/graph-node-modules/install-plan", { method: "POST", body: JSON.stringify(input) }),
+  installGraphNodeModule: (input: GraphNodeModuleInstallCommitRequest) =>
+    request<InstalledGraphNodeModuleStatus>("/api/graph-node-modules/install", { method: "POST", body: JSON.stringify(input) }),
+  exportGraphNodeModule: (input: GraphNodeModuleExportRequest) =>
+    request<GraphNodeModuleExportResult>("/api/graph-node-modules/export", { method: "POST", body: JSON.stringify(input) }),
+  graphNodeModuleStatuses: () => request<InstalledGraphNodeModuleStatus[]>("/api/graph-node-modules/status"),
+  removeInstalledGraphNodeModule: (graphNodeId: string) =>
+    request<void>(`/api/graph-node-modules/installed/${encodeURIComponent(graphNodeId)}`, { method: "DELETE" }),
+  updateCanvasTheme: (theme: CanvasTheme) =>
+    request<CanvasTheme>("/api/canvas-theme", {
       method: "PUT",
       body: JSON.stringify(theme)
     }),

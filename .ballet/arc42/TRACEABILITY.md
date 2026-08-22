@@ -3,8 +3,8 @@ id: arc42-traceability
 title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-21'
-version: 15
+updatedAt: '2026-08-22'
+version: 16
 tags:
   - arc42
   - traceability
@@ -15,11 +15,11 @@ tags:
 
 ## Tarkoitus
 
-Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-014` / `REQ-001`–`REQ-014` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
+Tämä tiedosto yhdistää hyväksytyn intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-015` / `REQ-001`–`REQ-015` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
 
 ## Tila
 
-Matriisi sisältää 18 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on verified 2026-08-17 ajettujen nimettyjen testien perusteella. QS-014 ja QS-015 säilyttävät strict-v11/v12-historiallisen evidenssin. QS-016 on paikallisesti verified 2026-08-21; QS-017:n technical/browser-osuus ja QS-018:n hermetic-osuus läpäisivät. Ihmisen visual verdict, pinnattu live `tk` -smoke ja tuotantokaltainen pilotti säilyvät avoimina.
+Matriisi sisältää 20 laatuketjua. QS-001–QS-018 säilyttävät aiemman hyväksytyn tai historiallisen evidenssin. QS-019/020 muodostavat strict-v14 Graph Node Engineeringin uuden acceptance-ketjun; technical/conformance- ja browser-portit läpäisevät, ihmisvisual verdict ja tuotantokaltainen provider-pilotti säilyvät avoimina.
 
 ## Trace-matriisi
 
@@ -44,6 +44,8 @@ Matriisi sisältää 18 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | goal-014 / REQ-014 | QS-016 | adr-022 / CON-009 | BB-003 / BB-004 / BB-005 / BB-006 / BB-009 | RT-012 / DEP-002 | TEST-016 | EVID-016 | verified locally |
 | goal-014 / REQ-014 | QS-017 | adr-021 / adr-022 / CON-005 / CON-009 | BB-001 / BB-002 / BB-009 | RT-010 / RT-012 / DEP-001 | TEST-017 | EVID-017 | technical/browser verified; human visual acceptance pending |
 | goal-014 / REQ-014 | QS-018 | adr-022 / CON-010 | BB-004 / BB-005 / BB-010 | RT-013 / DEP-002 / DEP-004 | TEST-018 | EVID-018 | hermetic verified; pinned live smoke pending |
+| goal-015 / REQ-015 | QS-019 | adr-023 / CON-002 / CON-003 / CON-011 | BB-003–BB-006 / BB-009 / BB-010 | RT-014 / RT-015 / DEP-002 | TEST-019 | EVID-019 | technical/conformance passed; live provider pilot open |
+| goal-015 / REQ-015 | QS-020 | adr-023 / CON-005 / CON-011 | BB-001 / BB-002 / BB-009 | RT-014 / DEP-001 | TEST-020 | EVID-020 | technical/browser passed; human visual verdict pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -68,6 +70,8 @@ Matriisi sisältää 18 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | TEST-016 | V13 schema- ja runtime-matriisi: 1/5/40 Loopia, invalid graphit, kaikki 18 oletustransitionia, snapshot immutability, 256-raja, Graph/Loop/scheduled-ajot, DONE ja repair call/return. | `graph-engineering-runbook` schema/runtime suites |
 | TEST-017 | Transition editor, Run-kohteet, 1/5/40 deterministic layout, decision+outcome-accessibility, desktop/narrow Graph QA ja Workflow Engineeringin suojatun visuaalisen sopimuksen regressio-QA. | frontend suites + browser QA |
 | TEST-018 | Hermetic `tk`-matriisi: success, timeout, malformed JSONL/Markdown, duplicate external-ref, dangling parent/dependency, cycle, partial write, restart, cancel, reconciliation ja yksi BUILD claim invocationissa; live smoke raportoidaan erikseen. | tracker/runtime suites + optional pinned `tk` smoke |
+| TEST-019 | Strict-v14/v4/v7/v8/v9/v10 schema-, snapshot-, composition-, runtime-, persistence- ja Graph Node Module -matriisi: scoped start/continuation/repair-enumit, Graph/GraphNode dispatch, Work→Validation, bounded retry, Luna orchestrator invalid-target retry, local Sol Repair, Graph-eskalaatio, same-Validation LIFO-return, State patch, depth/attempt/transition-rajat, restart/cancel/no-duplicate, v9 fail-closed, kaikkien 14 paketin roundtrip/provenance/mapping ja active legacy/platform-boundary -haut. | `three-level-graph-node-engineering` backend/shared/module suites + final gates |
+| TEST-020 | Kolmen canonical authoring-routen ja kahden Run-routen projection/UI/browser-matriisi: breadcrumb/back-forward, direct drill-down, scope, inspector/Sheet, active Run -lukot, keyboard/a11y, reduced motion, 1/5/40 GraphNode- ja 1/17/64 JobNode -layoutit 1440×900/390×844-viewporteissa sekä avaruusteeman visuaalinen regressio. | frontend suites + browser QA + human visual review |
 
 ## Evidenssikatalogi
 
@@ -91,6 +95,8 @@ Matriisi sisältää 18 laatuketjua. QS-011–QS-013:n paikallinen evidenssi on 
 | EVID-016 | Strict-v13 named RunBookin schema/runtime/root-kind/snapshot/limit/repair-tulokset; paikallisesti verified 2026-08-21. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-001/003/006 |
 | EVID-017 | Graph UI:n 1/5/40-layout-, a11y- ja desktop/narrow-kuvat sekä Workflow regression -kuvat; technical/browser verified, ihmisverdict pending. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-005 |
 | EVID-018 | Tracker adapter/outbox/reconciliation/fault-matrix verified hermetic; pinnattu live-smoke pending, koska `tk` puuttuu PATHista. | `.ballet/arc42/initiatives/graph-engineering-runbook/EVIDENCE.md`; GER-EVID-002/006/007 |
+| EVID-019 | Strict-v14 Graph/GraphNode/JobNode-domainin, agent routing/repairin, compositionin, SQLite v10:n ja 14 Graph Node Module v4 -paketin tekninen/conformance-evidenssi. | `.ballet/arc42/initiatives/three-level-graph-node-engineering/EVIDENCE.md`; TGNE-EVID-001–003/005 |
+| EVID-020 | Kolmen scopetun avaruuscanvasin route-, a11y-, layout-, desktop/narrow-browser- ja ihmisvisual-evidenssi. | `.ballet/arc42/initiatives/three-level-graph-node-engineering/EVIDENCE.md`; TGNE-EVID-004/005 |
 
 ## Ketjun tulkinta
 
@@ -102,7 +108,7 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-020`, `adr-021` ja `adr-022`.
+`adr-011`, `adr-015`, `adr-016` ja `adr-023` sekä historiallisten ketjujen ADR-017/020/021/022.
 
 ## Evidenssi
 

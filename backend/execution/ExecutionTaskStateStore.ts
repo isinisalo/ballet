@@ -63,13 +63,9 @@ const runnableTaskSql = `
   EXISTS (
     SELECT 1
     FROM root_runs root
-    JOIN loop_invocations loop ON loop.root_run_id = root.root_run_id
-    JOIN node_runs node ON node.loop_run_id = loop.loop_run_id
+    JOIN node_runs node ON node.root_run_id = root.root_run_id
     WHERE root.root_run_id = task.root_run_id
       AND root.status IN ('queued', 'running', 'waiting_for_input')
-      AND loop.loop_run_id = json_extract(task.spec_json, '$.loopRunId')
-      AND loop.status = 'running'
-      AND root.active_loop_run_id = loop.loop_run_id
       AND node.node_run_id = task.node_run_id
       AND node.node_run_id = json_extract(task.spec_json, '$.nodeRunId')
       AND node.status = 'queued'

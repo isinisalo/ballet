@@ -1,4 +1,4 @@
-import { defaultLoopTheme, defaultProjectAutomationConfig, type AppData } from "@shared/api/workspace-contracts";
+import { defaultCanvasTheme, defaultProjectAutomationConfig, type AppData } from "@shared/api/workspace-contracts";
 
 export type View =
   | "projects"
@@ -7,14 +7,14 @@ export type View =
   | "project-adrs"
   | "project-instructions"
   | "automation"
-  | "loop-theme"
+  | "canvas-theme"
   | "runtimes"
   | "execution-profiles"
   | "skills"
   | "run";
 
 export type SaveCollection = "skills";
-export type EngineeringView = "graph" | "workflow";
+export type EngineeringLevel = "graph" | "graph_node" | "job_node";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -22,10 +22,10 @@ export interface RouteState {
   creating?: boolean;
   documentPath?: string;
   executionProfileId?: string;
-  automationEntityId?: string;
-  automationView?: EngineeringView;
-  automationRouteIssue?: "invalid-view" | "missing-loop-id" | "non-canonical-graph";
-  runTargetKind?: "graph" | "loop";
+  engineeringLevel?: EngineeringLevel;
+  graphNodeId?: string;
+  jobNodeId?: string;
+  runTargetKind?: "graph" | "graph_node";
   runTargetId?: string;
   rootRunId?: string;
 }
@@ -43,14 +43,13 @@ export const emptyData: AppData = {
   instructions: [],
   skills: [],
   resourceIssues: [],
-  loopRuns: [],
+  graphNodeInvocations: [],
   activeRootRuns: [],
-  orchestratorRoutes: [],
-  scheduleStates: [],
+  routingDecisions: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
-  loopTheme: structuredClone(defaultLoopTheme),
-  loopThemeIssues: [],
+  canvasTheme: structuredClone(defaultCanvasTheme),
+  canvasThemeIssues: [],
   runtime: {
     instanceId: "",
     hostname: "",
@@ -66,7 +65,7 @@ export const emptyData: AppData = {
   runtimeConfigurationIssues: [],
   runTargets: {
     graph: { kind: "graph", id: "", name: "Graph", ready: false, issues: [] },
-    loops: []
+    graphNodes: []
   },
   projectDocumentTree: []
 };

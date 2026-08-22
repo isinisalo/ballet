@@ -2,7 +2,7 @@ import { Activity, ChevronRight, Route } from "lucide-react";
 import type { ProjectAutomationConfig } from "@shared/api/workspace-contracts";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem } from "@/components/ui/sidebar";
-import { automationGraphPath, automationLoopPath } from "../routing";
+import { automationGraphNodePath, automationGraphPath } from "../routing";
 import type { RouteState } from "../types";
 import { SidebarNavLinkItem } from "./SidebarNavLinkItem";
 
@@ -11,7 +11,7 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
   automation: ProjectAutomationConfig;
   navigate: (path: string) => void;
 }) {
-  const active = route.view === "automation" || route.view === "loop-theme";
+  const active = route.view === "automation" || route.view === "canvas-theme";
 
   return (
     <Collapsible defaultOpen={active} className="group/automation">
@@ -25,21 +25,21 @@ export function SidebarAutomationMenu({ route, automation, navigate }: {
         } />
         <CollapsibleContent>
           <SidebarMenuSub className="gap-0.5">
-            <SidebarNavLinkItem path={automationGraphPath()} isActive={route.view === "automation" && route.automationView === "graph"} navigate={navigate}>
+            <SidebarNavLinkItem path={automationGraphPath()} isActive={route.view === "automation" && route.engineeringLevel === "graph"} navigate={navigate}>
               <Activity /> <span>Graph Engineering</span>
             </SidebarNavLinkItem>
-            {automation.loops.length === 0 ? (
-              <SidebarMenuSubItem><span className="block px-2 py-1 text-xs text-muted-foreground">No loops.</span></SidebarMenuSubItem>
+            {automation.graph.graphNodes.length === 0 ? (
+              <SidebarMenuSubItem><span className="block px-2 py-1 text-xs text-muted-foreground">No Graph Nodes.</span></SidebarMenuSubItem>
             ) : null}
-            {automation.loops.map((loop) => (
+            {automation.graph.graphNodes.map((graphNode) => (
               <SidebarNavLinkItem
-                key={loop.id}
-                path={automationLoopPath(loop.id)}
-                isActive={route.view === "automation" && route.automationView === "workflow" && route.automationEntityId === loop.id}
+                key={graphNode.id}
+                path={automationGraphNodePath(graphNode.id)}
+                isActive={route.view === "automation" && route.graphNodeId === graphNode.id}
                 navigate={navigate}
                 className="h-6 min-w-0 pl-7 font-mono text-[0.7rem] text-muted-foreground data-active:text-sidebar-accent-foreground"
               >
-                <span className="truncate">{loop.id}</span>
+                <span className="truncate">{graphNode.id}</span>
               </SidebarNavLinkItem>
             ))}
           </SidebarMenuSub>

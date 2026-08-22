@@ -1,318 +1,207 @@
 import { z } from "zod";
-import { orchestratorRouteSchema } from "./runtime-orchestration-schemas.js";
-export {
-  orchestrationRequestSchema, orchestratorRouteSchema, rootRunOrchestrationProjectionSchema
-} from "./runtime-orchestration-schemas.js";
 import type { JsonValue } from "../domain/automation.js";
 import type {
-  CanonicalNodeOutcome, NodeRunRole, OrchestratorNodeOutcome, ValidationNodeOutcome,
-  JobNodeOutcome
+  CanonicalNodeOutcome, NodeRunRole, OrchestratorNodeOutcome, RepairNodeOutcome,
+  ValidationNodeOutcome, WorkNodeOutcome
 } from "../domain/runtime.js";
 
-const idSchema = z.string().uuid();
-const boundedText = z.string().max(20_000);
-const nonEmptyText = boundedText.trim().min(1);
-export const emptyBodySchema = z.object({}).strict();
-
-export const startRunBodySchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("graph"), targetId: z.string().trim().min(1).max(200), input: z.string().max(20_000).optional() }).strict(),
-  z.object({ kind: z.literal("loop"), targetId: z.string().trim().min(1).max(200), input: z.string().max(20_000).optional() }).strict()
-]);
-
-export const rootRunParamsSchema = z.object({ rootRunId: idSchema }).strict();
-export const nodeRunParamsSchema = z.object({
-  rootRunId: idSchema,
-  nodeRunId: idSchema
-}).strict();
-export const executionTaskParamsSchema = z.object({ taskId: idSchema }).strict();
-
-export const rootRunListQuerySchema = z.object({
-  state: z.enum(["active", "recent"]).optional(),
-  cursor: z.string().min(1).max(500).optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional()
-}).strict();
-
-export const executionEventsQuerySchema = z.object({
-  after: z.coerce.number().int().nonnegative().default(0),
-  limit: z.coerce.number().int().min(1).max(1000).default(500)
-}).strict();
-
-const patchPathSchema = z.string().min(1).startsWith("/");
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
+  z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)
+]));
 const statePatchOperationSchema = z.discriminatedUnion("op", [
-  z.object({ op: z.literal("add"), path: patchPathSchema, value: z.json() }).strict(),
-  z.object({ op: z.literal("remove"), path: patchPathSchema }).strict(),
-  z.object({ op: z.literal("replace"), path: patchPathSchema, value: z.json() }).strict()
+  z.object({ op: z.literal("add"), path: z.string(), value: jsonValueSchema }).strict(),
+  z.object({ op: z.literal("remove"), path: z.string() }).strict(),
+  z.object({ op: z.literal("replace"), path: z.string(), value: jsonValueSchema }).strict()
 ]);
-export const statePatchSchema = z.array(statePatchOperationSchema).min(1).max(128);
+const statePatchSchema = z.array(statePatchOperationSchema).max(128);
+const checksSchema = z.array(z.object({
+  name: z.string().min(1), status: z.enum(["passed", "failed", "skipped"]), details: z.string().optional()
+}).strict());
+const summary = z.string().trim().min(1).max(20_000);
 
-export const runCheckSchema = z.object({
-  name: z.string().trim().min(1).max(500),
-  status: z.enum(["passed", "failed", "skipped"]),
-  details: z.string().max(4_000).optional()
-}).strict();
+export const workNodeOutcomeSchema = z.discriminatedUnion("state", [
+  z.object({
+    role: z.literal("work"), state: z.literal("completed"), summary, checks: checksSchema,
+    artifacts: z.record(z.string(), jsonValueSchema), statePatch: statePatchSchema.optional()
+  }).strict(),
+  z.object({
+    role: z.literal("work"), state: z.literal("needs_input"), summary, checks: checksSchema,
+    question: summary, context: summary
+  }).strict(),
+  z.object({ role: z.literal("work"), state: z.literal("blocked"), summary, checks: checksSchema }).strict(),
+  z.object({ role: z.literal("work"), state: z.literal("failed"), summary, checks: checksSchema }).strict()
+]) satisfies z.ZodType<WorkNodeOutcome>;
 
-const checkedSummary = {
-  summary: boundedText,
-  checks: z.array(runCheckSchema).max(500)
-};
-
-export const jobCompletedOutcomeSchema = z.object({
-  role: z.literal("job"),
+export const validationNodeOutcomeSchema = z.object({
+  role: z.literal("validation"),
   state: z.literal("completed"),
-  ...checkedSummary,
-  artifacts: z.record(z.string(), z.json()),
+  summary,
+  checks: checksSchema,
+  decision: z.enum(["PASS", "FAIL"]),
+  evidence: jsonValueSchema,
+  feedback: summary.optional(),
+  expectedCorrection: summary.optional(),
+  repairRequest: z.object({
+    reason: summary,
+    requestedCapability: z.string().min(1),
+    evidenceRefs: z.array(z.string())
+  }).strict().optional(),
   statePatch: statePatchSchema.optional()
-}).strict();
+}).strict().superRefine((outcome, context) => {
+  if (outcome.decision === "PASS" && (outcome.feedback || outcome.expectedCorrection || outcome.repairRequest)) {
+    context.addIssue({ code: "custom", path: ["decision"], message: "PASS cannot request repair or correction." });
+  }
+  if (outcome.decision === "FAIL" && outcome.statePatch) {
+    context.addIssue({ code: "custom", path: ["statePatch"], message: "FAIL cannot patch State." });
+  }
+}) as z.ZodType<ValidationNodeOutcome>;
 
-export const jobNodeOutcomeSchema = z.union([
-  jobCompletedOutcomeSchema,
+export const orchestratorNodeOutcomeSchema = z.discriminatedUnion("action", [
   z.object({
-    role: z.literal("job"), state: z.literal("needs_input"), ...checkedSummary,
-    question: nonEmptyText, context: boundedText
-  }).strict(),
-  z.object({ role: z.literal("job"), state: z.literal("blocked"), ...checkedSummary }).strict(),
-  z.object({ role: z.literal("job"), state: z.literal("failed"), ...checkedSummary }).strict()
-]);
-
-const validationEscalationFields = {
-  reason: nonEmptyText,
-  evidenceRefs: z.array(z.string().trim().min(1).max(2_000)).max(500)
-};
-const validationEscalationSchema = z.union([
-  z.object({ ...validationEscalationFields, requestedCapability: nonEmptyText }).strict(),
-  z.object({ ...validationEscalationFields, requestedOutcome: z.json() }).strict()
-]);
-
-const validationCompletedPassSchema = z.object({
-  role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("PASS"),
-  ...checkedSummary, evidence: z.json(), transitionOutcome: z.string().regex(/^[a-z][a-z0-9_]*$/).optional(),
-  statePatch: statePatchSchema.optional()
-}).strict();
-const validationCompletedFailFields = {
-  role: z.literal("validation"), state: z.literal("completed"), decision: z.literal("FAIL"),
-  ...checkedSummary,
-  evidence: z.json(),
-  feedback: nonEmptyText,
-  expectedCorrection: nonEmptyText
-};
-const validationCompletedFailSchema = z.union([
-  z.object({ ...validationCompletedFailFields }).strict(),
-  z.object({
-    ...validationCompletedFailFields,
-    transitionOutcome: z.string().regex(/^[a-z][a-z0-9_]*$/)
-  }).strict(),
-  z.object({ ...validationCompletedFailFields, escalation: validationEscalationSchema }).strict()
-]);
-
-export const validationNodeOutcomeSchema = z.union([
-  validationCompletedPassSchema,
-  validationCompletedFailSchema,
-  z.object({
-    role: z.literal("validation"), state: z.literal("needs_input"), ...checkedSummary,
-    question: nonEmptyText, context: boundedText
-  }).strict(),
-  z.object({ role: z.literal("validation"), state: z.literal("blocked"), ...checkedSummary }).strict(),
-  z.object({ role: z.literal("validation"), state: z.literal("failed"), ...checkedSummary }).strict()
-]);
-
-export const respondToNodeRunBodySchema = z.union([
-  z.object({ kind: z.literal("job"), outcome: jobNodeOutcomeSchema }).strict(),
-  z.object({ kind: z.literal("validation"), outcome: validationNodeOutcomeSchema }).strict(),
-  z.object({ kind: z.literal("resume"), response: nonEmptyText }).strict()
-]);
-
-export const orchestratorNodeOutcomeSchema = z.union([
-  z.object({
-    role: z.literal("orchestrator"), state: z.literal("completed"),
-    targetLoopId: z.string().trim().min(1).max(200), routeReason: nonEmptyText,
-    dispatchInput: z.json(), expectedOutcome: z.json()
+    role: z.literal("orchestrator"), state: z.literal("completed"), action: z.literal("dispatch"),
+    summary, target: z.string().min(1), reason: summary, dispatchInput: jsonValueSchema.optional()
   }).strict(),
   z.object({
-    role: z.literal("orchestrator"), state: z.literal("needs_input"),
-    summary: boundedText, question: nonEmptyText, context: boundedText
+    role: z.literal("orchestrator"), state: z.literal("completed"), action: z.literal("complete"),
+    summary, result: z.enum(["PASS", "FAIL"]), reason: summary
   }).strict(),
-  z.object({ role: z.literal("orchestrator"), state: z.literal("blocked"), summary: boundedText }).strict(),
-  z.object({ role: z.literal("orchestrator"), state: z.literal("failed"), summary: boundedText }).strict()
-]);
+  z.object({
+    role: z.literal("orchestrator"), state: z.literal("completed"), action: z.literal("delegate_repair"),
+    summary, reason: summary
+  }).strict(),
+  z.object({
+    role: z.literal("orchestrator"), state: z.literal("needs_input"), action: z.literal("needs_input"),
+    summary, question: summary, context: summary
+  }).strict()
+]) satisfies z.ZodType<OrchestratorNodeOutcome>;
+
+export const repairNodeOutcomeSchema = z.discriminatedUnion("action", [
+  z.object({
+    role: z.literal("repair"), state: z.literal("completed"), action: z.literal("revalidate"),
+    summary, artifacts: z.record(z.string(), jsonValueSchema), statePatch: statePatchSchema.optional()
+  }).strict(),
+  z.object({
+    role: z.literal("repair"), state: z.literal("completed"), action: z.literal("dispatch"),
+    summary, target: z.string().min(1), reason: summary, artifacts: z.record(z.string(), jsonValueSchema),
+    statePatch: statePatchSchema.optional()
+  }).strict(),
+  z.object({
+    role: z.literal("repair"), state: z.literal("completed"), action: z.literal("escalate"), summary, reason: summary
+  }).strict(),
+  z.object({
+    role: z.literal("repair"), state: z.literal("needs_input"), action: z.literal("needs_input"),
+    summary, question: summary, context: summary
+  }).strict()
+]) satisfies z.ZodType<RepairNodeOutcome>;
 
 export const canonicalNodeOutcomeSchema = z.union([
-  jobNodeOutcomeSchema,
-  validationNodeOutcomeSchema,
-  orchestratorNodeOutcomeSchema
+  workNodeOutcomeSchema, validationNodeOutcomeSchema, orchestratorNodeOutcomeSchema, repairNodeOutcomeSchema
+]) satisfies z.ZodType<CanonicalNodeOutcome>;
+export const nodeOutcomeSchemaIds = {
+  work: "work-node-outcome-v7",
+  validation: "validation-node-outcome-v7",
+  orchestrator: "orchestrator-node-outcome-v7",
+  repair: "repair-node-outcome-v7"
+} as const;
+export const nodeOutcomeSchemaForRole = (role: NodeRunRole) => ({
+  work: workNodeOutcomeSchema,
+  validation: validationNodeOutcomeSchema,
+  orchestrator: orchestratorNodeOutcomeSchema,
+  repair: repairNodeOutcomeSchema
+})[role];
+export const parseNodeOutcomeForRole = (role: NodeRunRole, value: unknown): CanonicalNodeOutcome =>
+  nodeOutcomeSchemaForRole(role).parse(value) as CanonicalNodeOutcome;
+export const nodeOutcomeJsonSchemaForRole = (role: NodeRunRole): Record<string, JsonValue> =>
+  z.toJSONSchema(nodeOutcomeSchemaForRole(role), { target: "draft-07", unrepresentable: "any" }) as Record<string, JsonValue>;
+
+export const emptyBodySchema = z.object({}).strict();
+export const startRunBodySchema = z.object({
+  kind: z.enum(["graph", "graph_node"]), targetId: z.string().min(1), input: z.string().max(64_000).optional()
+}).strict();
+export const rootRunListQuerySchema = z.object({
+  state: z.enum(["active", "recent"]).optional(), cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional()
+}).strict();
+export const rootRunParamsSchema = z.object({ rootRunId: z.string().uuid() }).strict();
+export const nodeRunParamsSchema = z.object({ rootRunId: z.string().uuid(), nodeRunId: z.string().uuid() }).strict();
+export const executionTaskParamsSchema = z.object({ taskId: z.string().uuid() }).strict();
+export const executionEventsQuerySchema = z.object({
+  after: z.coerce.number().int().min(0).optional(), limit: z.coerce.number().int().min(1).max(500).optional()
+}).strict();
+export const nodeRunResponseBodySchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("work"), outcome: workNodeOutcomeSchema }).strict(),
+  z.object({ kind: z.literal("validation"), outcome: validationNodeOutcomeSchema }).strict(),
+  z.object({ kind: z.literal("resume"), response: z.string().trim().min(1).max(64_000) }).strict()
 ]);
+export const respondToNodeRunBodySchema = nodeRunResponseBodySchema;
 
-const patchEvidenceSchema = z.object({
-  patch: statePatchSchema,
-  patchSha256: z.string().regex(/^[a-f0-9]{64}$/)
+const timestamp = z.string().datetime();
+export const graphStateRevisionMetadataSchema = z.object({
+  rootRunId: z.string(), revision: z.number().int().min(0), parentRevision: z.number().int().min(0).optional(),
+  stateSha256: z.string(), sourceNodeRunId: z.string().optional(), patch: z.object({
+    patch: statePatchSchema, patchSha256: z.string()
+  }).strict().optional(), patchOmitted: z.boolean(), createdAt: timestamp
 }).strict();
-
-export const loopStateRevisionMetadataSchema = z.object({
-  rootRunId: idSchema,
-  revision: z.number().int().nonnegative(),
-  parentRevision: z.number().int().nonnegative().optional(),
-  stateSha256: z.string().regex(/^[a-f0-9]{64}$/),
-  sourceNodeRunId: idSchema.optional(),
-  patch: patchEvidenceSchema.optional(),
-  patchOmitted: z.boolean(),
-  createdAt: z.string()
-}).strict();
-
 export const rootRunStateProjectionSchema = z.object({
-  currentRevision: z.number().int().nonnegative(),
-  currentState: z.json().optional(),
-  currentStateSha256: z.string().regex(/^[a-f0-9]{64}$/),
-  revisions: z.array(loopStateRevisionMetadataSchema).max(64),
-  totalRevisionCount: z.number().int().positive(),
-  historyTruncated: z.boolean()
+  currentRevision: z.number().int().min(0), currentState: jsonValueSchema.optional(), currentStateSha256: z.string(),
+  revisions: z.array(graphStateRevisionMetadataSchema), totalRevisionCount: z.number().int().min(0), historyTruncated: z.boolean()
 }).strict();
-
-export const rootRunReturnDestinationSchema = z.object({
-  loopId: z.string().min(1),
-  jobNodeId: z.string().min(1),
-  validationNodeDefinitionId: z.string().min(1)
+export const routingRequestSchema = z.object({
+  routingRequestId: z.string(), rootRunId: z.string(), scope: z.enum(["graph", "graph_node"]),
+  kind: z.enum(["start", "continuation", "repair"]), graphNodeId: z.string().optional(),
+  sourceChildId: z.string().optional(), sourceNodeRunId: z.string().optional(), result: z.enum(["PASS", "FAIL"]).optional(),
+  requestedCapability: z.string().optional(), stateRevision: z.number().int().min(0), evidence: jsonValueSchema,
+  candidateKeys: z.array(z.string()), attempt: z.number().int().min(1),
+  status: z.enum(["pending", "waiting_for_input", "decided", "dispatched", "failed", "cancelled"]),
+  createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp.optional()
 }).strict();
-
+export const routingDecisionSchema = z.object({
+  routingDecisionId: z.string(), routingRequestId: z.string(), rootRunId: z.string(), orchestratorNodeRunId: z.string(),
+  action: z.enum(["dispatch", "complete", "delegate_repair", "needs_input"]), selectedTarget: z.string().optional(),
+  result: z.enum(["PASS", "FAIL"]).optional(), reason: z.string(), valid: z.boolean(), createdAt: timestamp
+}).strict();
 export const repairRequestSchema = z.object({
-  repairRequestId: idSchema,
-  rootRunId: idSchema,
-  requesterLoopRunId: idSchema,
-  requesterJobRunId: idSchema,
-  requesterValidationNodeRunId: idSchema,
-  attempt: z.number().int().positive(),
-  validationSummary: nonEmptyText,
-  requestedCapability: nonEmptyText.optional(),
-  requestedOutcome: z.json().optional(),
-  reason: nonEmptyText,
-  evidence: z.json().optional(),
-  stateRevisionAtRequest: z.number().int().nonnegative(),
-  orchestratorNodeRunId: idSchema.optional(),
-  routedLoopEdgeId: z.string().min(1).optional(),
-  routedTargetLoopId: z.string().min(1).optional(),
-  status: z.enum(["pending", "routed", "repaired", "failed", "cancelled"]),
-  returnLoopId: z.string().min(1),
-  returnJobNodeId: z.string().min(1),
-  returnValidationNodeDefinitionId: z.string().min(1),
-  nestingDepth: z.number().int().nonnegative(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  completedAt: z.string().optional()
-}).strict().refine((value) =>
-  (value.requestedCapability === undefined) !== (value.requestedOutcome === undefined), {
-  message: "Repair Request requires exactly one requested capability or requested outcome."
-});
-
-export const orchestrationFrameSchema = z.object({
-  frameId: idSchema,
-  rootRunId: idSchema,
-  repairRequestId: idSchema,
-  routeId: idSchema,
-  callerLoopRunId: idSchema,
-  calleeLoopRunId: idSchema,
-  parentFrameId: idSchema.optional(),
-  returnLoopId: z.string().min(1),
-  returnJobNodeId: z.string().min(1),
-  returnValidationNodeDefinitionId: z.string().min(1),
-  stateRevisionAtCall: z.number().int().nonnegative(),
-  nestingDepth: z.number().int().nonnegative(),
-  status: z.enum(["open", "returned", "failed", "cancelled"]),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  completedAt: z.string().optional()
+  repairRequestId: z.string(), rootRunId: z.string(), scope: z.enum(["graph", "graph_node"]),
+  graphNodeId: z.string().optional(), requesterNodeRunId: z.string(), requesterJobNodeInvocationId: z.string().optional(),
+  returnValidationNodeId: z.string(), attempt: z.number().int().min(1), depth: z.number().int().min(0),
+  reason: z.string(), requestedCapability: z.string().optional(), evidence: jsonValueSchema,
+  stateRevision: z.number().int().min(0), candidateKeys: z.array(z.string()),
+  status: z.enum(["pending", "running", "repaired", "escalated", "needs_input", "failed", "cancelled"]),
+  createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp.optional()
 }).strict();
-
+export const repairFrameSchema = z.object({
+  repairFrameId: z.string(), rootRunId: z.string(), repairRequestId: z.string(), parentFrameId: z.string().optional(),
+  returnGraphNodeInvocationId: z.string(), returnJobNodeInvocationId: z.string(), returnValidationNodeId: z.string(),
+  stateRevisionAtCall: z.number().int().min(0), depth: z.number().int().min(0),
+  status: z.enum(["open", "returned", "escalated", "failed", "cancelled"]),
+  createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp.optional()
+}).strict();
 export const repairResultSchema = z.object({
-  repairResultId: idSchema,
-  rootRunId: idSchema,
-  repairRequestId: idSchema,
-  orchestrationFrameId: idSchema,
-  targetLoopRunId: idSchema,
-  targetLoopId: z.string().min(1),
-  status: z.enum(["repaired", "blocked", "failed", "cancelled"]),
-  stateRevision: z.number().int().nonnegative(),
-  outcome: canonicalNodeOutcomeSchema.optional(),
-  summary: boundedText,
-  createdAt: z.string()
+  repairResultId: z.string(), rootRunId: z.string(), repairRequestId: z.string(), repairFrameId: z.string(),
+  stateRevision: z.number().int().min(0), outcome: canonicalNodeOutcomeSchema, summary: z.string(), createdAt: timestamp
 }).strict();
-
+export const rootRunOrchestrationProjectionSchema = z.object({
+  requests: z.array(routingRequestSchema), decisions: z.array(routingDecisionSchema),
+  pendingRequest: routingRequestSchema.optional(), selectedDecision: routingDecisionSchema.optional()
+}).strict();
 export const rootRunRepairProjectionSchema = z.object({
-  requests: z.array(repairRequestSchema).max(256),
-  routes: z.array(orchestratorRouteSchema).max(256),
-  continuations: z.array(orchestrationFrameSchema).max(256),
-  results: z.array(repairResultSchema).max(256),
-  activeContinuationChain: z.array(orchestrationFrameSchema).max(256),
-  pendingRepair: repairRequestSchema.optional(),
-  routedTarget: orchestratorRouteSchema.optional(),
-  returnDestination: rootRunReturnDestinationSchema.optional()
+  requests: z.array(repairRequestSchema), frames: z.array(repairFrameSchema), results: z.array(repairResultSchema),
+  activeFrames: z.array(repairFrameSchema), pendingRepair: repairRequestSchema.optional()
 }).strict();
-
 export const controlFlowEventSchema = z.object({
-  id: z.number().int().positive(),
-  rootRunId: idSchema,
-  sequence: z.number().int().positive(),
-  kind: z.enum([
-    "job_completed", "job_needs_input", "job_terminal", "validation_pass",
-    "validation_fail_retry", "validation_fail_escalated", "validation_terminal",
-    "repair_call", "repair_return", "repair_terminal", "graph_transition",
-    "orchestrator_terminal", "root_cancelled", "root_terminal", "execution_interrupted"
-  ]),
-  stateRevision: z.number().int().nonnegative(),
-  sourceLoopRunId: idSchema.optional(),
-  sourceJobRunId: idSchema.optional(),
-  sourceNodeRunId: idSchema.optional(),
-  targetLoopRunId: idSchema.optional(),
-  targetJobRunId: idSchema.optional(),
-  orchestrationRequestId: idSchema.optional(),
-  repairRequestId: idSchema.optional(),
-  orchestrationFrameId: idSchema.optional(),
-  createdAt: z.string()
+  id: z.number().int(), rootRunId: z.string(), sequence: z.number().int(),
+  kind: z.enum(["orchestrator_requested", "orchestrator_decided", "orchestrator_invalid", "graph_node_dispatched",
+    "job_node_dispatched", "work_completed", "validation_pass", "validation_fail_retry", "validation_fail_repair",
+    "repair_dispatched", "repair_return", "repair_escalated", "root_needs_input", "root_cancelled", "root_terminal", "execution_interrupted"]),
+  stateRevision: z.number().int().min(0), graphNodeInvocationId: z.string().optional(),
+  jobNodeInvocationId: z.string().optional(), sourceNodeRunId: z.string().optional(), targetNodeRunId: z.string().optional(),
+  routingRequestId: z.string().optional(), repairRequestId: z.string().optional(), repairFrameId: z.string().optional(), createdAt: timestamp
 }).strict();
-
-export const workspaceInvalidationEventSchema = z.discriminatedUnion("type", [
+export const workspaceInvalidationEventSchema = z.union([
+  z.object({ id: z.number(), type: z.literal("workspace-changed"), at: timestamp, reason: z.string().optional() }).strict(),
   z.object({
-    id: z.number().int().nonnegative(),
-    type: z.literal("workspace-changed"),
-    at: z.string(),
-    reason: z.string().max(1_000).optional()
-  }).strict(),
-  z.object({
-    id: z.number().int().nonnegative(),
-    type: z.literal("runs-changed"),
-    at: z.string(),
-    rootRunId: idSchema,
-    stateRevision: z.number().int().nonnegative(),
-    status: z.enum([
-      "queued", "running", "waiting_for_input", "finalizing", "completed",
-      "blocked", "failed", "cancelled"
-    ])
+    id: z.number(), type: z.literal("runs-changed"), at: timestamp, rootRunId: z.string(),
+    stateRevision: z.number(),
+    status: z.enum(["queued","running","waiting_for_input","finalizing","completed","blocked","failed","cancelled"])
   }).strict()
 ]);
-
-export const jobNodeOutcomeJsonSchema = jsonSchema(jobNodeOutcomeSchema);
-export const validationNodeOutcomeJsonSchema = jsonSchema(validationNodeOutcomeSchema);
-export const orchestratorNodeOutcomeJsonSchema = jsonSchema(orchestratorNodeOutcomeSchema);
-
-export const nodeOutcomeSchemaIds = {
-  job: "job-node-outcome-v6",
-  validation: "validation-node-outcome-v6",
-  orchestrator: "orchestrator-node-outcome-v6"
-} as const;
-
-export const nodeOutcomeJsonSchemaForRole = (role: NodeRunRole): Record<string, JsonValue> => {
-  if (role === "job") return jobNodeOutcomeJsonSchema;
-  if (role === "validation") return validationNodeOutcomeJsonSchema;
-  return orchestratorNodeOutcomeJsonSchema;
-};
-
-export function parseNodeOutcomeForRole(role: "job", input: unknown): JobNodeOutcome;
-export function parseNodeOutcomeForRole(role: "validation", input: unknown): ValidationNodeOutcome;
-export function parseNodeOutcomeForRole(role: "orchestrator", input: unknown): OrchestratorNodeOutcome;
-export function parseNodeOutcomeForRole(role: NodeRunRole, input: unknown): CanonicalNodeOutcome;
-export function parseNodeOutcomeForRole(role: NodeRunRole, input: unknown): CanonicalNodeOutcome {
-  if (role === "job") return jobNodeOutcomeSchema.parse(input);
-  if (role === "validation") return validationNodeOutcomeSchema.parse(input);
-  return orchestratorNodeOutcomeSchema.parse(input);
-}
-
-function jsonSchema(schema: z.ZodType): Record<string, JsonValue> {
-  return z.record(z.string(), z.json()).parse(z.toJSONSchema(schema));
-}

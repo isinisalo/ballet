@@ -1,19 +1,13 @@
-// Canonical persisted runtime contracts. Project authoring types live in their
-// own domain modules; this file owns only resolved, immutable Run evidence.
-import type { JsonValue, ProjectLoop } from "./automation.js";
+import type { JsonValue, NodeResult, ProjectGraphNode } from "./automation.js";
 import type { RootExecutionSnapshot } from "./executionRuntime.js";
-import type { LoopTheme } from "./loopThemes.js";
 
 export * from "./executionRuntime.js";
 export * from "./runtimeOrchestration.js";
 
 export const maxStatePatchBytes = 65_536;
-export const maxOrchestratorDispatchValueBytes = 65_536;
 export const maxStatePatchOperations = 128;
 export const maxRuntimeJsonDepth = 64;
-// Internal evidence events include Job, Validation, repair and Graph routing events.
-// The public RunBook transition limit is enforced separately by GraphRunbookEngine.
-export const maxControlFlowTransitions = 2_048;
+export const maxControlFlowTransitions = 256;
 export const maxReadStateRevisionMetadata = 64;
 export const maxReadStatePatchEvidenceBytes = 262_144;
 
@@ -22,13 +16,9 @@ export type JsonPatchOperation =
   | { op: "remove"; path: string }
   | { op: "replace"; path: string; value: JsonValue };
 export type StatePatch = JsonPatchOperation[];
+export interface StatePatchEvidence { patch: StatePatch; patchSha256: string; }
 
-export interface StatePatchEvidence {
-  patch: StatePatch;
-  patchSha256: string;
-}
-
-export interface LoopStateRevision {
+export interface GraphStateRevision {
   rootRunId: string;
   revision: number;
   parentRevision?: number;
@@ -37,161 +27,127 @@ export interface LoopStateRevision {
   patch?: StatePatchEvidence;
   sourceNodeRunId?: string;
   outcome?: CanonicalNodeOutcome;
-  controlFlowEventId?: number;
   createdAt: string;
 }
 
-/** Bounded read evidence. Historical state values and outcomes are never exposed here. */
-export interface LoopStateRevisionMetadata {
-  rootRunId: string;
-  revision: number;
-  parentRevision?: number;
-  stateSha256: string;
-  sourceNodeRunId?: string;
-  patch?: StatePatchEvidence;
-  patchOmitted: boolean;
-  createdAt: string;
-}
-
-export type NodeRunRole = "job" | "validation" | "orchestrator";
+export type GraphStateRevisionMetadata = Omit<GraphStateRevision, "state" | "outcome"> & { patchOmitted: boolean };
+export type NodeRunRole = "work" | "validation" | "orchestrator" | "repair";
+export type OrchestrationScope = "graph" | "graph_node";
 export type NodeRunStatus =
   | "queued" | "running" | "waiting_for_input" | "completed"
   | "blocked" | "failed" | "cancelled" | "interrupted";
-export type JobRunStatus = Exclude<NodeRunStatus, "interrupted">;
-
+export type InvocationStatus = Exclude<NodeRunStatus, "interrupted">;
 export type RunCheckStatus = "passed" | "failed" | "skipped";
+export interface RunCheck { name: string; status: RunCheckStatus; details?: string; }
 
-export interface RunCheck {
-  name: string;
-  status: RunCheckStatus;
-  details?: string;
-}
+interface OutcomeBase { role: NodeRunRole; summary: string; }
+interface CheckedOutcomeBase extends OutcomeBase { checks: RunCheck[]; }
 
-interface OutcomeSummary {
-  summary: string;
-}
-
-interface CheckedOutcomeSummary extends OutcomeSummary {
-  checks: RunCheck[];
-}
-
-export type JobCompletedOutcome = CheckedOutcomeSummary & {
-  role: "job";
-  state: "completed";
-  artifacts: { [key: string]: JsonValue };
-  statePatch?: StatePatch;
-};
-
-export type JobNodeOutcome =
-  | JobCompletedOutcome
-  | CheckedOutcomeSummary & {
-      role: "job";
+export type WorkNodeOutcome =
+  | CheckedOutcomeBase & {
+      role: "work";
+      state: "completed";
+      artifacts: Record<string, JsonValue>;
+      statePatch?: StatePatch;
+    }
+  | CheckedOutcomeBase & {
+      role: "work";
       state: "needs_input";
       question: string;
       context: string;
     }
-  | CheckedOutcomeSummary & {
-      role: "job";
-      state: "blocked" | "failed";
-    };
+  | CheckedOutcomeBase & { role: "work"; state: "blocked" | "failed" };
 
-interface ValidationEscalationBase {
+export interface ValidationRepairRequest {
   reason: string;
+  requestedCapability: string;
   evidenceRefs: string[];
 }
 
-export type ValidationEscalation = ValidationEscalationBase & (
-  | { requestedCapability: string; requestedOutcome?: never }
-  | { requestedCapability?: never; requestedOutcome: JsonValue }
-);
-
-type ValidationCompletedBase = CheckedOutcomeSummary & {
+export interface ValidationNodeOutcome extends CheckedOutcomeBase {
   role: "validation";
   state: "completed";
+  decision: NodeResult;
   evidence: JsonValue;
-};
-
-type ValidationFailRoute =
-  | { transitionOutcome?: never; escalation?: never }
-  | { transitionOutcome: string; escalation?: never }
-  | { transitionOutcome?: never; escalation: ValidationEscalation };
-
-export type ValidationCompletedOutcome = ValidationCompletedBase & (
-  | {
-      decision: "PASS";
-      transitionOutcome?: string;
-      statePatch?: StatePatch;
-      feedback?: never;
-      expectedCorrection?: never;
-      escalation?: never;
-    }
-  | {
-      decision: "FAIL";
-      feedback: string;
-      expectedCorrection: string;
-      statePatch?: never;
-    } & ValidationFailRoute
-);
-
-export type ValidationNodeOutcome =
-  | ValidationCompletedOutcome
-  | CheckedOutcomeSummary & {
-      role: "validation";
-      state: "needs_input";
-      question: string;
-      context: string;
-    }
-  | CheckedOutcomeSummary & {
-      role: "validation";
-      state: "blocked" | "failed";
-    };
+  feedback?: string;
+  expectedCorrection?: string;
+  repairRequest?: ValidationRepairRequest;
+  statePatch?: StatePatch;
+}
 
 export type OrchestratorNodeOutcome =
-  | {
+  | OutcomeBase & {
       role: "orchestrator";
       state: "completed";
-      targetLoopId: string;
-      routeReason: string;
-      dispatchInput: JsonValue;
-      expectedOutcome: JsonValue;
+      action: "dispatch";
+      target: string;
+      reason: string;
+      dispatchInput?: JsonValue;
     }
-  | OutcomeSummary & {
+  | OutcomeBase & {
+      role: "orchestrator";
+      state: "completed";
+      action: "complete";
+      result: NodeResult;
+      reason: string;
+    }
+  | OutcomeBase & {
+      role: "orchestrator";
+      state: "completed";
+      action: "delegate_repair";
+      reason: string;
+    }
+  | OutcomeBase & {
       role: "orchestrator";
       state: "needs_input";
+      action: "needs_input";
       question: string;
       context: string;
-    }
-  | OutcomeSummary & {
-      role: "orchestrator";
-      state: "blocked" | "failed";
     };
 
-export type CanonicalNodeOutcome = JobNodeOutcome | ValidationNodeOutcome | OrchestratorNodeOutcome;
+export type RepairNodeOutcome =
+  | OutcomeBase & {
+      role: "repair";
+      state: "completed";
+      action: "revalidate";
+      artifacts: Record<string, JsonValue>;
+      statePatch?: StatePatch;
+    }
+  | OutcomeBase & {
+      role: "repair";
+      state: "completed";
+      action: "dispatch";
+      target: string;
+      reason: string;
+      artifacts: Record<string, JsonValue>;
+      statePatch?: StatePatch;
+    }
+  | OutcomeBase & {
+      role: "repair";
+      state: "completed";
+      action: "escalate";
+      reason: string;
+    }
+  | OutcomeBase & {
+      role: "repair";
+      state: "needs_input";
+      action: "needs_input";
+      question: string;
+      context: string;
+    };
 
-export type LoopRunSource = "manual" | "transition" | "repair" | "schedule";
-export type LoopRunStatus =
-  | "queued" | "running" | "waiting_for_input" | "completed"
-  | "blocked" | "failed" | "cancelled";
-export type LoopScheduleOccurrenceStatus = "started" | "skipped" | "missed";
-
-export interface LoopScheduleOccurrence { jobNodeId: string; scheduledFor: string }
-
-export interface LoopScheduleState {
-  loopId: string;
-  jobNodeId: string;
-  nextRunAt?: string;
-  lastScheduledAt?: string;
-  lastStatus?: LoopScheduleOccurrenceStatus;
-  lastLoopRunId?: string;
-  lastError?: string;
-}
+export type CanonicalNodeOutcome =
+  | WorkNodeOutcome
+  | ValidationNodeOutcome
+  | OrchestratorNodeOutcome
+  | RepairNodeOutcome;
 
 export interface RootRun {
   rootRunId: string;
-  kind: "graph" | "loop";
+  kind: "graph" | "graph_node";
   targetId: string;
-  source: "manual" | "schedule";
-  status: LoopRunStatus | "finalizing";
+  source: "manual";
+  status: InvocationStatus | "finalizing";
   stateRevision: number;
   input?: string;
   outcome?: CanonicalNodeOutcome;
@@ -203,7 +159,7 @@ export interface RootRun {
   configHash: string;
   snapshotHash: string;
   transitionCount: number;
-  activeLoopRunId?: string;
+  activeGraphNodeInvocationId?: string;
   activeNodeRunId?: string;
   executionSnapshot: RootExecutionSnapshot;
   createdAt: string;
@@ -211,20 +167,15 @@ export interface RootRun {
   completedAt?: string;
 }
 
-export interface LoopRun {
-  loopRunId: string;
-  loopId: string;
+export interface GraphNodeInvocation {
+  graphNodeInvocationId: string;
+  graphNodeId: string;
   rootRunId: string;
-  parentLoopRunId?: string;
-  source: LoopRunSource;
-  status: LoopRunStatus;
+  parentGraphNodeInvocationId?: string;
+  source: "orchestrator" | "repair" | "root";
+  status: InvocationStatus;
   input?: JsonValue;
-  snapshot: ProjectLoop;
-  themeSnapshot: LoopTheme;
-  schedule?: LoopScheduleOccurrence;
-  orchestrationRequestId?: string;
-  repairRequestId?: string;
-  orchestrationFrameId?: string;
+  snapshot: ProjectGraphNode;
   entryStateRevision: number;
   completionStateRevision?: number;
   nestingDepth: number;
@@ -233,20 +184,17 @@ export interface LoopRun {
   completedAt?: string;
 }
 
-export interface JobRun {
-  jobRunId: string;
+export interface JobNodeInvocation {
+  jobNodeInvocationId: string;
   rootRunId: string;
-  loopRunId: string;
-  loopId: string;
+  graphNodeInvocationId: string;
+  graphNodeId: string;
   jobNodeId: string;
-  jobAttempt: number;
-  status: JobRunStatus;
+  workAttempt: number;
+  status: InvocationStatus;
   stateRevisionBefore: number;
   stateRevisionAfter?: number;
   activeNodeRunId?: string;
-  terminal?: "completed" | "blocked" | "failed" | "cancelled";
-  errorCode?: string;
-  errorMessage?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -255,12 +203,12 @@ export interface JobRun {
 export interface NodeRun {
   nodeRunId: string;
   rootRunId: string;
-  loopRunId: string;
-  jobRunId?: string;
+  graphNodeInvocationId?: string;
+  jobNodeInvocationId?: string;
+  scope?: OrchestrationScope;
   role: NodeRunRole;
-  loopId: string;
+  graphNodeId?: string;
   jobNodeId?: string;
-  workflowNodeId?: string;
   nodeDefinitionId: string;
   executionTaskId?: string;
   input?: JsonValue;
@@ -279,7 +227,7 @@ export interface NodeRun {
   completedAt?: string;
 }
 
-export interface LoopRunDetails extends LoopRun {
-  jobRuns: JobRun[];
+export interface GraphNodeInvocationDetails extends GraphNodeInvocation {
+  jobNodeInvocations: JobNodeInvocation[];
   nodeRuns: NodeRun[];
 }

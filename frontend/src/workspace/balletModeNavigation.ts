@@ -1,5 +1,5 @@
 import type { BalletMode } from "@shared/api/workspace-contracts";
-import { automationGraphPath, automationLoopPath, runGraphPath, runLoopPath, runOverviewPath } from "./routing";
+import { automationGraphNodePath, automationGraphPath, runGraphNodePath, runGraphPath, runOverviewPath } from "./routing";
 import type { RouteState } from "./types";
 
 export function pathForBalletMode({
@@ -11,24 +11,24 @@ export function pathForBalletMode({
 }): string {
   if (nextMode === "run") {
     if (route.view === "run") return runRoutePath(route);
-    if (route.view === "automation" && route.automationEntityId) return runLoopPath(route.automationEntityId);
+    if (route.view === "automation" && route.graphNodeId) return runGraphNodePath(route.graphNodeId);
     return runOverviewPath();
   }
 
   if (route.view !== "run") return configureRoutePath(route);
-  if (route.runTargetKind === "loop" && route.runTargetId) return automationLoopPath(route.runTargetId);
+  if (route.runTargetKind === "graph_node" && route.runTargetId) return automationGraphNodePath(route.runTargetId);
   return automationGraphPath();
 }
 
 const runRoutePath = (route: RouteState) => {
   if (route.runTargetKind === "graph" && route.runTargetId) return runGraphPath(route.runTargetId, route.rootRunId);
-  if (route.runTargetKind === "loop" && route.runTargetId) return runLoopPath(route.runTargetId, route.rootRunId);
+  if (route.runTargetKind === "graph_node" && route.runTargetId) return runGraphNodePath(route.runTargetId, route.rootRunId);
   return runOverviewPath(route.rootRunId);
 };
 
 const configureRoutePath = (route: RouteState) => {
   if (route.view === "automation") {
-    if (route.automationView === "workflow" && route.automationEntityId) return automationLoopPath(route.automationEntityId);
+    if (route.graphNodeId) return automationGraphNodePath(route.graphNodeId);
     return automationGraphPath();
   }
   return windowPath();

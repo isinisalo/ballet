@@ -9,40 +9,40 @@ import { MarkdownEntityService } from "./services/MarkdownEntityService.js";
 import { RuntimeDatabaseProvider } from "./services/RuntimeDatabaseProvider.js";
 import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 import type { WorkspaceContentData } from "./documents/markdownAppDataLoader.js";
-import type { LoopTheme } from "../shared/domain/loopThemes.js";
+import type { CanvasTheme } from "../shared/domain/canvasTheme.js";
 import type { ExecutionProfile } from "../shared/domain/projectConfig.js";
-import { LoopThemeRepository } from "./loop-themes/LoopThemeRepository.js";
-import { LoopThemeService } from "./services/LoopThemeService.js";
+import { CanvasThemeRepository } from "./canvas-themes/CanvasThemeRepository.js";
+import { CanvasThemeService } from "./services/CanvasThemeService.js";
 import type {
-  InstalledLoopModuleStatus,
-  LoopModuleExportResult,
-  LoopModuleInspection,
-  LoopModuleInstallPlan,
-  LoopModuleLibraryEntry
-} from "../shared/domain/loopModules.js";
-import { LoopModuleService } from "./loop-modules/LoopModuleService.js";
+  InstalledGraphNodeModuleStatus,
+  GraphNodeModuleExportResult,
+  GraphNodeModuleInspection,
+  GraphNodeModuleInstallPlan,
+  GraphNodeModuleLibraryEntry
+} from "../shared/domain/graphNodeModules.js";
+import { GraphNodeModuleService } from "./graph-node-modules/GraphNodeModuleService.js";
 
 export class MarkdownStore {
   private readonly projectRoot: string;
   private readonly runtimeDatabaseProvider: RuntimeDatabaseProvider;
   private projectConfigMutationQueue: Promise<void> = Promise.resolve();
-  private readonly loopThemeRepository = new LoopThemeRepository();
+  private readonly canvasThemeRepository = new CanvasThemeRepository();
   private readonly workspaceDataService: WorkspaceDataService;
   private readonly markdownEntityService: MarkdownEntityService;
   private readonly automationService: AutomationService;
-  private readonly loopThemeService: LoopThemeService;
-  private readonly loopModuleService: LoopModuleService;
+  private readonly canvasThemeService: CanvasThemeService;
+  private readonly graphNodeModuleService: GraphNodeModuleService;
 
   constructor(root = getProjectRoot(), runtimeDatabase?: RuntimeDatabase) {
     this.projectRoot = root;
     this.runtimeDatabaseProvider = new RuntimeDatabaseProvider(
       runtimeDatabase ?? new RuntimeDatabase(path.join(root, ".git", "ballet", "state.sqlite"))
     );
-    this.workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider, this.loopThemeRepository);
+    this.workspaceDataService = new WorkspaceDataService(() => this.root, this.runtimeDatabaseProvider, this.canvasThemeRepository);
     this.markdownEntityService = new MarkdownEntityService(() => this.root, () => this.read());
     this.automationService = new AutomationService(() => this.root, this.runtimeDatabaseProvider);
-    this.loopThemeService = new LoopThemeService(() => this.root, this.loopThemeRepository);
-    this.loopModuleService = new LoopModuleService(() => this.root, this.runtimeDatabaseProvider);
+    this.canvasThemeService = new CanvasThemeService(() => this.root, this.canvasThemeRepository);
+    this.graphNodeModuleService = new GraphNodeModuleService(() => this.root, this.runtimeDatabaseProvider);
   }
 
   get root(): string {
@@ -55,7 +55,7 @@ export class MarkdownStore {
 
   setWorkspaceEnricher(
     enrich: (data: WorkspaceContentData & Pick<AppData,
-      "loopRuns" | "activeRootRuns" | "orchestratorRoutes" | "scheduleStates">) => Promise<AppData>
+      "graphNodeInvocations" | "activeRootRuns" | "routingDecisions">) => Promise<AppData>
   ): void {
     this.workspaceDataService.setEnricher(enrich);
   }
@@ -94,48 +94,48 @@ export class MarkdownStore {
     return this.runProjectConfigMutation(async () => this.automationService.removeExecutionProfile(executionProfileId));
   }
 
-  updateLoopTheme(theme: LoopTheme): Promise<LoopTheme> {
-    return this.loopThemeService.update(theme);
+  updateCanvasTheme(theme: CanvasTheme): Promise<CanvasTheme> {
+    return this.canvasThemeService.update(theme);
   }
 
-  listLoopModuleLibrary(): Promise<LoopModuleLibraryEntry[]> {
-    return this.loopModuleService.listLibrary();
+  listGraphNodeModuleLibrary(): Promise<GraphNodeModuleLibraryEntry[]> {
+    return this.graphNodeModuleService.listLibrary();
   }
 
-  inspectLoopModule(input: unknown, source?: string): LoopModuleInspection {
-    return this.loopModuleService.inspect(input, source);
+  inspectGraphNodeModule(input: unknown, source?: string): GraphNodeModuleInspection {
+    return this.graphNodeModuleService.inspect(input, source);
   }
 
-  planLoopModuleInstall(input: { package: unknown; source: string; profileMappings?: Record<string, string> }): Promise<LoopModuleInstallPlan> {
-    return this.loopModuleService.plan(input);
+  planGraphNodeModuleInstall(input: { package: unknown; source: string; profileMappings?: Record<string, string> }): Promise<GraphNodeModuleInstallPlan> {
+    return this.graphNodeModuleService.plan(input);
   }
 
-  installLoopModule(input: {
+  installGraphNodeModule(input: {
     package: unknown;
     source: string;
     profileMappings?: Record<string, string>;
     expectedPlanHash: string;
-  }): Promise<InstalledLoopModuleStatus> {
-    return this.runProjectConfigMutation(() => this.loopModuleService.commit(input));
+  }): Promise<InstalledGraphNodeModuleStatus> {
+    return this.runProjectConfigMutation(() => this.graphNodeModuleService.commit(input));
   }
 
-  exportLoopModule(input: {
-    loopId: string;
+  exportGraphNodeModule(input: {
+    graphNodeId: string;
     title?: string;
     description?: string;
     version?: string;
     category?: string;
     tags?: string[];
-  }): Promise<LoopModuleExportResult> {
-    return this.loopModuleService.exportLoop(input);
+  }): Promise<GraphNodeModuleExportResult> {
+    return this.graphNodeModuleService.exportGraphNode(input);
   }
 
-  loopModuleStatuses(): Promise<InstalledLoopModuleStatus[]> {
-    return this.loopModuleService.statuses();
+  graphNodeModuleStatuses(): Promise<InstalledGraphNodeModuleStatus[]> {
+    return this.graphNodeModuleService.statuses();
   }
 
-  removeInstalledLoopModule(loopId: string): Promise<void> {
-    return this.runProjectConfigMutation(() => this.loopModuleService.remove(loopId));
+  removeInstalledGraphNodeModule(graphNodeId: string): Promise<void> {
+    return this.runProjectConfigMutation(() => this.graphNodeModuleService.remove(graphNodeId));
   }
 
   saveProjectDocument(input: {

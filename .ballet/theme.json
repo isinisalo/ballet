@@ -9,7 +9,7 @@
     "labelColor": "#c1c6d7",
     "style": "solid",
     "repairStyle": "dotted",
-    "crossLoopStyle": "dashed"
+    "crossScopeStyle": "dashed"
   },
   "connectionPoint": {
     "style": "near",

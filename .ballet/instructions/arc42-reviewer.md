@@ -2,7 +2,7 @@
 id: arc42-reviewer
 title: arc42 Independent Reviewer
 createdAt: 2026-08-16
-updatedAt: 2026-08-16
+updatedAt: 2026-08-22
 tags:
   - arc42
   - validation
@@ -28,7 +28,7 @@ Inspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not 
 
 ## State patch
 
-Only `decision: PASS` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must always include `feedback`, `expectedCorrection`, and exactly one target-free `requestedCapability` or `requestedOutcome`. Runtime owns the local retry budget and escalates through the FailEdge only after it is exhausted.
+Only `decision: PASS` may patch bounded `Arc42MethodStateV1` status/handoff references with changed paths, stable IDs and checks. `FAIL` must not patch State and must always include `feedback`, `expectedCorrection`, and exactly one target-free `requestedCapability` or `requestedOutcome`. Runtime owns the local retry budget and escalates the target-free failure context only after it is exhausted.
 
 ## Stop rules
 

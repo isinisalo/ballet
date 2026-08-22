@@ -1,55 +1,42 @@
 import { useState } from "react";
-import { Activity, History, Play } from "lucide-react";
+import { Play, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Panel } from "@/components/shared/workspace-ui";
-import { toErrorMessage } from "@/lib/errors";
 import type { RootRunSummary, RunTarget } from "@shared/api/workspace-contracts";
-import { runGraphPath, runLoopPath } from "../routing";
-import type { RunDashboardState } from "./useRunDashboard";
+import { runGraphNodePath, runGraphPath } from "../routing";
 import { runApi } from "./runApi";
-import { RootRunCard } from "./RootRunCard";
-import { RunTargetCard } from "./RunTargetCard";
+import type { RunDashboardState } from "./useRunDashboard";
 
 export function RunOverview({ dashboard, navigate }: { dashboard: RunDashboardState; navigate: (path: string) => void }) {
   const [pending, setPending] = useState("");
-  const [actionError, setActionError] = useState("");
-  const openTarget = (target: RunTarget, rootRunId = target.activeRootRunId) => navigate(
-    target.kind === "graph" ? runGraphPath(target.id, rootRunId) : runLoopPath(target.id, rootRunId)
-  );
+  const [error, setError] = useState("");
+  const open = (target: RunTarget, rootRunId?: string) => navigate(target.kind === "graph"
+    ? runGraphPath(target.id, rootRunId)
+    : runGraphNodePath(target.id, rootRunId));
   const start = async (target: RunTarget) => {
     setPending(`${target.kind}:${target.id}`);
-    setActionError("");
     try {
-      const run = await runApi.start(target.kind, target.id);
-      await dashboard.refresh();
-      openTarget(target, run.rootRunId);
-    } catch (caught) {
-      setActionError(toErrorMessage(caught, `Unable to start ${target.name}.`));
+      const detail = await runApi.start(target.kind, target.id);
+      open(target, detail.rootRunId);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to start Run.");
     } finally { setPending(""); }
   };
-  const cancel = async (run: RootRunSummary) => {
-    setPending(run.rootRunId);
-    setActionError("");
-    try { await dashboard.cancel(run); }
-    catch (caught) { setActionError(toErrorMessage(caught, "Unable to cancel root run.")); }
-    finally { setPending(""); }
-  };
-
-  return (
-    <Panel title="Run Overview" icon={<Play />} contentClassName="grid gap-0 p-0" action={<span className="font-mono text-[0.62rem] text-muted-foreground">stream: {dashboard.streamStatus}</span>}>
-      {dashboard.error || actionError ? <Alert variant="destructive" className="m-4 mb-0"><AlertDescription>{actionError || dashboard.error}</AlertDescription></Alert> : null}
-      <RunListSection title="Active root runs" icon={<Activity />} empty={dashboard.loading ? "Loading active runs…" : "No active runs."} runs={dashboard.active} pending={pending} navigate={navigate} onCancel={cancel} />
-      <TargetSection title="Configured Graph" targets={[dashboard.targets.graph]} pending={pending} onOpen={openTarget} onStart={start} />
-      <TargetSection title="Configured Loops" targets={dashboard.targets.loops} pending={pending} onOpen={openTarget} onStart={start} />
-      <RunListSection title="Recent runs" icon={<History />} empty={dashboard.loading ? "Loading recent runs…" : "No recent runs."} runs={dashboard.recent} pending={pending} navigate={navigate} />
-    </Panel>
-  );
+  return <div className="min-w-0 flex-1 overflow-auto">
+    {error ? <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert> : null}
+    <TargetSection title="Graph Run" targets={[dashboard.targets.graph]} pending={pending} onOpen={open} onStart={start} />
+    <TargetSection title="Graph Node Runs" targets={dashboard.targets.graphNodes} pending={pending} onOpen={open} onStart={start} />
+    <RunSection title="Active" runs={dashboard.active} onOpen={(run) => navigate(run.kind === "graph" ? runGraphPath(run.targetId, run.rootRunId) : runGraphNodePath(run.targetId, run.rootRunId))} onCancel={dashboard.cancel} />
+    <RunSection title="Recent" runs={dashboard.recent} onOpen={(run) => navigate(run.kind === "graph" ? runGraphPath(run.targetId, run.rootRunId) : runGraphNodePath(run.targetId, run.rootRunId))} />
+  </div>;
 }
 
-function RunListSection({ title, icon, empty, runs, pending, navigate, onCancel }: { title: string; icon: React.ReactNode; empty: string; runs: RootRunSummary[]; pending: string; navigate: (path: string) => void; onCancel?: (run: RootRunSummary) => void }) {
-  return <section className="border-b border-divider-strong last:border-b-0"><h2 className="flex h-10 items-center gap-2 bg-panel-section px-4 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{icon}{title}</h2>{runs.length ? runs.map((run) => <RootRunCard key={run.rootRunId} run={run} pending={pending === run.rootRunId} navigate={navigate} onCancel={onCancel} />) : <p className="px-4 py-5 text-xs text-muted-foreground">{empty}</p>}</section>;
+function TargetSection({ title, targets, pending, onOpen, onStart }: {
+  title: string; targets: RunTarget[]; pending: string;
+  onOpen: (target: RunTarget) => void; onStart: (target: RunTarget) => void;
+}) {
+  return <section className="border-b border-divider-strong"><h2 className="bg-panel-section px-4 py-2 font-mono text-[0.65rem] uppercase tracking-wide text-muted-foreground">{title}</h2><div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">{targets.map((target) => <div key={`${target.kind}:${target.id}`} className="rounded border border-divider-strong bg-card p-3"><div className="truncate font-mono text-xs text-tertiary">{target.id}</div><div className="mt-1 text-xs text-muted-foreground">{target.description ?? target.name}</div><div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => onOpen(target)}>Open</Button><Button size="sm" disabled={!target.ready || pending === `${target.kind}:${target.id}`} onClick={() => void onStart(target)}><Play /> Start</Button></div>{target.issues.length ? <p className="mt-2 text-xs text-destructive">{target.issues[0].message}</p> : null}</div>)}</div></section>;
 }
-
-function TargetSection({ title, targets, pending, onOpen, onStart }: { title: string; targets: RunTarget[]; pending: string; onOpen: (target: RunTarget) => void; onStart: (target: RunTarget) => void }) {
-  return <section className="border-b border-divider-strong"><h2 className="h-10 bg-panel-section px-4 pt-3 font-mono text-[0.66rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{title}</h2>{targets.length ? <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">{targets.map((target) => <RunTargetCard key={`${target.kind}:${target.id}`} target={target} pending={pending === `${target.kind}:${target.id}`} onOpen={() => onOpen(target)} onStart={() => onStart(target)} />)}</div> : <p className="px-4 py-5 text-xs text-muted-foreground">No {title.toLowerCase()}.</p>}</section>;
+function RunSection({ title, runs, onOpen, onCancel }: { title: string; runs: RootRunSummary[]; onOpen: (run: RootRunSummary) => void; onCancel?: (run: RootRunSummary) => Promise<void> }) {
+  return <section className="border-b border-divider-strong"><h2 className="bg-panel-section px-4 py-2 font-mono text-[0.65rem] uppercase tracking-wide text-muted-foreground">{title}</h2>{runs.length ? runs.map((run) => <div key={run.rootRunId} className="flex items-center gap-3 border-t border-divider-strong px-4 py-3"><button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen(run)}><div className="truncate font-mono text-xs">{run.targetId}</div><div className="text-xs text-muted-foreground">{run.status} · {run.updatedAt}</div></button>{onCancel ? <Button size="icon-sm" variant="ghost" aria-label={`Cancel ${run.targetId}`} onClick={() => void onCancel(run)}><X /></Button> : null}</div>) : <p className="px-4 py-5 text-xs text-muted-foreground">No {title.toLowerCase()} Runs.</p>}</section>;
 }

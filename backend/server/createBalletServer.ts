@@ -19,8 +19,9 @@ import { LocalRunTargetService } from "../runs/LocalRunTargetService.js";
 import { RootRunStore } from "../runs/RootRunStore.js";
 import { isActiveRootStatus } from "../runs/RunReadProjection.js";
 import { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
-import { LoopScheduler } from "../scheduling/LoopScheduler.js";
 import { MarkdownStore } from "../store.js";
+import { TkTracker } from "../tracker/TkTracker.js";
+import { TrackerOutbox } from "../tracker/TrackerOutbox.js";
 import { RotatingFileLogger } from "./RotatingFileLogger.js";
 
 export interface CreateBalletServerOptions {
@@ -50,6 +51,8 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   await runtime.start();
   const configurations = new RuntimeConfigurationService(settings, runtime);
+  const tracker = new TkTracker(options.tkCommand ?? savedSettings.tkCommand ?? "tk");
+  const trackerOutbox = new TrackerOutbox(() => database.connection(), tracker);
   const invalidations = new WorkspaceInvalidationBroadcaster();
   const store = new MarkdownStore(context.root, database);
   const targets = new LocalRunTargetService(roots);
@@ -66,7 +69,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   const runs = new LocalRunService({
     context, connection: () => database.connection(), database, roots, executions, runtime,
-    configurations, queue, tkCommand: options.tkCommand ?? savedSettings.tkCommand,
+    configurations, queue, tracker, trackerOutbox,
     onChanged: publishRunChanged
   });
   runHolder.service = runs;
@@ -76,8 +79,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     return {
       ...content,
       activeRootRuns,
-      orchestratorRoutes: activeRootRuns.flatMap((root) =>
-        database.readRootRuntime(root.rootRunId).orchestration.routes),
+      routingDecisions: database.listRoutingDecisions(),
       runtime: await runtime.snapshot(),
       runtimeConfigurationIssues: [
         ...configurationResolution.globalIssues,
@@ -93,16 +95,6 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   await runs.reconcile();
   await queue.start();
-  database.recoverReservedScheduleOccurrences();
-  const scheduler = new LoopScheduler({
-    readData: () => store.read(), database: () => database,
-    dispatch: (input) => runs.dispatchScheduled(input),
-    subscribeChanges: (listener) => invalidations.subscribe((event) => {
-      if (event.type === "workspace-changed") listener(event.reason);
-    }),
-    onChanged: () => invalidations.publish({ type: "workspace-changed", reason: "schedules" })
-  });
-  scheduler.start();
 
   const app = express();
   app.disable("x-powered-by");
@@ -136,7 +128,6 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     if (shuttingDown) return closed;
     shuttingDown = true;
     logger.info("Ballet shutdown started.");
-    await scheduler.stop();
     await Promise.race([
       queue.shutdown(85_000).then(() => runs.reconcile()),
       new Promise<void>((resolve) => {
@@ -155,7 +146,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   };
 
   logger.info("Ballet server initialized.", { root: context.root, instanceId: context.instanceId, port: options.port });
-  return { app, server, context, store, runtime, configurations, executions, runs, queue, scheduler, shutdown, logger };
+  return { app, server, context, store, runtime, configurations, executions, runs, queue, shutdown, logger };
 };
 
 export const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {

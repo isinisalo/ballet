@@ -1,5 +1,5 @@
 import type { BalletMode } from "@shared/api/workspace-contracts";
-import type { EngineeringView, ProjectDocumentCreateKind, RouteState } from "./types";
+import type { ProjectDocumentCreateKind, RouteState } from "./types";
 
 const projectDocumentCollectionSegment: Record<ProjectDocumentCreateKind, string> = {
   adr: "adrs",
@@ -22,27 +22,22 @@ const documentCollectionRoute = (view: "skills", url: URL): RouteState => {
   return isCreatingFromSearch(url) ? { view, creating: true } : { view };
 };
 
-const automationRoute = (url: URL): RouteState => {
-  const requestedView = url.searchParams.get("view");
-  if (requestedView === null && url.searchParams.has("level")) {
-    return { view: "automation", automationRouteIssue: "invalid-view" };
-  }
-  const automationView: EngineeringView | undefined = requestedView === null || requestedView === "graph"
-    ? "graph"
-    : requestedView === "workflow" ? "workflow" : undefined;
-  if (!automationView) return { view: "automation", automationRouteIssue: "invalid-view" };
-  if (automationView === "graph") return url.searchParams.has("id") || url.searchParams.has("new")
-    ? { view: "automation", automationView, automationRouteIssue: "non-canonical-graph" }
-    : { view: "automation", automationView };
-  const automationEntityId = url.searchParams.get("id") ?? undefined;
-  const creating = isCreatingFromSearch(url) || undefined;
-  return {
+const automationRoute = (url: URL): RouteState | undefined => {
+  if (url.pathname === "/automation/graph") return { view: "automation", engineeringLevel: "graph" };
+  const job = url.pathname.match(/^\/automation\/graph\/nodes\/([^/]+)\/jobs\/([^/]+)\/?$/);
+  if (job) return {
     view: "automation",
-    automationView,
-    automationEntityId,
-    creating,
-    automationRouteIssue: !automationEntityId && !creating ? "missing-loop-id" : undefined
+    engineeringLevel: "job_node",
+    graphNodeId: decodeURIComponent(job[1]),
+    jobNodeId: decodeURIComponent(job[2])
   };
+  const graphNode = url.pathname.match(/^\/automation\/graph\/nodes\/([^/]+)\/?$/);
+  if (graphNode) return {
+    view: "automation",
+    engineeringLevel: "graph_node",
+    graphNodeId: decodeURIComponent(graphNode[1])
+  };
+  return undefined;
 };
 
 const topLevelWorkspaceRoute = (url: URL): RouteState | undefined => {
@@ -51,8 +46,9 @@ const topLevelWorkspaceRoute = (url: URL): RouteState | undefined => {
     executionProfileId: url.searchParams.get("id") ?? undefined,
     creating: isCreatingFromSearch(url) || undefined
   };
-  if (url.pathname === "/automation/theme") return { view: "loop-theme" };
-  if (url.pathname === "/automation/loops" || url.pathname === "/automation") return automationRoute(url);
+  if (url.pathname === "/automation/theme") return { view: "canvas-theme" };
+  const automation = automationRoute(url);
+  if (automation) return automation;
   if (url.pathname === "/runtimes") return { view: "runtimes" };
   if (url.pathname === "/skills") return documentCollectionRoute("skills", url);
   return undefined;
@@ -65,11 +61,11 @@ export const routeFromPath = (path: string): RouteState => {
     rootRunId: url.searchParams.get("run") ?? undefined
   };
 
-  const runLoopMatch = url.pathname.match(/^\/run\/loops\/([^/]+)\/?$/);
-  if (runLoopMatch) return {
+  const runGraphNodeMatch = url.pathname.match(/^\/run\/graph-nodes\/([^/]+)\/?$/);
+  if (runGraphNodeMatch) return {
     view: "run",
-    runTargetKind: "loop",
-    runTargetId: decodeURIComponent(runLoopMatch[1]),
+    runTargetKind: "graph_node",
+    runTargetId: decodeURIComponent(runGraphNodeMatch[1]),
     rootRunId: url.searchParams.get("run") ?? undefined
   };
 
@@ -101,17 +97,16 @@ export const executionProfilePath = (id?: string) => `/execution-profiles${id ? 
 export const executionProfileCreatePath = () => "/execution-profiles?new=1";
 export const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 export const skillCreatePath = () => "/skills?new=1";
-export const automationGraphPath = () => "/automation/loops?view=graph";
-export const automationLoopPath = (id: string) => {
-  const params = new URLSearchParams({ view: "workflow", id });
-  return `/automation/loops?${params.toString()}`;
-};
-export const automationCreateLoopPath = () => "/automation/loops?view=workflow&new=1";
+export const automationGraphPath = () => "/automation/graph";
+export const automationGraphNodePath = (graphNodeId: string) =>
+  `/automation/graph/nodes/${encodeURIComponent(graphNodeId)}`;
+export const automationJobNodePath = (graphNodeId: string, jobNodeId: string) =>
+  `${automationGraphNodePath(graphNodeId)}/jobs/${encodeURIComponent(jobNodeId)}`;
 export const automationThemePath = () => "/automation/theme";
 export const runtimePath = () => "/runtimes";
 export const runOverviewPath = (rootRunId?: string) => `/run${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
-export const runLoopPath = (loopId: string, rootRunId?: string) =>
-  `/run/loops/${encodeURIComponent(loopId)}${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
+export const runGraphNodePath = (graphNodeId: string, rootRunId?: string) =>
+  `/run/graph-nodes/${encodeURIComponent(graphNodeId)}${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
 export const runGraphPath = (graphId: string, rootRunId?: string) =>
   `/run/graphs/${encodeURIComponent(graphId)}${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;
 export const balletModeFromRoute = (route: RouteState): BalletMode => route.view === "run" ? "run" : "configure";

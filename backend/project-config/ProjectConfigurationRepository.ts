@@ -74,14 +74,14 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version !== 13) return {
+    if (isRecord(value) && value.version !== 14) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 13 is required; version ${String(value.version)} is not supported.`
+        `Strict project config version 14 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -96,10 +96,8 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config,
-      version: 13,
-      orchestrator: automation.orchestrator,
+      version: 14,
       graph: automation.graph,
-      loops: automation.loops
     });
     this.write(root, config);
     return config;
@@ -113,7 +111,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 13,
+      version: 14,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -128,7 +126,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 13,
+      version: 14,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -142,7 +140,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 13,
+      version: 14,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -176,7 +174,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 13,
+  version: 14,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,
@@ -188,36 +186,32 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
     }))
     .sort((left, right) => compareIds(left.id, right.id)),
   issueTracker: { ...config.issueTracker },
-  orchestrator: {
-    mode: "runbook",
-    maxTransitions: config.orchestrator.maxTransitions,
-    ...(config.orchestrator.repairRouter ? { repairRouter: normalizeComposition(config.orchestrator.repairRouter) } : {})
-  },
   graph: {
-    id: config.graph.id,
-    name: config.graph.name,
-    startLoopId: config.graph.startLoopId,
-    transitions: config.graph.transitions.map((transition) => ({ ...transition, target: { ...transition.target } })),
-    repairEdges: config.graph.repairEdges.map((edge) => ({ ...edge }))
-  },
-  loops: config.loops.map((loop) => ({
-    ...loop,
-    capabilities: {
-      accepts: [...loop.capabilities.accepts].sort(compareIds),
-      provides: [...loop.capabilities.provides].sort(compareIds)
-    },
-    workflow: {
-      ...loop.workflow,
-      jobNodes: loop.workflow.jobNodes.map((node) =>
-        node.type === "human" ? node : normalizeComposition(node)),
-      validationNodes: loop.workflow.validationNodes.map((node) =>
-        node.type === "human" ? node : normalizeComposition(node)),
-      passEdges: loop.workflow.passEdges.map((edge) => ({ ...edge, target: { ...edge.target } })),
-      failEdges: loop.workflow.failEdges.map((edge) => ({ ...edge, target: { ...edge.target } }))
-    }
-  }))
+    ...config.graph,
+    state: { ...config.graph.state, initial: structuredClone(config.graph.state.initial) },
+    orchestrator: normalizeComposition(config.graph.orchestrator),
+    ...(config.graph.repairNode ? { repairNode: normalizeComposition(config.graph.repairNode) } : {}),
+    graphNodes: config.graph.graphNodes.map((graphNode) => ({
+      ...graphNode,
+      capabilities: {
+        accepts: [...graphNode.capabilities.accepts].sort(compareIds),
+        provides: [...graphNode.capabilities.provides].sort(compareIds)
+      },
+      stateContract: { ...graphNode.stateContract },
+      orchestrator: normalizeComposition(graphNode.orchestrator),
+      ...(graphNode.repairNode ? { repairNode: normalizeComposition(graphNode.repairNode) } : {}),
+      jobNodes: graphNode.jobNodes.map((jobNode) => ({
+        ...jobNode,
+        capabilities: {
+          accepts: [...jobNode.capabilities.accepts].sort(compareIds),
+          provides: [...jobNode.capabilities.provides].sort(compareIds)
+        },
+        workNode: jobNode.workNode.type === "human" ? { ...jobNode.workNode } : normalizeComposition(jobNode.workNode),
+        validationNode: jobNode.validationNode.type === "human" ? { ...jobNode.validationNode } : normalizeComposition(jobNode.validationNode)
+      }))
+    }))
+  }
 });
-
 const normalizeComposition = <T extends ProjectExecutionComposition>(composition: T): T => ({
   ...composition,
   skillIds: [...composition.skillIds].sort(compareIds)

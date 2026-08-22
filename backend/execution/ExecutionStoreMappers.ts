@@ -1,22 +1,14 @@
 import { createHash } from "node:crypto";
-import {
-  nodeOutcomeJsonSchemaForRole, nodeOutcomeSchemaIds, parseNodeOutcomeForRole
-} from "../../shared/api/runtime-schemas.js";
-import type {
-  CanonicalNodeOutcome, ExecutionEvent, ExecutionSpec, ExecutionTask
-} from "../../shared/domain/runtime.js";
-import {
-  parseSerializedTaskEnvelopeV6, type SerializedTaskEnvelopeV6
-} from "../integration/TaskEnvelopeV6.js";
+import { nodeOutcomeJsonSchemaForRole, nodeOutcomeSchemaIds, parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
+import type { CanonicalNodeOutcome, ExecutionEvent, ExecutionSpec, ExecutionTask } from "../../shared/domain/runtime.js";
+import { parseSerializedTaskEnvelopeV7 } from "../integration/TaskEnvelopeV7.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import type { ExecutionEventRow, ExecutionTaskRow } from "./ExecutionDbTypes.js";
+import { constrainRouteTargetSchema } from "./ExecutionComposition.js";
 import { executionSpecSchema } from "./ExecutionSpecSchema.js";
-import { constrainValidationTransitionSchema } from "./ExecutionComposition.js";
 
 export const toExecutionTask = (row: ExecutionTaskRow): ExecutionTask => {
-  if (sha256(row.spec_json) !== row.spec_hash) {
-    throw new Error(`Execution task ${row.task_id} has invalid persisted specification evidence.`);
-  }
+  if (sha256(row.spec_json) !== row.spec_hash) throw new Error(`Execution task ${row.task_id} has invalid persisted specification evidence.`);
   const spec = executionSpecSchema.parse(JSON.parse(row.spec_json));
   assertExecutionSpecEvidence(spec);
   if (spec.taskId !== row.task_id || spec.rootRunId !== row.root_run_id
@@ -38,52 +30,31 @@ export const assertExecutionSpecEvidence = (spec: ExecutionSpec): void => {
   if (sha256(spec.evidence.prompt) !== spec.evidence.promptSha256) {
     throw new Error(`Execution task ${spec.taskId} has invalid prompt evidence.`);
   }
-  const taskEnvelope = parseSerializedTaskEnvelopeV6(promptSection(
-    spec.evidence.prompt, "TASK-ENVELOPE", "v6", spec.taskId
+  const taskEnvelope = parseSerializedTaskEnvelopeV7(promptSection(
+    spec.evidence.prompt, "TASK-ENVELOPE", "v7", spec.taskId
   ));
-  assertTaskEnvelopeEvidence(spec, taskEnvelope);
+  const envelope = taskEnvelope.envelope;
+  if (taskEnvelope.sha256 !== spec.evidence.taskEnvelopeSha256
+    || envelope.role !== spec.evidence.nodeRole
+    || envelope.run.rootRunId !== spec.rootRunId
+    || envelope.run.nodeRunId !== spec.nodeRunId
+    || envelope.run.graphNodeInvocationId !== spec.graphNodeInvocationId
+    || envelope.run.jobNodeInvocationId !== spec.jobNodeInvocationId) {
+    throw new Error(`Execution task ${spec.taskId} has invalid Task Envelope evidence.`);
+  }
+  const routeTargets = envelope.role === "orchestrator" || envelope.role === "repair"
+    ? envelope.allowedCandidates.map(({ key }) => key) : [];
+  const expected = constrainRouteTargetSchema(nodeOutcomeJsonSchemaForRole(envelope.role), routeTargets);
   const schemaJson = canonicalJson(spec.evidence.outputSchema);
-  const expectedSchema = canonicalJson(expectedOutputSchema(spec, taskEnvelope));
-  if (spec.evidence.outputSchemaSha256 !== sha256(schemaJson)
-    || schemaJson !== expectedSchema
-    || promptSection(spec.evidence.prompt, "OUTPUT-SCHEMA", "v6", spec.taskId) !== schemaJson
+  if (schemaJson !== canonicalJson(expected)
+    || sha256(schemaJson) !== spec.evidence.outputSchemaSha256
+    || promptSection(spec.evidence.prompt, "OUTPUT-SCHEMA", "v7", spec.taskId) !== schemaJson
     || spec.evidence.outputSchemaId !== nodeOutcomeSchemaIds[spec.evidence.nodeRole]) {
     throw new Error(`Execution task ${spec.taskId} has invalid output schema evidence.`);
   }
-  assertRuntimeProfileEvidence(spec);
-};
-
-const assertTaskEnvelopeEvidence = (spec: ExecutionSpec, taskEnvelope: SerializedTaskEnvelopeV6): void => {
-  const envelope = taskEnvelope.envelope;
-  const baseMatches = taskEnvelope.sha256 === spec.evidence.taskEnvelopeSha256
-    && envelope.role === spec.evidence.nodeRole
-    && envelope.run.rootRunId === spec.rootRunId
-    && envelope.run.loopRunId === spec.loopRunId
-    && envelope.run.nodeRunId === spec.nodeRunId
-    && envelope.loop.id === spec.evidence.loopId;
-  const nodeMatches = envelope.role === "orchestrator"
-    || (envelope.run.jobRunId === spec.jobRunId && envelope.jobNode.id === spec.evidence.jobNodeId);
-  if (!baseMatches || !nodeMatches) {
-    throw new Error(`Execution task ${spec.taskId} has invalid Task Envelope evidence.`);
-  }
-};
-
-const expectedOutputSchema = (
-  spec: ExecutionSpec,
-  taskEnvelope: SerializedTaskEnvelopeV6
-) => spec.evidence.nodeRole === "validation" && taskEnvelope.envelope.role === "validation"
-  ? constrainValidationTransitionSchema(
-    nodeOutcomeJsonSchemaForRole("validation"),
-    taskEnvelope.envelope.allowedTransitions
-  )
-  : nodeOutcomeJsonSchemaForRole(spec.evidence.nodeRole);
-
-const assertRuntimeProfileEvidence = (spec: ExecutionSpec): void => {
   const profile = spec.evidence.executionProfile;
-  if (profile.provider !== spec.runtime.provider
-    || profile.model !== spec.runtime.model
-    || profile.reasoningEffort !== spec.runtime.reasoning
-    || profile.networkAccess !== spec.runtime.policy.network) {
+  if (profile.provider !== spec.runtime.provider || profile.model !== spec.runtime.model
+    || profile.reasoningEffort !== spec.runtime.reasoning || profile.networkAccess !== spec.runtime.policy.network) {
     throw new Error(`Execution task ${spec.taskId} has inconsistent profile and runtime evidence.`);
   }
 };
@@ -95,18 +66,10 @@ export const toExecutionEvent = (row: ExecutionEventRow): ExecutionEvent => ({
   contentBytes: row.content_bytes, terminal: Boolean(row.terminal), createdAt: row.created_at
 });
 
-const parseOutcome = (
-  source: string,
-  taskId: string,
-  role: ExecutionSpec["evidence"]["nodeRole"]
-): CanonicalNodeOutcome => {
-  try {
-    return parseNodeOutcomeForRole(role, JSON.parse(source));
-  } catch {
-    throw new Error(`Execution task ${taskId} has an invalid persisted ${role} outcome.`);
-  }
+const parseOutcome = (source: string, taskId: string, role: ExecutionSpec["evidence"]["nodeRole"]): CanonicalNodeOutcome => {
+  try { return parseNodeOutcomeForRole(role, JSON.parse(source)); }
+  catch { throw new Error(`Execution task ${taskId} has an invalid persisted ${role} outcome.`); }
 };
-
 const parseEventData = (source: string, taskId: string): Record<string, unknown> => {
   const value: unknown = JSON.parse(source);
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -114,11 +77,9 @@ const parseEventData = (source: string, taskId: string): Record<string, unknown>
   }
   return Object.fromEntries(Object.entries(value));
 };
-
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
-
 const promptSection = (prompt: string, kind: string, id: string, taskId: string): string => {
-  const opening = `<<< BALLET EXECUTION COMPOSITION V7 · ${kind} · ${id} >>>\n`;
+  const opening = `<<< BALLET EXECUTION COMPOSITION V8 · ${kind} · ${id} >>>\n`;
   const closing = `\n<<< END BALLET ${kind} >>>`;
   const start = prompt.indexOf(opening);
   if (start < 0 || prompt.indexOf(opening, start + opening.length) >= 0) {

@@ -1,0 +1,358 @@
+{
+  "format": "ballet-graph-node-module",
+  "version": 4,
+  "manifest": {
+    "category": "software-delivery",
+    "description": "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated.",
+    "id": "backend-implementation",
+    "tags": [
+      "backend",
+      "implementation",
+      "validation"
+    ],
+    "title": "Backend implementation",
+    "version": "2.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "A provider profile for repository-local backend analysis and implementation.",
+      "key": "engineer",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Backend engineer"
+    },
+    {
+      "description": "A provider profile for independent repository-local backend validation.",
+      "key": "reviewer",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Backend reviewer"
+    },
+    {
+      "key": "orchestrator-luna",
+      "title": "Cost-sensitive orchestrator",
+      "description": "Map to a low-cost provider profile such as Luna medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "repair-sol",
+      "title": "Capable repair",
+      "description": "Map to a capable repair profile such as Sol medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "software-engineering-state",
+    "version": "1.0.0",
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes.",
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ]
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "implementation:change.requested"
+    ],
+    "provides": [
+      "implementation:change.ready"
+    ],
+    "recommendedGraphRoutes": []
+  },
+  "resources": [
+    {
+      "body": "\n# Backend engineer\n\nAnalyze and implement one bounded backend change. Follow the repository's accepted architecture and existing domain, API, persistence, migration, and test patterns. Keep changes minimal, remove replaced code in scope, run relevant checks, and report concrete evidence. Never perform external writes or invent missing product intent.\n",
+      "key": "backend-engineer",
+      "kind": "instruction",
+      "metadata": {
+        "tags": [
+          "backend",
+          "implementation"
+        ]
+      },
+      "title": "Backend engineer"
+    },
+    {
+      "body": "\n# Backend reviewer\n\nIndependently validate one bounded backend change against its requested behavior, accepted architecture, domain and API contracts, persistence safety, compatibility constraints, and executable evidence. Do not edit the implementation while validating it. Return a precise repair request for every blocking gap.\n",
+      "key": "backend-reviewer",
+      "kind": "instruction",
+      "metadata": {
+        "tags": [
+          "backend",
+          "validation"
+        ]
+      },
+      "title": "Backend reviewer"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-node-orchestrator",
+      "title": "Graph Node Orchestrator",
+      "metadata": {},
+      "body": "\n# Graph Node Orchestrator\n\nSelect exactly one Job Node or `PASS | FAIL` terminal from the immutable candidate enum supplied for the current Graph Node decision. Use the current State revision, Job result and evidence, requested capability and candidate descriptions. Do not perform Job work, change State, edit files, broaden permissions or invent a target.\n\nReturn `dispatch`, `complete`, `delegate_repair` or `needs_input` using the strict structured outcome. A dispatch must name one enum member verbatim. Delegate only to the snapshot's local Repair Node. Escalation to Graph scope is available only through the Repair contract, never as a normal continuation.\n\nNever choose by array order, hidden project conventions or an identifier outside the candidate enum. Do not expose hidden chain-of-thought.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "repair-node",
+      "title": "Repair Node",
+      "metadata": {},
+      "body": "\n# Repair Node\n\nRepair only the bounded failure described by the immutable Repair Request. You may change validated State or artifacts inside the current Run worktree, then return to the exact Validation frame, dispatch one allowlisted repair candidate, or escalate to the parent scope. You may propose a future routing configuration change as an artifact, but the current snapshot, candidate enum and permissions remain immutable.\n\nDo not rerun Work when returning to Validation, reset its retry count, write outside the Run worktree, perform an external write without exact human authorization, or select an out-of-snapshot target. At Graph scope, escalate an unresolved case to human `needs_input`.\n\nReturn concise evidence and the strict Repair outcome. Do not expose hidden chain-of-thought.\n"
+    }
+  ],
+  "graphNode": {
+    "key": "backend-implementation",
+    "description": "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated.",
+    "nodeStyle": "terra",
+    "nodeSize": "large",
+    "capabilities": {
+      "accepts": [
+        "implementation:change.requested"
+      ],
+      "provides": [
+        "implementation:change.ready"
+      ]
+    },
+    "stateContract": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
+    },
+    "orchestrator": {
+      "key": "graph-node-orchestrator",
+      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "profileSlot": "orchestrator-luna",
+      "primaryInstruction": "graph-node-orchestrator",
+      "skills": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "key": "graph-node-start",
+          "candidates": [
+            {
+              "target": {
+                "jobNode": "analyze-backend-change"
+              },
+              "description": "Allowed initial Job Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "key": "analyze-backend-change-pass-route",
+            "sourceJobNode": "analyze-backend-change",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "implement-backend-change"
+                },
+                "description": "Allowed PASS continuation after analyze-backend-change."
+              }
+            ]
+          },
+          {
+            "key": "analyze-backend-change-fail-route",
+            "sourceJobNode": "analyze-backend-change",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after analyze-backend-change."
+              }
+            ]
+          },
+          {
+            "key": "implement-backend-change-pass-route",
+            "sourceJobNode": "implement-backend-change",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "validate-backend-change"
+                },
+                "description": "Allowed PASS continuation after implement-backend-change."
+              }
+            ]
+          },
+          {
+            "key": "implement-backend-change-fail-route",
+            "sourceJobNode": "implement-backend-change",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after implement-backend-change."
+              }
+            ]
+          },
+          {
+            "key": "validate-backend-change-pass-route",
+            "sourceJobNode": "validate-backend-change",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Allowed PASS continuation after validate-backend-change."
+              }
+            ]
+          },
+          {
+            "key": "validate-backend-change-fail-route",
+            "sourceJobNode": "validate-backend-change",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after validate-backend-change."
+              }
+            ]
+          }
+        ],
+        "repair": []
+      }
+    },
+    "repairNode": {
+      "key": "graph-node-repair",
+      "description": "Repairs difficult local failures before Graph escalation.",
+      "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
+      "nodeStyle": "sol",
+      "nodeSize": "medium",
+      "profileSlot": "repair-sol",
+      "primaryInstruction": "repair-node",
+      "skills": [],
+      "maxRepairDepth": 3,
+      "maxRepairAttempts": 3
+    },
+    "jobNodes": [
+      {
+        "key": "analyze-backend-change",
+        "description": "Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
+        "nodeStyle": "terra",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
+          "key": "analyze-backend-change-work",
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Inspect the repository and describe the smallest backend change that satisfies the requested behavior. Identify domain, API, persistence, migration, compatibility, and test boundaries without implementing yet.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
+          "key": "analyze-backend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Validate that the analysis identifies the bounded behavior, affected domain and API contracts, persistence or migration implications, compatibility constraints, and executable acceptance checks. Return a precise repair request when evidence is missing.",
+          "type": "agent"
+        }
+      },
+      {
+        "key": "implement-backend-change",
+        "description": "Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
+        "nodeStyle": "terra",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
+          "key": "implement-backend-change-work",
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Implement the bounded backend change using the repository's existing domain, API, persistence, and test patterns. Remove replaced code in scope and preserve unrelated behavior.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
+          "key": "implement-backend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Review the implementation against the requested behavior, repository architecture, API and persistence contracts, compatibility constraints, and security boundaries. Do not modify the implementation while validating it.",
+          "type": "agent"
+        }
+      },
+      {
+        "key": "validate-backend-change",
+        "description": "Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
+        "nodeStyle": "terra",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
+          "key": "validate-backend-change-work",
+          "nodeSize": "large",
+          "nodeStyle": "terra",
+          "primaryInstruction": "backend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Run the repository's relevant backend tests, API contract checks, persistence or migration checks, lint, and build gates. Fix in-scope failures and summarize exact evidence and limitations.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
+          "key": "validate-backend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "backend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Independently confirm that the named tests and contract checks passed, migrations are safe where applicable, no blocking architecture drift remains, and the evidence supports completion.",
+          "type": "agent"
+        }
+      }
+    ]
+  }
+}

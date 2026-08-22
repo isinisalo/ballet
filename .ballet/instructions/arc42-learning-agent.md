@@ -20,7 +20,7 @@ System contract → explicit human decisions and accepted Goals/ADRs → current
 
 ## Writes
 
-May record evidence-backed Findings in METHOD-HEALTH, section 11 and initiative REVIEW/status. Do not write externally, change dependencies/code in research, mutate Loop topology/permissions/network, or change accepted Goals/ADRs/instruction/skill behavior without explicit human approval.
+May record evidence-backed Findings in METHOD-HEALTH, section 11 and initiative REVIEW/status. Do not write externally, change dependencies/code in research, mutate Graph Node topology/permissions/network, or change accepted Goals/ADRs/instruction/skill behavior without explicit human approval.
 
 ## Sources and evidence
 

@@ -3,8 +3,8 @@ id: arc42-section-06
 title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-20'
-version: 10
+updatedAt: '2026-08-22'
+version: 11
 tags:
   - arc42
   - runtime
@@ -15,11 +15,11 @@ arc42Section: 6
 
 ## Tarkoitus
 
-Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaikaisuus, palautuminen, virhe tai ulkoinen vaikutus on arkkitehtonisesti merkittävä. Project-local Loop-topologia ei kuulu platformin kiinteään ohjauslogiikkaan.
+Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaikaisuus, palautuminen, virhe tai ulkoinen vaikutus on arkkitehtonisesti merkittävä. Project-local GraphNode-topologia ja Luna/Sol-profiilimapping eivät kuulu platformin kiinteään ohjauslogiikkaan.
 
 ## Tila
 
-RT-001–RT-003 ja RT-006–RT-011 säilyvät runtime-invariantteina tai historiallisina skenaarioina. Strict-v13-baseline lisää RT-012:n exact Graph RunBook -siirtymän ja RT-013:n tracker-outbox-sovituksen; niiden acceptance-evidenssi on pending. Config on v13, immutable snapshot v6 ja SQLite schema v9. Scheduled JobNode on isolated Loop Root Run, ja DEPLOYin ulkoinen toimi käynnistyy vain täsmällisellä ihmisvaltuutuksella.
+RT-001–RT-013 säilyvät invariantteina tai historiallisina skenaarioina. Strict-v14-baseline lisää RT-014:n scoped Graph/GraphNode-orchestrator-dispatchin ja RT-015:n bounded repair/escalation/return-polun. Config on v14, immutable snapshot v7 ja SQLite schema v10. Julkiset rootit ovat Graph ja GraphNode; standalone JobNode Run ja schedule poistuvat. Ulkoinen toimi käynnistyy edelleen vain täsmällisellä ihmisvaltuutuksella.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -180,7 +180,60 @@ sequenceDiagram
 
 Root Runin orchestration epic ja Loop invocationin chore käyttävät pysyviä external-refeja. Osittainen ulkoinen kirjoitus ei luo seuraavalla yrityksellä duplikaattia, koska reconciliation kysyy external-refin ja sovittaa linkin ennen uutta createa. Work-store CLI käyttää samaa strict adapteria mutta ei voi muokata orchestration-storea. BUILD claim valitsee enintään yhden ready-issuen yhtä invocationia kohti.
 
-## Skenaarioindeksi RT-001–RT-013
+RT-013 säilyttää strict-v13 tracker-evidenssin. Strict-v14 käyttää samoja fail-closed-idempotenssi-invariantteja GraphNode-invocationeihin ja SQLite v10:n generalisoituun request/decision/frame-evidenssiin.
+
+## RT-014: scoped Graph ja GraphNode orchestrator dispatch
+
+```mermaid
+flowchart TD
+  start["Graph tai GraphNode Root Run"] --> snapshot["Snapshot v7: State, scoped candidates, compositions, rights"]
+  snapshot --> scope{"Root scope"}
+  scope -->|"Graph"| graphOrch["Graph Orchestrator: Luna profile"]
+  scope -->|"GraphNode"| nodeOrch["Graph Node Orchestrator: Luna profile"]
+  graphOrch --> graphEnum{"dispatch GraphNode / PASS / FAIL / repair / needs_input"}
+  graphEnum --> child["Run selected GraphNode"]
+  child --> graphOrch
+  nodeOrch --> jobEnum{"dispatch JobNode / PASS / FAIL / repair / needs_input"}
+  jobEnum --> work["Run selected Job Work"]
+  work --> validation["Paired Validation"]
+  validation -->|"PASS"| nodeOrch
+  validation -->|"FAIL under limit"| work
+  validation -->|"FAIL at limit"| repairChoice["Graph Node Orchestrator decision"]
+```
+
+Runtime kutsuu Graph Orchestratoria Graph Runin alussa ja jokaisen GraphNode-tuloksen jälkeen. Graph Node Orchestratoria kutsutaan GraphNode-ajon alussa ja jokaisen JobNode-tuloksen jälkeen. Provider saa vain current requestiin sopivan strict candidate-enumin. Targetin pitää olla snapshotissa, oikeassa parent-scopessa ja oikeaa sääntötyyppiä; muuten canonical target-, invocation- ja State-vaikutus on nolla ja orchestrator-yritys kasvaa.
+
+GraphNode Run käyttää paikallista orchestratoria normaalissa flow'ssa ja päättyy paikalliseen `PASS | FAIL`-tulokseen. Se saa kutsua Graph-tason orchestratoria vain repair-eskalaatioon eikä jatka seuraavaan GraphNodeen. Work `completed` siirtyy aina paired Validationiin; tämä ja bounded retry ovat ainoat providerista riippumattomat child-siirtymät.
+
+## RT-015: orchestrator failure, Repair Node ja same-Validation-return
+
+```mermaid
+sequenceDiagram
+  participant V as Validation
+  participant O as Scoped Orchestrator
+  participant DB as SQLite v10 State + frames
+  participant R as Scoped Repair Node
+  participant GO as Graph Orchestrator/Repair
+  V-->>O: FAIL + evidence + target-ID-free repair request
+  O->>O: Select strict repair/delegate/escalate candidate
+  alt Invalid decision, attempt under 3
+    O->>O: Retry with same immutable enum
+  else Local repair selected
+    O->>DB: Push durable frame to exact Validation
+    O->>R: Sol profile; bounded State/artifact authority
+    R-->>DB: Valid patch + revalidate / allowed dispatch / escalate
+    DB-->>V: Pop frame; same Validation; latest State
+  else Escalate from GraphNode scope
+    O->>GO: Repair escalation only
+    GO-->>DB: Graph repair or human needs_input
+  end
+```
+
+Orchestratorin invalidi target tai kelpaamaton `needs_input` uusitaan enintään kolme kertaa, minkä jälkeen saman tason Repair Node aktivoituu, jos se on snapshotissa. Repair saa muuttaa vain Run-worktreen artefakteja ja validoitua Statea. Se ei saa lisätä candidatea, profiilia, oikeutta, skilliä tai resurssia aktiiviseen snapshotiin.
+
+Repair palaa durable LIFO-framella samaan Validationiin uusimmalla Statella: Work rerun = 0 ja retry reset = 0. Paikallinen Repair voi käyttää vain sallittua repair-dispatchia tai eskaloida Graph-tasolle. Graph Repairin jälkeen viimeinen raja on ihmisen `needs_input`. Repair depth, per-frame attempts ja orchestrator invalid attempts ovat enintään 3; transition count on enintään 256. Restart lukee vain commitoidun request/decision/frame-faktan ja cancellation estää myöhäisen vaikutuksen.
+
+## Skenaarioindeksi RT-001–RT-015
 
 | ID | Trigger ja vuorovaikutus | Rakennusosat | Tulos ja evidenssi |
 | --- | --- | --- | --- |
@@ -197,6 +250,8 @@ Root Runin orchestration epic ja Loop invocationin chore käyttävät pysyviä e
 | RT-011 | V11 Root Run alkaa eksplisiittisestä entry Loopista tai completed/repair-outcome tuottaa cross-Loop-candidatet; Orchestrator validoi graph-allowlistin, capabilityn ja permission-rajan. | BB-001, BB-003–BB-006, BB-009 | Zero-flow päättää Runin; yksi eroteltu target dispatchataan; ambiguity/ihmisvaltuutus → `needs_input`; repair palaa samaan Validationiin, flow-frameja 0. Runtime passed `GLE-EVID-004`, routing/Loop UI `GLE-EVID-005/007`; koko `EVID-014` pending. |
 | RT-012 | Graph Root Run käynnistyy snapshotatusta start Loopista ja terminal Validation antaa sallitun decision/outcomen; isolated/scheduled Loop Run päättyy ilman Graph-transitionia. | BB-001, BB-003–BB-006, BB-009 | Exact transition tai DONE commitoidaan; unknown/duplicate/missing outcome tai transition 257 failaa suljetusti; repair palaa RT-003:n mukaan. `GER-EVID-001` pending. |
 | RT-013 | Root/Loop tracker-intent kirjoitetaan tai palvelu restarttaa pending/partial `tk`-operaation jälkeen. | BB-004, BB-005, BB-010 | Run ei etene ennen sovitettua linkkiä; external-ref esiintyy kerran; malformed/dangling/cycle/timeout tuottaa waiting-tilan; BUILD claimaa enintään yhden issuen. `GER-EVID-002` pending. |
+| RT-014 | Graph/GraphNode Run alkaa tai child valmistuu; scoped Luna Orchestrator valitsee snapshotatusta strict enumista. | BB-003–BB-006 | Vain oikean scopen child/terminal/repair/needs_input hyväksytään; out-of-snapshot-targetin vaikutus on 0; Work→Validation ja retry säilyvät kiinteinä. |
+| RT-015 | Orchestrator epäonnistuu kolmesti tai Validation saavuttaa retryrajan; Sol Repair korjaa, reitittää tai eskaloi. | BB-004–BB-006, BB-010 | Same-Validation LIFO-return, latest State, Work rerun 0, retry reset 0, bounded depth/attempt ja Graph Repairin jälkeinen human `needs_input`. |
 
 ## Samanaikaisuusmalli
 
@@ -204,7 +259,6 @@ Root Runin orchestration epic ja Loop invocationin chore käyttävät pysyviä e
 - **Provider lanes:** `LocalExecutionQueue` ylläpitää provider-kohtaista FIFO-kaistaa. Sama provider säilyttää jonotusjärjestyksen; erilliset provider-kaistat voivat edetä rinnakkain.
 - **State:** expected revision ja SQLite-transaktio estävät lost update -tilanteen.
 - **Project config mutation:** authoring/module-mutaatiot serialisoidaan; stale plan revalidoidaan ennen commitia.
-- **Schedule:** due-slotin persistence estää saman schedule-instanssin duplikaattikäynnistyksen.
 - **Cancel/finalize:** persistent barrier ratkaisee kilpailun myöhäisen provider-payloadin kanssa.
 - **Tracker:** outbox/external-ref ratkaisee SQLite-commitin ja `tk`-prosessin välisen osittaisen vaikutuksen; pending intent estää control-flow'n.
 
@@ -224,15 +278,15 @@ Root Runin orchestration epic ja Loop invocationin chore käyttävät pysyviä e
 
 ## Kanoniset lähteet
 
-ADR-020 ja runtime-lähde omistavat Workflow-control-semanticsin; ADR-022 omistaa strict-v13 Graph RunBookin ja tracker-sovitusrajan. `.ballet/project.json` omistaa project-local Workflow't, Graphin transition/repair-datan ja tracker-konfiguraation. Story/Release Map omistaa toimitusjärjestyksen ja `tk` work-store toteutusissuet. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
+ADR-023 ja runtime-lähde omistavat strict-v14 Graph/GraphNode/JobNode-control-semanticsin. `.ballet/project.json` omistaa project-local GraphNode-rakenteen, scoped candidate-säännöt, Luna/Sol-profile mappingit ja tracker-konfiguraation. Story/Release Map omistaa toimitusjärjestyksen ja tracker work-store toteutusissuet. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021` ja `adr-022`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-023`.
 
 ## Evidenssi
 
-Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run UI -testit kattavat säilyvät skenaariot. RT-008–RT-011:n historiallinen evidenssi säilyy `EVID-011`–`EVID-014`:ssä. RT-012/013:n strict-v13 runtime- ja tracker-evidenssi on `EVID-016/018` ja pysyy pending-tilassa, kunnes vastaavat testit ovat läpäisseet. Scheduled ja deploy pysyvät erillisen triggerin/valtuutuksen takana.
+Runtime-, State-, persistence-, queue-, adapter-, worktree- ja Run UI -testit kattavat säilyvät skenaariot. RT-008–RT-013:n historiallinen evidenssi säilyy `EVID-011`–`EVID-018`:ssä. RT-014/015:n strict-v14 runtime-evidenssi indeksoidaan `EVID-019`:ään. Deploy ja muu ulkoinen kirjoitus pysyvät erillisen ihmisvaltuutuksen takana.
 
 ## Avoimet kysymykset
 
@@ -241,4 +295,4 @@ Runtime-, State-, persistence-, scheduler-, queue-, adapter-, worktree- ja Run U
 
 ## Seuraava katselmointiperuste
 
-Katselmoi osio, kun uusi failure-, concurrency-, recovery-, repair-, scheduling- tai external-effect-skenaario muuttaa yllä kuvattuja invariantteja.
+Katselmoi osio, kun uusi failure-, concurrency-, recovery-, repair-, routing- tai external-effect-skenaario muuttaa yllä kuvattuja invariantteja.

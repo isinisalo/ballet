@@ -3,8 +3,8 @@ id: arc42-project-status
 title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-21'
-version: 18
+updatedAt: '2026-08-22'
+version: 19
 tags:
   - arc42
   - status
@@ -19,55 +19,55 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 
 ## Tila
 
-- `goal-001`–`goal-014` ovat accepted.
-- `adr-001`–`adr-003`, `adr-005`–`adr-009` ja `adr-011`–`adr-022` ovat accepted. `adr-004` ja `adr-010` ovat superseded by `adr-015`. `adr-020` supersedoi strict-v11 Workflow-rakenteen ja `adr-021` tarkentaa Workflow-canvasin suojattua projektiota. `adr-022` supersedoi ADR-018:n tavallisen flow-targetin agenttireitityksen sekä ADR-019:n yhden arc42-vastuun per Loop -rajauksen muuttamatta niiden historiallista päätösevidenssiä.
-- Nykyinen hard cut on Project Config V13, Root Snapshot V6, Task Envelope/Outcome V6, prompt composition V7, ExecutionSpec V8, runtime DB V9 ja Loop Module Package V3. Compatibility-lukijoita ei ole.
-- Oletusprojekti sisältää viisi Loopia, 17 JobNode/ValidationNode-paria ja 18 named transitionia: DESIGNin 12 arc42-osiota, PLANin kaksi tehtävää sekä BUILD-, DEPLOY- ja VERIFY-vaiheiden yhden tehtävän. Oletusgraafissa ei ole repair-edgejä.
-- Platform tukee geneerisesti 1–40 Loopia, named RunBook-transitioneja, erillisiä repair call/return -reittejä, Graph/Loop Root Runeja ja scheduled isolated JobNode -ajoja ilman project-workflow'n nimien kovakoodausta.
-- `tk` on pinnatun käyttäytymisen pakollinen konekohtainen prerequisite Graph Runille. SQLite v9 tracker-outbox ja linkit sovittavat orchestration- ja work-storeja idempotentisti; frontendissä ei ole ticket-editoria.
-- Loop Library sisältää viisi `graph-engineering`-pakettia ja yhdeksän V3:een muunnettua geneeristä pakettia. `recommendedTransitions`, `recommendedRepairs` ja DEPLOYn `externalWrites: requires-human-authorization` ovat package-dataa, eivät runtime-aikainen riippuvuus.
-- Graph Engineering käyttää pelkistettyä determinististä layered layoutia. Workflow Engineeringin tumma tekninen ruudukko, Job-artworkit, koot, hehkut, amber-ID:t, mint-edget ja connection pointit säilyvät suojattuna visuaalisena sopimuksena.
-- Story/Release Map omistaa toimitusjärjestyksen; work-store toteutustaskit. DEPLOY vaatii edelleen täsmällisen ihmisvaltuutuksen eikä tämä muutos valtuuta deployta, mergeä tai pushia.
+- `goal-001`–`goal-015` ovat accepted.
+- `adr-023` omistaa nykyisen strict-v14 Graph/GraphNode/JobNode-domainin, scoped agent routingin, bounded Repair Noden ja kolmitasoisen avaruuscanvasin. Se supersedoi ADR-016/018/020/021/022:n Loop-, kaksinäkymä-, Edge-, schedule- ja deterministic RunBook -osuudet muuttamatta historiallisia tiedostoja.
+- Nykyinen hard cut on Project Config v14, Graph Node Module v4, Root Snapshot v7, Task Envelope/Outcome v7, composition v8, ExecutionSpec v9 ja SQLite v10. Compatibility-lukijoita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
+- Oletusprojekti sisältää viisi GraphNodea ja 17 aggregate JobNodea, joilla jokaisella on erillinen Work- ja Validation-lapsi. Viiden Graph Noden nimet ja arc42-/release-menettely ovat project-local-dataa.
+- Globaali ja viisi paikallista orchestratoria käyttävät explicit Luna/medium/network-off-profiilia; globaalilla ja jokaisella Graph Nodella on explicit Sol/medium/network-off Repair Node. Platform ei hardkoodaa malleja eikä tee fallbackia.
+- Julkiset Run-rajat ovat Graph Run ja GraphNode Run. Standalone JobNode Run ja schedule on poistettu. GraphNode Run käyttää Graph-tasoa vain repair-eskalaatioon.
+- Canonical authoring-reitit ovat `/automation/graph`, `/automation/graph/nodes/:graphNodeId` ja `/automation/graph/nodes/:graphNodeId/jobs/:jobNodeId`; Run-reitit ovat `/run/graphs/:graphId` ja `/run/graph-nodes/:graphNodeId`.
+- Kaikki kolme canvasia käyttävät suojattua 24 px avaruusgridia, planet-artworkeja, glow'ta, amber-ID:itä, mint-spokeja ja kirkkaita connection pointteja. Kullakin tasolla näytetään vain sen scope.
+- Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat edelleen täsmällisen ihmisvaltuutuksen.
 
 ## Toteutettu fakta, evidenssi ja avoin riski
 
 | Luokka | Nykytila |
 | --- | --- |
-| Hyväksytty päätös | `goal-014` / `adr-022` määrittää viiden Loopin RunBook-, state-, tracker-, module- ja UI-rajan. Aiemmat hyväksytyt State revision-, repair return-, permission- ja Workflow-visuaali-invariantit säilyvät. |
-| Toteutettu fakta | V13/V3/DB9-sopimukset, exact `GraphRunbookEngine`, Graph/Loop root-kindit, viiden Loopin project-data, tracker-adapter/outbox/CLI, Graph editor/layout sekä architecture source-of-truth löytyvät työpuusta. |
-| Paikallinen evidenssi | `GER-EVID-001`–`GER-EVID-006` läpäisivät: 495 testiä, strict-v13 arc42/config-gate, V3 module/release smoke, 1/5/40 layout-testit, desktop/narrow browser-QA, build, DESIGN-lint, boundary search ja diff check. Lintissä on 0 virhettä ja sama 14 warningin baseline. |
-| Avoin riski | RISK-001:n tuotantokaltainen pilotti, RISK-011:n lint-baseline, RISK-016:n pinnattu live `tk` -smoke ja RISK-017:n ihmisvisual review ovat avoimia. RISK-015 on teknisesti kontrolloitu local final gateillä. |
+| Hyväksytty päätös | `goal-015` / `adr-023` määrittää strict-v14 domain-, runtime-, module-, persistence- ja UI-rajan. State-, snapshot-, worktree-, tracker/outbox-, ihmisvaltuutus- ja same-Validation repair-return -invariantit säilyvät. |
+| Toteutettu fakta | Shared/domain/config/module-versiot, GraphRoutingEngine ja SQLite v10, Graph/GraphNode Run services, 14 v4-pakettia, kolme canonical canvas-routea sekä Luna/Sol-project data löytyvät työpuusta. |
+| Paikallinen evidenssi | `TGNE-EVID-001`–`TGNE-EVID-005`: 40 tiedoston 156 testiä, build, arc42, DESIGN, module, boundary, active-legacy ja diff-portit läpäisevät. Kolme canonical canvasia sekä 1/5/40 GraphNode- ja 1/17/64 JobNode-fixturet on mitattu 1440×900/390×844-koossa; 19 kuvaa on tallennettu initiative-evidenssiin. |
+| Avoin riski | Ihmisen desktop/narrow-visual verdict ja ensimmäinen tuotantokaltainen Luna/Sol-pilotti puuttuvat. Ne eivät valtuuta releasea tai external writea. |
 
 ## Kanoniset lähteet
 
-Osioindeksi on [README](README.md), trace-suhteet ovat [TRACEABILITYssa](TRACEABILITY.md), menetelmämetriikat [METHOD-HEALTHissa](METHOD-HEALTH.md), bounded State [STATE-CONTRACTissa](STATE-CONTRACT.md) ja aktiivisen työn yksityiskohdat [graph-engineering-runbook](initiatives/graph-engineering-runbook/BRIEF.md)-initiativessa.
+Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY.md), State-raja [STATE-CONTRACTissa](STATE-CONTRACT.md) ja aktiivisen muutoksen yksityiskohdat [three-level-graph-node-engineering](initiatives/three-level-graph-node-engineering/BRIEF.md)-initiativessa. `DESIGN.md` omistaa visuaalisen sopimuksen ja `adr-023` päätöksen.
 
 ## Relevantit päätökset
 
-`goal-014`, `adr-011`, `adr-015`, `adr-016`, `adr-020`, `adr-021` ja `adr-022`.
+`goal-015`, `adr-011`, `adr-015`, `adr-016` ja `adr-023`.
 
 ## Evidenssi
 
-- `.ballet/project.json` on V13 ja määrittää 5 Loopia, 17 Job/Validation-paria, 18 transitionia, 0 oletus-repairia ja kaksi worktree-local tracker-storea.
-- `.ballet/loop-library/graph-engineering/` sisältää viisi V3-pakettia; software-engineering- ja software-delivery-paketit säilyvät geneerisinä V3-paketteina.
-- [Story/Release Map](../releases/STORY-RELEASE-MAP.md) sisältää stable release/story ID:t eikä kopioi implementation issueita.
-- `graph-engineering-runbook`-EVIDENCE indeksoi TEST-016–TEST-018:n sekä läpäisseet browser-, module-, release- ja repository-gatet; live `tk` on erikseen pending.
+- `.ballet/project.json` on strict v14 ja määrittää viisi GraphNodea, 17 JobNodea, scoped candidate-säännöt sekä explicit Luna/Sol-mappingit.
+- `.ballet/graph-node-library/**` sisältää 14 strict-v4-pakettia.
+- `TEST-019` / `EVID-019` omistaa domain/runtime/module/conformance-evidenssin.
+- `TEST-020` / `EVID-020` omistaa canonical route-, scope-, a11y-, layout-, browser- ja visual-evidenssin.
 - `npm run validate:arc42` on deterministinen repository-conformance-gate.
 
 ## Avoimet kysymykset
 
-- `OQ-002`: ensimmäisen tuotantokaltaisen viiden Loopin pilotin repair-, tracker- ja method-health-baseline puuttuu.
-- Projektin omistajan visual review ratkaisee Graph Engineeringin desktop/narrow-acceptancen ja vahvistaa Workflow Engineeringin suojatun ilmeen säilymisen.
-- Optional live `tk` -smoke riippuu pinnatun prerequisite-komennon paikallisesta saatavuudesta; hermetic suite ei korvaa sitä.
+- Hyväksyykö projektin omistaja desktop- ja narrow-selainevidenssin avaruusteeman, kompaktiuden ja ymmärrettävyyden?
+- Millainen success/failure/repair-jakauma ensimmäisessä tuotantokaltaisessa Graph Runissa todentaa Luna-routerin ja Sol-repairin käytännön fitnessin?
+- Pinned tracker/provider live-smoke raportoidaan erikseen eikä hermetic testi korvaa sitä.
 
 ## Nykyinen handoff
 
-- Initiative: `graph-engineering-runbook`.
-- Status: `draft`; `goal-014` ja `adr-022` ovat accepted, tekniset final gatet ovat läpäisseet ja ihmisacceptance on pending.
-- Muuttunut stable evidenssi: `QS-016`–`QS-018`, `TEST-016`–`TEST-018`, `EVID-016`–`EVID-018`, CON-009/010 sekä BB-/RT-/DEP-päivitykset muodostavat uuden trace-ketjun.
-- Seuraava hyväksytty toimi: projektin omistaja antaa nimetylle Graph/Workflow browser-evidenssille visual verdictin; pinnatun `tk`:n live-smoke voidaan ajaa, kun prerequisite on tarkoituksellisesti saatavilla.
+- Initiative: `three-level-graph-node-engineering`.
+- Status: `draft`; `goal-015` ja `adr-023` ovat accepted, toteutus on työpuussa ja technical/browser/conformance-evidenssi läpäisee. Ihmisen visual verdict ja provider-pilotti ovat avoinna.
+- Muuttunut stable evidence chain: CON-011, RT-014/015, QS-019/020, TEST-019/020 ja EVID-019/020.
+- Seuraava hyväksytty toimi: pyydä projektin omistajan visual verdict tallennetuille kuville ja suunnittele erikseen tuotantokaltainen provider-pilotti.
 - Stop condition: deploy, release, rollback, merge tai push vaatii oman täsmällisen ihmisvaltuutuksensa.
 
 ## Seuraava katselmointiperuste
 
-Päivitä final gatejen, projektin omistajan review-päätöksen tai uuden hyväksytyn Goal/ADR-muutoksen jälkeen.
+Päivitä final gatejen, conformance Validationin, projektin omistajan visual review'n tai uuden hyväksytyn Goal/ADR-muutoksen jälkeen.

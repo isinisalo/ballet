@@ -4,7 +4,7 @@ import { useWorkspaceNavigation } from "../src/workspace/useWorkspaceNavigation"
 
 describe("workspace navigation blocker", () => {
   beforeEach(() => {
-    window.history.replaceState({}, "", "/automation/loops?view=graph");
+    window.history.replaceState({}, "", "/automation/graph");
   });
 
   it("confirms and blocks internal navigation while the workspace is dirty", () => {
@@ -15,8 +15,8 @@ describe("workspace navigation blocker", () => {
     act(() => result.current.navigate("/execution-profiles"));
 
     expect(confirm).toHaveBeenCalledWith("Discard theme changes?");
-    expect(window.location.pathname).toBe("/automation/loops");
-    expect(result.current.route).toEqual({ view: "automation", automationView: "graph" });
+    expect(window.location.pathname).toBe("/automation/graph");
+    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph" });
 
     confirm.mockReturnValue(true);
     act(() => result.current.navigate("/execution-profiles"));
@@ -35,24 +35,24 @@ describe("workspace navigation blocker", () => {
     expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
   });
 
-  it("restores Graph and Workflow Engineering through browser back and forward", async () => {
+  it("restores Graph and Graph Node Engineering through browser back and forward", async () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
-    act(() => result.current.navigate("/automation/loops?view=workflow&id=release"));
-    expect(result.current.route).toMatchObject({ view: "automation", automationView: "workflow", automationEntityId: "release" });
+    act(() => result.current.navigate("/automation/graph/nodes/release"));
+    expect(result.current.route).toMatchObject({ view: "automation", engineeringLevel: "graph_node", graphNodeId: "release" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);
       window.history.back();
       await traversed;
     });
-    expect(result.current.route).toEqual({ view: "automation", automationView: "graph" });
+    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);
       window.history.forward();
       await traversed;
     });
-    expect(result.current.route).toMatchObject({ view: "automation", automationView: "workflow", automationEntityId: "release" });
+    expect(result.current.route).toMatchObject({ view: "automation", engineeringLevel: "graph_node", graphNodeId: "release" });
   });
 
   it("restores a cancelled history traversal without losing the back/forward stack", async () => {

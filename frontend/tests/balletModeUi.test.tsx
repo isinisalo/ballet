@@ -37,10 +37,10 @@ describe("global Ballet mode", () => {
     expect(screen.getByRole("link", { name: "Selected item" })).toHaveClass("hover:bg-sidebar-hover", "data-active:bg-sidebar-accent", "data-active:hover:bg-sidebar-accent");
   });
 
-  it("preserves selected Loops and sends Configure-only views to the Run overview", () => {
-    expect(pathForBalletMode({ route: { view: "automation", automationView: "workflow", automationEntityId: "release" }, nextMode: "run" })).toBe("/run/loops/release");
-    expect(pathForBalletMode({ route: { view: "loop-theme" }, nextMode: "run" })).toBe("/run");
-    expect(pathForBalletMode({ route: { view: "run", runTargetKind: "loop", runTargetId: "release", rootRunId: "root-1" }, nextMode: "configure" })).toBe("/automation/loops?view=workflow&id=release");
+  it("preserves selected Graph Nodes and sends Configure-only views to the Run overview", () => {
+    expect(pathForBalletMode({ route: { view: "automation", engineeringLevel: "graph_node", graphNodeId: "release" }, nextMode: "run" })).toBe("/run/graph-nodes/release");
+    expect(pathForBalletMode({ route: { view: "canvas-theme" }, nextMode: "run" })).toBe("/run");
+    expect(pathForBalletMode({ route: { view: "run", runTargetKind: "graph_node", runTargetId: "release", rootRunId: "root-1" }, nextMode: "configure" })).toBe("/automation/graph/nodes/release");
     expect(pathForBalletMode({ route: { view: "execution-profiles", executionProfileId: "reviewer" }, nextMode: "run" })).toBe("/run");
     expect(pathForBalletMode({ route: { view: "skills" }, nextMode: "run" })).toBe("/run");
   });

@@ -1,0 +1,219 @@
+{
+  "format": "ballet-graph-node-module",
+  "version": 4,
+  "manifest": {
+    "category": "software-engineering",
+    "description": "Clarify one bounded specification. Done when intent, scope, constraints, acceptance measures and unresolved human decisions are explicit and independently validated.",
+    "id": "clarify-specification",
+    "tags": [
+      "software-engineering",
+      "starter"
+    ],
+    "title": "Clarify specification",
+    "version": "1.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "Network-off implementation profile.",
+      "key": "worker",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Worker"
+    },
+    {
+      "key": "orchestrator-luna",
+      "title": "Cost-sensitive orchestrator",
+      "description": "Map to a low-cost provider profile such as Luna medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "repair-sol",
+      "title": "Capable repair",
+      "description": "Map to a capable repair profile such as Sol medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "software-engineering-state",
+    "version": "1.0.0",
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes.",
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ]
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "software:specification.requested"
+    ],
+    "provides": [
+      "software:specification.clarified"
+    ],
+    "recommendedGraphRoutes": []
+  },
+  "resources": [
+    {
+      "body": "Clarify one bounded software specification without inventing intent. Separate facts, decisions, assumptions and open questions; stop for missing human-owned scope or acceptance measures.\n",
+      "key": "worker",
+      "kind": "instruction",
+      "metadata": {},
+      "title": "Clarify specification worker"
+    },
+    {
+      "body": "# Clarify specification\n\nCheck that the specification names one outcome, scope, non-goals, constraints, measurable acceptance criteria and unresolved decisions.\n",
+      "description": "Complete and verify the Clarify specification responsibility.",
+      "key": "task",
+      "kind": "skill",
+      "metadata": {},
+      "name": "clarify-specification-task"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-node-orchestrator",
+      "title": "Graph Node Orchestrator",
+      "metadata": {},
+      "body": "\n# Graph Node Orchestrator\n\nSelect exactly one Job Node or `PASS | FAIL` terminal from the immutable candidate enum supplied for the current Graph Node decision. Use the current State revision, Job result and evidence, requested capability and candidate descriptions. Do not perform Job work, change State, edit files, broaden permissions or invent a target.\n\nReturn `dispatch`, `complete`, `delegate_repair` or `needs_input` using the strict structured outcome. A dispatch must name one enum member verbatim. Delegate only to the snapshot's local Repair Node. Escalation to Graph scope is available only through the Repair contract, never as a normal continuation.\n\nNever choose by array order, hidden project conventions or an identifier outside the candidate enum. Do not expose hidden chain-of-thought.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "repair-node",
+      "title": "Repair Node",
+      "metadata": {},
+      "body": "\n# Repair Node\n\nRepair only the bounded failure described by the immutable Repair Request. You may change validated State or artifacts inside the current Run worktree, then return to the exact Validation frame, dispatch one allowlisted repair candidate, or escalate to the parent scope. You may propose a future routing configuration change as an artifact, but the current snapshot, candidate enum and permissions remain immutable.\n\nDo not rerun Work when returning to Validation, reset its retry count, write outside the Run worktree, perform an external write without exact human authorization, or select an out-of-snapshot target. At Graph scope, escalate an unresolved case to human `needs_input`.\n\nReturn concise evidence and the strict Repair outcome. Do not expose hidden chain-of-thought.\n"
+    }
+  ],
+  "graphNode": {
+    "key": "clarify-specification",
+    "description": "Clarify one bounded specification. Done when intent, scope, constraints, acceptance measures and unresolved human decisions are explicit and independently validated.",
+    "nodeStyle": "terra",
+    "nodeSize": "medium",
+    "capabilities": {
+      "accepts": [
+        "software:specification.requested"
+      ],
+      "provides": [
+        "software:specification.clarified"
+      ]
+    },
+    "stateContract": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
+    },
+    "orchestrator": {
+      "key": "graph-node-orchestrator",
+      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "profileSlot": "orchestrator-luna",
+      "primaryInstruction": "graph-node-orchestrator",
+      "skills": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "key": "graph-node-start",
+          "candidates": [
+            {
+              "target": {
+                "jobNode": "task"
+              },
+              "description": "Allowed initial Job Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "key": "task-pass-route",
+            "sourceJobNode": "task",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Allowed PASS continuation after task."
+              }
+            ]
+          },
+          {
+            "key": "task-fail-route",
+            "sourceJobNode": "task",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after task."
+              }
+            ]
+          }
+        ],
+        "repair": []
+      }
+    },
+    "repairNode": {
+      "key": "graph-node-repair",
+      "description": "Repairs difficult local failures before Graph escalation.",
+      "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
+      "nodeStyle": "sol",
+      "nodeSize": "medium",
+      "profileSlot": "repair-sol",
+      "primaryInstruction": "repair-node",
+      "skills": [],
+      "maxRepairDepth": 3,
+      "maxRepairAttempts": 3
+    },
+    "jobNodes": [
+      {
+        "key": "task",
+        "description": "Clarify one bounded specification. Done when intent, scope, constraints, acceptance measures and unresolved human decisions are explicit and independently validated.",
+        "nodeStyle": "terra",
+        "nodeSize": "medium",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Clarify one bounded specification. Done when intent, scope, constraints, acceptance measures and unresolved human decisions are explicit and independently validated.",
+          "key": "task-work",
+          "nodeSize": "medium",
+          "nodeStyle": "terra",
+          "primaryInstruction": "worker",
+          "profileSlot": "worker",
+          "skills": [
+            "task"
+          ],
+          "task": "Clarify one bounded specification from accepted sources and explicit human input. Record intent, scope, non-goals, constraints, measurable acceptance criteria and open decisions. Done means no acceptance-critical ambiguity is hidden.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Clarify specification.",
+          "key": "task-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "task": "Validate that the bounded specification is source-linked, measurable and explicit about every unresolved human-owned decision. Do not edit it.",
+          "type": "human"
+        }
+      }
+    ]
+  }
+}

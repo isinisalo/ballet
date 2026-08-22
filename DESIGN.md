@@ -30,8 +30,24 @@ colors:
   on-tertiary: '#472a00'
   tertiary-container: '#ca8100'
   on-tertiary-container: '#3e2400'
-  loop-flow: '#76d4ca'
-  loop-connection-point: '#e3fffb'
+  canvas-flow: '#76d4ca'
+  canvas-connection-point: '#e3fffb'
+  space-void: '#08090b'
+  luna-surface: '#87cdbc'
+  luna-highlight: '#b9eee1'
+  luna-shadow: '#214b47'
+  sol-surface: '#f5a63a'
+  sol-highlight: '#ffd795'
+  sol-shadow: '#71370b'
+  terra-surface: '#4e9b8b'
+  terra-highlight: '#9ae3d3'
+  terra-shadow: '#183a48'
+  flat-surface: '#72798b'
+  flat-highlight: '#b8c0d4'
+  flat-shadow: '#292d37'
+  vector-planet-surface: '#6a86c6'
+  vector-planet-highlight: '#b2c7fb'
+  vector-planet-shadow: '#273359'
   mars-surface: '#b85f4c'
   mars-highlight: '#e19a78'
   mars-shadow: '#572a25'
@@ -139,118 +155,127 @@ spacing:
 ---
 
 ## Brand & Style
-Ballet is a local orchestration command center for managing project documents, ExecutionProfiles, instructions, skills, runtimes, project-global graphs, Loops, Workflow Job and Validation Nodes, Pass and Fail Edges, route policy, the Loop Orchestrator, and Runs. The interface must feel like a high-stakes AI operations workspace: dense, structured, technical, and calm under pressure.
 
-The visual system uses **Modern Minimalism** fused with **Technical Industrialism**. Dark tonal layers reduce eye strain during long monitoring sessions, while high-vibrancy signal colors mark active node roles, validation decisions, Edge state, and Run urgency. The target users are DevOps engineers, AI architects, and orchestration operators who need fast scanning, reliable hierarchy, and low visual ambiguity.
+Ballet is a local orchestration command center for project documents, ExecutionProfiles, instructions, skills, runtimes, Graphs, GraphNodes, aggregate JobNodes, Work and Validation roles, scoped Orchestrators and Repair Nodes, and Runs. The interface is dense, structured, technical, and calm under pressure.
+
+The visual system combines Modern Minimalism with Technical Industrialism. Dark tonal layers support long sessions; high-vibrancy signals identify current role, validation result, repair attention and blocking failure. UI decoration never creates runtime state.
 
 ## Implementation Status Boundary
 
-The config/domain baseline is strict v13, Loop Module baseline v3, Root Execution Snapshot v6, Task Envelope and node outcome v6, execution spec v8/composition v7, and SQLite schema v9. The implemented authoring information architecture exposes exactly **Graph Engineering** and **Workflow Engineering** through URL-owned `graph | workflow` routes. Context, numeric level, and `view=loop` routes are removed. Workflow Engineering is the selected-Loop-only editor for separate Job/Validation domain definitions and Pass/Fail Edges, while its canvas projects Validation inside its owning Job artwork. Graph Engineering projects one compact Loop card per ProjectLoop, one distinct Orchestrator control strip, persisted named RunBook transitions, separately persisted repair routes, and canonical live Run evidence.
+The active baseline is strict project config v14, Graph Node Module v4, Root Snapshot v7, Task Envelope and role outcome v7, composition v8, ExecutionSpec v9 and SQLite v10. There are no legacy readers, route aliases, dual writes, schedule UI or standalone JobNode Run.
+
+Authoring has exactly three canonical URL-owned levels:
+
+- `/automation/graph` — Graph Engineering.
+- `/automation/graph/nodes/:graphNodeId` — Graph Node.
+- `/automation/graph/nodes/:graphNodeId/jobs/:jobNodeId` — Job Node.
+
+Run has Graph and GraphNode routes only. URL state owns the active level and IDs. Inspector selection remains ephemeral and never mutates topology.
 
 ## Colors
-The palette is rooted in a deep, multi-layered dark mode.
 
-Theme support is currently dark-only. Do not expose light or system theme modes unless a complete light palette is added to this file and implemented as first-class design tokens.
+The palette is dark-only. Do not expose light/system theme until this document contains a complete first-class light palette.
 
-- **Primary (Electric Blue):** Use for primary commands, selected navigation, focused fields, and selected Loop nodes.
-- **Secondary (Emerald):** Use for running Work or Validation phases, successful outcomes, accepted goals, healthy runtimes, and go-forward states.
-- **Loop Flow (Mint):** Use as the global Loop theme baseline for thin Validation PASS and project-global flow connectors and active Edge glow, with the brighter `loop-connection-point` token for connection orbs. Workflow PassEdge uses Mint/Secondary semantics and FailEdge uses Error semantics. Always pair these colors with an icon and exact text. Workflow canvas geometry is limited to `straight` and smart `smoothstep`; project theme patterns may still apply on other canvases without creating a third Workflow geometry or a visible validate/retry path.
-- **Tertiary (Amber):** Use for warnings, queued Node Runs, human-wait states, repair routing, and attention states that do not require destructive styling.
-- **Error:** Use only for failed or blocked Runs, invalid Loop state, destructive commands, and blocking validation errors.
-- **Background & Surfaces:** Use `#0c0e11` for the application and workspace base. Use `#111316` for primary cards and panels, and `#1a1c1f` for the sidebar, compact headers, and nested sections. Reserve `#1e2023` and `#282a2d` for popovers, selected states, hover states, and other elevated interactive surfaces. Keep borders subtle but visible with `#414755` or lower-contrast variants.
+- **Primary / Electric Blue:** primary commands, selected navigation and focused fields.
+- **Secondary / Emerald:** running Work/Validation, PASS, healthy state and go-forward semantics.
+- **Canvas Flow / Mint:** all thin candidate spokelines and the fixed Work→Validation link. Use the brighter connection-point token for orbs. Always pair color with exact icon/text.
+- **Tertiary / Amber:** IDs, warnings, queued/human-wait states, retry and repair attention.
+- **Error:** FAIL, blocked/failed Runs, invalid config and destructive actions only.
+- **Surfaces:** application `#0c0e11`, primary panels `#111316`, sidebar/compact headers `#1a1c1f`, elevated interactive surfaces `#1e2023`/`#282a2d`, subtle borders `#414755`.
+
+The project canvas theme may configure existing artwork colors, sizes and glows. It must not introduce a second application palette or new shape language.
 
 ## Typography
-Use **Inter** for the main interface. Use **Geist** for technical data, Edge targets, Run inputs, CLI excerpts, file paths, identifiers, timestamps, and frontmatter previews.
 
-- Use **headline-lg** for main workspace titles only.
-- Use **headline-md** and **headline-sm** for section-level hierarchy inside project, ExecutionProfile, Loop, Workflow Node, runtime, and Run views.
-- Use **body-md** as the default application text style.
-- Use **label-caps** for sidebar section labels, metadata labels, status group headings, and compact table headers.
-- Use **code-md** for TOML, YAML, Markdown frontmatter, JSON input, Work and Validation definitions, terminal output, and Edge targets.
-- Keep technical labels concise. Prefer exact entity names, status values, and timestamps over descriptive prose.
+Use Inter for interface text and Geist for identifiers, target enums, paths, timestamps, JSON/frontmatter and terminal data.
+
+- `headline-lg` is reserved for main workspaces; Engineering headers use compact `headline-sm` where density matters.
+- `body-md` is default application copy.
+- `label-caps` identifies metadata and status groups.
+- `code-md` displays exact technical values and definitions.
+- Canvas IDs remain readable at the minimum zoom; layout must not shrink label text below its configured minimum.
 
 ## Layout & Spacing
-The layout follows a fluid grid with sidebar-heavy navigation and dense operational workspaces.
 
-- **Desktop:** Use a 12-column grid. Keep primary navigation sidebars fixed near 280px when expanded. Let the main workspace remain fluid and scrollable.
-- **Data Density:** Keep density high but structured. Use the 4px spacing unit. Default vertical rhythm between related controls is 8px or 16px. Use 20px panel padding for primary work areas.
-- **Control Density:** Use 28px controls with 12px text for compact desktop forms and 32px controls with 14px text by default. At narrow mobile widths, use 40px controls and at least 16px input text to keep forms legible and prevent viewport zoom. Compact label/value forms use an 88px label column and stack labels above controls when that column would compress the value.
-- **Functional Zones:** Separate navigation, collection lists, entity detail panels, previews, Run history, and editor surfaces into clear zones with borders and tonal layers.
-- **Flow Visualization:** Use exactly two authoring canvases. **Graph Engineering** is the default project-global projection: place one restrained Orchestrator control strip above a deterministic left-to-right layered graph, render one compact rectangular `LoopNode` per `ProjectLoop`, and render `DONE` only as a terminal. Forward RunBook transitions use direct routes; cycles and backward transitions use deterministic smart `smoothstep` routes. Every transition label contains exact decision and outcome text such as `PASS · success` or `FAIL · invalid_plan`; color is never the only signal. Repair routes are a separately identifiable edge collection. Support 1, 5, and 40 Loops without overlap or forced unreadable fit, preserving pan and zoom. Do not derive topology from layout, selection, or client-only state. The Orchestrator control uses Primary/Secondary/Loop Flow/Tertiary semantics in normal states and Error only for blocking or failed state. **Workflow Engineering** renders only the selected Loop's independently selectable JobNode artworks and persisted PassEdges/FailEdges. Validation remains a distinct domain/editor role but is projected as an internal Job responsibility; fixed Job→Validation and retry transitions have no canvas Edge, and PASS/FAIL results have no endpoint node. Use a `straight` 1.5px path only for direct next-Job adjacency and deterministic smart `smoothstep` 1.5px routing for cycles, non-adjacent targets, and terminal results. Preserve its dark technical grid, configured planet artwork and sizes, glows, amber ID labels, thin mint connections, bright connection points, keyboard navigation, and tracked `.ballet/theme.json` colors across desktop and narrow viewports. Never combine Graph Engineering LoopNodes, Orchestrator control, or project-global routes with Workflow Engineering's internal JobNodes or Edges on the same authoring canvas.
-- **Mobile:** Stack panels vertically. Convert sidebars to sheets or drawers. Keep key filters and commands reachable from a persistent top or bottom control.
+- Desktop uses a 12-column fluid grid and a sidebar near 280px. Primary canvas space stays fluid.
+- Use the 4px spacing unit, 8/16px related-control rhythm and 20px primary-panel padding.
+- Compact desktop controls are 28px; default controls 32px; narrow controls at least 40px and form text at least 16px.
+- Desktop Engineering uses a compact header, dominant canvas and 22–24rem inspector. Narrow viewports move the same inspector content into a Sheet without page-level horizontal overflow.
+- Avoid empty decorative zones. Keep actions adjacent to the object or scope they affect.
 
-## Elevation & Depth
-Depth is conveyed through tonal layering first and shadows second.
+## Protected Three-Level Space Canvas Contract
 
-- **Level 0 (Base):** Use `#0c0e11` for the application and workspace background.
-- **Level 1 (Panels):** Use `#111316` for primary panels and cards with a 1px border. Use `#1a1c1f` selectively for compact headers and nested sections. Do not add decorative shadows.
-- **Level 2 (Modals/Popovers):** Use `#1e2023` with a visible border, a subtle 10% white inner edge, and a restrained dark shadow.
-- **Active State:** Elements currently selected, edited, monitored, or focused may receive a 4px Primary glow at 20% opacity.
-- **Disabled State:** Lower opacity and reduce contrast. Do not change the shape language or introduce new colors.
+All three canvases use the same protected visual language: a dark 24px technical grid, code-native planet artwork, configured independent sizes/styles, restrained reasoning glow, amber exact-ID labels, thin 1.5px mint connections, bright connection points and static semantic highlights under `prefers-reduced-motion`.
 
-## Shapes
-The shape language is **Soft-Industrial**. Keep controls precise and compact.
+### Graph Engineering
 
-- Use `rounded` (4px) for buttons, inputs, selects, tabs, and compact controls.
-- Use `rounded-lg` (8px) for panels, cards, code blocks, and previews.
-- Edge-to-edge workspace panels may be square when they meet the application frame or another flush workspace zone. Standalone panels and cards still use `rounded-lg`.
-- Use `rounded-xl` (12px) only for status pills, chips, and small non-rectangular metadata containers.
-- Use `rounded-full` only for dots, toggles, and circular icon targets.
-- Avoid large pill-shaped command buttons unless the existing component pattern requires it.
+- Center one globally scoped Luna Orchestrator artwork.
+- Show the optional Sol Repair Node visibly connected to the Orchestrator.
+- Arrange only GraphNode planets around the hub.
+- Show fixed PASS/FAIL connection points.
+- Spokes represent membership in authored start/continuation/repair candidate rules. They are not child-to-child Edges or runtime outcomes.
+- Activating a GraphNode navigates directly to its Graph Node route. Selecting Orchestrator or Repair opens the inspector.
 
-## Dense Forms & Editor Workspaces
-Forms are operational workspaces, not document-style pages. Keep them compact, explicit, and predictable across ExecutionProfiles, Markdown documents, Skills, Loop configuration, themes, and Runs.
+### Graph Node
 
-- Render only one entity identity or workspace-title layer before the content. Do not repeat the entity name, status, section name, and editor mode in stacked header rows.
-- Do not ship disabled tabs or toolbar controls for future functionality. Remove unavailable modes until they have real content and complete keyboard semantics.
-- Use the Markdown Workbench pattern for text-heavy editors: one live Preview region, one Edit region, compact panel headers, metrics next to the editor, and Save/Delete actions in the Edit header.
-- Use a compact inspector rail for entity identity and metadata. Give it one name/description/status block followed by edge-to-edge sections with an 88px label/value grid.
-- Every control has an associated label. Connect descriptions and field errors with `aria-describedby`, set `aria-invalid` on the control, and show the exact error directly below the affected control. Use `fieldset` and `legend` for grouped choices.
-- Show server or form-wide failures in one destructive Alert near the form start. A disabled Save control never replaces a visible validation explanation.
-- Entity editors use explicit Save and expose dirty, valid, and pending state. Prevent duplicate submissions while pending. ExecutionProfile editing is explicit-save; runtime values are never autosaved from the Node editor.
-- Use container-aware responsive layouts. Keep inspector, Preview, and Edit side by side only when each retains useful width; otherwise stack them in that order.
-- Keep shadcn/Base UI primitives in `components/ui` and compose product-specific density, validation, status, panels, and actions in the shared application layer. Do not import Base UI primitives directly from feature views.
-- Treat the selected Loop canvas as a deterministic visual boundary during form work. Opening the inspector, reordering display order, or changing local panel state must not mutate saved domain semantics. Keep the established canvas/sheet split and shared `.loop-*` theme contract.
+- Center the selected GraphNode's Luna Orchestrator and show its optional Sol Repair Node.
+- Arrange only that GraphNode's JobNode planets around the hub; render zero peer/foreign GraphNodes or foreign Jobs.
+- Show PASS/FAIL connection points and candidate membership spokes.
+- Activating a JobNode navigates directly to its Job Node route.
 
-## Components
-- **Sidebar:** Treat the sidebar as an operational index, not a marketing navigation area. Use compact labels, icons, grouped sections, and clear selected state.
-- **Buttons:** Primary buttons are solid Electric Blue. Secondary buttons are ghost or outline controls with subtle borders. Destructive buttons must use the error token family.
-- **Status Chips:** Use a leading dot plus label. Emerald means running or healthy. Amber means queued, pending, or needs attention. Gray means unavailable, unknown, or archived. Use pulse animation only for live-running state.
-- **ExecutionProfile Editor:** Use one Configure collection and detail route under `/execution-profiles`. The editor exposes only Name, Provider, Model, Reasoning effort, and Network access. Keep the identity and metadata rail compact with `inspector-title`, `inspector-body`, `inspector-value`, and `inspector-label`. Persist only through explicit Save, show the lowercase kebab-case ID as technical metadata, and never add instruction, skill, task, Edge, appearance, workspace-access, or machine-local controls.
-- **Reasoning Glow:** Derive an Agent or Scheduled Job Node's glow from its ExecutionProfile reasoning effort using seven progressively wider, brighter, and more saturated levels in this order: `light`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`. Smaller efforts are grayer and dimmer; larger efforts approach the Loop theme's node glow color. The single Job canvas artwork uses the Job profile when idle or running Job and the paired Validation profile while Agent Validation is active; its artwork style and size remain Job-owned. A missing or unavailable active profile has no reasoning glow and is a blocking validation state; semantic Run status rings remain independent.
-- **Cards & Panels:** Use cards for repeated entities and panels for workspace regions. Do not place cards inside cards. Prefer headers with metadata and a compact command area. Standalone surfaces use `rounded-lg`; flush workspace regions use the square-edge exception. Present ExecutionProfiles, Skills, ADRs, Goals, and Instructions as dense responsive collection grids. Graph Engineering is a canvas plus inspector, not a Loop card collection. Place the same subdued dashed add card first where collection creation is supported and keep existing entities as compact metadata cards with an explicit Open action.
-- **Loop Library & Installed Loop Metadata:** `Add Loop` opens one modal-level responsive dialog containing search, only non-empty category controls, one-box module cards, `Import file`, and `Create blank Loop`. A module card shows title, at most two description lines, version/category, material permission/network badges and one Add command; it never previews internal Workflow Nodes. Reveal profile mapping, conflicts, State-contract comparison, hashes, exact changed paths and advanced metadata only when required or explicitly expanded. After install, refresh authoritative workspace state and select the materialized LoopNode in Graph Engineering. Its inspector shows module title/version/content-derived provenance status plus Open Workflow Engineering, Export and Remove commands without hiding project-local Loop identity. V3 `recommendedTransitions` and `recommendedRepairs` remain advisory metadata until the user creates persisted project-global routes; a module never silently materializes a peer target.
-- **Tables & Lists:** Use tight row heights, clear separators, and zebra-striping with a 2% lighter surface tint when rows are dense. Keep row controls icon-first where possible.
-- **Inputs:** Use dark surfaces, 1px borders, and Primary focus state. Validation messages must be explicit and adjacent to the field.
-- **Run Timeline:** Use monospaced entries. Start each row with a muted timestamp, then the Workflow Node ID, Node Run role or provider source, canonical outcome, and status. Use Emerald for Validation PASS, Amber for waiting or repair states, and Error for FAIL, failed, or blocked states; retain exact text and icons so color is never the only signal.
-- **CLI Run Console:** Render a selected ExecutionTask's persisted provider-neutral Codex or Copilot event stream in a dense dark monospaced console. Each row starts with a muted receipt time, provider source, and a fixed-width semantic type (`SYSTEM`, `THINK`, `AGENT`, `CMD`, `OUTPUT`, `FILE`, `TOOL`, `INFO`, `WARN`, or `ERROR`). Preserve command whitespace, allow horizontal scrolling, auto-follow only while the operator remains at the bottom, and expose reconnect and 1 MB truncation state explicitly. Display only provider-published reasoning summaries; never render hidden or raw chain-of-thought.
-- **Local Runtime:** Use one dense local-host workspace instead of a machine registry. Show the hostname, current checkout, service uptime, active/busy counts, and a Codex/Copilot capability table with exact command, CLI version, authentication, models, policy capabilities, and health. Emerald is reserved for a ready provider, Amber for busy or attention, Gray for unavailable or unknown, and Error for a blocking health issue. Expose `Refresh capabilities` and `View logs`; lifecycle control belongs to the checkout-scoped CLI. Do not show machine search, device filters, Connect, pairing, restart, disconnect, or computer selection.
-- **Local CLI Repair:** Provider authentication is always completed in the provider's local CLI. When a command is missing or authentication fails, show the exact local repair command in a copyable Geist block next to that provider. Never ask for Codex, GitHub, Git, or Ballet credentials, and never present device-code approval or pairing states.
-- **Local Node Execution:** The implementation keeps portable provider, model, reasoning effort, and network intent in an ExecutionProfile in strict v13 `.ballet/project.json` without a compatibility reader or silent defaults. Keep provider command overrides, optional `tkCommand`, and checkout-wide absolute `readOnlyRoots` in `.git/ballet/settings.json`. Agent and Scheduled Job Nodes, Agent Validation Nodes, and an optional repair-router select one profile; their editors never edit runtime values. RunBook flow routing itself never invokes a provider. There is no provider fallback, runtime attachment, Agent-specific local policy, or `workspaceAccess` field. A legacy `agentReadOnlyRoots` property is a blocking error with exact remediation and is never silently cleaned up.
-- **Project Instructions Workbench:** Present `.ballet/instructions/**/*.md` resources as a responsive live Markdown Preview and Edit workspace. Reuse project Markdown rendering, technical editor typography, tonal panel boundaries, draft validation, word/token metrics, and explicit Save. Display title, `project:<id>`, relative path, and validation state. A document without a valid frontmatter ID remains visible as a document but is not selectable as a primary instruction.
-- **Project Skills Collection:** Present `.agents/skills/**/SKILL.md` resources with title or name, path-derived `project:<relative-directory>` ID, relative path, and validation state. Invalid paths remain visible as blocking catalog errors. V1 snapshots and composes only the selected `SKILL.md`; no Built-in catalog, clone action, registry, or drag-reorder appears.
-- **Markdown & Frontmatter Previews:** Render metadata in compact, code-like blocks. Use Geist and preserve exact key names. Separate preview content from editable controls with a visible tonal boundary.
-- **Command & Filter Controls:** Use compact search, segmented filters, and command-bar patterns for fast navigation across projects, ExecutionProfiles, Loops, Workflow Nodes, and Runs.
-- **Loop Theme Editor:** Open the single project theme directly at `/automation/theme`. Use one full-width technical workspace with a fixed-height, non-interactive showcase composed of a grouped artwork gallery and a short Edge/terminal canvas above dense Node, Edge, and Connection point control zones. The gallery shows every fixed node artwork at a representative independent size plus the fixed Route Loop summary artwork; the canvas demonstrates Validation PASS, FAIL, retry, cross-Loop Edges, connection points, and Workflow PASS/FAIL plus technical terminals without forcing the complete catalog into one unreadably long graph. The editor chrome always uses Ballet design tokens; project-defined hex colors are scoped to Loop canvases only. Preview valid draft changes immediately, keep invalid partial color input visibly adjacent to its field while retaining the last valid preview value, and persist only through an explicit Save command. Do not expose theme identity, copying, assignment, usage counts, or renderer-per-size controls.
-- **Workflow Node Cards:** Use outside the selected-Loop canvas for Loop definitions, Workflow Engineering inspectors, and detailed Run snapshots. Job and Validation are distinct, text-labeled entities and may show role type, selected ExecutionProfile name when applicable, status, Job attempt, and a concise task, criteria, or Run input section. Do not combine them into a composite card or reuse them as Graph Engineering LoopNodes.
-- **Global Ballet Mode:** Place one text-first `Ballet` dropdown at the upper-left of the sidebar. Its popup offers `Run` and `Configure` with concise descriptions and a selected-state indicator. Do not render Loop- or Work-Loop-Node-local mode controls. Configure contains Project documents, Project Instructions, Project Skills, Execution Profiles, Theme, and Loops. Run uses `/run`, `/run/graphs/:graphId?run=<rootRunId>`, and `/run/loops/:loopId?run=<rootRunId>`; standalone Agent Run routes do not exist. Preserve the selected Loop when switching modes and route Configure-only resources to Run Overview. The Run sidebar contains Overview, active Root Runs, Graphs, and Loops.
-- **Workflow Engineering Editors:** Keep Loop identity, required description, first-class capability metadata, State description, initial State JSON, and start Job in the Loop definition inspector. Keep project-global graph routes out of Workflow Engineering and link back to Graph Engineering for those connections. Job and Validation each have their own inspector with identity, description, task, role type, appearance, and provider execution composition; Job additionally owns `maxRetries`, composition, and the optional schedule. Scheduled is available only to the start Job and never to Validation. Show `Job → paired Validation` and `Validation FAIL → paired Job` retry as fixed read-only invariants. PassEdge and FailEdge are independently selectable and editable only within their allowed target contracts. Profile and primary are required selects, and Skills remain a keyboard-accessible Project-only multi-select whose removable chips are sorted by ID.
-- **Atomic Job Pair Authoring:** `Add Job` creates one JobNode, its deterministic `<job-id>-validation` ValidationNode, one PassEdge to PASS, and one FailEdge to FAIL in one state transition. Delete the pair together. Disable deletion when the Job is the Workflow start or an incoming PassEdge target. Never leave an orphan, shared Validation, or partial Edge set visible between UI states.
-- **Loop Orchestrator Editor:** Show the Loop Orchestrator exactly once as a distinct top control strip in Graph Engineering, never as a LoopNode or Workflow Node and never as detached decoration. Selecting it opens the canonical Orchestrator inspector; on narrow viewports, open that inspector in a Sheet from both the control and a visible canvas command. Expose RunBook mode, transition limit, optional repair-router composition, graph name/start Loop, transition evidence, and separate repair routes. Ordinary flow is selected only by the terminal Validation's allowed `(decision, outcome)` and resolved from the immutable strict-v13 snapshot; the repair router exists only when repair routes exist. Labels and icons distinguish route kinds without relying on color alone. Normal Orchestrator identity must not use the Error token.
-- **Graph and Workflow Engineering Navigation:** Treat the canvas as the dominant workspace surface. Use one compact two-row desktop header: the first row contains one `headline-sm` H1 using exactly `Graph Engineering` or `Workflow Engineering`, a single-line graph explanation or selected-Loop identity, and view-specific actions; the second row contains a compact breadcrumb and the two-view control. Keep desktop header controls at 28px and vertical header padding at 8px. URL state owns `view=graph | workflow` and Workflow Engineering's selected Loop ID; Graph inspector selection is ephemeral UI state and never topology or routing state. Support browser back/forward and only the canonical deep links `/automation/loops?view=graph` and `/automation/loops?view=workflow&id=<loop-id>`. Graph Engineering is the default. Preserve a 34rem canvas minimum. A Graph LoopNode is keyboard focusable: Space selects it and Enter opens Workflow Engineering. Workflow JobNodes and persisted Edges are keyboard focusable and selectable with exact accessible names. On narrow viewports, retain 40px action and view controls, allow their own horizontal scrolling, keep the canvas usable, keep the Workflow inspector in the same vertical flow below the canvas, and move Graph selection/Orchestrator inspectors into one Sheet without page-level horizontal overflow. Do not keep Context, numeric level, `view=loop`, or disabled future tabs.
-- **Run Control Surface:** Lead with one compact canonical-position strip for active Loop, Workflow Node, Job/Validation/Orchestrator role, Job attempt, State revision, repair depth, return destination, and finalization. Follow it with a Mission / All Loops visual workspace and one persistent live inspector. Mission keeps the immutable selected-Loop canvas primary, adds a short narration derived only from canonical Run position, and gives its code-native planets restrained status-driven character expressions. All Loops is the focused secondary snapshot: label the Loop Orchestrator separately, render compact Loop planets, keep normal flow routes concise, highlight only the active repair Loop Edge, and show the persisted LIFO return path. The live inspector exposes exact status, node, role, ExecutionProfile, Job attempt, State revision, repair depth, outcome, and Repair Request values; never invent progress, elapsed time, ETA, dialogue, State, route, or return targets. Below it, use dense timeline, canonical State revision/patch-evidence, and selected ExecutionTask console panels; collapse large JSON values rather than truncating their semantics. Human Job returns a Job outcome; Human Validation returns `PASS` or `FAIL`, with FAIL carrying the required feedback/correction/escalation payload; an Orchestrator awaiting input exposes only resume.
-- **Workflow Canvas Nodes:** Render exactly one code-native planet artwork for every JobNode. The paired ValidationNode is part of that Job artwork's accessible identity and active status/glow projection; it is not a separate canvas node or independent canvas selection. Preserve the Job-owned configured artwork, size, glow, work-producing Briefcase identity, internal Validation Shield cue, amber exact ID label, and centered anchors. In Run, map the composite artwork's active role and status only from canonical position. Character expression remains decorative; exact role and status stay available as text and in the inspector.
-- **Workflow Results:** PASS and FAIL remain fixed domain results, not authorable or executable Nodes, and are not rendered as endpoint nodes. A terminal persisted Edge ends at a bright connection point with an exact icon-plus-text `PASS` or `FAIL · escalate` label. Results have no execution composition, schedule, outgoing Edge, selection, or inspector.
-- **Workflow Canvas Interaction:** Render only the persisted selectable PassEdge and FailEdge collection between Job artworks or to terminal result connection points. Use `straight` geometry for direct next-Job adjacency and smart rounded `smoothstep` geometry for every cycle, non-adjacent target, and terminal route; do not add Bézier, freeform, dashed, dotted, validate, or retry Edge styles. Preserve thin 1.5px semantic paths, bright 5px connection points, cycles, Loop summaries, and the 24px grid. The application persists only strict v13, has no v12 parser, dual-write, silent defaults, Context route, numeric authoring level, or `view=loop` alias. Creating or saving a provider-backed Job or Validation definition requires explicit ExecutionProfile and Project primary-instruction selections; never select a first profile or instruction silently. Ballet Run keeps the fully resolved Root Run snapshot—Loops, Workflow Nodes, internal Pass/Fail Edges, graph transitions and repairs, capabilities, profiles, project resources, System instruction, theme, artwork, and sizes—immutable. It gives the active composite Job artwork a restrained Emerald pulse, gives a human-wait Node Run an Amber pulse, and preserves active route animation. Pulses and route motion become static semantic highlights under `prefers-reduced-motion`.
+### Job Node
+
+- Render separate Work and Validation planets with their own configured artwork.
+- Draw Work→Validation as a fixed mint validate link.
+- Draw Validation FAIL retry→Work as a fixed amber retry route and label its bounded retry semantics.
+- Show PASS/FAIL terminals as connection points, not executable nodes.
+- Work and Validation selection open their settings/instructions. Job aggregate settings open from a compact header command.
+
+## Canvas Layout & Interaction
+
+- Use deterministic radial multi-ring placement. Preserve stable ordering, minimum separation, pan/zoom and minimum text size for 1/5/40 GraphNodes and 1/17/64 JobNodes.
+- Acceptance is zero node overlap, zero page-level horizontal overflow and zero clipped core action at 1440×900 and 390×844.
+- Canvas objects are keyboard focusable with exact accessible names. Space selects and Enter drills down when the object has a child route.
+- Breadcrumbs navigate to the parent and Graph Engineering. Browser back/forward must reproduce URL-owned scope.
+- Do not add decorative edge types, freeform topology, Bézier routes, hybrid level controls or foreign-scope summaries to a canvas.
+- Active Run locks authoring mutations but keeps inspection and navigation available.
+
+## Inspectors & Authoring
+
+- Orchestrator inspector exposes identity, scope, explicit ExecutionProfile, primary instruction, skills, limits and authored start/continuation/repair candidate rules.
+- Repair inspector exposes explicit ExecutionProfile, instruction, skills, attempt/depth limits and bounded outcomes. It never presents expanded permission or active-snapshot mutation controls.
+- Work inspector exposes agent/human type, task, appearance, explicit profile/instruction/skills and capability/State contract.
+- Validation inspector exposes criteria, appearance, explicit composition and PASS/FAIL contract. FAIL repair input contains no target ID.
+- Job aggregate inspector exposes identity, appearance, capability and `maxRetries` without duplicating child composition.
+- Blank authoring/import requires an explicit profile and instruction mapping. Never choose the first profile or instruction silently.
+- Work, Validation and Repair instructions must not name sibling node IDs. Only same-level Orchestrator instructions and candidate rules know routing targets.
+
+## Graph Node Modules
+
+Graph Node Module v4 UI supports inspect, plan, install, export and remove for exactly one GraphNode plus its aggregate Jobs, scoped Orchestrator, optional Repair and resource closure. Show package hash, provenance, conflicts and explicit profile/instruction mapping. Peer-GraphNode-targets are project-global and must not appear as package-owned routes.
+
+## Run Control Surface
+
+Lead with a compact canonical-position strip for root kind, GraphNode, JobNode, role, profile, attempt, State revision, repair depth, return destination and terminal status. Follow with a scope-correct snapshot and one persistent live inspector. Derive all values from immutable snapshot and canonical persistence; never invent progress, elapsed time, ETA, dialogue, State, target or return path from provider prose.
+
+Human Work returns a Work outcome. Human Validation returns `PASS | FAIL`; FAIL carries evidence and target-ID-free repair input. Orchestrator awaiting input exposes only the valid resume/decision boundary.
+
+## Other Workspaces
+
+- **ExecutionProfiles:** compact provider/model/reasoning/network controls; no implicit fallback.
+- **Project Instructions:** responsive Markdown preview/edit with exact `project:<id>`, path, validation state and explicit Save.
+- **Project Skills:** list `.agents/skills/**/SKILL.md` with project ID, path and validation state; invalid paths remain visible blocking errors.
+- **Canvas Theme:** one `/automation/theme` workspace using only the fixed artwork/connection token language. Theme identity, cloning, assignment and per-size renderers are outside the current boundary.
+- **Global Ballet Mode:** one text-first Ballet menu for Run and Configure. Configure contains documents, instructions, skills, profiles, theme and Graph Engineering; Run contains Overview, active Graph Runs and GraphNode Runs.
 
 ## Do's and Don'ts
-- Do use the token values in this file as the source of truth for UI color, spacing, radius, and typography decisions.
-- Do prefer dense, scannable, work-focused screens over decorative landing-page composition.
-- Do use Electric Blue, Emerald, and Amber as operational signals with consistent meanings.
-- Do keep UI copy precise, short, and tied to concrete project, ExecutionProfile, Loop, Workflow Node, Node Run, Edge, runtime, or Run state.
-- Do keep visual hierarchy clear through typography scale, borders, and tonal layers.
-- Don't introduce one-off colors, gradients outside the fixed node artwork presets, ornamental backgrounds, or large decorative illustrations.
-- Don't use bright signal colors for passive decoration.
-- Don't increase border radius beyond the defined scale for standard controls.
-- Don't use hero-scale type inside dashboards, sidebars, cards, tables, editors, or panels.
-- Don't hide operational state behind vague labels; expose exact status, owner, source, target, and timestamps where relevant.
+
+- Do use these tokens for color, spacing, radius and typography.
+- Do prefer dense, scannable, work-focused surfaces.
+- Do use exact entity IDs, scope, status, target enum and timestamps.
+- Do distinguish Luna Orchestrator and Sol Repair through existing artwork/labels, not a new palette.
+- Don't introduce one-off colors, ornamental backgrounds, decorative gradients or a new shape language.
+- Don't use signal colors as passive decoration.
+- Don't hide operational state behind vague labels.
+- Don't combine Graph, GraphNode and JobNode scopes on one canvas.
+- Don't render candidate membership as child-to-child runtime Edges.

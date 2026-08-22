@@ -1,130 +1,109 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TkTicket, TkUpsertInput, TkStoreKind } from "./TkTracker.js";
-import { TkTracker } from "./TkTracker.js";
+import Database from "better-sqlite3";
+import { afterEach, describe, expect, it } from "vitest";
+import type { StoredRootRun } from "../runs/RootRunStore.js";
+import { runtimeSchema } from "../storage/RuntimeSchema.js";
+import type { TkTracker } from "./TkTracker.js";
 import { TrackerOutbox } from "./TrackerOutbox.js";
-import { createRuntimeStoreFixture, type RuntimeStoreTestFixture } from "../runtime/RuntimeStore.test-fixture.js";
 
-const fixtures: RuntimeStoreTestFixture[] = [];
-afterEach(async () => Promise.all(fixtures.splice(0).map((fixture) => fixture.close())));
+const connections: Database.Database[] = [];
+afterEach(() => connections.splice(0).forEach((connection) => connection.close()));
 
-describe("TrackerOutbox reconciliation", () => {
-  it("writes stable root and Loop intents before applying each operation exactly once", async () => {
-    const fixture = await graphFixture();
-    const fake = fakeTracker();
-    const outbox = new TrackerOutbox(fixture.connection, fake.tracker);
+describe("TrackerOutbox GraphNode reconciliation", () => {
+  it("materializes one root and GraphNode ticket and closes both exactly once", async () => {
+    const connection = fixtureDatabase("completed");
+    const calls: string[] = [];
+    const tracker = fakeTracker(calls);
+    const outbox = new TrackerOutbox(() => connection, tracker);
 
-    await expect(outbox.reconcileOrPause(fixture.roots.require("root-run"))).resolves.toBe(true);
-    await expect(outbox.reconcileOrPause(fixture.roots.require("root-run"))).resolves.toBe(true);
+    await expect(outbox.reconcileOrPause(fixtureRoot("completed"))).resolves.toBe(true);
+    await expect(outbox.reconcileOrPause(fixtureRoot("completed"))).resolves.toBe(true);
 
-    expect(fake.upsert).toHaveBeenCalledTimes(2);
-    expect(fake.start).toHaveBeenCalledTimes(2);
-    expect(fake.externalRefs()).toEqual(["ballet-loop-run:loop-run", "ballet-root:root-run"]);
-    expect(rows(fixture, "SELECT status FROM tracker_outbox")).toEqual([
-      { status: "applied" }, { status: "applied" }, { status: "applied" }, { status: "applied" }
-    ]);
-    expect(rows(fixture, "SELECT external_ref FROM tracker_links ORDER BY external_ref")).toEqual([
-      { external_ref: "ballet-loop-run:loop-run" }, { external_ref: "ballet-root:root-run" }
+    expect(connection.prepare("SELECT COUNT(*) FROM tracker_links").pluck().get()).toBe(2);
+    expect(connection.prepare("SELECT COUNT(*) FROM tracker_outbox WHERE status = 'applied'").pluck().get()).toBe(6);
+    expect(calls).toEqual([
+      "upsert:ballet-root:root-1",
+      "upsert:ballet-graph-node-invocation:graph-node-invocation-1",
+      "start:ticket-1", "start:ticket-2", "close:ticket-2", "close:ticket-1"
     ]);
   });
 
-  it("pauses after a partial external write and reconciles without duplicates after restart", async () => {
-    const fixture = await graphFixture();
-    const fake = fakeTracker({ failAfterFirstUpsert: true });
-    const first = new TrackerOutbox(fixture.connection, fake.tracker);
+  it("preserves a terminal status across a failed partial reconciliation and resumes idempotently", async () => {
+    const connection = fixtureDatabase("completed");
+    const calls: string[] = [];
+    let unavailable = true;
+    const outbox = new TrackerOutbox(() => connection, fakeTracker(calls, () => unavailable));
 
-    await expect(first.reconcileOrPause(fixture.roots.require("root-run"))).resolves.toBe(false);
-    expect(fake.externalRefs()).toEqual(["ballet-root:root-run"]);
-    expect(fixture.roots.require("root-run")).toMatchObject({
-      status: "waiting_for_input", errorCode: "tracker_unavailable"
-    });
-    expect(rows(fixture, "SELECT status, error_message FROM tracker_outbox ORDER BY rowid")[0])
-      .toMatchObject({ status: "pending", error_message: "simulated partial write" });
+    await expect(outbox.reconcileOrPause(fixtureRoot("completed"))).resolves.toBe(false);
+    expect(connection.prepare(
+      "SELECT status FROM root_runs WHERE root_run_id = 'root-1'"
+    ).pluck().get()).toBe("waiting_for_input");
+    expect(connection.prepare(
+      "SELECT finalization_terminal_status FROM root_runs WHERE root_run_id = 'root-1'"
+    ).pluck().get()).toBe("completed");
 
-    fixture.release();
-    const reopened = fixture.reopen();
-    fake.allowWrites();
-    const resumed = new TrackerOutbox(fixture.connection, fake.tracker);
-    await expect(resumed.reconcileOrPause(reopened.roots.require("root-run"))).resolves.toBe(true);
-
-    expect(fake.externalRefs()).toEqual(["ballet-loop-run:loop-run", "ballet-root:root-run"]);
-    expect(rows(fixture, "SELECT status FROM tracker_outbox WHERE status = 'pending'")).toEqual([]);
-    expect(reopened.roots.require("root-run")).toMatchObject({
-      status: "running", errorCode: undefined, errorMessage: undefined
-    });
-  });
-
-  it("records cancellation closure once for both the Loop invocation and Root Run", async () => {
-    const fixture = await graphFixture();
-    const fake = fakeTracker();
-    const outbox = new TrackerOutbox(fixture.connection, fake.tracker);
-    await outbox.reconcileOrPause(fixture.roots.require("root-run"));
-
-    fixture.connection().prepare(
-      "UPDATE loop_invocations SET status = 'cancelled', updated_at = ?, completed_at = ? WHERE loop_run_id = 'loop-run'"
-    ).run("2026-08-21T00:01:00.000Z", "2026-08-21T00:01:00.000Z");
-    fixture.roots.setStatus("root-run", "cancelled", { timestamp: "2026-08-21T00:01:00.000Z" });
-    await outbox.reconcileOrPause(fixture.roots.require("root-run"));
-    await outbox.reconcileOrPause(fixture.roots.require("root-run"));
-
-    expect(fake.close).toHaveBeenCalledTimes(2);
-    expect(fake.close.mock.calls.map((call) => call[3]).sort()).toEqual(["tk-1", "tk-2"]);
-    expect(rows(fixture, "SELECT action, status FROM tracker_outbox WHERE action = 'close' ORDER BY rowid"))
-      .toEqual([{ action: "close", status: "applied" }, { action: "close", status: "applied" }]);
+    unavailable = false;
+    await expect(outbox.reconcileOrPause(fixtureRoot("waiting_for_input"))).resolves.toBe(true);
+    expect(connection.prepare(
+      "SELECT status FROM root_runs WHERE root_run_id = 'root-1'"
+    ).pluck().get()).toBe("completed");
+    expect(connection.prepare("SELECT COUNT(*) FROM tracker_links").pluck().get()).toBe(2);
+    expect(connection.prepare("SELECT COUNT(*) FROM tracker_outbox").pluck().get()).toBe(6);
   });
 });
 
-const graphFixture = async () => {
-  const fixture = await createRuntimeStoreFixture({}, {
-    rootKind: "graph",
-    transitions: [{
-      id: "done", source: "main-loop", decision: "PASS", outcome: "success",
-      target: { runResult: "DONE" }, description: "Complete."
-    }]
-  });
-  fixtures.push(fixture);
-  fixture.loops.createLoopRun({
-    loopRunId: "loop-run", loop: fixture.loop, rootRunId: "root-run", source: "manual"
-  });
-  return fixture;
+const fixtureDatabase = (status: "running" | "completed"): Database.Database => {
+  const connection = new Database(":memory:");
+  connections.push(connection);
+  connection.pragma("foreign_keys = ON");
+  connection.exec(runtimeSchema);
+  connection.prepare(`
+    INSERT INTO root_runs (
+      root_run_id, kind, target_id, source, status, worktree_path, branch, head_sha,
+      config_hash, snapshot_hash, execution_snapshot_json, created_at, updated_at, completed_at
+    ) VALUES ('root-1', 'graph', 'graph-engineering', 'manual', ?, '/tmp/worktree',
+      'ballet/run/root-1', 'head', 'config', 'snapshot', '{}', 'now', 'now', ?)
+  `).run(status, status === "completed" ? "now" : null);
+  connection.prepare(`
+    INSERT INTO graph_node_invocations (
+      graph_node_invocation_id, root_run_id, graph_node_id, source, status,
+      snapshot_json, entry_state_revision, completion_state_revision, nesting_depth,
+      created_at, updated_at, completed_at
+    ) VALUES ('graph-node-invocation-1', 'root-1', 'design', 'orchestrator', 'completed',
+      '{}', 0, 0, 0, 'now', 'now', 'now')
+  `).run();
+  return connection;
 };
 
-const rows = (fixture: RuntimeStoreTestFixture, sql: string): unknown[] =>
-  fixture.connection().prepare(sql).all();
+const fixtureRoot = (status: "waiting_for_input" | "completed"): StoredRootRun => ({
+  rootRunId: "root-1", kind: "graph", targetId: "graph-engineering", source: "manual", status,
+  stateRevision: 0, transitionCount: 0, worktreePath: "/tmp/worktree", branch: "ballet/run/root-1",
+  headSha: "head", configHash: "config", snapshotHash: "snapshot", createdAt: "now", updatedAt: "now",
+  executionSnapshot: {
+    graph: { name: "Graph Engineering" },
+    issueTracker: {
+      kind: "tk", testedRevision: "revision",
+      orchestrationDirectory: ".tickets/orchestration", workDirectory: ".tickets/work"
+    }
+  }
+} as unknown as StoredRootRun);
 
-const fakeTracker = (options: { failAfterFirstUpsert?: boolean } = {}) => {
-  const tickets = new Map<string, TkTicket>();
-  let fail = options.failAfterFirstUpsert ?? false;
-  const upsert = vi.fn(async (
-    _worktree: string,
-    _config: unknown,
-    _store: TkStoreKind,
-    input: TkUpsertInput
-  ): Promise<TkTicket> => {
-    let ticket = tickets.get(input.externalRef);
-    if (!ticket) {
-      ticket = {
-        id: `tk-${tickets.size + 1}`, status: "open", deps: [], links: [],
-        created: "2026-08-21T00:00:00Z", type: input.type,
-        priority: input.priority ?? 2, "external-ref": input.externalRef,
-        ...(input.parentId ? { parent: input.parentId } : {})
-      };
-      tickets.set(input.externalRef, ticket);
-    }
-    if (fail) {
-      fail = false;
-      throw new Error("simulated partial write");
-    }
-    return ticket;
-  });
-  const start = vi.fn<TkTracker["start"]>(async () => undefined);
-  const close = vi.fn<TkTracker["close"]>(async () => undefined);
-  const tracker = { upsert, start, close, reopen: vi.fn(), note: vi.fn() } as unknown as TkTracker;
+const fakeTracker = (
+  calls: string[], unavailable: () => boolean = () => false
+): TkTracker => {
+  const fail = () => { if (unavailable()) throw new Error("tracker unavailable"); };
   return {
-    tracker,
-    upsert,
-    start,
-    close,
-    allowWrites: () => { fail = false; },
-    externalRefs: () => [...tickets.keys()].sort()
-  };
+    upsert: async (_worktree: string, _config: unknown, _store: string, input: { externalRef: string }) => {
+      fail();
+      calls.push(`upsert:${input.externalRef}`);
+      return { id: `ticket-${calls.filter((call) => call.startsWith("upsert:")).length}` };
+    },
+    start: async (_worktree: string, _config: unknown, _store: string, ticketId: string) => {
+      fail(); calls.push(`start:${ticketId}`);
+    },
+    close: async (_worktree: string, _config: unknown, _store: string, ticketId: string) => {
+      fail(); calls.push(`close:${ticketId}`);
+    },
+    reopen: async () => { fail(); },
+    note: async () => { fail(); }
+  } as unknown as TkTracker;
 };

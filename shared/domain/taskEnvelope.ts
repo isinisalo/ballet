@@ -1,157 +1,96 @@
-import type { JsonValue } from "./automation.js";
-import type { CanonicalNodeOutcome, JobCompletedOutcome } from "./runtime.js";
+import type { JsonValue, NodeResult } from "./automation.js";
+import type { OrchestrationScope, WorkNodeOutcome } from "./runtime.js";
 
-export const taskEnvelopeVersion = 6 as const;
+export const taskEnvelopeVersion = 7 as const;
 export const maxTaskEnvelopeBytes = 384 * 1024;
 export const maxRelevantHistoryEntries = 8;
 export const maxRelevantHistoryBytes = 64 * 1024;
-export const maxOrchestrationRequestEnvelopeBytes = 64 * 1024;
+export const maxRoutingRequestEnvelopeBytes = 64 * 1024;
 export const maxResumeContextBytes = 32 * 1024;
 
 export interface TaskEnvelopeRunIdentity {
   rootRunId: string;
-  loopRunId: string;
+  graphNodeInvocationId?: string;
+  jobNodeInvocationId?: string;
   nodeRunId: string;
 }
-
-export interface TaskEnvelopeProviderRunIdentity extends TaskEnvelopeRunIdentity {
-  jobRunId: string;
-}
-
-export interface TaskEnvelopeLoopIdentity {
-  id: string;
-  description: string;
-}
-
-export interface TaskEnvelopeWorkflowNodeIdentity {
-  id: string;
-  description: string;
-}
-
-export interface TaskEnvelopeState {
-  revision: number;
-  value: JsonValue;
-  sha256: string;
-}
-
-export interface TaskEnvelopeResumeContext {
-  question: string;
-  context: string;
-  response: string;
-}
-
+export interface TaskEnvelopeNodeIdentity { id: string; description: string; }
+export interface TaskEnvelopeState { revision: number; value: JsonValue; sha256: string; }
+export interface TaskEnvelopeResumeContext { question: string; context: string; response: string; }
 export interface TaskEnvelopeHistoryEntry {
   sequence: number;
   nodeRunId: string;
-  role: "job" | "validation" | "orchestrator";
+  role: "work" | "validation" | "orchestrator" | "repair";
   state: "completed" | "needs_input" | "blocked" | "failed";
   summary: string;
   stateRevision: number;
 }
-
-interface TaskEnvelopeRepairRequestBase {
-  id: string;
-  requesterLoopRunId: string;
-  requesterJobRunId: string;
-  requesterValidationNodeRunId: string;
-  attempt: number;
-  validationSummary: string;
-  reason: string;
-  evidence?: JsonValue;
-  stateRevisionAtRequest: number;
-  nestingDepth: number;
-}
-
-export type TaskEnvelopeRepairRequest = TaskEnvelopeRepairRequestBase & (
-  | { requestedCapability: string; requestedOutcome?: never }
-  | { requestedCapability?: never; requestedOutcome: JsonValue }
-);
-
-export interface TaskEnvelopeRouteCandidate {
-  id: string;
-  description: string;
-  capabilities: {
-    accepts: string[];
-    provides: string[];
-  };
-  route: {
-    kind: "repair";
-    capability: string;
-    description: string;
-  };
-}
-
-export interface TaskEnvelopeOrchestrationRequest {
-  id: string;
-  kind: "repair";
-  sourceLoopId: string;
-  sourceLoopRunId: string;
-  sourceNodeRunId: string;
-  stateRevisionAtRequest: number;
-  completionSummary: string;
-  completionEvidence: JsonValue;
-  requestedCapability?: string;
-  expectedOutcome?: JsonValue;
-}
-
-export interface TaskEnvelopeRepairReturn {
-  repairRequest: TaskEnvelopeRepairRequest;
-  repairResult: {
-    id: string;
-    frameId: string;
-    targetLoopRunId: string;
-    targetLoopId: string;
-    stateRevision: number;
-    outcome?: CanonicalNodeOutcome;
-    summary: string;
-  };
-}
+export interface TaskEnvelopeRouteCandidate { key: string; description: string; }
 
 interface TaskEnvelopeBase {
   version: typeof taskEnvelopeVersion;
-  loop: TaskEnvelopeLoopIdentity;
+  run: TaskEnvelopeRunIdentity;
+  role: "work" | "validation" | "orchestrator" | "repair";
   task: string;
   state: TaskEnvelopeState;
   resume?: TaskEnvelopeResumeContext;
   relevantHistory: TaskEnvelopeHistoryEntry[];
 }
 
-export interface JobTaskEnvelopeV6 extends TaskEnvelopeBase {
-  role: "job";
-  run: TaskEnvelopeProviderRunIdentity;
-  jobNode: TaskEnvelopeWorkflowNodeIdentity;
-  jobAttempt: number;
-  previousValidationFeedback?: {
-    feedback: string;
-    expectedCorrection: string;
-  };
+export interface WorkTaskEnvelopeV7 extends TaskEnvelopeBase {
+  role: "work";
+  graphNode: TaskEnvelopeNodeIdentity;
+  jobNode: TaskEnvelopeNodeIdentity;
+  workNode: TaskEnvelopeNodeIdentity;
+  workAttempt: number;
+  previousValidationFeedback?: { feedback: string; expectedCorrection: string };
 }
 
-export interface ValidationTaskEnvelopeV6 extends TaskEnvelopeBase {
+export interface ValidationTaskEnvelopeV7 extends TaskEnvelopeBase {
   role: "validation";
-  run: TaskEnvelopeProviderRunIdentity;
-  jobNode: TaskEnvelopeWorkflowNodeIdentity;
-  validationNode: TaskEnvelopeWorkflowNodeIdentity;
-  jobAttempt: number;
-  jobOutcome: JobCompletedOutcome;
-  repairReturn?: TaskEnvelopeRepairReturn;
-  allowedTransitions: Array<{
-    id: string;
-    decision: "PASS" | "FAIL";
-    outcome: string;
-    target: { loopId: string } | { runResult: "DONE" };
-    description: string;
-  }>;
+  graphNode: TaskEnvelopeNodeIdentity;
+  jobNode: TaskEnvelopeNodeIdentity;
+  validationNode: TaskEnvelopeNodeIdentity;
+  workAttempt: number;
+  workOutcome: WorkNodeOutcome;
+  repairReturn?: { repairRequestId: string; repairResultId: string; stateRevision: number; summary: string };
 }
 
-export interface OrchestratorTaskEnvelopeV6 extends TaskEnvelopeBase {
+export interface OrchestratorTaskEnvelopeV7 extends TaskEnvelopeBase {
   role: "orchestrator";
-  run: TaskEnvelopeRunIdentity;
-  orchestrationRequest: TaskEnvelopeOrchestrationRequest;
+  scope: OrchestrationScope;
+  graphNode?: TaskEnvelopeNodeIdentity;
+  request: {
+    id: string;
+    kind: "start" | "continuation" | "repair";
+    sourceChildId?: string;
+    result?: NodeResult;
+    requestedCapability?: string;
+    evidence: JsonValue;
+  };
   allowedCandidates: TaskEnvelopeRouteCandidate[];
+  repairAvailable: boolean;
 }
 
-export type TaskEnvelopeV6 =
-  | JobTaskEnvelopeV6
-  | ValidationTaskEnvelopeV6
-  | OrchestratorTaskEnvelopeV6;
+export interface RepairTaskEnvelopeV7 extends TaskEnvelopeBase {
+  role: "repair";
+  scope: OrchestrationScope;
+  graphNode?: TaskEnvelopeNodeIdentity;
+  request: {
+    id: string;
+    reason: string;
+    requestedCapability?: string;
+    evidence: JsonValue;
+    returnValidationNodeId: string;
+    attempt: number;
+    depth: number;
+  };
+  allowedCandidates: TaskEnvelopeRouteCandidate[];
+  parentEscalationAvailable: boolean;
+}
+
+export type TaskEnvelopeV7 =
+  | WorkTaskEnvelopeV7
+  | ValidationTaskEnvelopeV7
+  | OrchestratorTaskEnvelopeV7
+  | RepairTaskEnvelopeV7;

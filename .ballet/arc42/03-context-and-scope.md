@@ -3,8 +3,8 @@ id: arc42-section-03
 title: Konteksti ja rajaus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-22'
+version: 4
 tags:
   - arc42
   - context
@@ -20,7 +20,7 @@ Tämä osio määrittää Balletin liiketoiminta- ja teknisen järjestelmärajan
 
 ## Tila
 
-Konteksti vastaa nykyistä checkout-local-arkkitehtuuria. Loop Engineer- ja Run mission control -näkymät ovat käyttöliittymäprojektioita saman rajan sisällä; ne eivät ole uusia runtime-järjestelmiä.
+Konteksti vastaa nykyistä checkout-local-arkkitehtuuria. Kolmitasoiset Graph Engineering-, Graph Node- ja Job Node -näkymät sekä Graph/GraphNode Run -näkymät ovat käyttöliittymäprojektioita saman rajan sisällä; ne eivät ole uusia runtime-järjestelmiä.
 
 ## Liiketoimintakonteksti
 
@@ -57,10 +57,10 @@ flowchart LR
   api -->|"Task Envelope + exact prompt"| lanes["Provider-kohtaiset FIFO-kaistat"]
   lanes <-->|"strict outcome"| codex["Codex app-server"]
   lanes <-->|"strict outcome"| copilot["GitHub Copilot SDK/CLI"]
-  package["Loop module JSON"] -->|"browser file content / library package"| api
+  package["Graph Node Module v4 JSON"] -->|"browser file content / library package"| api
 ```
 
-React SPA käyttää Expressin loopback-API:a. Backend lukee project-local-resurssit, muodostaa reachable automationista immutable Root Run -snapshotin, luo branch/worktreen, jonottaa provider-tehtävät ja persistoi runtime-faktat SQLiteen. Adapterit saavat täsmällisesti koostetun promptin ja strict output-skeeman. Vain validoitu outcome voi tuottaa atomisen State-revision tai ohjausvirtatapahtuman.
+React SPA käyttää Expressin loopback-API:a. Backend lukee strict-v14 project-local-resurssit, muodostaa Graph- tai GraphNode-Runille immutable Root Snapshot v7:n, luo branch/worktreen, jonottaa scoped role -tehtävät ja persistoi runtime-faktat SQLite v10:een. Adapterit saavat täsmällisesti koostetun promptin, strict target-enumin ja output-skeeman. Vain validoitu outcome voi tuottaa atomisen State-revision, invocationin tai ohjausvirtatapahtuman.
 
 ## I/O-, kanava- ja luottamusrajakartoitus
 
@@ -79,7 +79,7 @@ React SPA käyttää Expressin loopback-API:a. Backend lukee project-local-resur
 2. **Project truth → runtime snapshot:** snapshot jää immutableksi, vaikka checkoutin tiedostot myöhemmin muuttuvat.
 3. **Runtime → provider:** provider saa vain koostetun tehtävän; providerin teksti on epäluotettua, kunnes output schema ja runtime-säännöt hyväksyvät sen.
 4. **Worktree → active checkout/remote:** tulos ei ylitä rajaa ilman erillistä ihmisvaltuutusta.
-5. **Loop package → project-local resources:** paketti on dataa, ei luotettua koodia; materialisointi on inspect/plan/commit-transaktio.
+5. **Graph Node Module → project-local resources:** paketti on dataa, ei luotettua koodia; materialisointi on inspect/plan/install-transaktio eikä paketti saa omistaa peer-GraphNode-targetteja.
 
 ## Rajauksen ulkopuolella
 
@@ -87,19 +87,20 @@ React SPA käyttää Expressin loopback-API:a. Backend lukee project-local-resur
 - Cloud-hosted Ballet-runtime ja checkoutien välinen yhteinen runtime-tietokanta.
 - Automaattinen merge, push, release, deploy tai rollback.
 - Mielivaltaisen pakettipolun tai etärekisterin lataaminen backendissä.
-- Project-specific roadmap-, milestone-, acceptance- tai arc42-workflow platform-koodissa.
+- Project-specific roadmap-, milestone-, acceptance- tai arc42-menettely platform-koodissa.
+- Standalone JobNode Run, schedule tai compatibility control plane vanhalle domainille.
 
 ## Kanoniset lähteet
 
-`README.md`, `goal-001`, `goal-003`, `goal-005`, `goal-008`, `goal-010` ja ADR-001/005/006/008/009/016.
+`README.md`, `goal-001`, `goal-003`, `goal-005`, `goal-008`, `goal-010`, `goal-015` ja ADR-001/005/006/008/009/016/023.
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009` ja `adr-016`.
+`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`, `adr-016` ja `adr-023`.
 
 ## Evidenssi
 
-Local API-, checkout identity-, provider adapter-, Git worktree-, recovery- ja Loop module -testit kattavat toteutetut tekniset rajat. Kahdeksan arkkitehtuurikaavion renderöitävyys tarkistetaan dokumentaatioaloitteen evidenssissä.
+Local API-, checkout identity-, provider adapter-, Git worktree-, recovery- ja Graph Node Module -testit kattavat toteutetut tekniset rajat. Uuden boundaryn evidenssi indeksoidaan EVID-019/020-ketjuun.
 
 ## Avoimet kysymykset
 

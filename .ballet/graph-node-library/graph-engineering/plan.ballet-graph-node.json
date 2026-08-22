@@ -1,0 +1,338 @@
+{
+  "format": "ballet-graph-node-module",
+  "version": 4,
+  "manifest": {
+    "id": "plan",
+    "title": "PLAN",
+    "description": "Select the next release and materialize executable tk work.",
+    "version": "1.0.0",
+    "category": "graph-engineering",
+    "tags": [
+      "graph-engineering",
+      "runbook"
+    ]
+  },
+  "permissions": {
+    "network": "forbidden",
+    "externalWrites": false
+  },
+  "profileSlots": [
+    {
+      "key": "slot-1",
+      "title": "Codex GPT-5.6 Sol · Medium · Network off",
+      "description": "Compatible codex profile for Codex GPT-5.6 Sol · Medium · Network off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "slot-2",
+      "title": "Codex GPT-5.6 Luna · Medium · Network off",
+      "description": "Compatible codex profile for Codex GPT-5.6 Luna · Medium · Network off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "orchestrator-luna",
+      "title": "Cost-sensitive orchestrator",
+      "description": "Map to a low-cost provider profile such as Luna medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "repair-sol",
+      "title": "Capable repair",
+      "description": "Map to a capable repair profile such as Sol medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "plan-state",
+    "version": "1.0.0",
+    "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run.",
+    "requiredKeys": [
+      "contractVersion",
+      "deployment",
+      "releaseMap",
+      "verification",
+      "work"
+    ]
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "graph:desired-state.defined",
+      "graph:plan.invalid"
+    ],
+    "provides": [
+      "graph:release.planned"
+    ],
+    "recommendedGraphRoutes": [
+      {
+        "direction": "outgoing",
+        "result": "PASS",
+        "capability": "graph:release.planned",
+        "description": "PASS success routes plan to build."
+      },
+      {
+        "direction": "outgoing",
+        "result": "FAIL",
+        "capability": "graph:desired-state.requested",
+        "description": "FAIL failure routes plan to design."
+      }
+    ]
+  },
+  "resources": [
+    {
+      "kind": "instruction",
+      "key": "graph-plan-agent",
+      "title": "Graph Engineering Plan Agent",
+      "metadata": {
+        "createdAt": "2026-08-20",
+        "updatedAt": "2026-08-20",
+        "tags": [
+          "graph-engineering",
+          "planning"
+        ]
+      },
+      "body": "\n# Graph Engineering Plan Agent\n\nTreat `.ballet/releases/STORY-RELEASE-MAP.md` as the ordered delivery map and `.tickets/work` as the sole implementation-issue store. Select the first eligible `planned` release; never silently reorder releases or invent human-owned priority.\n\nUse only the bounded `ballet tracker` commands for work tickets. Upsert by stable external reference, create one release epic, link every implementation issue to it, preserve acceptance references and add only valid acyclic dependencies. Repeated execution must converge without duplicate tickets.\n\nPatch State with identifiers, counts, paths and status only. Do not copy ticket bodies, maps, diffs or logs into State.\n\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-engineering-reviewer",
+      "title": "Graph Engineering Independent Reviewer",
+      "metadata": {
+        "createdAt": "2026-08-20",
+        "updatedAt": "2026-08-20",
+        "tags": [
+          "graph-engineering",
+          "validation"
+        ]
+      },
+      "body": "\n# Graph Engineering Independent Reviewer\n\nValidate the paired Job independently against its task, accepted Goals and ADRs, canonical arc42 sources, current bounded State, tracker evidence and actual checks. Do not edit the artifact under review.\n\nReturn only `PASS | FAIL`, bounded evidence and, on FAIL, an optional target-free repair request describing the required capability. Never name or select another Job Node, Graph Node, route or terminal; the current Graph Node Orchestrator owns that decision.\n\nDo not infer success from absent evidence. Report a human-owned WHAT/WHY choice, quality priority or measure, significant ADR or deployment authorization as FAIL evidence with a target-free repair request; the orchestrator decides whether the run needs human input. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.\n"
+    },
+    {
+      "kind": "skill",
+      "key": "traceability",
+      "name": "traceability",
+      "description": "Build and validate stable architecture trace chains. Use when work connects Goals or requirements to quality scenarios, decisions, concepts, building blocks, runtime/deployment scenarios, tests, monitors and evidence.",
+      "metadata": {},
+      "body": "\n# Traceability\n\n1. Start from an existing Goal/REQ ID and one measurable QS ID.\n2. Link the smallest relevant ADR/CON, BB and RT/DEP IDs; create no placeholder ID without a canonical definition.\n3. Name an executable test or monitor and a concrete evidence ID with status.\n4. Mark missing links `pending` or as an Open question; never infer passed evidence.\n5. Update `TRACEABILITY.md` only for relationships/status and keep full content in its owner document.\n6. Run `npm run validate:arc42` and include exact unresolved IDs in the outcome.\n"
+    },
+    {
+      "kind": "skill",
+      "key": "conformance-review",
+      "name": "conformance-review",
+      "description": "Compare a bounded implementation or document change against accepted architecture. Use for diff reviews, architecture drift detection, acceptance preparation and independent Validation.",
+      "metadata": {},
+      "body": "\n# Conformance review\n\n1. Read the initiative BRIEF/PLAN and referenced QS/ADR/CON/BB/RT/DEP IDs.\n2. Inspect the actual diff and relevant tests; sample critical source when the change is broad.\n3. Classify each mismatch as intended architecture update, implementation defect, documentation drift, risk/debt or an Open question.\n4. Cite exact files, stable IDs and evidence. Do not treat provider prose as control evidence.\n5. Do not modify the implementation while acting as Validation. Request local retry or capability repair with a measurable expected correction.\n6. Record acceptance/conformance evidence and remaining limitations in initiative EVIDENCE/REVIEW.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-node-orchestrator",
+      "title": "Graph Node Orchestrator",
+      "metadata": {},
+      "body": "\n# Graph Node Orchestrator\n\nSelect exactly one Job Node or `PASS | FAIL` terminal from the immutable candidate enum supplied for the current Graph Node decision. Use the current State revision, Job result and evidence, requested capability and candidate descriptions. Do not perform Job work, change State, edit files, broaden permissions or invent a target.\n\nReturn `dispatch`, `complete`, `delegate_repair` or `needs_input` using the strict structured outcome. A dispatch must name one enum member verbatim. Delegate only to the snapshot's local Repair Node. Escalation to Graph scope is available only through the Repair contract, never as a normal continuation.\n\nNever choose by array order, hidden project conventions or an identifier outside the candidate enum. Do not expose hidden chain-of-thought.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "repair-node",
+      "title": "Repair Node",
+      "metadata": {},
+      "body": "\n# Repair Node\n\nRepair only the bounded failure described by the immutable Repair Request. You may change validated State or artifacts inside the current Run worktree, then return to the exact Validation frame, dispatch one allowlisted repair candidate, or escalate to the parent scope. You may propose a future routing configuration change as an artifact, but the current snapshot, candidate enum and permissions remain immutable.\n\nDo not rerun Work when returning to Validation, reset its retry count, write outside the Run worktree, perform an external write without exact human authorization, or select an out-of-snapshot target. At Graph scope, escalate an unresolved case to human `needs_input`.\n\nReturn concise evidence and the strict Repair outcome. Do not expose hidden chain-of-thought.\n"
+    }
+  ],
+  "graphNode": {
+    "key": "plan",
+    "description": "Select the next release and materialize executable tk work.",
+    "nodeStyle": "terra",
+    "nodeSize": "large",
+    "capabilities": {
+      "accepts": [
+        "graph:desired-state.defined",
+        "graph:plan.invalid"
+      ],
+      "provides": [
+        "graph:release.planned"
+      ]
+    },
+    "stateContract": {
+      "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
+    },
+    "orchestrator": {
+      "key": "graph-node-orchestrator",
+      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "profileSlot": "orchestrator-luna",
+      "primaryInstruction": "graph-node-orchestrator",
+      "skills": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "key": "graph-node-start",
+          "candidates": [
+            {
+              "target": {
+                "jobNode": "select-release"
+              },
+              "description": "Allowed initial Job Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "key": "select-release-pass-route",
+            "sourceJobNode": "select-release",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "materialize-work"
+                },
+                "description": "Allowed PASS continuation after select-release."
+              }
+            ]
+          },
+          {
+            "key": "select-release-fail-route",
+            "sourceJobNode": "select-release",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after select-release."
+              }
+            ]
+          },
+          {
+            "key": "materialize-work-pass-route",
+            "sourceJobNode": "materialize-work",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Allowed PASS continuation after materialize-work."
+              }
+            ]
+          },
+          {
+            "key": "materialize-work-fail-route",
+            "sourceJobNode": "materialize-work",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after materialize-work."
+              }
+            ]
+          }
+        ],
+        "repair": []
+      }
+    },
+    "repairNode": {
+      "key": "graph-node-repair",
+      "description": "Repairs difficult local failures before Graph escalation.",
+      "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
+      "nodeStyle": "sol",
+      "nodeSize": "medium",
+      "profileSlot": "repair-sol",
+      "primaryInstruction": "repair-node",
+      "skills": [],
+      "maxRepairDepth": 3,
+      "maxRepairAttempts": 3
+    },
+    "jobNodes": [
+      {
+        "key": "select-release",
+        "description": "Select the first eligible planned release.",
+        "nodeStyle": "terra",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 2,
+        "workNode": {
+          "type": "agent",
+          "key": "select-release-work",
+          "description": "Select the first eligible planned release.",
+          "nodeStyle": "terra",
+          "nodeSize": "large",
+          "task": "Read the ordered Story/Release Map, select its first eligible planned release, validate design, acceptance and environment references, and patch only bounded State references. Return needs_input for ambiguous priority.",
+          "profileSlot": "slot-1",
+          "primaryInstruction": "graph-plan-agent",
+          "skills": [
+            "traceability"
+          ]
+        },
+        "validationNode": {
+          "type": "agent",
+          "key": "select-release-validation",
+          "description": "Validate selected release.",
+          "nodeStyle": "luna",
+          "nodeSize": "small",
+          "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome.",
+          "profileSlot": "slot-2",
+          "primaryInstruction": "graph-engineering-reviewer",
+          "skills": [
+            "conformance-review"
+          ]
+        }
+      },
+      {
+        "key": "materialize-work",
+        "description": "Materialize the selected release work idempotently.",
+        "nodeStyle": "terra",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 2,
+        "workNode": {
+          "type": "agent",
+          "key": "materialize-work-work",
+          "description": "Materialize the selected release work idempotently.",
+          "nodeStyle": "terra",
+          "nodeSize": "large",
+          "task": "Use only ballet tracker. Upsert one ballet-release:<stable-id> epic and its implementation issues with stable external refs, acceptance references, parent and dependencies. Do not duplicate tasks in the Story/Release Map.",
+          "profileSlot": "slot-1",
+          "primaryInstruction": "graph-plan-agent",
+          "skills": [
+            "traceability"
+          ]
+        },
+        "validationNode": {
+          "type": "agent",
+          "key": "materialize-work-validation",
+          "description": "Validate materialized release work.",
+          "nodeStyle": "luna",
+          "nodeSize": "small",
+          "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure.",
+          "profileSlot": "slot-2",
+          "primaryInstruction": "graph-engineering-reviewer",
+          "skills": [
+            "conformance-review"
+          ]
+        }
+      }
+    ]
+  }
+}

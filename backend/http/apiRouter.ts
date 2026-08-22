@@ -20,18 +20,18 @@ import {
   collectionUpsertSchema,
   executionProfileParamsSchema,
   executionProfileSaveSchema,
-  loopThemeSchema,
+  canvasThemeSchema,
   projectDocumentCreateSchema,
   projectDocumentSaveSchema,
   type MutableCollectionName
 } from "../../shared/api/workspace-schemas.js";
 import {
-  loopModuleExportRequestSchema,
-  loopModuleInspectRequestSchema,
-  loopModuleInstallCommitRequestSchema,
-  loopModuleInstallPlanRequestSchema,
-  loopModuleLoopParamsSchema
-} from "../../shared/api/loop-module-schemas.js";
+  graphNodeModuleExportRequestSchema,
+  graphNodeModuleInspectRequestSchema,
+  graphNodeModuleInstallCommitRequestSchema,
+  graphNodeModuleInstallPlanRequestSchema,
+  graphNodeModuleParamsSchema
+} from "../../shared/api/graph-node-module-schemas.js";
 import type { ExecutionStore } from "../execution/ExecutionStore.js";
 import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import { readProjectConfigStatus } from "../project/configGitStatus.js";
@@ -58,9 +58,9 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     options.invalidations.publish({ type: "workspace-changed", reason: "automation" });
     res.json(saved);
   }));
-  router.put("/loop-theme", route(async (req, res) => {
-    res.json(await options.store.updateLoopTheme(parseBody(loopThemeSchema, req)));
-    options.invalidations.publish({ type: "workspace-changed", reason: "loop-theme" });
+  router.put("/canvas-theme", route(async (req, res) => {
+    res.json(await options.store.updateCanvasTheme(parseBody(canvasThemeSchema, req)));
+    options.invalidations.publish({ type: "workspace-changed", reason: "canvas-theme" });
   }));
   router.post("/project-documents", route(async (req, res) => {
     res.json(await options.store.saveProjectDocument(parseBody(projectDocumentSaveSchema, req)));
@@ -72,25 +72,25 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
   }));
   router.get("/project/config-status", route(async (_req, res) => res.json(await readProjectConfigStatus(options.store.root))));
 
-  router.get("/loop-modules/library", route(async (_req, res) => res.json(await options.store.listLoopModuleLibrary())));
-  router.post("/loop-modules/inspect", route(async (req, res) => {
-    const input = parseBody(loopModuleInspectRequestSchema, req);
-    res.json(options.store.inspectLoopModule(input.package, input.source));
+  router.get("/graph-node-modules/library", route(async (_req, res) => res.json(await options.store.listGraphNodeModuleLibrary())));
+  router.post("/graph-node-modules/inspect", route(async (req, res) => {
+    const input = parseBody(graphNodeModuleInspectRequestSchema, req);
+    res.json(options.store.inspectGraphNodeModule(input.package, input.source));
   }));
-  router.post("/loop-modules/install-plan", route(async (req, res) =>
-    res.json(await options.store.planLoopModuleInstall(parseBody(loopModuleInstallPlanRequestSchema, req)))));
-  router.post("/loop-modules/install", route(async (req, res) => {
-    const installed = await options.store.installLoopModule(parseBody(loopModuleInstallCommitRequestSchema, req));
-    options.invalidations.publish({ type: "workspace-changed", reason: "loop-module-install" });
+  router.post("/graph-node-modules/install-plan", route(async (req, res) =>
+    res.json(await options.store.planGraphNodeModuleInstall(parseBody(graphNodeModuleInstallPlanRequestSchema, req)))));
+  router.post("/graph-node-modules/install", route(async (req, res) => {
+    const installed = await options.store.installGraphNodeModule(parseBody(graphNodeModuleInstallCommitRequestSchema, req));
+    options.invalidations.publish({ type: "workspace-changed", reason: "graph-node-module-install" });
     res.status(201).json(installed);
   }));
-  router.post("/loop-modules/export", route(async (req, res) =>
-    res.json(await options.store.exportLoopModule(parseBody(loopModuleExportRequestSchema, req)))));
-  router.get("/loop-modules/status", route(async (_req, res) => res.json(await options.store.loopModuleStatuses())));
-  router.delete("/loop-modules/installed/:loopId", route(async (req, res) => {
-    const { loopId } = parseParams(loopModuleLoopParamsSchema, req);
-    await options.store.removeInstalledLoopModule(loopId);
-    options.invalidations.publish({ type: "workspace-changed", reason: "loop-module-remove" });
+  router.post("/graph-node-modules/export", route(async (req, res) =>
+    res.json(await options.store.exportGraphNodeModule(parseBody(graphNodeModuleExportRequestSchema, req)))));
+  router.get("/graph-node-modules/status", route(async (_req, res) => res.json(await options.store.graphNodeModuleStatuses())));
+  router.delete("/graph-node-modules/installed/:graphNodeId", route(async (req, res) => {
+    const { graphNodeId } = parseParams(graphNodeModuleParamsSchema, req);
+    await options.store.removeInstalledGraphNodeModule(graphNodeId);
+    options.invalidations.publish({ type: "workspace-changed", reason: "graph-node-module-remove" });
     res.status(204).end();
   }));
 

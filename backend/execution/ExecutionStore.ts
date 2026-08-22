@@ -7,9 +7,7 @@ import type {
   ExecutionSpec,
   ExecutionTask
 } from "../../shared/domain/runtime.js";
-import { maxControlFlowTransitions } from "../../shared/domain/runtime.js";
 import { parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
-import { nodeRunRowSchema } from "../runtime/RuntimeDbTypes.js";
 import {
   executionEventRowSchema, executionTaskRowSchema, readExecutionInteger,
   readExecutionString, type ExecutionEventRow
@@ -257,45 +255,52 @@ export class ExecutionStore {
       `).run(message, timestamp, timestamp, taskId);
       const value = this.connection().prepare("SELECT * FROM node_runs WHERE node_run_id = ?")
         .get(task.spec.nodeRunId);
-      if (!value) return;
-      const node = nodeRunRowSchema.parse(value);
-      if (node.status !== "running") return;
+      if (!isNodeRuntimeRow(value) || value.status !== "running") return;
       this.connection().prepare(`
         UPDATE node_runs SET status = 'interrupted', error_code = 'interrupted', error_message = ?,
           state_revision_after = ?, completed_at = ?, updated_at = ? WHERE node_run_id = ?
-      `).run(message, node.state_revision_before, timestamp, timestamp, node.node_run_id);
-      if (node.job_run_id) this.connection().prepare(`
-        UPDATE job_runs SET status = 'failed', terminal = 'failed', active_node_run_id = NULL,
-          state_revision_after = ?, error_code = 'interrupted', error_message = ?, completed_at = ?, updated_at = ?
-        WHERE job_run_id = ? AND status IN ('queued','running','waiting_for_input')
-      `).run(node.state_revision_before, message, timestamp, timestamp, node.job_run_id);
-      this.connection().prepare(`
-        UPDATE loop_invocations SET status = 'failed', completion_state_revision = ?,
+      `).run(message, value.state_revision_before, timestamp, timestamp, value.node_run_id);
+      if (value.job_node_invocation_id) this.connection().prepare(`
+        UPDATE job_node_invocations SET status = 'failed', active_node_run_id = NULL,
+          state_revision_after = ?, completed_at = ?, updated_at = ?
+        WHERE job_node_invocation_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(value.state_revision_before, timestamp, timestamp, value.job_node_invocation_id);
+      if (value.graph_node_invocation_id) this.connection().prepare(`
+        UPDATE graph_node_invocations SET status = 'failed', completion_state_revision = ?,
           completed_at = ?, updated_at = ?
-        WHERE loop_run_id = ? AND status IN ('queued','running','waiting_for_input')
-      `).run(node.state_revision_before, timestamp, timestamp, node.loop_run_id);
+        WHERE graph_node_invocation_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(value.state_revision_before, timestamp, timestamp, value.graph_node_invocation_id);
       const root = this.connection().prepare(`
         SELECT current_state_revision, transition_count FROM root_runs WHERE root_run_id = ?
-      `).get(node.root_run_id);
+      `).get(value.root_run_id);
       const stateRevision = readExecutionInteger(root, "current_state_revision");
       const transitionCount = readExecutionInteger(root, "transition_count");
       const sequence = transitionCount + 1;
-      const recordTransition = sequence <= maxControlFlowTransitions;
       this.connection().prepare(`
         UPDATE root_runs SET transition_count = ?, active_node_run_id = NULL,
-          active_loop_run_id = NULL, updated_at = ? WHERE root_run_id = ?
-      `).run(recordTransition ? sequence : transitionCount, timestamp, node.root_run_id);
-      if (recordTransition) this.connection().prepare(`
-          INSERT INTO control_flow_events (
-            root_run_id, sequence, kind, state_revision, source_loop_run_id,
-            source_job_run_id, source_node_run_id, created_at
-          ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
-        `).run(node.root_run_id, sequence, stateRevision, node.loop_run_id,
-          node.job_run_id, node.node_run_id, timestamp);
+          active_graph_node_invocation_id = NULL, status = 'failed', error_code = 'interrupted',
+          error_message = ?, completed_at = ?, updated_at = ? WHERE root_run_id = ?
+      `).run(sequence, message, timestamp, timestamp, value.root_run_id);
+      this.connection().prepare(`
+        INSERT INTO control_flow_events (
+          root_run_id, sequence, kind, state_revision, graph_node_invocation_id,
+          job_node_invocation_id, source_node_run_id, created_at
+        ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
+      `).run(value.root_run_id, sequence, stateRevision, value.graph_node_invocation_id,
+        value.job_node_invocation_id, value.node_run_id, timestamp);
     })();
     return this.require(taskId);
   }
 }
+
+const isNodeRuntimeRow = (value: unknown): value is {
+  node_run_id: string; root_run_id: string; graph_node_invocation_id: string | null;
+  job_node_invocation_id: string | null; state_revision_before: number; status: string;
+} => typeof value === "object" && value !== null
+  && typeof Reflect.get(value, "node_run_id") === "string"
+  && typeof Reflect.get(value, "root_run_id") === "string"
+  && typeof Reflect.get(value, "state_revision_before") === "number"
+  && typeof Reflect.get(value, "status") === "string";
 
 const truncateUtf8 = (value: string, maxBytes: number): string => {
   if (Buffer.byteLength(value, "utf8") <= maxBytes) return value;

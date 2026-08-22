@@ -2,7 +2,6 @@ import { EmptyState } from "@/components/shared/workspace-ui";
 import type { AppData } from "@shared/api/workspace-contracts";
 import type { AppStreamStatus } from "../app/useAppStream";
 import { AutomationView } from "./automation/AutomationView";
-import { LoopThemeEditorView } from "./automation/themes/LoopThemeEditorView";
 import type { useWorkspaceMutations } from "./data/useWorkspaceMutations";
 import {
     AdrsPage,
@@ -59,9 +58,17 @@ export function WorkspaceRouteOutlet({
     case "project-instructions":
       return <InstructionsPage project={selection.project} documents={selection.instructionDocuments} instructions={data.instructions} selectedInstruction={selection.selectedInstruction} creating={route.creating} saveProjectDocument={mutations.saveProjectDocument} createProjectDocument={mutations.createProjectDocument} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
     case "automation":
-      return <AutomationView data={data} selectedId={route.automationEntityId} view={route.automationView ?? "graph"} routeIssue={route.automationRouteIssue} creating={route.creating === true} saveAutomation={mutations.saveAutomation} refreshWorkspace={mutations.refresh} loopModules={mutations.loopModules} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
-    case "loop-theme":
-      return <LoopThemeEditorView data={data} updateTheme={mutations.updateLoopTheme} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+      return <AutomationView
+        data={data}
+        level={route.engineeringLevel ?? "graph"}
+        graphNodeId={route.graphNodeId}
+        jobNodeId={route.jobNodeId}
+        saveAutomation={mutations.saveAutomation}
+        navigate={navigate}
+        setNavigationBlocker={setNavigationBlocker}
+      />;
+    case "canvas-theme":
+      return <EmptyState title="Canvas theme" action="The protected space-canvas theme uses DESIGN.md tokens." />;
     case "runtimes":
       return <RuntimeRegistryView runtime={data.runtime} onRefreshed={mutations.refresh} />;
     case "execution-profiles":

@@ -1,31 +1,29 @@
 import { z } from "zod";
 import {
-  loopNodeSizes,
-  loopNodeStyles,
-  loopCapabilityPattern,
-  graphTransitionOutcomePattern,
-  maxGraphTransitions,
-  maxLoopCapabilities,
-  maxLoopCapabilityLength,
+  canvasNodeSizes,
+  canvasNodeStyles,
+  maxGraphNodeJobNodes,
   maxJobRetriesLimit,
+  maxNodeCapabilities,
+  maxNodeCapabilityLength,
+  maxOrchestratorTransitions,
+  maxProjectGraphNodes,
   maxProjectStateBytes,
-  maxProjectLoops,
   maxRepairAttemptsLimit,
   maxRepairDepthLimit,
-  type ProjectAutomationConfig,
-  type JsonValue
+  maxRouteAttemptsLimit,
+  nodeCapabilityPattern,
+  type JsonValue,
+  type ProjectAutomationConfig
 } from "../domain/automation.js";
-import type { ExecutionProfile, ProjectConfiguration, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import {
-  loopConnectionPointStyles,
-  loopEdgeLineStyles,
-  type LoopTheme
-} from "../domain/loopThemes.js";
+  canvasConnectionLineStyles,
+  canvasConnectionPointStyles,
+  type CanvasTheme
+} from "../domain/canvasTheme.js";
+import type { ExecutionProfile, ProjectConfiguration, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 import { validateProjectConfigSchema } from "./project-config-schema-validation.js";
-import { projectJobScheduleSchema } from "./job-schedule-schema.js";
-
-export { projectJobScheduleSchema } from "./job-schedule-schema.js";
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -76,38 +74,28 @@ export const projectDocumentCreateSchema = z.object({
   title: z.string().min(1)
 }).strict();
 
-export const collectionParamsSchema = z.object({
-  collection: z.string().min(1)
-}).strict();
-
+export const collectionParamsSchema = z.object({ collection: z.string().min(1) }).strict();
 export const collectionItemParamsSchema = z.object({
   collection: z.string().min(1),
   id: z.string().min(1)
 }).strict();
 
-const collectionUpsertSchemas = {
-  skills: skillSchema
-} as const;
-
+const collectionUpsertSchemas = { skills: skillSchema } as const;
 export type MutableCollectionName = keyof typeof collectionUpsertSchemas;
-
 export const collectionUpsertSchema = <T extends MutableCollectionName>(
   collection: T
 ): z.ZodType<WorkspaceSaveRequestByCollection[T]> =>
   collectionUpsertSchemas[collection] as unknown as z.ZodType<WorkspaceSaveRequestByCollection[T]>;
 
 export const kebabCaseIdPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export const executionProfileIdSchema = z.string()
-  .min(1)
-  .max(200)
+export const executionProfileIdSchema = z.string().min(1).max(200)
   .regex(kebabCaseIdPattern, "Execution profile id must be lowercase kebab-case.");
 export const projectInstructionIdSchema = z.string()
   .regex(/^project:[a-z0-9]+(?:-[a-z0-9]+)*$/, "Primary instruction id must be a project:<lowercase-kebab-case> id.");
-export const projectSkillIdSchema = z.string()
-  .regex(
-    /^project:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/,
-    "Skill id must be a project:<lowercase-kebab-case/path> id."
-  );
+export const projectSkillIdSchema = z.string().regex(
+  /^project:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/,
+  "Skill id must be a project:<lowercase-kebab-case/path> id."
+);
 export const executionProfileSchema = z.object({
   id: executionProfileIdSchema,
   name: z.string().trim().min(1).max(200),
@@ -118,174 +106,132 @@ export const executionProfileSchema = z.object({
 }).strict() satisfies z.ZodType<ExecutionProfile>;
 export const executionProfileSaveSchema = executionProfileSchema.omit({ id: true });
 export const executionProfileParamsSchema = z.object({ executionProfileId: executionProfileIdSchema }).strict();
-const automationDescriptionSchema = z.string().trim().min(1).max(2000);
-const taskDescriptionSchema = z.string().trim().min(1).max(20_000).refine(
-  (value) => value.trim().length > 0,
-  "Task description must be non-empty."
-);
-const automationLoopIdSchema = z.string().min(2).max(101);
-const automationNodeIdSchema = z.string()
-  .min(1)
-  .max(160)
-  .regex(kebabCaseIdPattern, "Node id must be lowercase kebab-case.")
-  .refine((value) => value !== "pass" && value !== "fail", "Node id is reserved for a Workflow result.");
-const automationEdgeIdSchema = z.string()
-  .min(1)
-  .max(200)
-  .regex(kebabCaseIdPattern, "Edge id must be lowercase kebab-case.");
-const kebabLoopIdSchema = automationLoopIdSchema.regex(kebabCaseIdPattern, "Loop id must be lowercase kebab-case.");
-export const loopCapabilitySchema = z.string()
-  .trim()
-  .min(1, "Capability must be non-empty.")
-  .max(maxLoopCapabilityLength, `Capability must not exceed ${maxLoopCapabilityLength} characters.`)
-  .regex(
-    loopCapabilityPattern,
-    "Capability must use a namespaced lowercase id such as namespace:capability.name."
-  );
-const loopCapabilityListSchema = z.array(loopCapabilitySchema)
-  .max(maxLoopCapabilities, `Capability lists must not contain more than ${maxLoopCapabilities} values.`)
-  .refine((values) => new Set(values).size === values.length, "Capabilities must be unique.");
-const loopThemeColorSchema = z.string()
-  .regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
 
-export const loopThemeSchema = z.object({
+const descriptionSchema = z.string().trim().min(1).max(2_000);
+const taskSchema = z.string().trim().min(1).max(20_000);
+const entityIdSchema = z.string().min(1).max(160)
+  .regex(kebabCaseIdPattern, "Node id must be lowercase kebab-case.")
+  .refine((value) => value !== "pass" && value !== "fail", "Node id is reserved for a terminal result.");
+const ruleIdSchema = z.string().min(1).max(200).regex(kebabCaseIdPattern, "Rule id must be lowercase kebab-case.");
+export const nodeCapabilitySchema = z.string().trim().min(1).max(maxNodeCapabilityLength)
+  .regex(nodeCapabilityPattern, "Capability must use a namespaced lowercase id such as namespace:capability.name.");
+const capabilityListSchema = z.array(nodeCapabilitySchema).max(maxNodeCapabilities)
+  .refine((values) => new Set(values).size === values.length, "Capabilities must be unique.");
+
+const themeColorSchema = z.string().regex(/^#[0-9a-f]{6}$/, "Expected a six-digit lowercase hex color.");
+export const canvasThemeSchema = z.object({
   version: z.literal(4),
-  node: z.object({
-    labelColor: loopThemeColorSchema,
-    glowColor: loopThemeColorSchema
-  }).strict(),
+  node: z.object({ labelColor: themeColorSchema, glowColor: themeColorSchema }).strict(),
   edge: z.object({
-    color: loopThemeColorSchema,
-    labelColor: loopThemeColorSchema,
-    style: z.enum(loopEdgeLineStyles),
-    repairStyle: z.enum(loopEdgeLineStyles),
-    crossLoopStyle: z.enum(loopEdgeLineStyles)
+    color: themeColorSchema,
+    labelColor: themeColorSchema,
+    style: z.enum(canvasConnectionLineStyles),
+    repairStyle: z.enum(canvasConnectionLineStyles),
+    crossScopeStyle: z.enum(canvasConnectionLineStyles)
   }).strict(),
-  connectionPoint: z.object({
-    style: z.enum(loopConnectionPointStyles),
-    color: loopThemeColorSchema
-  }).strict()
-}).strict() satisfies z.ZodType<LoopTheme>;
-const nodeVisualBase = {
-  nodeStyle: z.enum(loopNodeStyles),
-  nodeSize: z.enum(loopNodeSizes)
-};
-const executableNodeBase = {
-  ...nodeVisualBase,
-  id: automationNodeIdSchema,
-  description: automationDescriptionSchema,
-  task: taskDescriptionSchema
-};
-const executionComposition = {
+  connectionPoint: z.object({ style: z.enum(canvasConnectionPointStyles), color: themeColorSchema }).strict()
+}).strict() satisfies z.ZodType<CanvasTheme>;
+
+const appearanceFields = { nodeStyle: z.enum(canvasNodeStyles), nodeSize: z.enum(canvasNodeSizes) };
+const compositionFields = {
   executionProfileId: executionProfileIdSchema,
   primaryInstructionId: projectInstructionIdSchema,
-  skillIds: z.array(projectSkillIdSchema).refine(
-    (ids) => new Set(ids).size === ids.length,
-    "Skill ids must be unique."
-  )
+  skillIds: z.array(projectSkillIdSchema)
+    .refine((ids) => new Set(ids).size === ids.length, "Skill ids must be unique.")
 };
-const jobNodeFields = {
-  ...executableNodeBase,
-  validationNodeId: automationNodeIdSchema,
-  maxRetries: z.number().int().min(0).max(maxJobRetriesLimit)
-};
-const projectJobNodeSchema = z.discriminatedUnion("type", [
-  z.object({ ...jobNodeFields, ...executionComposition, type: z.literal("agent") }).strict(),
-  z.object({ ...jobNodeFields, type: z.literal("human") }).strict(),
-  z.object({
-    ...jobNodeFields,
-    ...executionComposition,
-    type: z.literal("scheduled"),
-    schedule: projectJobScheduleSchema
-  }).strict()
+const executableFields = { ...appearanceFields, id: entityIdSchema, description: descriptionSchema, task: taskSchema };
+const workNodeSchema = z.discriminatedUnion("type", [
+  z.object({ ...executableFields, ...compositionFields, type: z.literal("agent") }).strict(),
+  z.object({ ...executableFields, type: z.literal("human") }).strict()
 ]);
-const projectValidationNodeSchema = z.discriminatedUnion("type", [
-  z.object({ ...executableNodeBase, ...executionComposition, type: z.literal("agent") }).strict(),
-  z.object({ ...executableNodeBase, type: z.literal("human") }).strict()
+const validationNodeSchema = z.discriminatedUnion("type", [
+  z.object({ ...executableFields, ...compositionFields, type: z.literal("agent") }).strict(),
+  z.object({ ...executableFields, type: z.literal("human") }).strict()
 ]);
-const projectPassEdgeSchema = z.object({
-  id: automationEdgeIdSchema,
-  sourceValidationNodeId: automationNodeIdSchema,
-  target: z.union([
-    z.object({ jobNodeId: automationNodeIdSchema }).strict(),
-    z.object({ workflowResult: z.literal("PASS") }).strict()
-  ])
+const capabilitiesSchema = z.object({ accepts: capabilityListSchema, provides: capabilityListSchema }).strict();
+const jobNodeSchema = z.object({
+  ...appearanceFields,
+  id: entityIdSchema,
+  description: descriptionSchema,
+  capabilities: capabilitiesSchema,
+  maxRetries: z.number().int().min(0).max(maxJobRetriesLimit),
+  workNode: workNodeSchema,
+  validationNode: validationNodeSchema
 }).strict();
-const projectFailEdgeSchema = z.object({
-  id: automationEdgeIdSchema,
-  sourceValidationNodeId: automationNodeIdSchema,
-  target: z.object({ workflowResult: z.literal("FAIL") }).strict()
+
+const terminalTargetSchema = z.object({ terminal: z.enum(["PASS", "FAIL"]) }).strict();
+const graphTargetSchema = z.union([
+  z.object({ graphNodeId: entityIdSchema }).strict(),
+  terminalTargetSchema
+]);
+const graphNodeTargetSchema = z.union([
+  z.object({ jobNodeId: entityIdSchema }).strict(),
+  terminalTargetSchema
+]);
+const candidateSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
+  target,
+  description: descriptionSchema
 }).strict();
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
-  z.string(),
-  z.number().finite(),
-  z.boolean(),
-  z.null(),
-  z.array(jsonValueSchema),
-  z.record(z.string(), jsonValueSchema)
-]));
-const stateInitialSchema = jsonValueSchema.refine((value) =>
-  new TextEncoder().encode(JSON.stringify(value)).byteLength <= maxProjectStateBytes,
-`Initial Loop state must not exceed ${maxProjectStateBytes} bytes.`);
-const projectLoopSchema = z.object({
-  id: kebabLoopIdSchema,
-  description: automationDescriptionSchema,
-  capabilities: z.object({
-    accepts: loopCapabilityListSchema,
-    provides: loopCapabilityListSchema
-  }).strict(),
-  state: z.object({
-    description: automationDescriptionSchema,
-    initial: stateInitialSchema
-  }).strict(),
-  workflow: z.object({
-    startJobNodeId: automationNodeIdSchema,
-    jobNodes: z.array(projectJobNodeSchema).min(1),
-    validationNodes: z.array(projectValidationNodeSchema).min(1),
-    passEdges: z.array(projectPassEdgeSchema),
-    failEdges: z.array(projectFailEdgeSchema)
-  }).strict()
-}).strict();
-const orchestratorComposition = {
-  executionProfileId: executionProfileIdSchema,
-  primaryInstructionId: projectInstructionIdSchema,
-  skillIds: executionComposition.skillIds
+const routingSchema = <T extends z.ZodTypeAny>(target: T) => {
+  const candidate = candidateSchema(target);
+  return z.object({
+    start: z.object({ id: ruleIdSchema, candidates: z.array(candidate).min(1) }).strict(),
+    continuation: z.array(z.object({
+      id: ruleIdSchema,
+      sourceId: entityIdSchema,
+      result: z.enum(["PASS", "FAIL"]),
+      candidates: z.array(candidate).min(1)
+    }).strict()).max(maxOrchestratorTransitions),
+    repair: z.array(z.object({
+      id: ruleIdSchema,
+      sourceId: entityIdSchema,
+      capability: nodeCapabilitySchema,
+      candidates: z.array(candidate).min(1)
+    }).strict()).max(maxOrchestratorTransitions)
+  }).strict();
 };
-const repairRouterSchema = z.object({
-  ...orchestratorComposition,
+const orchestratorSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
+  ...appearanceFields,
+  ...compositionFields,
+  id: entityIdSchema,
+  description: descriptionSchema,
+  maxTransitions: z.number().int().min(1).max(maxOrchestratorTransitions),
+  maxRouteAttempts: z.number().int().min(1).max(maxRouteAttemptsLimit),
+  routing: routingSchema(target)
+}).strict();
+const repairNodeSchema = z.object({
+  ...appearanceFields,
+  ...compositionFields,
+  id: entityIdSchema,
+  description: descriptionSchema,
+  task: taskSchema,
   maxRepairDepth: z.number().int().min(0).max(maxRepairDepthLimit),
   maxRepairAttempts: z.number().int().min(1).max(maxRepairAttemptsLimit)
 }).strict();
-const orchestratorSchema = z.object({
-  mode: z.literal("runbook"),
-  maxTransitions: z.number().int().min(1).max(maxGraphTransitions),
-  repairRouter: repairRouterSchema.optional()
-}).strict();
-const projectGraphTransitionSchema = z.object({
-  id: automationEdgeIdSchema,
-  source: kebabLoopIdSchema,
-  decision: z.enum(["PASS", "FAIL"]),
-  outcome: z.string().min(1).max(64).regex(graphTransitionOutcomePattern, "Outcome must be lowercase snake_case."),
-  target: z.union([
-    z.object({ loopId: kebabLoopIdSchema }).strict(),
-    z.object({ runResult: z.literal("DONE") }).strict()
-  ]),
-  description: automationDescriptionSchema
-}).strict();
-const projectRepairEdgeSchema = z.object({
-  id: automationEdgeIdSchema,
-  source: kebabLoopIdSchema,
-  target: kebabLoopIdSchema,
-  capability: loopCapabilitySchema,
-  description: automationDescriptionSchema
-}).strict();
 
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
+  z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)
+]));
+const initialStateSchema = jsonValueSchema.refine((value) =>
+  new TextEncoder().encode(JSON.stringify(value)).byteLength <= maxProjectStateBytes,
+`Initial Graph state must not exceed ${maxProjectStateBytes} bytes.`);
+const graphNodeSchema = z.object({
+  ...appearanceFields,
+  id: entityIdSchema,
+  description: descriptionSchema,
+  capabilities: capabilitiesSchema,
+  stateContract: z.object({ description: descriptionSchema }).strict(),
+  orchestrator: orchestratorSchema(graphNodeTargetSchema),
+  repairNode: repairNodeSchema.optional(),
+  jobNodes: z.array(jobNodeSchema).min(1).max(maxGraphNodeJobNodes)
+}).strict();
 const graphSchema = z.object({
-  id: kebabLoopIdSchema,
+  id: entityIdSchema,
   name: z.string().trim().min(1).max(200),
-  startLoopId: z.union([kebabLoopIdSchema, z.literal("")]),
-  transitions: z.array(projectGraphTransitionSchema).max(maxGraphTransitions),
-  repairEdges: z.array(projectRepairEdgeSchema)
+  state: z.object({ description: descriptionSchema, initial: initialStateSchema }).strict(),
+  orchestrator: orchestratorSchema(graphTargetSchema),
+  repairNode: repairNodeSchema.optional(),
+  graphNodes: z.array(graphNodeSchema).min(1).max(maxProjectGraphNodes)
 }).strict();
 
 const trackerDirectorySchema = z.string()
@@ -298,17 +244,13 @@ export const projectIssueTrackerSchema = z.object({
 }).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
 
 export const automationConfigSchema = z.object({
-  version: z.literal(13),
-  orchestrator: orchestratorSchema,
-  graph: graphSchema,
-  loops: z.array(projectLoopSchema).max(maxProjectLoops)
-}).strict() satisfies z.ZodType<ProjectAutomationConfig>;
+  version: z.literal(14),
+  graph: graphSchema
+}).strict() as z.ZodType<ProjectAutomationConfig>;
 
 export const projectConfigSchema = z.object({
-  version: z.literal(13),
+  version: z.literal(14),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
-  orchestrator: orchestratorSchema,
-  graph: graphSchema,
-  loops: z.array(projectLoopSchema).max(maxProjectLoops)
-}).strict().superRefine(validateProjectConfigSchema) satisfies z.ZodType<ProjectConfiguration>;
+  graph: graphSchema
+}).strict().superRefine(validateProjectConfigSchema) as z.ZodType<ProjectConfiguration>;

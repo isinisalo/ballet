@@ -3,8 +3,8 @@ id: ballet-goals-summary
 title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
-updatedAt: '2026-08-21'
-version: 9
+updatedAt: '2026-08-22'
+version: 10
 tags:
   - yhteenveto
   - tavoitteet
@@ -24,9 +24,9 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 ## Mitä Balletilla tehdään?
 
-1. **Määritellään työ** repositoryssä: Goalit, ADR:t, arc42-arkkitehtuuri, Loopit, Workflow't, Job/Validation-nodet, Pass/Fail Edget, ExecutionProfilet, instructionit, skillsit ja teema.
+1. **Määritellään työ** repositoryssä: Goalit, ADR:t, arc42-arkkitehtuuri, Graph, GraphNodet, aggregate JobNodet, Work/Validation-lapset, scoped orchestrator/repair-candidatet, ExecutionProfilet, instructionit, skillsit ja canvas-teema.
 2. **Koostetaan provider-tehtävä** deterministisesti System-ohjeesta, primary instructionista, valituista skillseistä, roolikohtaisesta Task Envelopesta ja tulosskeemasta.
-3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; terminal Validation valitsee sallitun päätös/outcome-parin ja RunBook reitittää exact immutable snapshot -transitioniin. Repair call/return säilyy tästä erillisenä.
+3. **Suoritetaan työnkulku** Codexilla tai Copilotilla; Graph- ja Graph Node -orchestratorit valitsevat tasojen välisen dispatchin immutable snapshotin strict enumista. Work→Validation ja bounded retry ovat Job Noden sisäisiä invariantteja, ja Repair palaa samaan Validationiin.
 4. **Seurataan ajoa** selainkäyttöliittymästä: tila, konsolitapahtumat, hyväksytty/hylätty jatkopolku, virheet ja finalisointi.
 5. **Suojataan aktiivinen checkout**: onnistunut työ commitoidaan Run-branchille ja siivotaan, muu worktree säilytetään tutkittavaksi. Ballet ei mergeä eikä pushaa automaattisesti.
 
@@ -34,32 +34,31 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 | Osa | Tehtävä |
 | --- | --- |
-| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, URL-ohjatut Graph Engineering / Workflow Engineering -authoring-näkymät, editorit sekä runtime- ja Run-näkymät |
-| Paikallinen Express-palvelu | Loopback-API, validointi, orkestrointi, ajastus ja tapahtumavirrat |
+| React/Vite-käyttöliittymä | Configure- ja Run-työtilat, URL-ohjatut Graph Engineering / Graph Node / Job Node -authoring-näkymät, inspectorit sekä runtime- ja Run-näkymät |
+| Paikallinen Express-palvelu | Loopback-API, validointi, scoped agent routing ja tapahtumavirrat |
 | Provider-adapterit | Codex CLI ja GitHub Copilot CLI yhteisen tehtävä-, tapahtuma- ja tulosmallin takana |
-| SQLite-tila | Root Runien, Graph/Loop/Job/Validation-roolikohtaisten Runien, State-revisioiden, jonojen, tapahtumien, tracker-outboxin ja ajastusten kestävä paikallinen historia |
+| SQLite-tila | Root Runien, GraphNode/JobNode-invocationien, work/validation/scoped-orchestrator/repair-roolien, State-revisioiden, routing-evidenssin, jonojen, tapahtumien ja tracker-outboxin kestävä paikallinen historia |
 | Git-eristys | Root Run -kohtainen branch ja worktree, snapshot, commitointi ja epäonnistumisten säilytys |
 | Checkout-CLI | `ballet`, `stop`, `restart`, `status`, `logs`, `update` ja `version` sekä launchd-elinkaari |
 
 ## Nykytila tämän repositoryn perusteella
 
-- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v13** -skeemaa.
-- Projektissa on **14 hyväksyttyä Goalia** ja 22 ADR-recordia, joista 20 on accepted ja kaksi superseded. ADR-022 omistaa nykyisen RunBook-rajan ja säilyttää aiempien päätösten historian.
-- Paikallinen Loop Library sisältää **14 V3-pakettia**: viisi Graph Engineering -moduulia ja yhdeksän geneeristä moduulia. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
-- Graph Engineering näyttää yhden Orchestrator-control-noden, kompaktit Loop-kortit, DONE-terminalin ja päätös+outcome-labeloidut transitionit. Workflow Engineeringin suojattu avaruusteema säilyy selected-Loop-editorina.
-- Tavallinen cross-Loop-flow on exact `(source, decision, outcome)` -RunBook-reititys. Agenttipohjaista Orchestrator-valintaa käytetään vain custom repair-edgeihin.
-- Balletin oletusgraafi on DESIGN → PLAN → BUILD → DEPLOY → VERIFY, yhteensä **5 Loopia**, **17 JobNodea**, **17 ValidationNodea**, **18 transitionia** ja **0 oletus-repair-edgeä**. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
-- Project-local `GraphEngineeringStateV1`, erillinen runtime `GraphOrchestrationStateV1`, Story/Release Map ja kaksi `tk`-storea erottavat bounded coordinationin, reitityksen, toimitusjärjestyksen ja toteutustaskit.
-- Current hard cut on snapshot/envelope/outcome V6, composition V7, ExecutionSpec V8, runtime DB V9 ja Loop Module Package V3.
-- Koodissa ovat sekä Codex- että Copilot-adapterit, scheduler, provider-kohtaiset FIFO-jonot, SQLite-palautuminen, Git-worktree-eristys ja macOS-jakelutyökalut.
-- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja Loop-graafin.
+- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v14** -skeemaa.
+- Projektissa on **15 hyväksyttyä Goalia** ja 23 ADR-recordia. ADR-023 omistaa nykyisen kolmitasoisen domain/routing/canvas-rajan ja säilyttää aiempien päätösten historian.
+- Paikallinen Graph Node Library sisältää **14 V4-pakettia**. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
+- Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat. Job Node näyttää Work/Validation-planeetat, validate/retryn ja PASS/FAIL-terminalit.
+- Tavallinen tasojen välinen flow on scoped agent routing immutable snapshotin strict candidate-enumista. Providerin foreign target vaikuttaa nolla kertaa; bounded Repair käsittelee poikkeuksen ennen ihmiseskalaatiota.
+- Balletin oletusgraafissa on **5 GraphNodea** ja **17 aggregate JobNodea**, joilla on erilliset Work/Validation-lapset. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
+- Current hard cut on snapshot/envelope/outcome V7, composition V8, ExecutionSpec V9, runtime DB V10 ja Graph Node Module Package V4.
+- Koodissa ovat sekä Codex- että Copilot-adapterit, provider-kohtaiset FIFO-jonot, SQLite-palautuminen, Git-worktree-eristys ja macOS-jakelutyökalut. Schedule-domainia tai standalone JobNode Runia ei ole.
+- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja strict-v14 GraphNode-graafin.
 
 ## Mitä puuttuu tai ei vielä näy käytössä?
 
 **Todentamatta end-to-end:**
 
-- `graph-engineering-runbook`-initiative on draft: strict-v13/V3/DB9-toteutus on koossa, mutta final gatejen, browser-QA:n ja ihmisacceptancen evidenssi viimeistellään ennen acceptancea.
-- Ensimmäistä viiden Loopin RunBookia ei ole vielä ajettu tuotantokaltaisena end-to-end-pilottina.
+- `three-level-graph-node-engineering`-initiative on draft: strict-v14/V4/DB10-toteutus on työpuussa, mutta final gatejen, browser-QA:n, conformance-arvion ja ihmisacceptancen evidenssi viimeistellään ennen initiative-acceptancea.
+- Ensimmäistä viiden GraphNoden Graph Runia ei ole vielä ajettu tuotantokaltaisena end-to-end-pilottina.
 - Method-healthin runtime-, transition-, repair- ja tracker-baselinet puuttuvat ensimmäiseen pilottiin asti.
 - Pinnatun `tk`-revision live-smoke riippuu paikallisesta prerequisite-asennuksesta; hermetic fake-CLI-testit eivät korvaa sitä.
 - Konfiguraatiossa ei ole Copilot-ExecutionProfilea tai Copilot-Nodea, vaikka platform-adapteri on toteutettu.
@@ -71,7 +70,7 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 - automaattinen merge tai push;
 - Linux- ja Windows-jakelu;
 - provider-fallback ja Codex/Copilotin ulkopuoliset providerit;
-- remote registry, marketplace, automaattiset module-päivitykset, executable package code, Built-in-resurssikatalogi ja standalone Agent -entity;
+- remote registry, marketplace, automaattiset module-päivitykset, executable package code, Built-in-resurssikatalogi, standalone Agent -entity, schedule ja standalone JobNode Run;
 - vaalea teema sekä keskeytyneen käynnissä olleen työn hiljainen automaattinen uudelleenajo.
 
 ## Tiivis arvio
@@ -80,4 +79,4 @@ Balletin vahvin idea ei ole “agenttien määrä”, vaan **todennettava suorit
 
 `versionhallittu intentio → immutable snapshot → eristetty työtila → strukturoitu tulos → pysyvä evidenssi`
 
-Seuraava hyväksyntäraja on `graph-engineering-runbook`-initiativen `EVID-016`–`EVID-018`-ketju: final gatet, Graphin desktop/narrow-QA, Workflow-regressio ja projektin omistajan visual review. Seuraava menetelmäkypsyysaskel on rajattu viiden Loopin end-to-end-pilotti ennen erikseen päätettävää alpha-julkaisua.
+Seuraava hyväksyntäraja on `three-level-graph-node-engineering`-initiativen `EVID-019`–`EVID-020`-ketju: final gatet, kolmen canvasin desktop/narrow-QA, conformance Validation ja projektin omistajan visual review. Seuraava menetelmäkypsyysaskel on rajattu viiden GraphNoden end-to-end-pilotti ennen erikseen päätettävää alpha-julkaisua.

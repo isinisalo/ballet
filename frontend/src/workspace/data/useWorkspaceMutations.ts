@@ -2,11 +2,11 @@ import { useCallback, useMemo } from "react";
 import type {
   ExecutionProfileSaveRequest,
   MarkdownDocument,
-  LoopTheme,
+  CanvasTheme,
   ProjectAutomationConfig,
-  LoopModuleInstallCommitRequest,
-  LoopModuleInstallPlanRequest,
-  LoopModuleExportRequest,
+  GraphNodeModuleInstallCommitRequest,
+  GraphNodeModuleInstallPlanRequest,
+  GraphNodeModuleExportRequest,
   WorkspaceSaveRequestByCollection
 } from "../../../../shared/api/workspace-contracts";
 import { api } from "../../api";
@@ -109,43 +109,43 @@ export function useWorkspaceMutations({
     );
   }, [runMutation]);
 
-  const updateLoopTheme = useCallback(async (theme: LoopTheme) => {
+  const updateCanvasTheme = useCallback(async (theme: CanvasTheme) => {
     return runMutation(
-      () => api.updateLoopTheme(theme),
+      () => api.updateCanvasTheme(theme),
       "Theme saved.",
-      "Unable to save Loop theme."
+      "Unable to save canvas theme."
     );
   }, [runMutation]);
 
-  const installLoopModule = useCallback(async (input: LoopModuleInstallCommitRequest) => runMutation(
-    () => api.installLoopModule(input),
-    "Loop module installed.",
-    "Unable to install Loop module."
+  const installGraphNodeModule = useCallback(async (input: GraphNodeModuleInstallCommitRequest) => runMutation(
+    () => api.installGraphNodeModule(input),
+    "Graph Node module installed.",
+    "Unable to install Graph Node module."
   ), [runMutation]);
 
-  const removeInstalledLoopModule = useCallback(async (loopId: string) => {
+  const removeInstalledGraphNodeModule = useCallback(async (graphNodeId: string) => {
     await runMutation(
-      () => api.removeInstalledLoopModule(loopId),
-      "Installed Loop removed.",
-      "Unable to remove installed Loop."
+      () => api.removeInstalledGraphNodeModule(graphNodeId),
+      "Installed Graph Node removed.",
+      "Unable to remove installed Graph Node."
     );
   }, [runMutation]);
 
-  const exportLoopModule = useCallback(async (input: LoopModuleExportRequest) => runMutation(
-    () => api.exportLoopModule(input),
-    "Loop module exported.",
-    "Unable to export Loop module."
+  const exportGraphNodeModule = useCallback(async (input: GraphNodeModuleExportRequest) => runMutation(
+    () => api.exportGraphNodeModule(input),
+    "Graph Node module exported.",
+    "Unable to export Graph Node module."
   ), [runMutation]);
 
-  const loopModules = useMemo(() => ({
-    listLibrary: api.listLoopModuleLibrary,
-    inspect: api.inspectLoopModule,
-    plan: (input: LoopModuleInstallPlanRequest) => api.planLoopModuleInstall(input),
-    install: installLoopModule,
-    statuses: api.loopModuleStatuses,
-    exportLoop: exportLoopModule,
-    remove: removeInstalledLoopModule
-  }), [exportLoopModule, installLoopModule, removeInstalledLoopModule]);
+  const graphNodeModules = useMemo(() => ({
+    listLibrary: api.listGraphNodeModuleLibrary,
+    inspect: api.inspectGraphNodeModule,
+    plan: (input: GraphNodeModuleInstallPlanRequest) => api.planGraphNodeModuleInstall(input),
+    install: installGraphNodeModule,
+    statuses: api.graphNodeModuleStatuses,
+    exportGraphNode: exportGraphNodeModule,
+    remove: removeInstalledGraphNodeModule
+  }), [exportGraphNodeModule, installGraphNodeModule, removeInstalledGraphNodeModule]);
 
   return {
     save,
@@ -156,8 +156,8 @@ export function useWorkspaceMutations({
     createProjectDocument,
     remove,
     saveAutomation,
-    updateLoopTheme,
-    loopModules,
+    updateCanvasTheme,
+    graphNodeModules,
     refresh
   };
 }

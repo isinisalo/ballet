@@ -1,61 +1,48 @@
-export const projectConfigurationVersion = 13 as const;
+export const projectConfigurationVersion = 14 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxJobRetriesLimit = 100;
-export const maxProjectLoops = 40;
-export const maxGraphTransitions = 256;
-export {
-  getProjectFailEdges,
-  getProjectGraphTransitions,
-  getProjectRepairEdges,
-  getProjectPassEdges,
-  getProjectPassTargetJobId,
-  getProjectValidationNode,
-  getReachableProjectJobNodeIds,
-  getReachableProjectLoopGraph,
-  getReachableProjectLoopIds,
-  hasReachableProjectWorkflowPass,
-  isAllowedProjectRepairRoute,
-  maxRepairDepthLimit,
-  resolveProjectWorkflowStartJob,
-  type ReachableProjectLoopGraph
-} from "./automationReachability.js";
+export const maxProjectGraphNodes = 40;
+export const maxGraphNodeJobNodes = 64;
+export const maxOrchestratorTransitions = 256;
+export const maxRouteAttemptsLimit = 3;
 export const maxRepairAttemptsLimit = 100;
-export const maxLoopCapabilities = 64;
-export const maxLoopCapabilityLength = 200;
-export const loopCapabilityPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._/-][a-z0-9]+)*$/;
+export const maxRepairDepthLimit = 100;
+export const maxNodeCapabilities = 64;
+export const maxNodeCapabilityLength = 200;
+export const nodeCapabilityPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._/-][a-z0-9]+)*$/;
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
-export const workflowResults = ["PASS", "FAIL"] as const;
-export type WorkflowResult = (typeof workflowResults)[number];
+export const nodeResults = ["PASS", "FAIL"] as const;
+export type NodeResult = (typeof nodeResults)[number];
 
-export const loopNodeSizes = ["tiny", "small", "medium", "large"] as const;
-export type LoopNodeSize = (typeof loopNodeSizes)[number];
-export type LoopNodePixels = 24 | 36 | 48 | 64;
+export const canvasNodeSizes = ["tiny", "small", "medium", "large"] as const;
+export type CanvasNodeSize = (typeof canvasNodeSizes)[number];
+export type CanvasNodePixels = 24 | 36 | 48 | 64;
 
-export interface LoopNodeSizeDefinition {
+export interface CanvasNodeSizeDefinition {
   label: string;
-  pixels: LoopNodePixels;
+  pixels: CanvasNodePixels;
 }
 
-export const loopNodeSizeCatalog: Readonly<Record<LoopNodeSize, LoopNodeSizeDefinition>> = {
+export const canvasNodeSizeCatalog: Readonly<Record<CanvasNodeSize, CanvasNodeSizeDefinition>> = {
   tiny: { label: "Tiny", pixels: 24 },
   small: { label: "Small", pixels: 36 },
   medium: { label: "Medium", pixels: 48 },
   large: { label: "Large", pixels: 64 }
 };
 
-export const loopNodeStyles = ["flat", "luna", "mars", "terra", "sol", "vector-planet"] as const;
-export type LoopNodeStyle = (typeof loopNodeStyles)[number];
-export type LoopNodeStyleGroup = "classic" | "planet";
+export const canvasNodeStyles = ["flat", "luna", "mars", "terra", "sol", "vector-planet"] as const;
+export type CanvasNodeStyle = (typeof canvasNodeStyles)[number];
+export type CanvasNodeStyleGroup = "classic" | "planet";
 
-export interface LoopNodeStyleDefinition {
+export interface CanvasNodeStyleDefinition {
   label: string;
-  group: LoopNodeStyleGroup;
+  group: CanvasNodeStyleGroup;
 }
 
-export const loopNodeStyleCatalog: Readonly<Record<LoopNodeStyle, LoopNodeStyleDefinition>> = {
+export const canvasNodeStyleCatalog: Readonly<Record<CanvasNodeStyle, CanvasNodeStyleDefinition>> = {
   flat: { label: "Flat", group: "classic" },
   luna: { label: "Luna", group: "classic" },
   mars: { label: "Mars", group: "classic" },
@@ -64,12 +51,12 @@ export const loopNodeStyleCatalog: Readonly<Record<LoopNodeStyle, LoopNodeStyleD
   "vector-planet": { label: "Vector planet", group: "planet" }
 };
 
-export const defaultLoopNodeStyle: LoopNodeStyle = "flat";
-export const defaultLoopNodeSize: LoopNodeSize = "medium";
+export const defaultCanvasNodeStyle: CanvasNodeStyle = "flat";
+export const defaultCanvasNodeSize: CanvasNodeSize = "medium";
 
 export interface ProjectNodeAppearance {
-  nodeStyle: LoopNodeStyle;
-  nodeSize: LoopNodeSize;
+  nodeStyle: CanvasNodeStyle;
+  nodeSize: CanvasNodeSize;
 }
 
 export interface ProjectExecutionComposition {
@@ -78,89 +65,44 @@ export interface ProjectExecutionComposition {
   skillIds: string[];
 }
 
-export type ProjectScheduleWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
-export type ProjectScheduleCadence = "daily" | "weekdays" | "weekly" | "monthly";
-
-interface ProjectJobScheduleBase {
-  time: string;
-  timeZone: string;
+export interface ProjectNodeCapabilities {
+  accepts: string[];
+  provides: string[];
 }
 
-export interface ProjectOnceJobSchedule extends ProjectJobScheduleBase {
-  kind: "once";
-  date: string;
+export interface ProjectStateDefinition {
+  description: string;
+  initial: JsonValue;
 }
 
-interface ProjectRecurringJobScheduleBase extends ProjectJobScheduleBase {
-  kind: "recurring";
-  startsOn: string;
+export interface ProjectStateContract {
+  description: string;
 }
 
-export interface ProjectDailyJobSchedule extends ProjectRecurringJobScheduleBase {
-  cadence: "daily";
-}
-
-export interface ProjectWeekdaysJobSchedule extends ProjectRecurringJobScheduleBase {
-  cadence: "weekdays";
-}
-
-export interface ProjectWeeklyJobSchedule extends ProjectRecurringJobScheduleBase {
-  cadence: "weekly";
-  weekdays: ProjectScheduleWeekday[];
-}
-
-export interface ProjectMonthlyJobSchedule extends ProjectRecurringJobScheduleBase {
-  cadence: "monthly";
-  dayOfMonth: number;
-}
-
-export type ProjectRecurringJobSchedule =
-  | ProjectDailyJobSchedule
-  | ProjectWeekdaysJobSchedule
-  | ProjectWeeklyJobSchedule
-  | ProjectMonthlyJobSchedule;
-
-export type ProjectJobSchedule = ProjectOnceJobSchedule | ProjectRecurringJobSchedule;
-
-interface ProjectJobNodeBase extends ProjectNodeAppearance {
+interface ProjectExecutableNodeBase extends ProjectNodeAppearance {
   id: string;
   description: string;
   task: string;
-  validationNodeId: string;
-  /** Additional local executions after the first Job execution. */
-  maxRetries: number;
 }
 
-export interface ProjectAgentJobNode extends ProjectJobNodeBase, ProjectExecutionComposition {
+export interface ProjectAgentWorkNode extends ProjectExecutableNodeBase, ProjectExecutionComposition {
   type: "agent";
 }
 
-export interface ProjectHumanJobNode extends ProjectJobNodeBase {
+export interface ProjectHumanWorkNode extends ProjectExecutableNodeBase {
   type: "human";
   executionProfileId?: never;
   primaryInstructionId?: never;
   skillIds?: never;
 }
 
-export interface ProjectScheduledJobNode extends ProjectJobNodeBase, ProjectExecutionComposition {
-  type: "scheduled";
-  schedule: ProjectJobSchedule;
-}
+export type ProjectWorkNode = ProjectAgentWorkNode | ProjectHumanWorkNode;
 
-export type ProjectProviderJobNode = ProjectAgentJobNode | ProjectScheduledJobNode;
-export type ProjectJobNode = ProjectProviderJobNode | ProjectHumanJobNode;
-
-interface ProjectValidationNodeBase extends ProjectNodeAppearance {
-  id: string;
-  description: string;
-  task: string;
-}
-
-export interface ProjectAgentValidationNode extends ProjectValidationNodeBase, ProjectExecutionComposition {
+export interface ProjectAgentValidationNode extends ProjectExecutableNodeBase, ProjectExecutionComposition {
   type: "agent";
 }
 
-export interface ProjectHumanValidationNode extends ProjectValidationNodeBase {
+export interface ProjectHumanValidationNode extends ProjectExecutableNodeBase {
   type: "human";
   executionProfileId?: never;
   primaryInstructionId?: never;
@@ -169,138 +111,134 @@ export interface ProjectHumanValidationNode extends ProjectValidationNodeBase {
 
 export type ProjectValidationNode = ProjectAgentValidationNode | ProjectHumanValidationNode;
 
-export type ProjectPassEdgeTarget =
-  | { jobNodeId: string }
-  | { workflowResult: "PASS" };
-
-export interface ProjectPassEdge {
+export interface ProjectJobNode extends ProjectNodeAppearance {
   id: string;
-  sourceValidationNodeId: string;
-  target: ProjectPassEdgeTarget;
+  description: string;
+  capabilities: ProjectNodeCapabilities;
+  /** Additional Work executions after the first Work execution. */
+  maxRetries: number;
+  workNode: ProjectWorkNode;
+  validationNode: ProjectValidationNode;
 }
 
-export interface ProjectFailEdge {
-  id: string;
-  sourceValidationNodeId: string;
-  target: { workflowResult: "FAIL" };
-}
+export interface ProjectGraphNodeTarget { graphNodeId: string; }
+export interface ProjectJobNodeTarget { jobNodeId: string; }
+export interface ProjectTerminalTarget { terminal: NodeResult; }
 
-export interface ProjectWorkflow {
-  startJobNodeId: string;
-  jobNodes: ProjectJobNode[];
-  validationNodes: ProjectValidationNode[];
-  passEdges: ProjectPassEdge[];
-  failEdges: ProjectFailEdge[];
-}
+export type ProjectGraphRouteTarget = ProjectGraphNodeTarget | ProjectTerminalTarget;
+export type ProjectGraphNodeRouteTarget = ProjectJobNodeTarget | ProjectTerminalTarget;
 
-export const graphTransitionOutcomePattern = /^[a-z][a-z0-9_]*$/;
-
-export interface ProjectGraphTransition {
-  id: string;
-  source: string;
-  decision: WorkflowResult;
-  outcome: string;
-  target: { loopId: string } | { runResult: "DONE" };
+export interface ProjectRouteCandidate<TTarget> {
+  target: TTarget;
   description: string;
 }
 
-export interface ProjectRepairEdge {
+export interface ProjectStartCandidateRule<TTarget> {
   id: string;
-  source: string;
-  target: string;
+  candidates: ProjectRouteCandidate<TTarget>[];
+}
+
+export interface ProjectContinuationCandidateRule<TTarget> {
+  id: string;
+  sourceId: string;
+  result: NodeResult;
+  candidates: ProjectRouteCandidate<TTarget>[];
+}
+
+export interface ProjectRepairCandidateRule<TTarget> {
+  id: string;
+  sourceId: string;
   capability: string;
+  candidates: ProjectRouteCandidate<TTarget>[];
+}
+
+export interface ProjectCandidateRouting<TTarget> {
+  start: ProjectStartCandidateRule<TTarget>;
+  continuation: ProjectContinuationCandidateRule<TTarget>[];
+  repair: ProjectRepairCandidateRule<TTarget>[];
+}
+
+export interface ProjectOrchestrator<TTarget> extends ProjectExecutionComposition, ProjectNodeAppearance {
+  id: string;
   description: string;
+  maxTransitions: number;
+  maxRouteAttempts: number;
+  routing: ProjectCandidateRouting<TTarget>;
+}
+
+export interface ProjectRepairNode extends ProjectExecutionComposition, ProjectNodeAppearance {
+  id: string;
+  description: string;
+  task: string;
+  maxRepairDepth: number;
+  maxRepairAttempts: number;
+}
+
+export interface ProjectGraphNode extends ProjectNodeAppearance {
+  id: string;
+  description: string;
+  capabilities: ProjectNodeCapabilities;
+  stateContract: ProjectStateContract;
+  orchestrator: ProjectOrchestrator<ProjectGraphNodeRouteTarget>;
+  repairNode?: ProjectRepairNode;
+  jobNodes: ProjectJobNode[];
 }
 
 export interface ProjectGraph {
   id: string;
   name: string;
-  startLoopId: string;
-  transitions: ProjectGraphTransition[];
-  repairEdges: ProjectRepairEdge[];
-}
-
-export interface ProjectLoopCapabilities {
-  accepts: string[];
-  provides: string[];
-}
-
-export interface ProjectLoopState {
-  description: string;
-  initial: JsonValue;
-}
-
-export interface ProjectLoop {
-  id: string;
-  description: string;
-  capabilities: ProjectLoopCapabilities;
-  state: ProjectLoopState;
-  workflow: ProjectWorkflow;
-}
-
-export interface ProjectLoopRepairRouter extends ProjectExecutionComposition {
-  maxRepairDepth: number;
-  maxRepairAttempts: number;
-}
-
-export interface ProjectLoopOrchestrator {
-  mode: "runbook";
-  maxTransitions: number;
-  repairRouter?: ProjectLoopRepairRouter;
+  state: ProjectStateDefinition;
+  orchestrator: ProjectOrchestrator<ProjectGraphRouteTarget>;
+  repairNode?: ProjectRepairNode;
+  graphNodes: ProjectGraphNode[];
 }
 
 export interface ProjectAutomationConfig {
   version: typeof projectConfigurationVersion;
-  orchestrator: ProjectLoopOrchestrator;
   graph: ProjectGraph;
-  loops: ProjectLoop[];
 }
 
-export const defaultProjectLoopOrchestrator = (): ProjectLoopOrchestrator => ({
-  mode: "runbook",
-  maxTransitions: maxGraphTransitions
+export const defaultProjectOrchestrator = <TTarget>(): ProjectOrchestrator<TTarget> => ({
+  id: "orchestrator",
+  description: "Selects the next allowed target from the immutable candidate set.",
+  nodeStyle: "luna",
+  nodeSize: "medium",
+  executionProfileId: "",
+  primaryInstructionId: "",
+  skillIds: [],
+  maxTransitions: maxOrchestratorTransitions,
+  maxRouteAttempts: maxRouteAttemptsLimit,
+  routing: {
+    start: { id: "start", candidates: [] },
+    continuation: [],
+    repair: []
+  }
 });
 
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: projectConfigurationVersion,
-  orchestrator: defaultProjectLoopOrchestrator(),
-  graph: { id: "graph-engineering", name: "Graph Engineering", startLoopId: "", transitions: [], repairEdges: [] },
-  loops: [],
+  graph: {
+    id: "graph-engineering",
+    name: "Graph Engineering",
+    state: { description: "Shared immutable-snapshot Graph state.", initial: {} },
+    orchestrator: defaultProjectOrchestrator<ProjectGraphRouteTarget>(),
+    graphNodes: []
+  }
 });
 
-export const isProjectProviderJobNode = (node: ProjectJobNode): node is ProjectProviderJobNode =>
-  node.type === "agent" || node.type === "scheduled";
-
-export const isProjectHumanJobNode = (node: ProjectJobNode): node is ProjectHumanJobNode =>
-  node.type === "human";
-
-export const isProjectScheduledJobNode = (node: ProjectJobNode): node is ProjectScheduledJobNode =>
-  node.type === "scheduled";
-
+export const isProjectAgentWorkNode = (node: ProjectWorkNode): node is ProjectAgentWorkNode => node.type === "agent";
+export const isProjectHumanWorkNode = (node: ProjectWorkNode): node is ProjectHumanWorkNode => node.type === "human";
 export const isProjectAgentValidationNode = (
   node: ProjectValidationNode
 ): node is ProjectAgentValidationNode => node.type === "agent";
-
 export const isProjectHumanValidationNode = (
   node: ProjectValidationNode
 ): node is ProjectHumanValidationNode => node.type === "human";
 
-export const clockTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-
-export const isCalendarDate = (value: string): boolean => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-};
-
-export const isIanaTimeZone = (value: string): boolean => {
-  if (!value || /^[+-]\d{2}:\d{2}$/.test(value)) return false;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
+export const routeTargetKey = (target: ProjectGraphRouteTarget | ProjectGraphNodeRouteTarget): string => {
+  if ("graphNodeId" in target) return `graph-node:${target.graphNodeId}`;
+  if ("jobNodeId" in target) return `job-node:${target.jobNodeId}`;
+  return `terminal:${target.terminal}`;
 };
 
 export interface ProjectAutomationIssue {

@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
@@ -67,7 +67,7 @@ describe("ExecutionProfile HTTP API", () => {
     const persisted = JSON.parse(await readFile(path.join(store.root, ".ballet", "project.json"), "utf8")) as {
       executionProfiles: Array<{ id: string; name: string }>;
     };
-    expect(persisted.executionProfiles).toEqual([expect.objectContaining({ id: "primary", name: "Updated primary" })]);
+    expect(persisted.executionProfiles).toContainEqual(expect.objectContaining({ id: "primary", name: "Updated primary" }));
     expect(publish).toHaveBeenCalledTimes(2);
   });
 });
@@ -75,6 +75,8 @@ describe("ExecutionProfile HTTP API", () => {
 const startApp = async () => {
   const root = await mkdtemp(path.join(tmpdir(), "ballet-execution-profile-http-"));
   roots.push(root);
+  await mkdir(path.join(root, ".ballet"), { recursive: true });
+  await writeFile(path.join(root, ".ballet", "project.json"), await readFile(".ballet/project.json", "utf8"));
   const store = new MarkdownStore(root, new RuntimeDatabase(path.join(root, "state.sqlite")));
   stores.push(store);
   const publish = vi.fn();

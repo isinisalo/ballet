@@ -46,27 +46,7 @@ const sections = [
   "12-glossary.md"
 ];
 
-const expectedLoopIds = ["design", "plan", "build", "deploy", "verify"];
-const expectedTransitions = [
-  "design|PASS|success|plan",
-  "design|FAIL|failure|design",
-  "plan|PASS|success|build",
-  "plan|FAIL|failure|design",
-  "build|PASS|more_work|build",
-  "build|PASS|success|deploy",
-  "build|FAIL|implementation_defect|build",
-  "build|FAIL|invalid_plan|plan",
-  "build|FAIL|invalid_design|design",
-  "deploy|PASS|success|verify",
-  "deploy|FAIL|transient_deployment_error|deploy",
-  "deploy|FAIL|implementation_defect|build",
-  "deploy|FAIL|invalid_plan|plan",
-  "verify|PASS|more_work|plan",
-  "verify|PASS|complete|DONE",
-  "verify|FAIL|implementation_defect|build",
-  "verify|FAIL|invalid_plan|plan",
-  "verify|FAIL|invalid_design|design"
-];
+const expectedGraphNodeIds = ["design", "plan", "build", "deploy", "verify"];
 const expectedDesignJobs = [
   "design-01-introduction-and-goals",
   "design-02-constraints",
@@ -81,8 +61,6 @@ const expectedDesignJobs = [
   "design-11-risks-and-technical-debt",
   "design-12-glossary"
 ];
-
-const networkAllowed = new Set();
 
 const addIssue = (message) => issues.push(message);
 const rel = (absolute) => path.relative(root, absolute).split(path.sep).join("/");
@@ -260,44 +238,23 @@ if (!parsedConfig.success) {
   for (const issue of parsedConfig.error.issues) addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`);
 } else {
   config = parsedConfig.data;
-  const automation = {
-    version: 13,
-    orchestrator: config.orchestrator,
-    graph: config.graph,
-    loops: config.loops
-  };
+  const automation = { version: 14, graph: config.graph };
   for (const issue of validateProjectAutomationConfig(automation, config.executionProfiles)) addIssue(`Automation ${issue.path}: ${issue.message}`);
   const resources = await loadProjectResources(root);
   for (const issue of resources.issues) addIssue(`Resource ${issue.relativePath}: ${issue.message}`);
   for (const issue of validateProjectExecutionResources(automation, resources)) addIssue(`Resource reference ${issue.path}: ${issue.message}`);
 
-  for (const loop of config.loops) {
-    const validationOwners = new Map();
-    for (const job of loop.workflow.jobNodes) {
-      const owners = validationOwners.get(job.validationNodeId) ?? [];
-      owners.push(job.id);
-      validationOwners.set(job.validationNodeId, owners);
-    }
-    for (const validation of loop.workflow.validationNodes) {
-      const owners = validationOwners.get(validation.id) ?? [];
-      if (owners.length !== 1) addIssue(`${loop.id}/${validation.id} has ${owners.length} Job owners; expected 1.`);
-      const passEdges = loop.workflow.passEdges.filter((edge) => edge.sourceValidationNodeId === validation.id);
-      const failEdges = loop.workflow.failEdges.filter((edge) => edge.sourceValidationNodeId === validation.id);
-      if (passEdges.length !== 1) addIssue(`${loop.id}/${validation.id} has ${passEdges.length} PassEdges; expected 1.`);
-      if (failEdges.length !== 1) addIssue(`${loop.id}/${validation.id} has ${failEdges.length} FailEdges; expected 1.`);
-    }
+  const graphNodeIds = config.graph.graphNodes.map((entry) => entry.id);
+  if (JSON.stringify(graphNodeIds) !== JSON.stringify(expectedGraphNodeIds)) {
+    addIssue(`Default GraphNode order mismatch: ${graphNodeIds.join(", ")}`);
   }
-
-  const loopIds = config.loops.map((entry) => entry.id);
-  if (JSON.stringify(loopIds) !== JSON.stringify(expectedLoopIds)) addIssue(`Default Loop order mismatch: ${loopIds.join(", ")}`);
-  if (config.graph.startLoopId !== "design") addIssue(`Default start Loop must be design, received ${config.graph.startLoopId}.`);
-  const transitions = config.graph.transitions.map((entry) => {
-    const target = "loopId" in entry.target ? entry.target.loopId : entry.target.runResult;
-    return `${entry.source}|${entry.decision}|${entry.outcome}|${target}`;
-  });
-  if (JSON.stringify(transitions) !== JSON.stringify(expectedTransitions)) addIssue(`Default RunBook mismatch: ${transitions.join(", ")}`);
-  if (config.graph.repairEdges.length !== 0) addIssue("Default Graph must not contain repair edges.");
-  const designJobs = config.loops.find((entry) => entry.id === "design")?.workflow.jobNodes.map((entry) => entry.id) ?? [];
+  const startTargets = config.graph.orchestrator.routing.start.candidates.map(({ target }) => (
+    "graphNodeId" in target ? target.graphNodeId : `terminal:${target.terminal}`
+  ));
+  if (JSON.stringify(startTargets) !== JSON.stringify(["design"])) {
+    addIssue(`Default Graph start candidates must contain only design, received ${startTargets.join(", ")}.`);
+  }
+  const designJobs = config.graph.graphNodes.find((entry) => entry.id === "design")?.jobNodes.map((entry) => entry.id) ?? [];
   if (JSON.stringify(designJobs) !== JSON.stringify(expectedDesignJobs)) addIssue(`DESIGN Job order mismatch: ${designJobs.join(", ")}`);
 
   const stateSource = docs.get(path.join(arc42Root, "STATE-CONTRACT.md"))?.source ?? "";
@@ -310,10 +267,8 @@ if (!parsedConfig.success) {
     : value && typeof value === "object"
       ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${deepCanonical(value[key])}`).join(",")}}`
       : JSON.stringify(value);
-  const baseline = config.loops[0]?.state.initial;
-  for (const entry of config.loops) {
-    if (deepCanonical(entry.state.initial) !== deepCanonical(baseline)) addIssue(`${entry.id} initial State differs from other default Loops.`);
-    if (contractState && deepCanonical(entry.state.initial) !== deepCanonical(contractState)) addIssue(`${entry.id} initial State differs from STATE-CONTRACT.`);
+  if (contractState && deepCanonical(config.graph.state.initial) !== deepCanonical(contractState)) {
+    addIssue("Graph initial State differs from STATE-CONTRACT.");
   }
   void canonical;
 
@@ -322,22 +277,24 @@ if (!parsedConfig.success) {
     if (entry.reasoningEffort !== "medium") addIssue(`ExecutionProfile ${entry.id} does not preserve medium baseline.`);
     if (/(?:high|xhigh|max|pro)/i.test(entry.reasoningEffort) || "reasoning" in entry && entry.reasoning?.mode) addIssue(`Unsupported high/pro reasoning configuration in ${entry.id}.`);
   }
-  const observedNetworkOn = new Set();
-  for (const entry of config.loops) {
-    for (const job of entry.workflow.jobNodes) {
-      if (job.type !== "human" && profiles.get(job.executionProfileId)?.networkAccess) {
-        observedNetworkOn.add(`${entry.id}/${job.id}/job`);
-      }
-    }
-    for (const validation of entry.workflow.validationNodes) {
-      if (validation.type !== "human" && profiles.get(validation.executionProfileId)?.networkAccess) {
-        observedNetworkOn.add(`${entry.id}/${validation.id}/validation`);
-      }
+  const validateComposition = (composition, location, expectedModel) => {
+    const profile = profiles.get(composition.executionProfileId);
+    if (!profile) return;
+    if (profile.networkAccess) addIssue(`Network-on profile used outside allowlist: ${location}.`);
+    if (expectedModel && profile.model !== expectedModel) addIssue(`${location} must use ${expectedModel}, received ${profile.model}.`);
+  };
+  validateComposition(config.graph.orchestrator, "graph/orchestrator", "gpt-5.6-luna");
+  if (!config.graph.repairNode) addIssue("Default Graph must define a Repair Node.");
+  else validateComposition(config.graph.repairNode, "graph/repair", "gpt-5.6-sol");
+  for (const graphNode of config.graph.graphNodes) {
+    validateComposition(graphNode.orchestrator, `${graphNode.id}/orchestrator`, "gpt-5.6-luna");
+    if (!graphNode.repairNode) addIssue(`Default GraphNode ${graphNode.id} must define a Repair Node.`);
+    else validateComposition(graphNode.repairNode, `${graphNode.id}/repair`, "gpt-5.6-sol");
+    for (const jobNode of graphNode.jobNodes) {
+      if (jobNode.workNode.type === "agent") validateComposition(jobNode.workNode, `${graphNode.id}/${jobNode.id}/work`);
+      if (jobNode.validationNode.type === "agent") validateComposition(jobNode.validationNode, `${graphNode.id}/${jobNode.id}/validation`);
     }
   }
-  for (const location of observedNetworkOn) if (!networkAllowed.has(location)) addIssue(`Network-on profile used outside allowlist: ${location}.`);
-  for (const location of networkAllowed) if (!observedNetworkOn.has(location)) addIssue(`Expected network-on node is not configured: ${location}.`);
-  if (profiles.get(config.orchestrator.executionProfileId)?.networkAccess) addIssue("Orchestrator must use network-off profile.");
 
 }
 
@@ -376,6 +333,14 @@ if (issues.length > 0) {
   for (const issue of issues) process.stderr.write(`- ${issue}\n`);
   process.exitCode = 1;
 } else {
-  const jobs = config?.loops.reduce((total, loop) => total + loop.workflow.jobNodes.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${config?.loops.length ?? 0} Loops, ${jobs} Jobs, ${config?.graph.transitions.length ?? 0} RunBook transitions.\n`);
+  const graphNodes = config?.graph.graphNodes.length ?? 0;
+  const jobs = config?.graph.graphNodes.reduce((total, graphNode) => total + graphNode.jobNodes.length, 0) ?? 0;
+  const candidateRules = config
+    ? config.graph.orchestrator.routing.continuation.length
+      + config.graph.orchestrator.routing.repair.length
+      + config.graph.graphNodes.reduce((total, graphNode) => total
+        + graphNode.orchestrator.routing.continuation.length
+        + graphNode.orchestrator.routing.repair.length, 0)
+    : 0;
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${graphNodes} GraphNodes, ${jobs} JobNodes, ${candidateRules} candidate rules.\n`);
 }

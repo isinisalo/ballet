@@ -1,9 +1,4 @@
-import {
-  defaultProjectAutomationConfig,
-  type ProjectGraph,
-  type ProjectLoop,
-  type ProjectLoopOrchestrator
-} from "./automation.js";
+import { defaultProjectAutomationConfig, type ProjectGraph } from "./automation.js";
 import type { RuntimeProvider } from "./runtime.js";
 
 export interface ProjectIssueTrackerConfig {
@@ -23,12 +18,10 @@ export interface ExecutionProfile {
 }
 
 export interface ProjectConfiguration {
-  version: 13;
+  version: 14;
   executionProfiles: ExecutionProfile[];
   issueTracker: ProjectIssueTrackerConfig;
-  orchestrator: ProjectLoopOrchestrator;
   graph: ProjectGraph;
-  loops: ProjectLoop[];
 }
 
 export interface ProjectConfigurationIssue {

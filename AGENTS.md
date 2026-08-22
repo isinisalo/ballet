@@ -12,13 +12,13 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - Päivitä `DESIGN.md`, kun tarkoituksellinen design-muutos vaikuttaa väreihin, typografiaan, spacingiin, radius-sääntöihin, komponenttikäytäntöihin tai käyttöliittymän visuaaliseen periaatteeseen.
 - Jos nykyinen toteutus poikkeaa `DESIGN.md`-ohjeesta, älä tee laajaa uudelleenmuotoilua sivutehtävänä. Kohdista muutos pyydettyyn osaan ja vältä riippumattomia refaktorointeja.
 
-## Workflow Engineering -näkymän visuaalinen vakaus
+## Kolmitasoisen Graph Node Engineeringin visuaalinen vakaus
 
-- Workflow Engineering -canvasin avaruusteema on suojattu visuaalinen sopimus. Säilytä tumma tekninen ruudukko, planeettamaiset Job-artworkit, niiden konfiguroidut koot ja tyylit, hehkut, amber-ID-labelit, ohuet mintunväriset yhteydet sekä kirkkaat yhteyspisteet. Validation on Job-artworkin sisäinen vastuu eikä erillinen canvas-node.
-- Workflow Engineering -canvasissa näytetään vain JobNodet ja persisted PassEdge/FailEdge-yhteydet. PASS/FAIL-resultit eivät ole nodeja, kiinteitä validate/retry-runtime-siirtymiä ei piirretä Edgeinä ja Edge-geometria saa olla vain `straight` tai deterministisesti reititetty smart `smoothstep`; älä lisää muita Edge-tyylejä.
-- Domain-, runtime-, schema-, reititys- tai terminologiamuutos ei oikeuta muuttamaan Workflow Engineeringin ulkoasua. Sovita uudet toiminnalliset käsitteet olemassa olevaan visuaaliseen kieleen.
-- Älä muuta Workflow Engineering -näkymää ulkonäöllisesti ilman käyttäjän eksplisiittistä pyyntöä tai dokumentoitua painavaa syytä. Painava syy on esimerkiksi saavutettavuusongelma, todistettu käytettävyysvika tai uuden pakollisen semantiikan mahdottomuus nykyisellä esityksellä.
-- Jos painava syy vaatii visuaalisen muutoksen, kirjaa perustelu ennen toteutusta, päivitä tarvittaessa `DESIGN.md` ja liitä muutokseen desktop- ja narrow-viewportin ennen/jälkeen-selain-QA. Älä korvaa avaruusteemaa toisella shape- tai artwork-kielellä sivuvaikutuksena.
+- Graph Engineering-, Graph Node- ja Job Node -canvasien avaruusteema on suojattu visuaalinen sopimus. Säilytä tumma 24 px tekninen ruudukko, planeettamaiset artworkit ja niiden konfiguroidut koot/tyylit, reasoning glow't, amber-ID-labelit, ohuet 1.5 px mintunväriset spoket/yhteydet, kirkkaat yhteyspisteet sekä reduced-motion-tuki.
+- Graph Engineering näyttää vain globaalin Luna Orchestratorin, valinnaisen Sol Repair Noden, GraphNode-planeetat ja kiinteät PASS/FAIL-connection pointit. Graph Node näyttää vain valitun Graph Noden Luna Orchestratorin, valinnaisen Sol Repair Noden, sen JobNode-planeetat ja terminaalit. Job Node näyttää vain aggregate Jobin Work- ja Validation-planeetat, mintun validate-yhteyden, amber-retryn ja PASS/FAIL-terminalit. Foreign-scope-nodeja ei näytetä.
+- Graph- ja Graph Node -spoket kuvaavat authoroitujen candidate-sääntöjen sallittua membershipiä, eivät child-to-child Edgejä tai runtime-tuloksia. Work→Validation ja retry ovat ainoat kiinteät Job Node -canvasin sisäiset yhteydet.
+- Käytä deterministic multi-ring -layoutia, pan/zoomia ja kiinteää minimitekstikokoa. Hyväksymisfixturet ovat 1/5/40 GraphNodea ja 1/17/64 JobNodea; tavoite on nolla node-overlapia, nolla sivutason vaakaylivuotoa ja nolla leikattua ydintoimintoa desktop- ja narrow-viewporteissa.
+- Domain-, runtime-, schema-, reititys- tai terminologiamuutos ei oikeuta vaihtamaan avaruusteemaa tai lisäämään uutta shape-/palette-kieltä. Jos pakollinen semantiikka, saavutettavuus tai todistettu käytettävyysvika vaatii muutoksen, kirjaa perustelu, päivitä tarvittaessa `DESIGN.md` ja liitä desktop/narrow ennen/jälkeen-selain-QA.
 
 ## Validointi
 
@@ -28,14 +28,14 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - Aja `npm run build`, kun muutos vaikuttaa frontend-koodiin, komponenttien rajapintoihin, CSS:ään, Tailwind-luokkiin tai bundlaukseen.
 - Aja `npx @google/design.md lint DESIGN.md`, kun muutat `DESIGN.md`-tiedostoa ja komento on saatavilla ilman manuaalista tunnistautumista.
 - Aja `git diff --check` ennen muutoksen luovuttamista.
-- Aja Loop-module-sopimuksen package-, install/export-, API-, UI- ja release smoke -testit, kun muutos vaikuttaa `.ballet/loop-library/**`, `.ballet/loop-modules/**` tai niiden materialisointiin.
+- Aja Graph Node Module -sopimuksen package-, install/export-, API-, UI- ja release smoke -testit, kun muutos vaikuttaa `.ballet/graph-node-library/**`, `.ballet/graph-node-modules/**` tai niiden materialisointiin.
 - Raportoi selvästi, jos validointikomentoa ei voi ajaa tai se epäonnistuu ympäristösyyn vuoksi.
 
 ## Platformin ja projektin raja
 
-- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Loop, ProjectWorkflow, JobNode, ValidationNode, PassEdge, FailEdge, State, ProjectGraphTransition, ProjectRepairEdge, RepairRequest, LoopOrchestrator, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Root Run snapshot, provider-suoritus, tracker-adapter/outbox ja runtime state.
+- Balletin platform-koodi saa toteuttaa vain yleisiä primitivejä: Graph, GraphNode, aggregate JobNode, WorkNode, ValidationNode, scoped Orchestrator, scoped RepairNode, candidate-sääntö, State, RepairRequest/frame, ExecutionProfile, instruction- ja skill-resurssien ratkaisu, Graph/GraphNode Root Run snapshot, provider-suoritus, tracker-adapter/outbox ja runtime state.
 - Roadmap-, milestone-, issue-, acceptance-, staging-, release-, deploy- ja arc42-menettelyt kuuluvat project-local dataan tiedostoissa `.ballet/project.json`, `.ballet/releases/**`, `.tickets/**`, `.ballet/instructions/**`, `.agents/skills/**` ja `.ballet/arc42/**`.
-- Loop-module package-, katalogi-, install-, export- ja provenance-primitiveet ovat geneerisiä platform-ominaisuuksia. Moduulien nimet, capabilityt, instructionit, skillsit, recommended transitionit/repairsit ja external-write-metadata ovat `.ballet/loop-library/**`-dataa; runtime lukee vain materialisoitua project-local dataa.
+- Graph Node Module package-, katalogi-, install-, export- ja provenance-primitiveet ovat geneerisiä platform-ominaisuuksia. Moduulien nimet, capabilityt, instructionit, skillsit, candidate-suositukset ja external-write-metadata ovat `.ballet/graph-node-library/**`-dataa; runtime lukee vain materialisoitua project-local dataa. Peer-GraphNode-targetit kuuluvat project-global candidate-sääntöihin, eivät pakettiin.
 - Älä kovakoodaa project-workflow'ta `backend/`, `frontend/` tai `shared/`-koodiin tai Balletin pakolliseen System instructioniin.
 - Tarkista execution- tai orchestration-muutoksen jälkeen, ettei platform-koodiin tullut project-workflow-kohtaisia tunnisteita:
 
@@ -49,11 +49,11 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 
 - Aloita aina `ARCHITECTURE.md`-tiedostosta. `.ballet/arc42/` on kanoninen 12-osioinen arkkitehtuurirakenne, `.ballet/goals/` omistaa WHAT/WHY-päätökset, `.ballet/adr/` arkkitehtuuripäätökset ja `DESIGN.md` UI-design-järjestelmän.
 - Luo uusi aloite kopioimalla `.ballet/arc42/initiatives/TEMPLATE/` polkuun `.ballet/arc42/initiatives/<initiative-id>/`, anna kaikille tiedostoille uniikit vakaat ID:t ja aloita `draft`-statuksella.
-- Oletus-RunBook on DESIGN → PLAN → BUILD → DEPLOY → VERIFY. Terminal Validation valitsee sallitun named outcomen ja runtime reitittää immutable snapshotin exact transitioniin; agentti ei valitse tavallisen flow'n target Loopia. Custom repair säilyy erillisenä allowlistattuna call/returnina samaan Validation Nodeen.
-- State sisältää vain rajatun `GraphEngineeringStateV1`-nykytilan ja vakaat viitteet. `GraphOrchestrationStateV1` omistaa erilliset runtime-reititysfaktat, Markdown pitkäikäisen projektitotuuden ja `tk` implementation-issuet. Älä kopioi dokumentteja, ticket-runkoja, diffejä tai runtime-lokeja Stateen.
+- Repositoryn oletusgraphissa ovat project-local GraphNodet DESIGN, PLAN, BUILD, DEPLOY ja VERIFY. Graph- ja Graph Node -orchestratorit valitsevat kaikki tasojen väliset targetit immutable snapshotin strict candidate-enumista; Work→Validation ja bounded retry ovat Job Noden kiinteitä invariantteja. Repair on rajattu call/return samaan Validation Nodeen.
+- State sisältää vain rajatun `GraphEngineeringStateV1`-nykytilan, runtime-reititysfaktat ja vakaat viitteet. Markdown omistaa pitkäikäisen projektitotuuden ja tracker implementation-issuet. Älä kopioi dokumentteja, ticket-runkoja, diffejä tai runtime-lokeja Stateen.
 - Pysähdy `needs_input`-tilaan, kun WHAT/WHY, laatutavoitteen prioriteetti/mitta, merkittävä ADR tai usean yhtä hyvän repair-targetin valinta vaatii ihmistä.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen. DEPLOY pysähtyy ilman valtuutusta `needs_input`-tilaan, eikä Ballet mergeä tai pushaa tuloksia automaattisesti.
-- Scheduled JobNode ajetaan erillisenä Loop Root Runina eikä jatka Graph-transitioneihin. Schedule-, topology-, RunBook-, tracker-, permission-, network-, instruction- ja skill-käyttäytymismuutokset ovat aina katselmoitavia ja hyväksyttäviä ennen soveltamista.
+- Schedulea ja standalone JobNode Runia ei ole aktiivisessa domainissa. Topology-, candidate routing-, repair-, tracker-, permission-, network-, instruction- ja skill-käyttäytymismuutokset ovat aina katselmoitavia ja hyväksyttäviä ennen soveltamista.
 - Päivitä `STATUS.md`, `TRACEABILITY.md`, initiative-handoff ja `METHOD-HEALTH.md` vain uuden evidenssin tai päätöksen perusteella; älä tee semanttista dokumenttichurnia.
 
 ## Tärkeää

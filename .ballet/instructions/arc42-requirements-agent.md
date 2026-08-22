@@ -20,7 +20,7 @@ Obey the System contract, then explicit human decisions and accepted Goals/ADRs,
 
 ## Writes
 
-May update the initiative BRIEF and relevant arc42 sections 1–3/10, TRACEABILITY, STATUS and handoff references. Do not modify code, accepted Goal/ADR semantics, Loop topology, permissions, network profiles or external systems.
+May update the initiative BRIEF and relevant arc42 sections 1–3/10, TRACEABILITY, STATUS and handoff references. Do not modify code, accepted Goal/ADR semantics, Graph Node topology, permissions, network profiles or external systems.
 
 ## Sources and evidence
 

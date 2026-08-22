@@ -25,7 +25,7 @@ describe("LocalServerService database preflight", () => {
     const service = new LocalServerService({ project, launchd, startupTimeoutMs: 10 });
 
     await expect(service.ensureStarted()).rejects.toThrow(
-      "Unsupported Ballet state schema 3; expected 9."
+      "Unsupported Ballet state schema 3; expected 10."
     );
     expect(installCalls).toBe(0);
     expect(await readFile(project.databasePath)).toEqual(expect.any(Buffer));

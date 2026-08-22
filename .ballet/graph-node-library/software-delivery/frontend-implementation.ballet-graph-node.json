@@ -1,0 +1,358 @@
+{
+  "format": "ballet-graph-node-module",
+  "version": 4,
+  "manifest": {
+    "category": "software-delivery",
+    "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
+    "id": "frontend-implementation",
+    "tags": [
+      "frontend",
+      "implementation",
+      "accessibility"
+    ],
+    "title": "Frontend implementation",
+    "version": "2.0.0"
+  },
+  "permissions": {
+    "externalWrites": false,
+    "network": "forbidden"
+  },
+  "profileSlots": [
+    {
+      "description": "A provider profile for repository-local frontend analysis and implementation.",
+      "key": "engineer",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Frontend engineer"
+    },
+    {
+      "description": "A provider profile for independent repository-local frontend validation.",
+      "key": "reviewer",
+      "network": "forbidden",
+      "providers": [
+        "codex",
+        "copilot"
+      ],
+      "title": "Frontend reviewer"
+    },
+    {
+      "key": "orchestrator-luna",
+      "title": "Cost-sensitive orchestrator",
+      "description": "Map to a low-cost provider profile such as Luna medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "repair-sol",
+      "title": "Capable repair",
+      "description": "Map to a capable repair profile such as Sol medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "software-engineering-state",
+    "version": "1.0.0",
+    "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes.",
+    "requiredKeys": [
+      "artifacts",
+      "checks",
+      "contractVersion",
+      "evidence",
+      "request",
+      "status"
+    ]
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "implementation:change.requested"
+    ],
+    "provides": [
+      "implementation:change.ready"
+    ],
+    "recommendedGraphRoutes": []
+  },
+  "resources": [
+    {
+      "body": "\n# Frontend engineer\n\nAnalyze and implement one bounded frontend change. Follow the repository's accepted architecture, design system, API, routing, state, component, accessibility, responsive layout, and test patterns. Keep changes minimal, remove replaced code in scope, verify real viewport behavior, and report concrete evidence. Never perform external writes or invent missing product intent.\n",
+      "key": "frontend-engineer",
+      "kind": "instruction",
+      "metadata": {
+        "tags": [
+          "frontend",
+          "implementation"
+        ]
+      },
+      "title": "Frontend engineer"
+    },
+    {
+      "body": "\n# Frontend reviewer\n\nIndependently validate one bounded frontend change against its requested user journey, accepted architecture, design system, API contract, accessibility semantics, keyboard behavior, responsive layouts, and executable evidence. Do not edit the implementation while validating it. Return a precise repair request for every blocking gap.\n",
+      "key": "frontend-reviewer",
+      "kind": "instruction",
+      "metadata": {
+        "tags": [
+          "frontend",
+          "validation"
+        ]
+      },
+      "title": "Frontend reviewer"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-node-orchestrator",
+      "title": "Graph Node Orchestrator",
+      "metadata": {},
+      "body": "\n# Graph Node Orchestrator\n\nSelect exactly one Job Node or `PASS | FAIL` terminal from the immutable candidate enum supplied for the current Graph Node decision. Use the current State revision, Job result and evidence, requested capability and candidate descriptions. Do not perform Job work, change State, edit files, broaden permissions or invent a target.\n\nReturn `dispatch`, `complete`, `delegate_repair` or `needs_input` using the strict structured outcome. A dispatch must name one enum member verbatim. Delegate only to the snapshot's local Repair Node. Escalation to Graph scope is available only through the Repair contract, never as a normal continuation.\n\nNever choose by array order, hidden project conventions or an identifier outside the candidate enum. Do not expose hidden chain-of-thought.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "repair-node",
+      "title": "Repair Node",
+      "metadata": {},
+      "body": "\n# Repair Node\n\nRepair only the bounded failure described by the immutable Repair Request. You may change validated State or artifacts inside the current Run worktree, then return to the exact Validation frame, dispatch one allowlisted repair candidate, or escalate to the parent scope. You may propose a future routing configuration change as an artifact, but the current snapshot, candidate enum and permissions remain immutable.\n\nDo not rerun Work when returning to Validation, reset its retry count, write outside the Run worktree, perform an external write without exact human authorization, or select an out-of-snapshot target. At Graph scope, escalate an unresolved case to human `needs_input`.\n\nReturn concise evidence and the strict Repair outcome. Do not expose hidden chain-of-thought.\n"
+    }
+  ],
+  "graphNode": {
+    "key": "frontend-implementation",
+    "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
+    "nodeStyle": "sol",
+    "nodeSize": "large",
+    "capabilities": {
+      "accepts": [
+        "implementation:change.requested"
+      ],
+      "provides": [
+        "implementation:change.ready"
+      ]
+    },
+    "stateContract": {
+      "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
+    },
+    "orchestrator": {
+      "key": "graph-node-orchestrator",
+      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "profileSlot": "orchestrator-luna",
+      "primaryInstruction": "graph-node-orchestrator",
+      "skills": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "key": "graph-node-start",
+          "candidates": [
+            {
+              "target": {
+                "jobNode": "analyze-frontend-change"
+              },
+              "description": "Allowed initial Job Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "key": "analyze-frontend-change-pass-route",
+            "sourceJobNode": "analyze-frontend-change",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "implement-frontend-change"
+                },
+                "description": "Allowed PASS continuation after analyze-frontend-change."
+              }
+            ]
+          },
+          {
+            "key": "analyze-frontend-change-fail-route",
+            "sourceJobNode": "analyze-frontend-change",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after analyze-frontend-change."
+              }
+            ]
+          },
+          {
+            "key": "implement-frontend-change-pass-route",
+            "sourceJobNode": "implement-frontend-change",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "validate-frontend-change"
+                },
+                "description": "Allowed PASS continuation after implement-frontend-change."
+              }
+            ]
+          },
+          {
+            "key": "implement-frontend-change-fail-route",
+            "sourceJobNode": "implement-frontend-change",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after implement-frontend-change."
+              }
+            ]
+          },
+          {
+            "key": "validate-frontend-change-pass-route",
+            "sourceJobNode": "validate-frontend-change",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Allowed PASS continuation after validate-frontend-change."
+              }
+            ]
+          },
+          {
+            "key": "validate-frontend-change-fail-route",
+            "sourceJobNode": "validate-frontend-change",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after validate-frontend-change."
+              }
+            ]
+          }
+        ],
+        "repair": []
+      }
+    },
+    "repairNode": {
+      "key": "graph-node-repair",
+      "description": "Repairs difficult local failures before Graph escalation.",
+      "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
+      "nodeStyle": "sol",
+      "nodeSize": "medium",
+      "profileSlot": "repair-sol",
+      "primaryInstruction": "repair-node",
+      "skills": [],
+      "maxRepairDepth": 3,
+      "maxRepairAttempts": 3
+    },
+    "jobNodes": [
+      {
+        "key": "analyze-frontend-change",
+        "description": "Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
+        "nodeStyle": "sol",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
+          "key": "analyze-frontend-change-work",
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "frontend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Inspect the repository and describe the smallest frontend change that satisfies the user journey. Identify API, component, design-system, accessibility, responsive layout, state, and test boundaries without implementing yet.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
+          "key": "analyze-frontend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "frontend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Validate that the analysis identifies the user journey, relevant API contract, design-system rules, accessibility behavior, viewport expectations, and executable acceptance checks. Return a precise repair request when evidence is missing.",
+          "type": "agent"
+        }
+      },
+      {
+        "key": "implement-frontend-change",
+        "description": "Implement the approved user interface with existing components, tokens, state, and API patterns.",
+        "nodeStyle": "sol",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Implement the approved user interface with existing components, tokens, state, and API patterns.",
+          "key": "implement-frontend-change-work",
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "frontend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Implement the bounded frontend change using the repository's existing component, styling, state, routing, API, and test patterns. Preserve semantic accessibility and remove replaced code in scope.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Implement the approved user interface with existing components, tokens, state, and API patterns.",
+          "key": "implement-frontend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "frontend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Review the implementation against the requested user journey, API contract, repository architecture, design system, accessibility semantics, responsive behavior, and state boundaries. Do not modify the implementation while validating it.",
+          "type": "agent"
+        }
+      },
+      {
+        "key": "validate-frontend-change",
+        "description": "Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
+        "nodeStyle": "sol",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 3,
+        "workNode": {
+          "description": "Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
+          "key": "validate-frontend-change-work",
+          "nodeSize": "large",
+          "nodeStyle": "sol",
+          "primaryInstruction": "frontend-engineer",
+          "profileSlot": "engineer",
+          "skills": [],
+          "task": "Run the repository's relevant UI tests, accessibility checks, responsive browser verification, lint, and production build. Fix in-scope failures and summarize exact viewport and command evidence and limitations.",
+          "type": "agent"
+        },
+        "validationNode": {
+          "description": "Validate Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
+          "key": "validate-frontend-change-validation",
+          "nodeSize": "small",
+          "nodeStyle": "luna",
+          "primaryInstruction": "frontend-reviewer",
+          "profileSlot": "reviewer",
+          "skills": [],
+          "task": "Independently confirm keyboard and accessibility behavior, desktop and narrow layout evidence, relevant tests, lint, and production build results. Reject completion when a required state or action is hidden, clipped, or unsupported by evidence.",
+          "type": "agent"
+        }
+      }
+    ]
+  }
+}

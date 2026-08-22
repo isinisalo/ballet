@@ -1,115 +1,65 @@
+import type { JsonValue } from "./automation.js";
 import type {
+  CanonicalNodeOutcome,
   ControlFlowEvent,
   ExecutionTask,
-  LoopRunDetails,
-  LoopStateRevisionMetadata,
-  OrchestrationFrame,
-  OrchestrationRequest,
-  OrchestratorRoute,
+  GraphNodeInvocationDetails,
+  GraphStateRevisionMetadata,
+  NodeRunRole,
+  RepairFrame,
   RepairRequest,
   RepairResult,
   RootExecutionSnapshot,
   RootFinalizationReport,
+  RoutingDecision,
+  RoutingRequest,
   RuntimePreflightIssue,
-  CanonicalNodeOutcome,
-  NodeRunRole,
   ValidationNodeOutcome,
-  JobNodeOutcome
+  WorkNodeOutcome
 } from "./runtime.js";
-import type { JsonValue } from "./automation.js";
 
 export type BalletMode = "configure" | "run";
-export type DashboardRunStatus =
-  | "queued"
-  | "running"
-  | "waiting_for_input"
-  | "finalizing"
-  | "completed"
-  | "blocked"
-  | "failed"
-  | "cancelled";
-export type RootRunKind = "graph" | "loop";
-export type RootRunSource = "manual" | "schedule";
+export type DashboardRunStatus = "queued" | "running" | "waiting_for_input" | "finalizing" | "completed" | "blocked" | "failed" | "cancelled";
+export type RootRunKind = "graph" | "graph_node";
 export type RootRunListState = "active" | "recent";
 
 export interface RootRunCurrentPosition {
-  loopRunId?: string;
-  loopId?: string;
-  jobRunId?: string;
+  graphNodeInvocationId?: string;
+  graphNodeId?: string;
+  jobNodeInvocationId?: string;
   jobNodeId?: string;
   nodeRunId?: string;
   nodeRole?: NodeRunRole;
   taskId?: string;
   executionProfileId?: string;
   taskStatus?: ExecutionTask["status"];
-  loopDescription?: string;
-  jobNodeDescription?: string;
-  jobAttempt?: number;
+  workAttempt?: number;
   repairDepth?: number;
-  lastJobOutcome?: JobNodeOutcome;
-  lastValidationDecision?: "PASS" | "FAIL";
+  lastWorkOutcome?: WorkNodeOutcome;
+  lastValidationOutcome?: ValidationNodeOutcome;
   repairRequestId?: string;
-  routedTargetLoopId?: string;
-  returnDestination?: RootRunReturnDestination;
 }
-
-export interface RootRunReturnDestination {
-  loopId: string;
-  jobNodeId: string;
-  validationNodeDefinitionId: string;
-}
-
 export interface RootRunStateProjection {
   currentRevision: number;
   currentState?: JsonValue;
   currentStateSha256: string;
-  revisions: LoopStateRevisionMetadata[];
+  revisions: GraphStateRevisionMetadata[];
   totalRevisionCount: number;
   historyTruncated: boolean;
 }
-
 export interface RootRunRepairProjection {
   requests: RepairRequest[];
-  routes: OrchestratorRoute[];
-  continuations: OrchestrationFrame[];
+  frames: RepairFrame[];
   results: RepairResult[];
-  activeContinuationChain: OrchestrationFrame[];
+  activeFrames: RepairFrame[];
   pendingRepair?: RepairRequest;
-  routedTarget?: OrchestratorRoute;
-  returnDestination?: RootRunReturnDestination;
 }
-
 export interface RootRunOrchestrationProjection {
-  requests: OrchestrationRequest[];
-  routes: OrchestratorRoute[];
-  pendingRequest?: OrchestrationRequest;
-  selectedRoute?: OrchestratorRoute;
+  requests: RoutingRequest[];
+  decisions: RoutingDecision[];
+  pendingRequest?: RoutingRequest;
+  selectedDecision?: RoutingDecision;
 }
-
-export interface GraphOrchestrationStateV1 {
-  version: 1;
-  graphId: string;
-  startLoopId: string;
-  currentLoopId?: string;
-  currentLoopRunId?: string;
-  lastTransition?: {
-    id: string;
-    sourceLoopId: string;
-    decision: "PASS" | "FAIL";
-    outcome: string;
-    targetLoopId?: string;
-    runResult?: "DONE";
-  };
-  transitionCount: number;
-  terminalResult?: "DONE";
-  tracking: {
-    rootExternalRef: string;
-    rootTicketId?: string;
-    activeLoopExternalRef?: string;
-    activeLoopTicketId?: string;
-  };
-}
-
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";
   success: boolean;
@@ -117,12 +67,11 @@ export interface RootRunFinalization {
   startedAt: string;
   completedAt?: string;
 }
-
 export interface RootRunSummary {
   rootRunId: string;
   kind: RootRunKind;
   targetId: string;
-  source: RootRunSource;
+  source: "manual";
   status: DashboardRunStatus;
   stateRevision: number;
   input?: string;
@@ -135,37 +84,22 @@ export interface RootRunSummary {
   updatedAt: string;
   completedAt?: string;
 }
-
 export interface RootRunDetail extends RootRunSummary {
   executionSnapshot: RootExecutionSnapshot;
-  loopRuns: LoopRunDetails[];
+  graphNodeInvocations: GraphNodeInvocationDetails[];
   tasks: ExecutionTask[];
   state: RootRunStateProjection;
   orchestration: RootRunOrchestrationProjection;
-  graphOrchestration?: GraphOrchestrationStateV1;
   repair: RootRunRepairProjection;
   controlFlowEvents: ControlFlowEvent[];
 }
-
-export interface RootRunListQuery {
-  state?: RootRunListState;
-  cursor?: string;
-  limit?: number;
-}
-
-export interface RootRunListResponse { items: RootRunSummary[]; nextCursor?: string }
-
-export interface StartRootRunRequest {
-  kind: RootRunKind;
-  targetId: string;
-  input?: string;
-}
-
+export interface RootRunListQuery { state?: RootRunListState; cursor?: string; limit?: number; }
+export interface RootRunListResponse { items: RootRunSummary[]; nextCursor?: string; }
+export interface StartRootRunRequest { kind: RootRunKind; targetId: string; input?: string; }
 export type RespondToNodeRunRequest =
-  | { kind: "job"; outcome: JobNodeOutcome }
+  | { kind: "work"; outcome: WorkNodeOutcome }
   | { kind: "validation"; outcome: ValidationNodeOutcome }
   | { kind: "resume"; response: string };
-
 export interface RunTarget {
   kind: RootRunKind;
   id: string;
@@ -176,7 +110,6 @@ export interface RunTarget {
   activeRootRunId?: string;
   latestRootRunId?: string;
 }
-
 export interface RunTargetIssue {
   code: RuntimePreflightIssue["code"] | "invalid_config";
   message: string;
@@ -184,25 +117,10 @@ export interface RunTargetIssue {
   nodeId?: string;
   path?: string;
 }
-
-export interface RunTargetsResponse { graph: RunTarget; loops: RunTarget[] }
-
+export interface RunTargetsResponse { graph: RunTarget; graphNodes: RunTarget[]; }
 export type WorkspaceInvalidationEvent =
   | { id: number; type: "workspace-changed"; at: string; reason?: string }
-  | {
-      id: number;
-      type: "runs-changed";
-      at: string;
-      rootRunId: string;
-      stateRevision: number;
-      status: DashboardRunStatus;
-    };
-
+  | { id: number; type: "runs-changed"; at: string; rootRunId: string; stateRevision: number; status: DashboardRunStatus };
 export type WorkspaceInvalidationInput =
   | { type: "workspace-changed"; reason?: string }
-  | {
-      type: "runs-changed";
-      rootRunId: string;
-      stateRevision: number;
-      status: DashboardRunStatus;
-    };
+  | { type: "runs-changed"; rootRunId: string; stateRevision: number; status: DashboardRunStatus };

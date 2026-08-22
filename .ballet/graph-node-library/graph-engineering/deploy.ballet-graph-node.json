@@ -1,0 +1,286 @@
+{
+  "format": "ballet-graph-node-module",
+  "version": 4,
+  "manifest": {
+    "id": "deploy",
+    "title": "DEPLOY",
+    "description": "Deploy the selected release only with exact human authorization.",
+    "version": "1.0.0",
+    "category": "graph-engineering",
+    "tags": [
+      "graph-engineering",
+      "runbook"
+    ]
+  },
+  "permissions": {
+    "network": "forbidden",
+    "externalWrites": "requires-human-authorization"
+  },
+  "profileSlots": [
+    {
+      "key": "slot-1",
+      "title": "Codex GPT-5.6 Sol · Medium · Network off",
+      "description": "Compatible codex profile for Codex GPT-5.6 Sol · Medium · Network off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "slot-2",
+      "title": "Codex GPT-5.6 Luna · Medium · Network off",
+      "description": "Compatible codex profile for Codex GPT-5.6 Luna · Medium · Network off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "orchestrator-luna",
+      "title": "Cost-sensitive orchestrator",
+      "description": "Map to a low-cost provider profile such as Luna medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    },
+    {
+      "key": "repair-sol",
+      "title": "Capable repair",
+      "description": "Map to a capable repair profile such as Sol medium network-off.",
+      "providers": [
+        "codex"
+      ],
+      "network": "forbidden"
+    }
+  ],
+  "stateContract": {
+    "id": "deploy-state",
+    "version": "1.0.0",
+    "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run.",
+    "requiredKeys": [
+      "contractVersion",
+      "deployment",
+      "releaseMap",
+      "verification",
+      "work"
+    ]
+  },
+  "capabilities": {
+    "requires": [],
+    "accepts": [
+      "graph:release.built"
+    ],
+    "provides": [
+      "graph:release.deployed"
+    ],
+    "recommendedGraphRoutes": [
+      {
+        "direction": "outgoing",
+        "result": "PASS",
+        "capability": "graph:release.deployed",
+        "description": "PASS success routes deploy to verify."
+      },
+      {
+        "direction": "outgoing",
+        "result": "FAIL",
+        "capability": "graph:release.built",
+        "description": "FAIL transient_deployment_error routes deploy to deploy."
+      },
+      {
+        "direction": "outgoing",
+        "result": "FAIL",
+        "capability": "graph:release.planned",
+        "description": "FAIL implementation_defect routes deploy to build."
+      },
+      {
+        "direction": "outgoing",
+        "result": "FAIL",
+        "capability": "graph:desired-state.defined",
+        "description": "FAIL invalid_plan routes deploy to plan."
+      }
+    ]
+  },
+  "resources": [
+    {
+      "kind": "instruction",
+      "key": "graph-deploy-agent",
+      "title": "Graph Engineering Deploy Agent",
+      "metadata": {
+        "createdAt": "2026-08-20",
+        "updatedAt": "2026-08-20",
+        "tags": [
+          "graph-engineering",
+          "deploy",
+          "external-write"
+        ]
+      },
+      "body": "\n# Graph Engineering Deploy Agent\n\nResolve the exact release version, target environment, external write actions, expected evidence and rollback plan before deployment. Return `needs_input` before the first external write.\n\nResume permits only the actions explicitly authorized in the response and only when they still match the prepared version and target. A vague approval, stale authorization or changed plan is not authority. Never merge, push, release or deploy as an inferred side effect.\n\nAfter authorized execution, store only bounded authorization and evidence references in State. Do not copy logs or credentials into State or tickets.\n\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-engineering-reviewer",
+      "title": "Graph Engineering Independent Reviewer",
+      "metadata": {
+        "createdAt": "2026-08-20",
+        "updatedAt": "2026-08-20",
+        "tags": [
+          "graph-engineering",
+          "validation"
+        ]
+      },
+      "body": "\n# Graph Engineering Independent Reviewer\n\nValidate the paired Job independently against its task, accepted Goals and ADRs, canonical arc42 sources, current bounded State, tracker evidence and actual checks. Do not edit the artifact under review.\n\nReturn only `PASS | FAIL`, bounded evidence and, on FAIL, an optional target-free repair request describing the required capability. Never name or select another Job Node, Graph Node, route or terminal; the current Graph Node Orchestrator owns that decision.\n\nDo not infer success from absent evidence. Report a human-owned WHAT/WHY choice, quality priority or measure, significant ADR or deployment authorization as FAIL evidence with a target-free repair request; the orchestrator decides whether the run needs human input. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.\n"
+    },
+    {
+      "kind": "skill",
+      "key": "architecture-views",
+      "name": "architecture-views",
+      "description": "Maintain risk-driven arc42 context, building-block, runtime and deployment views. Use when designing structures, interfaces, source mappings or architecturally significant scenarios.",
+      "metadata": {},
+      "body": "\n# Architecture views\n\n1. Update context boundaries before internal structures when an external interface changes.\n2. Describe each important building block by responsibility, interfaces, quality significance, source location, implemented requirements and open risks.\n3. Map static blocks to source directories and shared interfaces.\n4. Document only runtime/deployment scenarios that are important, risky, complex or needed by a quality scenario.\n5. Keep diagrams and text consistent; prefer a compact table or scenario over redundant views.\n6. Link every change to QS/ADR/CON IDs and record unresolved design choices as Open questions or ADR proposals.\n"
+    },
+    {
+      "kind": "skill",
+      "key": "conformance-review",
+      "name": "conformance-review",
+      "description": "Compare a bounded implementation or document change against accepted architecture. Use for diff reviews, architecture drift detection, acceptance preparation and independent Validation.",
+      "metadata": {},
+      "body": "\n# Conformance review\n\n1. Read the initiative BRIEF/PLAN and referenced QS/ADR/CON/BB/RT/DEP IDs.\n2. Inspect the actual diff and relevant tests; sample critical source when the change is broad.\n3. Classify each mismatch as intended architecture update, implementation defect, documentation drift, risk/debt or an Open question.\n4. Cite exact files, stable IDs and evidence. Do not treat provider prose as control evidence.\n5. Do not modify the implementation while acting as Validation. Request local retry or capability repair with a measurable expected correction.\n6. Record acceptance/conformance evidence and remaining limitations in initiative EVIDENCE/REVIEW.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "graph-node-orchestrator",
+      "title": "Graph Node Orchestrator",
+      "metadata": {},
+      "body": "\n# Graph Node Orchestrator\n\nSelect exactly one Job Node or `PASS | FAIL` terminal from the immutable candidate enum supplied for the current Graph Node decision. Use the current State revision, Job result and evidence, requested capability and candidate descriptions. Do not perform Job work, change State, edit files, broaden permissions or invent a target.\n\nReturn `dispatch`, `complete`, `delegate_repair` or `needs_input` using the strict structured outcome. A dispatch must name one enum member verbatim. Delegate only to the snapshot's local Repair Node. Escalation to Graph scope is available only through the Repair contract, never as a normal continuation.\n\nNever choose by array order, hidden project conventions or an identifier outside the candidate enum. Do not expose hidden chain-of-thought.\n"
+    },
+    {
+      "kind": "instruction",
+      "key": "repair-node",
+      "title": "Repair Node",
+      "metadata": {},
+      "body": "\n# Repair Node\n\nRepair only the bounded failure described by the immutable Repair Request. You may change validated State or artifacts inside the current Run worktree, then return to the exact Validation frame, dispatch one allowlisted repair candidate, or escalate to the parent scope. You may propose a future routing configuration change as an artifact, but the current snapshot, candidate enum and permissions remain immutable.\n\nDo not rerun Work when returning to Validation, reset its retry count, write outside the Run worktree, perform an external write without exact human authorization, or select an out-of-snapshot target. At Graph scope, escalate an unresolved case to human `needs_input`.\n\nReturn concise evidence and the strict Repair outcome. Do not expose hidden chain-of-thought.\n"
+    }
+  ],
+  "graphNode": {
+    "key": "deploy",
+    "description": "Deploy the selected release only with exact human authorization.",
+    "nodeStyle": "terra",
+    "nodeSize": "large",
+    "capabilities": {
+      "accepts": [
+        "graph:release.built"
+      ],
+      "provides": [
+        "graph:release.deployed"
+      ]
+    },
+    "stateContract": {
+      "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
+    },
+    "orchestrator": {
+      "key": "graph-node-orchestrator",
+      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+      "nodeStyle": "luna",
+      "nodeSize": "medium",
+      "profileSlot": "orchestrator-luna",
+      "primaryInstruction": "graph-node-orchestrator",
+      "skills": [],
+      "maxTransitions": 256,
+      "maxRouteAttempts": 3,
+      "routing": {
+        "start": {
+          "key": "graph-node-start",
+          "candidates": [
+            {
+              "target": {
+                "jobNode": "release"
+              },
+              "description": "Allowed initial Job Node."
+            }
+          ]
+        },
+        "continuation": [
+          {
+            "key": "release-pass-route",
+            "sourceJobNode": "release",
+            "result": "PASS",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "PASS"
+                },
+                "description": "Allowed PASS continuation after release."
+              }
+            ]
+          },
+          {
+            "key": "release-fail-route",
+            "sourceJobNode": "release",
+            "result": "FAIL",
+            "candidates": [
+              {
+                "target": {
+                  "terminal": "FAIL"
+                },
+                "description": "Allowed FAIL terminal after release."
+              }
+            ]
+          }
+        ],
+        "repair": []
+      }
+    },
+    "repairNode": {
+      "key": "graph-node-repair",
+      "description": "Repairs difficult local failures before Graph escalation.",
+      "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
+      "nodeStyle": "sol",
+      "nodeSize": "medium",
+      "profileSlot": "repair-sol",
+      "primaryInstruction": "repair-node",
+      "skills": [],
+      "maxRepairDepth": 3,
+      "maxRepairAttempts": 3
+    },
+    "jobNodes": [
+      {
+        "key": "release",
+        "description": "Deploy one explicitly authorized release.",
+        "nodeStyle": "terra",
+        "nodeSize": "large",
+        "capabilities": {
+          "accepts": [],
+          "provides": []
+        },
+        "maxRetries": 2,
+        "workNode": {
+          "type": "agent",
+          "key": "release-work",
+          "description": "Deploy one explicitly authorized release.",
+          "nodeStyle": "terra",
+          "nodeSize": "large",
+          "task": "Prepare exact environment, version, actions and rollback plan; return needs_input before any external write. Continue only with explicit authorization for those exact actions and record evidence refs.",
+          "profileSlot": "slot-1",
+          "primaryInstruction": "graph-deploy-agent",
+          "skills": [
+            "architecture-views"
+          ]
+        },
+        "validationNode": {
+          "type": "agent",
+          "key": "release-validation",
+          "description": "Validate authorization and deployment evidence.",
+          "nodeStyle": "luna",
+          "nodeSize": "small",
+          "task": "PASS success. Terminal FAIL transient_deployment_error, implementation_defect, or invalid_plan. Do not deploy.",
+          "profileSlot": "slot-2",
+          "primaryInstruction": "graph-engineering-reviewer",
+          "skills": [
+            "conformance-review"
+          ]
+        }
+      }
+    ]
+  }
+}

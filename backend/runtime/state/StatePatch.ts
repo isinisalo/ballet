@@ -29,7 +29,7 @@ export interface AppliedStatePatch {
 export const validateState = (state: unknown): JsonValue => {
   try {
     assertJsonValue(state, {
-      label: "Loop state",
+      label: "Graph state",
       maxBytes: maxProjectStateBytes,
       maxDepth: maxRuntimeJsonDepth
     });
