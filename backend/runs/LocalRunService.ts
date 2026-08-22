@@ -21,6 +21,8 @@ import { RootRunStore } from "./RootRunStore.js";
 import {
   currentPosition, decodeRunCursor, encodeRunCursor, isActiveRootStatus, publicRootSummary
 } from "./RunReadProjection.js";
+import { derivePolicyProjection } from "../policy/PolicyProjection.js";
+import { reconstructExecutionGraph, summarizePolicyTelemetry } from "../policy/PolicyRunReadModel.js";
 
 export interface LocalRunServiceOptions {
   context: ProjectContext;
@@ -100,7 +102,30 @@ export class LocalRunService {
     const graphNodeInvocations = this.options.database.listRootGraphNodeInvocations(rootRunId);
     const tasks = this.options.executions.listByRoot(rootRunId);
     const state = this.options.database.readRootState(rootRunId);
-    const orchestration = this.options.database.readRootOrchestration(rootRunId);
+    const persistedOrchestration = this.options.database.readRootOrchestration(rootRunId);
+    const strategy = root.executionSnapshot.graph.strategy;
+    const latestPolicyDecision = persistedOrchestration.policyDecisions.at(-1);
+    const policyProjection = strategy.kind === "ssp_v1" && latestPolicyDecision?.state
+      && latestPolicyDecision.solverStatus === "converged"
+      ? derivePolicyProjection({
+          strategy,
+          currentStateId: latestPolicyDecision.state.stateId,
+          snapshotGraphNodeIds: root.executionSnapshot.graph.graphNodes.map(({ id }) => id),
+          modelSha256: latestPolicyDecision.modelSha256,
+          source: "run_snapshot"
+        })
+      : undefined;
+    const orchestration = {
+      ...persistedOrchestration,
+      policyProjection,
+      executionGraph: strategy.kind === "ssp_v1" ? reconstructExecutionGraph({
+        strategy,
+        decisions: persistedOrchestration.policyDecisions,
+        observations: persistedOrchestration.policyObservations,
+        invocations: graphNodeInvocations
+      }) : [],
+      policyTelemetry: summarizePolicyTelemetry(persistedOrchestration.policyObservations)
+    };
     const repair = this.options.database.readRootRepair(rootRunId);
     return {
       ...publicRootSummary(root),

@@ -11,6 +11,7 @@ import { runOverviewPath } from "../routing";
 import { RunOverview } from "./RunOverview";
 import { runApi } from "./runApi";
 import type { RunDashboardState } from "./useRunDashboard";
+import { RunPolicyViews } from "./RunPolicyViews";
 
 export function RunWorkspace({ route, data, appStreamStatus, dashboard, navigate }: {
   route: RouteState; data: AppData; appStreamStatus: AppStreamStatus;
@@ -44,6 +45,5 @@ function RunTargetWorkspace({ target, detail, navigate, refresh }: {
   </section>;
 }
 function RunDetail({ detail }: { detail: RootRunDetail }) {
-  return <div className="min-h-0 flex-1 overflow-auto p-4"><div className="grid gap-3 lg:grid-cols-3"><Evidence label="Status" value={detail.status} /><Evidence label="State revision" value={String(detail.stateRevision)} /><Evidence label="Transitions" value={String(detail.controlFlowEvents.length)} /></div><div className="mt-4 rounded border border-divider-strong bg-card"><h2 className="border-b border-divider-strong px-3 py-2 font-mono text-[0.65rem] uppercase text-muted-foreground">Control flow</h2>{detail.controlFlowEvents.length ? detail.controlFlowEvents.map((event) => <div key={event.id} className="border-b border-divider-strong px-3 py-2 text-xs last:border-0"><span className="font-mono text-tertiary">{event.sequence}</span> · {event.kind}</div>) : <p className="p-3 text-xs text-muted-foreground">Waiting for the first routing decision.</p>}</div></div>;
+  return <RunPolicyViews detail={detail} />;
 }
-function Evidence({ label, value }: { label: string; value: string }) { return <div className="rounded border border-divider-strong bg-card p-3"><div className="font-mono text-[0.65rem] uppercase text-muted-foreground">{label}</div><div className="mt-1 text-sm">{value}</div></div>; }

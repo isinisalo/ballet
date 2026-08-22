@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 16
+version: 17
 tags:
   - arc42
   - building-blocks
@@ -122,7 +122,7 @@ Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-
 
 `TEST-019` kattaa domain-, snapshot-, runtime-, persistence- ja module-rajat. `TEST-020` kattaa BB-001:n reitit, scope-projektiot, a11y:n ja layoutin. Conformance-evidenssi indeksoidaan `EVID-019`/`EVID-020`:een.
 
-BB-011:n core on toteutettu ja indeksoitu `TEST-021` / `EVID-021`:een. Täysi Decision Model editor, bounded branch-rollout, 1 024-state benchmark ja pilotti ovat avoimia.
+BB-011:n core, structured Decision Model editor, bounded branch-rollout sekä persisted execution/telemetry read model on toteutettu ja indeksoitu `TEST-021` / `EVID-021`:een. 1 024-state/cross-host benchmark, human calibration/usability, cancel-race stressi ja pilotti ovat avoimia.
 
 ## Avoimet kysymykset
 

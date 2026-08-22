@@ -5,11 +5,16 @@ import {
   AutomationValidationError,
   loadProjectAutomationConfigWithIssues,
   saveProjectAutomationConfig,
-  validateProjectExecutionResources
+  validateProjectExecutionResources,
+  validateProjectAutomationConfig
 } from "../automation.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
+import type { PolicyPreviewResultV1 } from "../../shared/domain/decisionModel.js";
+import { decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
+import { evaluatePolicyDecision } from "../policy/PolicyRuntime.js";
+import { derivePolicyProjection } from "../policy/PolicyProjection.js";
 
 export class AutomationService {
   private readonly projectConfigurations = new ProjectConfigurationRepository();
@@ -31,6 +36,54 @@ export class AutomationService {
     const resourceIssues = validateProjectExecutionResources(config, resources);
     if (resourceIssues.length) throw new AutomationValidationError("Execution resources are invalid.", resourceIssues);
     return saveProjectAutomationConfig(this.root(), config);
+  }
+
+  previewPolicy(config: ProjectAutomationConfig): PolicyPreviewResultV1 {
+    const loaded = this.projectConfigurations.load(this.root());
+    const issues = validateProjectAutomationConfig(config, loaded.config?.executionProfiles ?? []);
+    if (issues.length) return { issues };
+    if (config.graph.strategy.kind !== "ssp_v1") return {
+      issues: [{ path: "graph.strategy", message: "Policy Preview requires the explicit ssp_v1 orchestration strategy." }]
+    };
+    const strategy = config.graph.strategy;
+    const modelSha256 = decisionModelSha256(strategy.model);
+    const evaluation = evaluatePolicyDecision({
+      strategy,
+      context: {
+        epochKind: "start",
+        graphNodeInvocationCount: 0,
+        stateRevision: 0,
+        projectState: config.graph.state.initial,
+        authorizationFacts: config.graph.state.initial,
+        evidenceRefs: ["configure:draft-unsnapshotted"]
+      },
+      snapshotGraphNodeIds: config.graph.graphNodes.map(({ id }) => id),
+      modelSha256
+    });
+    return {
+      issues: [],
+      preview: {
+        derived: true,
+        persisted: false,
+        state: evaluation.state,
+        admissibleActionIds: evaluation.admissible.actionIds,
+        excludedActions: evaluation.admissible.excludedActions,
+        selectedGraphNodeId: evaluation.solution?.selectedActionId,
+        actionValues: evaluation.solution?.actionValues ?? [],
+        expectedRemainingCostMicros: evaluation.solution?.stateValueMicros,
+        solverStatus: evaluation.status,
+        modelVersion: 1,
+        modelSha256,
+        projection: evaluation.state && evaluation.status === "converged" ? derivePolicyProjection({
+          strategy,
+          currentStateId: evaluation.state.stateId,
+          snapshotGraphNodeIds: config.graph.graphNodes.map(({ id }) => id),
+          modelSha256,
+          source: "configure_draft"
+        }) : undefined,
+        message: evaluation.message
+      }
+    };
   }
 
   createExecutionProfile(profile: ExecutionProfile): ExecutionProfile {

@@ -13,12 +13,17 @@ import type {
   RootFinalizationReport,
   RoutingDecision,
   RoutingRequest,
-  PolicyDecisionRecordV1,
-  PolicyOptionObservationV1,
   RuntimePreflightIssue,
   ValidationNodeOutcome,
   WorkNodeOutcome
 } from "./runtime.js";
+import type {
+  ExecutionGraphOccurrenceV1,
+  PolicyDecisionRecordV1,
+  PolicyOptionObservationV1,
+  PolicyProjectionV1,
+  PolicyTelemetryV1
+} from "./decisionModel.js";
 
 export type BalletMode = "configure" | "run";
 export type DashboardRunStatus = "queued" | "running" | "waiting_for_input" | "finalizing" | "completed" | "blocked" | "failed" | "cancelled";
@@ -63,6 +68,9 @@ export interface RootRunOrchestrationProjection {
   selectedDecision?: RoutingDecision;
   policyDecisions: PolicyDecisionRecordV1[];
   policyObservations: PolicyOptionObservationV1[];
+  policyProjection?: PolicyProjectionV1;
+  executionGraph: ExecutionGraphOccurrenceV1[];
+  policyTelemetry: PolicyTelemetryV1[];
 }
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";

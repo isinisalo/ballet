@@ -304,7 +304,9 @@ export class RuntimeDatabase {
       pendingRequest: [...requests].reverse().find(({ status }) => ["pending","waiting_for_input"].includes(status)),
       selectedDecision: [...decisions].reverse().find(({ valid }) => valid),
       policyDecisions: this.policyEvidence.listDecisions(rootRunId),
-      policyObservations: this.policyEvidence.listObservations(rootRunId)
+      policyObservations: this.policyEvidence.listObservations(rootRunId),
+      executionGraph: [],
+      policyTelemetry: []
     };
   }
 

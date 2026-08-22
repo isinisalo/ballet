@@ -201,3 +201,93 @@ export interface PolicyOptionObservationV1 {
   snapshotSha256: string;
   createdAt: string;
 }
+
+export type PolicyProjectionCutoffV1 = "cycle" | "epoch_limit" | "node_limit" | "solver_error";
+
+export interface PolicyProjectionNodeV1 {
+  projectionNodeId: string;
+  stateId: string;
+  depth: number;
+  cumulativeProbabilityPpm: number;
+  selectedGraphNodeId?: string;
+  expectedRemainingCostMicros?: number;
+  configuredExpectedCostMicros?: number;
+  actionValues: SspActionValueV1[];
+  terminal?: DecisionTerminalKind;
+  cutoff?: PolicyProjectionCutoffV1;
+  message?: string;
+}
+
+export interface PolicyProjectionEdgeV1 {
+  fromProjectionNodeId: string;
+  toProjectionNodeId: string;
+  probabilityPpm: number;
+  cumulativeProbabilityPpm: number;
+  configuredPrior: true;
+}
+
+export interface PolicyProjectionV1 {
+  derived: true;
+  source: "configure_draft" | "run_snapshot";
+  sourceDecisionStateId: string;
+  modelVersion: 1;
+  modelSha256: string;
+  solverStatus: SspSolverStatus;
+  nodes: PolicyProjectionNodeV1[];
+  edges: PolicyProjectionEdgeV1[];
+  truncated: boolean;
+  maxDecisionEpochs: number;
+  maxProjectionNodes: number;
+}
+
+export interface PolicyPreviewV1 {
+  derived: true;
+  persisted: false;
+  state?: DecisionStateV1;
+  admissibleActionIds: string[];
+  excludedActions: ExcludedDecisionActionV1[];
+  selectedGraphNodeId?: string;
+  actionValues: SspActionValueV1[];
+  expectedRemainingCostMicros?: number;
+  solverStatus: PolicyDecisionStatus;
+  modelVersion: 1;
+  modelSha256: string;
+  projection?: PolicyProjectionV1;
+  message?: string;
+}
+
+export interface PolicyPreviewResultV1 {
+  issues: Array<{ path: string; message: string }>;
+  preview?: PolicyPreviewV1;
+}
+
+export interface ExecutionGraphOccurrenceV1 {
+  occurrenceId: string;
+  epoch: number;
+  policyDecisionId: string;
+  graphNodeInvocationId?: string;
+  graphNodeId: string;
+  status: "selected" | "running" | "observed";
+  decisionStateBefore?: DecisionStateV1;
+  expectedRemainingCostMicros?: number;
+  selectedActionValueMicros?: number;
+  configuredExpectedCostMicros?: number;
+  expectedOutcomeDistribution: DecisionTransitionV1[];
+  actualCostMicros?: number;
+  actualOutcome?: NodeResult;
+  decisionStateAfter?: DecisionStateV1;
+  durationMillis?: number;
+  modelSha256: string;
+  snapshotSha256: string;
+  createdAt: string;
+}
+
+export interface PolicyTelemetryV1 {
+  graphNodeId: string;
+  stateId: string;
+  observationCount: number;
+  outcomeCounts: Partial<Record<NodeResult, number>>;
+  observedNextStateCounts: Record<string, number>;
+  meanActualCostMicros?: number;
+  meanDurationMillis: number;
+}

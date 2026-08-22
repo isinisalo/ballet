@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 24
+version: 25
 tags:
   - arc42
   - status
@@ -38,8 +38,8 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 | Toteutettu fakta | Strict v15 domain/config, Snapshot v8, SQLite v11, agent/SSP strategy union, pure Decision State/admissibility/solver, append-only policy evidence, Graph/GraphNode Run services, 14 v4-pakettia ja kolme canonical routea löytyvät työpuusta. |
 | Paikallinen evidenssi | Aiempi TGNE-EVID-001–005 säilyy Graph/Graph Node -baseline-evidenssinä. ADR-025:n unit/component/integration-, full gate-, desktop/narrow-browser- ja installed-app-evidenssi on passed ja indeksoitu `job-node-industrial-flow-canvas`-initiativeen. |
 | Avoin riski | Uuden Job-flow'n ihmisvisual verdict ja ensimmäinen tuotantokaltainen Luna/Sol-pilotti puuttuvat. Ne eivät valtuuta releasea tai external writea. |
-| Policy core | `stochastic-policy-orchestration` toteuttaa Capability Graph / Decision Model / Execution Graph -rajan, bounded Decision Staten, GraphNode Optionin, hard `A(s)`:n, explicit priors/costit, proper-policy value iterationin ja decision/observation-evidenssin. Täysi visual Policy Projection/editor on seuraava slice. |
-| Policy evidence | SPO-EVID-000–006: human approval, arbitrary/full-rename schema, bounded sources, hard guard, solver, immutable snapshot, atomic SQLite evidence, outcome deviation, restart, full gate ja conformance passed. Full editor/projection, max-bound/cross-host, cancel-race ja pilot ovat review-rajalla. |
+| Policy core | `stochastic-policy-orchestration` toteuttaa Capability Graph / Decision Model / Execution Graph -rajan, bounded Decision Staten, GraphNode Optionin, hard `A(s)`:n, explicit priors/costit, proper-policy value iterationin, structured Configure-editorin, bounded Policy Projectionin ja factual Run-trajectoryn. |
+| Policy evidence | SPO-EVID-000–006: human approval, arbitrary/full-rename schema, bounded sources, hard guard, solver, immutable snapshot, atomic SQLite evidence, outcome deviation, restart, full editor/projection sekä desktop/narrow browser QA. Max-bound/cross-host, human calibration/usability, cancel-race ja pilot ovat review-rajalla. |
 
 ## Kanoniset lähteet
 

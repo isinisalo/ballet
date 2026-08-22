@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 20
+version: 21
 tags:
   - arc42
   - traceability
@@ -73,7 +73,7 @@ Matriisi sisältää 21 laatuketjua. QS-001–QS-020 säilyttävät accepted/his
 | TEST-018 | Hermetic `tk`-matriisi: success, timeout, malformed JSONL/Markdown, duplicate external-ref, dangling parent/dependency, cycle, partial write, restart, cancel, reconciliation ja yksi BUILD claim invocationissa; live smoke raportoidaan erikseen. | tracker/runtime suites + optional pinned `tk` smoke |
 | TEST-019 | Strict-v14/v4/v7/v8/v9/v10 schema-, snapshot-, composition-, runtime-, persistence- ja Graph Node Module -matriisi: scoped start/continuation/repair-enumit, Graph/GraphNode dispatch, Work→Validation, bounded retry, Luna orchestrator invalid-target retry, local Sol Repair, Graph-eskalaatio, same-Validation LIFO-return, State patch, depth/attempt/transition-rajat, restart/cancel/no-duplicate, v9 fail-closed, kaikkien 14 paketin roundtrip/provenance/mapping ja active legacy/platform-boundary -haut. | `three-level-graph-node-engineering` backend/shared/module suites + final gates |
 | TEST-020 | Kolmen canonical authoring-routen ja kahden Run-routen projection/UI/browser-matriisi: Graph/Graph Node planet/multi-ring -regressio, Job industrial flow'n pure layout/ghost/retry/interaction-semantics, inspector/Sheet, active Run -lukot, keyboard/a11y, reduced motion sekä 1440×900/390×844 overflow/visual QA. | frontend suites + browser QA + human visual review |
-| TEST-021 | Strict-v15/v8/v11 SSP/SMDP-matriisi: decision feature/state/schema, arbitrary GraphNode metamorphic fixtures, hard admissibility/authorization, exact ppm/microcost validation, proper-policy analysis, Bellman convergence/tie/numeric/time/size bounds, snapshot/hash, atomic decision/dispatch/observation, restart/no-duplicate, explicit agent/ssp no-fallback, strategy-aware Configure/Run evidence, 1/5/40 schema ja platform-name coupling audit. Full rollout UI, cancel-race stress ja max-bound benchmark raportoidaan erikseen. | `stochastic-policy-orchestration` shared/backend/frontend/conformance suites |
+| TEST-021 | Strict-v15/v8/v11 SSP/SMDP-matriisi: decision feature/state/schema, arbitrary GraphNode metamorphic fixtures, hard admissibility/authorization, exact ppm/microcost validation, proper-policy analysis, Bellman convergence/tie/numeric/time/size bounds, snapshot/hash, atomic decision/dispatch/observation, restart/no-duplicate, explicit agent/ssp no-fallback, structured Configure editor/preview, bounded Run projection, repeated factual execution occurrence, 1/5/40 schema/layout ja platform-name coupling audit. Cancel-race stress ja max-bound/cross-host benchmark raportoidaan erikseen. | `stochastic-policy-orchestration` shared/backend/frontend/browser/conformance suites |
 
 ## Evidenssikatalogi
 

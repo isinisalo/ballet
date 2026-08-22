@@ -5,6 +5,7 @@ import type {
   ExecutionProfileSaveRequest,
   CanvasTheme,
   ProjectAutomationConfig,
+  PolicyPreviewResultV1,
   InstalledGraphNodeModuleStatus,
   GraphNodeModuleExportRequest,
   GraphNodeModuleExportResult,
@@ -36,6 +37,11 @@ export const api = {
   saveAutomation: (config: ProjectAutomationConfig) =>
     request<ProjectAutomationConfig>("/api/automation", {
       method: "PUT",
+      body: JSON.stringify(config)
+    }),
+  previewPolicy: (config: ProjectAutomationConfig) =>
+    request<PolicyPreviewResultV1>("/api/automation/policy-preview", {
+      method: "POST",
       body: JSON.stringify(config)
     }),
   listGraphNodeModuleLibrary: () => request<GraphNodeModuleLibraryEntry[]>("/api/graph-node-modules/library"),

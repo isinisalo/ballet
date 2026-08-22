@@ -52,6 +52,12 @@ import type {
   GraphNodeModuleExportResult, GraphNodeModuleInspection, GraphNodeModuleInstallPlan,
   GraphNodeModuleLibraryEntry, GraphNodeModulePackageV4, InstalledGraphNodeModuleStatus
 } from "../domain/graphNodeModules.js";
+import type {
+  DecisionFeatureDefinitionV1, DecisionOptionModelRowV1, DecisionStateDefinitionV1,
+  ExecutionGraphOccurrenceV1, PolicyDecisionRecordV1, PolicyPreviewResultV1, PolicyPreviewV1, PolicyProjectionEdgeV1,
+  PolicyProjectionNodeV1, PolicyProjectionV1, PolicyTelemetryV1, ProjectCapabilityGraphV1,
+  ProjectSspDecisionModelV1, ProjectSspGraphStrategyV1, SspActionValueV1
+} from "../domain/decisionModel.js";
 
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
 export type ProjectDocumentSaveRequest = Pick<MarkdownDocument, "relativePath" | "frontmatter" | "body">;
@@ -133,4 +139,8 @@ export type {
   OrchestratorTaskEnvelopeV7, RepairTaskEnvelopeV7,
   InstalledGraphNodeModuleStatus, GraphNodeModuleExportResult, GraphNodeModuleInspection,
   GraphNodeModuleInstallPlan, GraphNodeModuleLibraryEntry, GraphNodeModulePackageV4
+  , DecisionFeatureDefinitionV1, DecisionOptionModelRowV1, DecisionStateDefinitionV1,
+  ExecutionGraphOccurrenceV1, PolicyDecisionRecordV1, PolicyPreviewResultV1, PolicyPreviewV1, PolicyProjectionEdgeV1,
+  PolicyProjectionNodeV1, PolicyProjectionV1, PolicyTelemetryV1, ProjectCapabilityGraphV1,
+  ProjectSspDecisionModelV1, ProjectSspGraphStrategyV1, SspActionValueV1
 };

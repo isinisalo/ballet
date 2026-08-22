@@ -11,6 +11,7 @@ import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 import type { WorkspaceContentData } from "./documents/markdownAppDataLoader.js";
 import type { CanvasTheme } from "../shared/domain/canvasTheme.js";
 import type { ExecutionProfile } from "../shared/domain/projectConfig.js";
+import type { PolicyPreviewResultV1 } from "../shared/domain/decisionModel.js";
 import { CanvasThemeRepository } from "./canvas-themes/CanvasThemeRepository.js";
 import { CanvasThemeService } from "./services/CanvasThemeService.js";
 import type {
@@ -80,6 +81,10 @@ export class MarkdownStore {
 
   saveAutomation(config: ProjectAutomationConfig): Promise<ProjectAutomationConfig> {
     return this.runProjectConfigMutation(() => this.automationService.save(config));
+  }
+
+  previewPolicy(config: ProjectAutomationConfig): PolicyPreviewResultV1 {
+    return this.automationService.previewPolicy(config);
   }
 
   createExecutionProfile(profile: ExecutionProfile): Promise<ExecutionProfile> {

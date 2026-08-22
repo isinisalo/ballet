@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 13
+version: 14
 tags:
   - arc42
   - glossary
@@ -36,7 +36,7 @@ Active accepted baseline on strict-v15 `Graph → GraphNode → JobNode → Work
 | Option | accepted | GraphNode temporaalisesti laajennettuna actionina: initiation set tulee hard admissibilitystä, internal policy GraphNode/Job-runtimesta ja termination canonical GraphNode outcome -rajasta. |
 | SSP goal | accepted | Explicit absorbing `success` Decision State, jonka arvo on 0. `failure` ja `blocked` ovat explicit non-goal terminaleja, eivät halpoja actioneita. |
 | Proper policy | accepted | Policy, joka saavuttaa success-terminalin probabilityllä 1 jokaisesta sallitusta nonterminal lähtötilasta. Failure/blocked tai suljettu non-goal recurrent class tekee policysta improperin. |
-| Policy Projection | partial implementation | Persisted decision/observation evidence on read-only Run DTO:ssa; täysi bounded branch/cumulative probability rollout kuuluu seuraavaan sliceen. Ei Current Plan, workflow source of truth tai dispatch authority. |
+| Policy Projection | implemented | Current Decision Statesta ja configured/snapshotted mallista johdettu deterministic branch/cumulative probability rollout, jonka rajat ovat enintään 20 decision epochia ja 100 projection-nodea. Configure-preview on unsnapshotted; Run-projection immutable snapshotista. Ei Current Plan, workflow source of truth tai dispatch authority. |
 | Execution Graph | accepted | Persistoitu factual option trajectory ja samplet `(state_before, action, cost/observations, outcome, state_after)` model/snapshot refs -viitteineen. Ei muuta Decision Modelia automaattisesti. |
 | `agent_v1` / `ssp_v1` | accepted | Eksplisiittiset Graph-strategiat. Ensimmäinen käyttää current LLM candidate routingia, toinen Bellman SSP-policya; niiden välillä ei ole fallbackia. |
 

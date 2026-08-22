@@ -154,6 +154,9 @@ const validateSspStrategy = (
     if (!state.terminal && rows.length === 0) add(context, [...statePath, index], `Nonterminal state ${state.id} requires at least one action.`);
     if (rows.length > 40) add(context, [...rowsPath], `State ${state.id} exceeds the 40 action limit.`);
   });
+  for (const graphNodeId of capabilityIds) if (!strategy.model.stateActions.some((row) => row.graphNodeId === graphNodeId)) add(
+    context, rowsPath, `Capability action ${graphNodeId} requires at least one Decision Model state/action row.`
+  );
   if (!allNonterminalsHaveProperPolicy(strategy)) add(
     context, rowsPath, "Every nonterminal state must have a proper policy that reaches success almost surely."
   );

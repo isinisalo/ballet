@@ -58,6 +58,10 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     options.invalidations.publish({ type: "workspace-changed", reason: "automation" });
     res.json(saved);
   }));
+  router.post("/automation/policy-preview", route(async (req, res) => {
+    const config = parseBody(automationConfigSchema, req);
+    res.json(options.store.previewPolicy(config));
+  }));
   router.put("/canvas-theme", route(async (req, res) => {
     res.json(await options.store.updateCanvasTheme(parseBody(canvasThemeSchema, req)));
     options.invalidations.publish({ type: "workspace-changed", reason: "canvas-theme" });
