@@ -3,11 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EngineeringInspector, type EngineeringInspectorModel } from "../src/workspace/automation/EngineeringInspector";
 import {
-  JobEngineeringCanvas,
   SpaceEngineeringCanvas,
   spaceRadialLayout,
   type SpaceCanvasNode
 } from "../src/workspace/automation/SpaceEngineeringCanvas";
+import { JobFlowCanvas } from "../src/workspace/automation/JobFlowCanvas";
+import type { ProjectJobNode } from "@shared/api/workspace-contracts";
 import { projectInstruction } from "./projectInstructionFixture";
 
 const node = (id: string, role = "Graph Node"): SpaceCanvasNode => ({
@@ -45,27 +46,38 @@ describe("three-level engineering canvases", () => {
     expect(screen.queryByRole("button", { name: /Work Node/ })).not.toBeInTheDocument();
   });
 
-  it("shows only Work and Validation inside a Job Node", async () => {
+  it("shows the industrial Job flow and opens only Work and Validation", async () => {
     const user = userEvent.setup();
     const openWork = vi.fn();
     const openValidation = vi.fn();
-    render(<JobEngineeringCanvas
-      work={node("work", "Work Node")}
-      validation={node("validation", "Validation Node")}
+    render(<JobFlowCanvas
+      job={jobNode()}
+      orchestratorId="graph-node-orchestrator"
+      selected="work"
+      locked={false}
       onWork={openWork}
       onValidation={openValidation}
     />);
 
-    await user.click(screen.getByRole("button", { name: "Work Node work" }));
-    await user.click(screen.getByRole("button", { name: "Validation Node validation" }));
+    const work = screen.getByRole("button", { name: "Take action, Work Node · work" });
+    const validation = screen.getByRole("button", { name: "Verify Result, Validation Node · validation" });
+    expect(work).toHaveAttribute("aria-pressed", "true");
+    await user.tab();
+    expect(work).toHaveFocus();
+    await user.keyboard("{Enter}");
+    await user.tab();
+    expect(validation).toHaveFocus();
+    await user.keyboard(" ");
 
     expect(openWork).toHaveBeenCalledOnce();
     expect(openValidation).toHaveBeenCalledOnce();
-    expect(screen.getByText("VALIDATE")).toBeInTheDocument();
-    expect(screen.getByText("RETRY")).toBeInTheDocument();
-    expect(screen.queryByText("PASS")).not.toBeInTheDocument();
-    expect(screen.queryByText("FAIL")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Orchestrator/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Start, Job entry")).toBeInTheDocument();
+    expect(screen.getByLabelText("Graph Node Orchestrator, graph-node-orchestrator")).toBeInTheDocument();
+    expect(screen.getByLabelText("Next job, Not configured")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByLabelText("Done, Complete Graph Node · PASS")).toBeInTheDocument();
+    expect(screen.getByLabelText("Escalate, Graph Node Orchestrator")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Next job|Done|Escalate|Orchestrator/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Human gate")).not.toBeInTheDocument();
   });
 
   it.each([1, 5, 17, 40, 64])("places %i nodes deterministically without button overlap", (count) => {
@@ -83,6 +95,19 @@ describe("three-level engineering canvases", () => {
       }
     }
   });
+});
+
+const jobNode = (maxRetries = 2): ProjectJobNode => ({
+  id: "job", description: "Job", nodeStyle: "terra", nodeSize: "medium",
+  capabilities: { accepts: [], provides: [] }, maxRetries,
+  workNode: {
+    id: "work", description: "Work", task: "Perform work.", type: "agent", nodeStyle: "sol", nodeSize: "large",
+    executionProfileId: "luna-medium", primaryInstructionId: "project:work", skillIds: []
+  },
+  validationNode: {
+    id: "validation", description: "Validation", task: "Verify work.", type: "agent", nodeStyle: "luna", nodeSize: "small",
+    executionProfileId: "luna-medium", primaryInstructionId: "project:validation", skillIds: []
+  }
 });
 
 describe("engineering inspector", () => {
@@ -140,5 +165,22 @@ describe("engineering inspector", () => {
     await user.click(await screen.findByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledOnce();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+  });
+
+  it("keeps inspection available while disabling authoring for an active Run", () => {
+    render(<EngineeringInspector
+      model={{
+        key: "work", role: "Work Node", title: "Take action", id: "work",
+        description: "Performs work.", task: "Perform the task.", locked: true
+      }}
+      profiles={[]}
+      instructions={[]}
+      onChange={vi.fn()}
+      onClose={vi.fn()}
+    />);
+
+    expect(screen.getByText("Locked while an active Run uses this snapshot.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Description")).toBeDisabled();
+    expect(screen.getByLabelText("Task")).toBeDisabled();
   });
 });

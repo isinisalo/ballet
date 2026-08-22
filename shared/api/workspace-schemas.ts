@@ -140,11 +140,11 @@ const compositionFields = {
     .refine((ids) => new Set(ids).size === ids.length, "Skill ids must be unique.")
 };
 const executableFields = { ...appearanceFields, id: entityIdSchema, description: descriptionSchema, task: taskSchema };
-const workNodeSchema = z.discriminatedUnion("type", [
+export const projectWorkNodeSchema = z.discriminatedUnion("type", [
   z.object({ ...executableFields, ...compositionFields, type: z.literal("agent") }).strict(),
   z.object({ ...executableFields, type: z.literal("human") }).strict()
 ]);
-const validationNodeSchema = z.discriminatedUnion("type", [
+export const projectValidationNodeSchema = z.discriminatedUnion("type", [
   z.object({ ...executableFields, ...compositionFields, type: z.literal("agent") }).strict(),
   z.object({ ...executableFields, type: z.literal("human") }).strict()
 ]);
@@ -155,8 +155,8 @@ const jobNodeSchema = z.object({
   description: descriptionSchema,
   capabilities: capabilitiesSchema,
   maxRetries: z.number().int().min(0).max(maxJobRetriesLimit),
-  workNode: workNodeSchema,
-  validationNode: validationNodeSchema
+  workNode: projectWorkNodeSchema,
+  validationNode: projectValidationNodeSchema
 }).strict();
 
 const terminalTargetSchema = z.object({ terminal: z.enum(["PASS", "FAIL"]) }).strict();

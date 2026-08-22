@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 12
+version: 13
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-010 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-011 kokoaa strict-v14:n scoped agent routing-, bounded repair-, immutable candidate- ja kolmitasoisen UI-scope-sopimuksen usean rakennusosan yhteiseksi rajaksi. `QS-019`–`QS-020`-evidenssi indeksoidaan uuteen initiative-ketjuun.
+CON-001–CON-010 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-011 kokoaa strict-v14:n scoped agent routing-, bounded repair-, immutable candidate- ja kolmitasoisen UI-scope-sopimuksen usean rakennusosan yhteiseksi rajaksi. ADR-025 muuttaa vain Job-tason authoring-projektiota: industrial flow näyttää samat invariantit kirjoittamatta candidate- tai runtime-tilaa.
 
 ## Konseptikartta
 
@@ -29,13 +29,13 @@ CON-001–CON-010 säilyvät hyväksyttyinä tai historiallisina konsepteina. CO
 | CON-002 | Durable canonical control: strict role outcomes, atomiset State patchit, append-only revisionit, bounded retry, repair-frame ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012, QS-015 | ADR-015, ADR-020, runtime/state/queue-storet |
 | CON-003 | Deterministinen execution composition: System → primary → vakaasti järjestetyt skillit → `TaskEnvelope` → role/output schema, kaikki snapshotattuna ja hashattuna. | BB-003, BB-004, BB-006 | QS-002, QS-004, QS-011 | ADR-012, ADR-013, `ExecutionComposition` |
 | CON-004 | Siirrettävät project resources: repository-polut omistavat configin, dokumentit, instructionit ja skillit; machine state jää `.git/ballet`-hakemistoon. | BB-003, BB-008, BB-009 | QS-002, QS-005, QS-009 | ADR-002, ADR-014, ADR-016, resource catalog |
-| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013, QS-014 | [DESIGN.md](../../DESIGN.md), `engineeringProjections.ts`, `loopRunViewModel.ts` |
+| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013, QS-014, QS-020 | [DESIGN.md](../../DESIGN.md), `SpaceEngineeringCanvas.tsx`, `JobFlowCanvas.tsx`, `loopRunViewModel.ts` |
 | CON-006 | Evidenssipohjainen arc42 Method: stable ID:t, väitetyypit, initiative handoff, traceability, conformance ja mitattu method health. | BB-003–BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42-resurssit |
 | CON-007 | Copy-to-project module trust: strict rajattu JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit ja content-derived provenance. | BB-001–BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
 | CON-008 | Workflow structural integrity: jokainen Job omistaa yhden Validationin, jokaisella Validationilla on yksi PassEdge ja FailEdge, Jobit ovat saavutettavia ja vähintään yksi PASS-tulos saavutetaan; validate/retry ovat kiinteitä runtime-siirtymiä. Canvas projisoi parin yhdeksi Job-artworkiksi ja vain persisted Edget. | BB-001, BB-003–BB-006, BB-009 | QS-003, QS-009, QS-015 | ADR-020, ADR-021, project/workflow schema, Workflow runtime ja canvas |
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
-| CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Kolme canvasia projisoivat vain oman scopensa. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
+| CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää parent-orchestratorin vain read-only-junctionina. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
 
 ## Turvallisuus ja auktorisointi
 
@@ -102,7 +102,8 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 ## UI:n totuusperiaate
 
 - `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
-- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | job_node`: Graph Engineering näyttää globaalin Orchestratorin/Repairin ja vain GraphNode-planeetat; Graph Node näyttää paikallisen Orchestratorin/Repairin ja vain parentin JobNode-planeetat; Job Node näyttää vain Work/Validation-planeetat, fixed validate/retry-polut ja PASS/FAIL-terminalit.
+- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | job_node`: Graph Engineering näyttää globaalin Orchestratorin/Repairin ja vain GraphNode-planeetat; Graph Node näyttää paikallisen Orchestratorin/Repairin ja vain parentin JobNode-planeetat; Job Node näyttää Work/Validationin industrial flow'ssa sekä read-only entry/result/retry/orchestrator/exit-rakenteen.
+- Job-flow'n `Next job` on aina disabled placeholder, read-only Orchestrator näyttää exact ID:n ja vain Work/Validation avaavat inspectorin. Nämä elementit eivät ole candidate-, topology- tai runtime-kirjoituksia.
 - Spoke kuvaa authoroidun candidate-jäsenyyden, ei child-to-child Edgeä. Layout tai valinta ei omista topologiaa eikä foreign-scope-nodea näytetä.
 - Run-projektio näyttää Graph- tai GraphNode-Rootin immutable snapshotin ja canonical positionin ilman standalone JobNode Runia.
 - Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
@@ -124,7 +125,7 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016` ja `adr-023` sekä ADR-023:n säilyttämät aiemmat invariantit.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025` sekä niiden säilyttämät aiemmat invariantit.
 
 ## Evidenssi
 

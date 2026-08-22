@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 13
+version: 14
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-010 säilyvät vastuualueina. ADR-023 muuttaa BB-001/003/004/005/009:n sopimukset: kolme canonical canvasia korvaavat Graph/Workflow-kaksinäkymän, Graph/GraphNode Runeissa kaikki tasojen väliset päätökset ovat agenttiohjattuja ja schedule poistuu. Strict cut on config v14, snapshot v7, envelope/outcome v7, composition v8, ExecutionSpec v9, SQLite v10 ja Graph Node Module v4.
+BB-001–BB-010 säilyvät vastuualueina. ADR-023 omistaa strict-v14-domainin ja kolme canonical routea; ADR-025 korvaa vain BB-001:n Job Node -canvasprojektion industrial flow'lla. Graph/GraphNode Runeissa kaikki tasojen väliset päätökset säilyvät agenttiohjattuina eikä config-, runtime- tai module-versio muutu.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -67,12 +67,12 @@ flowchart LR
 | Elementti | Vastuu | Omistajuus | Lähdeankkuri |
 | --- | --- | --- | --- |
 | Workspace route state | Jäsentää canonical Configure/Run-reitit, breadcrumbin ja browser back/forwardin. | URL omistaa aktiivisen Graph-, GraphNode- tai JobNode-scopen; inspector selection on ephemeral. | `frontend/src/workspace/routing.ts`, `WorkspaceRouteOutlet.tsx` |
-| Graph Engineering | Projisoi globaalin Luna Orchestratorin, optional Sol Repair Noden, GraphNode-planeetat, candidate-spoket ja PASS/FAIL-terminalit. | Sisältää 0 Job/Work/Validation-nodea. | `AutomationView.tsx`, `EngineeringShell.tsx`, `SpaceEngineeringCanvas.tsx` |
+| Graph Engineering | Projisoi globaalin Luna Orchestratorin, optional Sol Repair Noden, GraphNode-planeetat ja candidate-spoket ilman result-endpointteja. | Sisältää 0 Job/Work/Validation-nodea. | `AutomationView.tsx`, `EngineeringShell.tsx`, `SpaceEngineeringCanvas.tsx` |
 | Graph Node | Projisoi vain valitun Graph Noden orchestratorin, repairin ja JobNode-planeetat. | Sisältää 0 peer-GraphNodea ja 0 toisen Graph Noden Jobia. | `EngineeringShell.tsx`, `SpaceEngineeringCanvas.tsx` |
-| Job Node | Projisoi Work- ja Validation-planeetat, fixed validate/retry-yhteydet ja terminalit. | Work/Validation ovat valittavia; Job-asetukset avataan otsakkeen komennosta. | `SpaceEngineeringCanvas.tsx`, `EngineeringInspector.tsx` |
+| Job Node | Projisoi Start/Work/Validation/result/retry/orchestrator/Next job/Done/Escalate -industrial flow'n. | Vain Work/Validation ovat valittavia; Next job on disabled ghost ja muut flow-merkit read-only. Runtime routing ei muutu. | `JobFlowCanvas.tsx`, `jobFlowProjection.ts`, `EngineeringInspector.tsx` |
 | Inspector/Sheet | Näyttää orchestrator-, repair-, Work-, Validation- tai Job-asetukset ja instructionit. | 22–24rem desktop inspector; narrow-viewportissa sama sisältö Sheetissä. | `EngineeringInspector.tsx`, `EngineeringShell.tsx` |
 
-Canvas käyttää tummaa 24 px gridia, project theme -artworkeja, reasoning glow'ta, amber-ID:itä, 1.5 px mint-spokeja, kirkkaita connection pointteja ja reduced-motionia. Deterministinen monikehäinen layout, pan/zoom ja minimitekstikoko kattavat 1/5/40 GraphNodea sekä 1/17/64 JobNodea. Spoke kuvaa authoroidun candidate-säännön membershipiä, ei child-to-child Edgeä.
+Kaikki canvasit käyttävät tummaa 24 px gridia ja reduced-motionia. Graph/Graph Node säilyttävät project theme -planet-artworkit, reasoning glow'n, amber-ID:t, 1.5 px mint-spoket, connection pointit ja deterministic multi-ring/pan/zoom-layoutin 1/5/40 GraphNode- sekä 1/17/64 JobNode-fixtureille. Job käyttää deterministic wide/narrow-flow-layoutia, jossa normal/retry/fail-yhteydet ja ghost/read-only-tilat ovat eksplisiittisiä. Spoke kuvaa authoroidun candidate-säännön membershipiä; Job-flow ei kirjoita candidatea.
 
 ## BB-004/005 whitebox: snapshot ja runtime
 
@@ -98,11 +98,11 @@ Canvas käyttää tummaa 24 px gridia, project theme -artworkeja, reasoning glow
 
 ## Kanoniset lähteet
 
-Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-023` omistaa uuden vastuurajan, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
+Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-023` omistaa domain/runtime-vastuurajan, `adr-025` Job-canvasprojektion, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016` ja `adr-023` sekä niiden ADR-023:ssa säilytetyt invariantit.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025` sekä niiden säilyttämät invariantit.
 
 ## Evidenssi
 

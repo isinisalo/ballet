@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-22'
-version: 10
+version: 11
 tags:
   - yhteenveto
   - tavoitteet
@@ -44,9 +44,9 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Nykytila tämän repositoryn perusteella
 
 - Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v14** -skeemaa.
-- Projektissa on **15 hyväksyttyä Goalia** ja 24 ADR-recordia. ADR-023 omistaa kolmitasoisen domain/routing-rajan ja ADR-024 täsmentää nykyisen canvas-projektion; aiempien päätösten historia säilyy.
+- Projektissa on **15 hyväksyttyä Goalia** ja 25 ADR-recordia. ADR-023 omistaa kolmitasoisen domain/routing-rajan ja ADR-025 Job Node -authoringin industrial flow -projektion; aiempien päätösten historia säilyy.
 - Paikallinen Graph Node Library sisältää **14 V4-pakettia**. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
-- Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat ilman PASS/FAIL-endpointteja. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat ilman PASS/FAIL-endpointteja. Job Node näyttää Work/Validation-planeetat sekä validate/retryn ilman PASS/FAIL-terminaaleja; PASS/FAIL säilyy Validation- ja runtime-sopimuksessa.
+- Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat ilman PASS/FAIL-endpointteja. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat ilman PASS/FAIL-endpointteja. Job Node näyttää Work/Validationin deterministic industrial flow'ssa, read-only result/retry/orchestrator/exit-rakenteen ja disabled Next job -placeholderin; runtime routing ei muutu.
 - Tavallinen tasojen välinen flow on scoped agent routing immutable snapshotin strict candidate-enumista. Providerin foreign target vaikuttaa nolla kertaa; bounded Repair käsittelee poikkeuksen ennen ihmiseskalaatiota.
 - Balletin oletusgraafissa on **5 GraphNodea** ja **17 aggregate JobNodea**, joilla on erilliset Work/Validation-lapset. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
 - Current hard cut on snapshot/envelope/outcome V7, composition V8, ExecutionSpec V9, runtime DB V10 ja Graph Node Module Package V4.

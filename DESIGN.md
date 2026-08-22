@@ -202,9 +202,9 @@ Use Inter for interface text and Geist for identifiers, target enums, paths, tim
 - Desktop Engineering uses a compact header, dominant canvas and 22–24rem inspector. Narrow viewports move the same inspector content into a Sheet without page-level horizontal overflow.
 - Avoid empty decorative zones. Keep actions adjacent to the object or scope they affect.
 
-## Protected Three-Level Space Canvas Contract
+## Protected Three-Level Canvas Contract
 
-All three canvases use the same protected visual language: a dark 24px technical grid, code-native planet artwork, configured independent sizes/styles, restrained reasoning glow, amber exact-ID labels, thin 1.5px mint connections and static semantic highlights under `prefers-reduced-motion`. PASS/FAIL result endpoints are not rendered on these canvases.
+All three canvases use the same dark 24px technical grid, existing color tokens, compact exact-ID typography and static semantic highlights under `prefers-reduced-motion`. Graph Engineering and Graph Node share the protected planet/multi-ring language. Job Node uses ADR-025's protected industrial flow language; this intentional shape exception does not create runtime state or a second palette.
 
 ### Graph Engineering
 
@@ -224,19 +224,21 @@ All three canvases use the same protected visual language: a dark 24px technical
 
 ### Job Node
 
-- Render separate Work and Validation planets with their own configured artwork.
-- Draw Work→Validation as a fixed mint validate link.
-- Draw Validation FAIL retry→Work as a fixed amber retry route and label its bounded retry semantics.
-- Do not render PASS/FAIL terminal labels, points or endpoint spokes.
-- Work and Validation selection open their settings/instructions. Job aggregate settings open from a compact header command.
+- Render one deterministic authoring flow: `Start → Take action → Verify Result → Result`.
+- Project Work as the interactive Take action card and Validation as the interactive Verify Result card. Preserve their configured artwork as a compact emblem and their configured size as the card width.
+- Show structurally incomplete Work/Validation definitions as dashed ghost cards that remain selectable for repair.
+- From Result, show FAIL to a retry-limit junction and PASS to a read-only Graph Node Orchestrator junction with its exact ID. Normal flow is 1.5px mint, retry is 1.5px amber dashed and exhausted FAIL is Error semantic.
+- Show `Next job` as a dashed, `aria-disabled`, non-interactive placeholder. It never implies a persisted target. Show Start, Done and Escalate as fixed non-interactive semantic markers; Done means current Graph Node PASS and Escalate means the bounded-failure handoff to the Graph Node Orchestrator.
+- `maxRetries = 0` omits the active retry-return link. No Human gate, freeform edge authoring or runtime action belongs to this canvas.
+- Work and Validation selection open their settings/instructions. Job aggregate settings open from the compact header command; narrow viewports use the same inspector content in a Sheet.
 
 ## Canvas Layout & Interaction
 
-- Use deterministic radial multi-ring placement. Preserve stable ordering, minimum separation, pan/zoom and minimum text size for 1/5/40 GraphNodes and 1/17/64 JobNodes.
+- Use deterministic radial multi-ring placement for Graph/Graph Node and deterministic wide/narrow static placement for Job flow. Preserve stable ordering, minimum separation, Graph-level pan/zoom and minimum text size for 1/5/40 GraphNodes and 1/17/64 JobNodes.
 - Acceptance is zero node overlap, zero page-level horizontal overflow and zero clipped core action at 1440×900 and 390×844.
-- Canvas objects are keyboard focusable with exact accessible names. Space selects and Enter drills down when the object has a child route.
+- Interactive canvas objects are keyboard focusable with exact accessible names. Space selects and Enter drills down when the object has a child route. Job flow's fixed semantic markers and placeholder are not focus targets.
 - Breadcrumbs navigate to the parent and Graph Engineering. Browser back/forward must reproduce URL-owned scope.
-- Do not add decorative edge types, freeform topology, Bézier routes, hybrid level controls or foreign-scope summaries to a canvas.
+- Do not add decorative edge types, freeform topology, Bézier routes or hybrid level controls. Job flow's read-only Graph Node Orchestrator junction is the only approved parent-scope reference and is never selectable.
 - Active Run locks authoring mutations but keeps inspection and navigation available.
 
 ## Inspectors & Authoring
@@ -273,7 +275,7 @@ Human Work returns a Work outcome. Human Validation returns `PASS | FAIL`; FAIL 
 - Do prefer dense, scannable, work-focused surfaces.
 - Do use exact entity IDs, scope, status, target enum and timestamps.
 - Do distinguish Luna Orchestrator and Sol Repair through existing artwork/labels, not a new palette.
-- Don't introduce one-off colors, ornamental backgrounds, decorative gradients or a new shape language.
+- Don't introduce one-off colors, ornamental backgrounds, decorative gradients or shape language beyond the protected planet and Job industrial-flow contracts.
 - Don't use signal colors as passive decoration.
 - Don't hide operational state behind vague labels.
 - Don't combine Graph, GraphNode and JobNode scopes on one canvas.

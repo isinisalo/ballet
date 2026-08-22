@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 13
+version: 14
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Nykyinen hard cut käyttää strict-v14 Graph/GraphNode/JobNode-sopimusta, Graph Node Module v4:ää, Root Snapshot/Task Envelope/outcome v7:ää, composition v8:aa, ExecutionSpec v9:ää ja SQLite schema v10:tä. Repositoryn oletusgraafissa on viisi GraphNodea ja 17 aggregate JobNodea. Scoped Luna-orchestratorit päättävät tasojen välisen reitityksen strict candidate-enumista; scoped Sol Repair Nodet käsittelevät rajatut poikkeukset ennen ihmiseskalaatiota. Graph-, Graph Node- ja Job Node -canvasit käyttävät samaa suojattua avaruusteemaa ja näyttävät vain oman scopensa. `three-level-graph-node-engineering`-initiativen tekninen ja visuaalinen evidenssi indeksoidaan erikseen eikä pending-tulosta käsitellä hyväksyntänä. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
+12-osioinen baseline on hyväksytty. Nykyinen hard cut käyttää strict-v14 Graph/GraphNode/JobNode-sopimusta, Graph Node Module v4:ää, Root Snapshot/Task Envelope/outcome v7:ää, composition v8:aa, ExecutionSpec v9:ää ja SQLite schema v10:tä. Repositoryn oletusgraafissa on viisi GraphNodea ja 17 aggregate JobNodea. Scoped Luna-orchestratorit päättävät tasojen välisen reitityksen strict candidate-enumista; scoped Sol Repair Nodet käsittelevät rajatut poikkeukset ennen ihmiseskalaatiota. Graph/Graph Node käyttävät suojattua avaruusteemaa ja Job Node ADR-025:n industrial flow -projektiota samalla 24 px gridillä; runtime routing säilyy muuttumattomana. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
 
 ## Osiot
 
@@ -58,6 +58,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Workflow Engineering initiative](initiatives/workflow-engineering/BRIEF.md): accepted `goal-013` / `adr-020` / `adr-021` -päätösrajan draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju; strict-v12/v2-tekninen evidenssi ja Job-only canvas-korjaus arvioidaan erikseen, final gate ja ihmisacceptance ovat pending.
 - [Graph Engineering RunBook initiative](initiatives/graph-engineering-runbook/BRIEF.md): accepted `goal-014` / `adr-022` -rajan strict-v13/V3-, tracker-, viiden Loopin data-, Graph UI- ja conformance-evidenssi.
 - [Three-level Graph Node Engineering initiative](initiatives/three-level-graph-node-engineering/BRIEF.md): accepted `goal-015` / `adr-023` -rajan strict-v14/V4/V10-, scoped routing/repair-, kolmen canvasin ja conformance-evidenssi.
+- [Job Node industrial flow canvas initiative](initiatives/job-node-industrial-flow-canvas/BRIEF.md): accepted `adr-025` -päätöksen bounded UI-, a11y-, desktop/narrow- ja conformance-evidenssi ilman runtime-sopimusmuutosta.
 
 ## Kanoninen omistajuus
 
@@ -78,7 +79,7 @@ Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `
 
 ## Relevantit päätökset
 
-`goal-009`–`goal-015`, `adr-011`, `adr-013`–`adr-016` ja `adr-023`.
+`goal-009`–`goal-015`, `adr-011`, `adr-013`–`adr-016`, `adr-023` ja `adr-025`.
 
 ## Evidenssi
 

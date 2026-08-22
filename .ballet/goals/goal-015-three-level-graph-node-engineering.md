@@ -9,7 +9,7 @@ tags:
   - graph-engineering
   - graph-node
   - orchestrator
-version: 1
+version: 2
 ---
 
 # Kolmitasoinen Graph Node Engineering ja agenttiohjattu reititys
@@ -24,7 +24,7 @@ Job Node säilyttää kaksi kiinteää sisäistä invarianttia: Work valmistuu V
 
 - Graph Engineering näyttää kokonaisuuden, globaalin orchestratorin, valinnaisen Repair Noden ja GraphNode-planeetat ilman alemman tason nodeja.
 - Graph Node näyttää yhden Graph Noden JobNode-planeetat, paikallisen orchestratorin ja valinnaisen Repair Noden ilman vieraan scopin nodeja.
-- Job Node näyttää erilliset Work- ja Validation-planeetat, validate/retry-yhteydet ja PASS/FAIL-terminalit.
+- Job Node näyttää Workin ja Validationin tummassa industrial flow -projektiossa yhdessä entry-, result-, retry-, orchestrator-, Done-, Escalate- ja ghost Next job -rakenteen kanssa muuttamatta runtime-reititystä.
 - Suora drill-down, breadcrumb sekä browser back/forward tekevät kolmen tason rakenteesta ymmärrettävän ilman rinnakkaista hybridi- tai compatibility-näkymää.
 - Orchestratorit käyttävät Balletin oletusdatassa kustannusherkkää Luna/medium/network-off-profiilia. Vaikeampi repair käyttää Sol/medium/network-off-profiilia ennen ihmiseskalaatiota. Platform ei hardkoodaa kumpaakaan mallia.
 
@@ -48,4 +48,4 @@ Koordinoitu raja on project config v14, Graph Node Module v4, Root Snapshot v7, 
 
 ## Todentaminen
 
-Tavoite on toteutunut, kun `QS-019` / `TEST-019` / `EVID-019` todentaa strict-v14-domainin, snapshotatun Luna/Sol-compositionin, agenttireitityksen, repair/return/restart/cancel-rajat, SQLite v10:n ja kaikkien 14 Graph Node Module v4 -paketin roundtripin. `QS-020` / `TEST-020` / `EVID-020` todentaa kolme canonical routea, scopen, keyboard/a11y:n, inspectorit, deterministic multi-ring-layoutin sekä desktop/narrow-viewportien avaruusteeman ilman overlapia, vaakaylivuotoa tai leikattua ydintoimintoa. Ihmisen visual verdict säilyy erillisenä acceptance-rajana.
+Tavoite on toteutunut, kun `QS-019` / `TEST-019` / `EVID-019` todentaa strict-v14-domainin, snapshotatun Luna/Sol-compositionin, agenttireitityksen, repair/return/restart/cancel-rajat, SQLite v10:n ja kaikkien 14 Graph Node Module v4 -paketin roundtripin. `QS-020` / `TEST-020` / `EVID-020` todentaa kolme canonical routea, scopen, keyboard/a11y:n, inspectorit, Graph/Graph Node -tasojen deterministic multi-ring-avaruuscanvasit sekä Job-tason deterministic industrial flow -canvasin ilman overlapia, vaakaylivuotoa tai leikattua ydintoimintoa. Ihmisen visual verdict säilyy erillisenä acceptance-rajana.

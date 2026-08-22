@@ -100,7 +100,12 @@ export {
 export { defaultCanvasTheme } from "../domain/canvasTheme.js";
 export { maxControlFlowTransitions, maxReadStatePatchEvidenceBytes, maxReadStateRevisionMetadata, maxRuntimeJsonDepth, maxStatePatchBytes, maxStatePatchOperations } from "../domain/runtime.js";
 export { maxRelevantHistoryBytes, maxRelevantHistoryEntries, maxResumeContextBytes, maxRoutingRequestEnvelopeBytes, maxTaskEnvelopeBytes, taskEnvelopeVersion } from "../domain/taskEnvelope.js";
-export { automationConfigSchema, kebabCaseIdPattern } from "./workspace-schemas.js";
+export {
+  automationConfigSchema,
+  kebabCaseIdPattern,
+  projectValidationNodeSchema,
+  projectWorkNodeSchema
+} from "./workspace-schemas.js";
 export { graphNodeModulePackageV4Schema } from "./graph-node-module-schemas.js";
 
 export type {

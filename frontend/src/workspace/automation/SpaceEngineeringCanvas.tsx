@@ -78,38 +78,6 @@ export function SpaceEngineeringCanvas({ hub, repair, children, onHub, onRepair,
   );
 }
 
-export function JobEngineeringCanvas({ work, validation, onWork, onValidation }: {
-  work: SpaceCanvasNode;
-  validation: SpaceCanvasNode;
-  onWork: () => void;
-  onValidation: () => void;
-}) {
-  const width = 860;
-  const height = 560;
-  const workPoint = { x: 300, y: 270 };
-  const validationPoint = { x: 570, y: 270 };
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useCenterOnResize(scrollRef, width, height);
-  return (
-    <div ref={scrollRef} className="space-engineering-canvas min-h-0 min-w-0 flex-1 overflow-auto">
-      <div className="space-engineering-stage mx-auto" style={{ width, height }}>
-        <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
-          <defs>
-            <marker id="mint-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--canvas-flow)" /></marker>
-            <marker id="amber-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="var(--tertiary)" /></marker>
-          </defs>
-          <line className="space-spoke" x1={workPoint.x + 52} y1={workPoint.y} x2={validationPoint.x - 52} y2={validationPoint.y} markerEnd="url(#mint-arrow)" />
-          <path d={`M ${validationPoint.x} ${validationPoint.y + 62} C ${validationPoint.x} 430, ${workPoint.x} 430, ${workPoint.x} ${workPoint.y + 62}`} fill="none" stroke="var(--tertiary)" strokeWidth="1.5" strokeDasharray="8 7" markerEnd="url(#amber-arrow)" />
-        </svg>
-        <CanvasNodeButton node={work} point={workPoint} onClick={onWork} />
-        <CanvasNodeButton node={validation} point={validationPoint} onClick={onValidation} />
-        <div className="absolute font-mono text-[0.65rem] text-secondary" style={{ left: 428, top: 244 }}>VALIDATE</div>
-        <div className="absolute font-mono text-[0.65rem] text-tertiary" style={{ left: 410, top: 410 }}>RETRY</div>
-      </div>
-    </div>
-  );
-}
-
 function CanvasNodeButton({ node, point, onClick }: { node: SpaceCanvasNode; point: Point; onClick: () => void }) {
   const pixels = canvasNodeSizeCatalog[node.nodeSize].pixels;
   const size = Math.max(58, pixels * 1.45);
