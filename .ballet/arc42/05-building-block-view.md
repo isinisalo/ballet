@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 14
+version: 15
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-010 säilyvät vastuualueina. ADR-023 omistaa strict-v14-domainin ja kolme canonical routea; ADR-025 korvaa vain BB-001:n Job Node -canvasprojektion industrial flow'lla. Graph/GraphNode Runeissa kaikki tasojen väliset päätökset säilyvät agenttiohjattuina eikä config-, runtime- tai module-versio muutu.
+BB-001–BB-010 säilyvät accepted vastuualueina. BB-011 on draft policy decision -rakennusosa, joka hyväksyttynä liittyy samaan Graph runtimeen BB-005:n pure decision porttina; sitä ei ole vielä toteutettu. ADR-023/025 säilyvät aktiivisena strict-v14-baselinena.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -30,6 +30,7 @@ flowchart LR
   api --> planner["BB-004 Graph Run planner"]
   api --> modules["BB-009 Graph Node module boundary"]
   planner --> runtime["BB-005 Graph routing runtime"]
+  runtime -. "draft ssp_v1" .-> policy["BB-011 Policy decision subsystem"]
   planner --> tracker["BB-010 tracker adapter + outbox"]
   runtime --> tracker
   runtime --> execution["BB-006 Provider execution"]
@@ -51,6 +52,7 @@ flowchart LR
 | BB-008 | Project-local arc42 Method resources ja validointi. | Markdown/JSON-polut, stable ID:t ja npm-validointi. | Jaettu intentio, traceability ja evidenssipohjainen muutos. | `.ballet/arc42/`, `.ballet/goals/`, `.ballet/adr/`, `.agents/skills/arc42/` | REQ-002, REQ-009, REQ-015 |
 | BB-009 | Graph Node Module v4 inspect/plan/install/export/remove ja provenance. | Strict package/API, materialisointijono ja resource catalog. | Supply-chain-näkyvyys ja project/runtime-rajan säilyminen. | `shared/domain/graphNodeModules.ts`, `shared/api/graph-node-module-schemas.ts`, `backend/graph-node-modules/` | REQ-002, REQ-010, REQ-015 |
 | BB-010 | Tracker adapter ja transactional outbox. | argv-only process adapter, SQLite intent/linkit ja worktree-local stores. | Fail-closed external process boundary ja idempotentti reconciliation. | `backend/tracker/`, `backend/cli/TrackerCli.ts`, SQLite v10 tracker-taulut | REQ-006, REQ-015 |
+| BB-011 | Draft Policy decision subsystem projisoi bounded Decision Staten, ratkaisee hard `A(s)`:n, validoi finite SSP/SMDP-mallin, laskee Q/V/policyn ja tuottaa bounded rolloutin. Se ei suorita GraphNodea eikä omista workflow'ta. | BB-003:n snapshotted model, BB-005:n canonical facts/guards ja pure `DecisionStateProjector` / `AdmissibleActionResolver` / `SspPolicySolver` -portit. | Project-agnostic deterministic routing, fail-closed numerics, inspectable policy ja erillinen execution evidence. | proposed `shared/domain/decisionModel.ts`, `backend/policy/`, BB-005 SQLite v11 adapter, BB-001 read models | REQ-002, REQ-006, REQ-007, REQ-016 |
 
 ## Rajapinta- ja riippuvuussäännöt
 
@@ -61,6 +63,8 @@ flowchart LR
 - BB-009 materialisoi package-datan project-local-resursseiksi config-last-transaktiolla. Runtime ei lue packagea eikä package sisällä peer-GraphNode-targetteja.
 - BB-010 ei päätä Graph-control-flow'ta eikä issueita kopioida Stateen; pending reconciliation estää seuraavan vaikutuksen.
 - BB-002–BB-007 toteuttavat vain geneerisiä primitivejä. Balletin viiden GraphNoden nimet ja arc42-/release-menettely pysyvät project-local-datassa.
+- Draft BB-011 saa action-ID:t vain BB-003:n snapshotatusta GraphNode-kokoelmasta. Se ei tunne default-nodeja, lue live project configia, kutsu provideria tai mutatoi model probabilityjä.
+- BB-005 omistaa edelleen atomisen dispatchin/terminalin. BB-011 palauttaa validin policy-päätöksen tai typed failure -tuloksen; se ei muodosta toista control-flow/store-omistajaa.
 
 ## BB-001 whitebox: kolmitasoinen operator workspace
 
@@ -89,6 +93,16 @@ Kaikki canvasit käyttävät tummaa 24 px gridia ja reduced-motionia. Graph/Grap
 
 `ExecutionComposition` ratkaisee System → primary → vakaasti järjestetyt skillit → Task Envelope v7 → role/output schema -järjestyksen ja hashin. Sama snapshot/envelope tuottaa samat tavut. Profile, model, instruction tai skill ei saa fallbackia. Ballet-projectin orchestrator mapping käyttää Luna/medium/network-off-profiilia ja repair mapping Sol/medium/network-off-profiilia; BB-006 käsittelee niitä kuten mitä tahansa explicit `ExecutionProfile`-dataa.
 
+## BB-011 whitebox: draft policy decision subsystem
+
+| Osa | Vastuu | Input/output | Fail-closed-raja |
+| --- | --- | --- | --- |
+| Decision model validator | Tarkistaa finite feature/state/action-catalogin, explicit terminalit, ppm-summat, positive microcostit, cardinalityn ja kaikki stable ID -viitteet. | Snapshotted `ProjectSspDecisionModelV1` → canonical model/hash tai typed issue list. | Ei normalizationia, default-prioria tai stale GraphNode -viitettä. |
+| Decision State projector | Lukee nimetyt runtime-/State revision-/authorization-faktat ja tuottaa yhden exact feature vector/state ID:n. | Canonical facts + feature definitions → `DecisionStateV1`. | Missing/unknown/ambiguous mapping → 0 policy decisioniä. |
+| Admissible action resolver | Leikkaa snapshot-, candidate-, model-, permission-, authorization- ja lifecycle-rajat. | State + Capability Graph + guards → included/excluded actions reason codeineen. | Unauthorized action puuttuu solver-inputista eikä saa Q-arvoa. |
+| SSP solver | Tekee proper-policy/MEC-preflightin ja bounded Bellman value iterationin stable orderissa. | Finite model + `A(s)` → Q/V/policy/iterations/residual/hash tai typed failure. | No proper policy, invalid numerics, timeout tai non-convergence → 0 dispatchia ja 0 strategy fallbackia. |
+| Policy projection | Projisoi current policyn bounded branch-probability rolloutiksi. | Policy + model + current state → read-only max 20 epoch / 100 node projection. | Cycle/horizon katkaistaan näkyvästi; projection ei ole control state. |
+
 ## BB-009 whitebox: Graph Node Module v4
 
 1. **Inspect:** rajoita koko, parsi UTF-8 JSON, validoi strict v4, canonicalisoi ja laske SHA-256.
@@ -98,15 +112,17 @@ Kaikki canvasit käyttävät tummaa 24 px gridia ja reduced-motionia. Graph/Grap
 
 ## Kanoniset lähteet
 
-Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-023` omistaa domain/runtime-vastuurajan, `adr-025` Job-canvasprojektion, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
+Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-023` omistaa active domain/runtime-vastuurajan, `adr-025` Job-canvasprojektion, draft `adr-026` BB-011-ehdotuksen, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025` sekä niiden säilyttämät invariantit.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025`; draft `adr-026`.
 
 ## Evidenssi
 
 `TEST-019` kattaa domain-, snapshot-, runtime-, persistence- ja module-rajat. `TEST-020` kattaa BB-001:n reitit, scope-projektiot, a11y:n ja layoutin. Conformance-evidenssi indeksoidaan `EVID-019`/`EVID-020`:een.
+
+BB-011:n `TEST-021` / `EVID-021` ovat pending; nykyisessä lähdekoodissa ei ole policy subsystem -toteutusta.
 
 ## Avoimet kysymykset
 

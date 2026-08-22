@@ -4,7 +4,7 @@ title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 11
+version: 12
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-013 säilyvät invariantteina tai historiallisina skenaarioina. Strict-v14-baseline lisää RT-014:n scoped Graph/GraphNode-orchestrator-dispatchin ja RT-015:n bounded repair/escalation/return-polun. Config on v14, immutable snapshot v7 ja SQLite schema v10. Julkiset rootit ovat Graph ja GraphNode; standalone JobNode Run ja schedule poistuvat. Ulkoinen toimi käynnistyy edelleen vain täsmällisellä ihmisvaltuutuksella.
+RT-001–RT-015 kuvaavat accepted invariantit tai historialliset skenaariot. RT-016 on draft Graph SSP/SMDP decision epoch -skenaario eikä ole aktiivista runtimea. Config on edelleen v14, immutable snapshot v7 ja SQLite schema v10, kunnes draft `adr-026` hyväksytään ja toteutetaan.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -233,7 +233,41 @@ Orchestratorin invalidi target tai kelpaamaton `needs_input` uusitaan enintään
 
 Repair palaa durable LIFO-framella samaan Validationiin uusimmalla Statella: Work rerun = 0 ja retry reset = 0. Paikallinen Repair voi käyttää vain sallittua repair-dispatchia tai eskaloida Graph-tasolle. Graph Repairin jälkeen viimeinen raja on ihmisen `needs_input`. Repair depth, per-frame attempts ja orchestrator invalid attempts ovat enintään 3; transition count on enintään 256. Restart lukee vain commitoidun request/decision/frame-faktan ja cancellation estää myöhäisen vaikutuksen.
 
-## Skenaarioindeksi RT-001–RT-015
+## RT-016: draft Graph SSP/SMDP decision epoch
+
+```mermaid
+sequenceDiagram
+  actor Operator as Operaattori
+  participant Runtime as Graph runtime
+  participant State as Canonical facts + State revision
+  participant Policy as BB-011 SSP policy
+  participant Store as Decision/observation store
+  participant Option as User GraphNode Option
+  Operator->>Runtime: Start Graph Run with ssp_v1
+  Runtime->>Runtime: Validate/snapshot Capability Graph + Decision Model + rights
+  Runtime->>State: Read exact epoch facts
+  State-->>Policy: Bounded DecisionStateV1
+  Policy->>Policy: Resolve A(s), proper-policy preflight, Bellman value iteration
+  alt Valid converged proper policy
+    Policy-->>Runtime: selected GraphNode + ordered Q/V + solver evidence
+    Runtime->>Store: Atomic decision + dispatch fact
+    Runtime->>Option: Execute selected GraphNode Option
+    Option-->>Runtime: Verified terminal outcome + observed dimensions
+    Runtime->>State: Commit canonical outcomes/patches
+    Runtime->>Store: Commit option observation and state_after
+    Runtime->>Runtime: New decision epoch or explicit absorbing terminal
+  else invalid state/model, no proper policy or non-convergence
+    Policy-->>Runtime: Typed failure; selected action absent
+    Runtime->>Store: Persist failure/model/snapshot evidence
+    Runtime-->>Operator: needs_input or accepted typed terminal error
+  end
+```
+
+Decision epoch syntyy ennen ensimmäistä GraphNodea ja jokaisen GraphNode Optionin canonical terminoinnin jälkeen. Decision State johdetaan current factseista uudelleen; sitä ei patchata itsenäisenä workflow-statena. `A(s)` suodatetaan ennen solveria, joten unauthorized/out-of-snapshot-action ei saa Q-arvoa. Solver-result ja dispatch commitoidaan samassa transaktiossa; restart ei ratkaise jo commitoitua epochia tai dispatchaa sitä kahdesti.
+
+Kun projected state on explicit `success | failure | blocked` terminal, runtime persistoi terminalin eikä kutsu solveria. Empty candidate/action set nonterminalissa on model failure, ei completion. Option observation tallentaa sample-tuplen ja model/snapshot refs -viitteet muuttamatta probability- tai cost-konfiguraatiota. `agent_v1` käyttää RT-014:ää; strategioiden välillä ei ole fallbackia.
+
+## Skenaarioindeksi RT-001–RT-016
 
 | ID | Trigger ja vuorovaikutus | Rakennusosat | Tulos ja evidenssi |
 | --- | --- | --- | --- |
@@ -252,6 +286,7 @@ Repair palaa durable LIFO-framella samaan Validationiin uusimmalla Statella: Wor
 | RT-013 | Root/Loop tracker-intent kirjoitetaan tai palvelu restarttaa pending/partial `tk`-operaation jälkeen. | BB-004, BB-005, BB-010 | Run ei etene ennen sovitettua linkkiä; external-ref esiintyy kerran; malformed/dangling/cycle/timeout tuottaa waiting-tilan; BUILD claimaa enintään yhden issuen. `GER-EVID-002` pending. |
 | RT-014 | Graph/GraphNode Run alkaa tai child valmistuu; scoped Luna Orchestrator valitsee snapshotatusta strict enumista. | BB-003–BB-006 | Vain oikean scopen child/terminal/repair/needs_input hyväksytään; out-of-snapshot-targetin vaikutus on 0; Work→Validation ja retry säilyvät kiinteinä. |
 | RT-015 | Orchestrator epäonnistuu kolmesti tai Validation saavuttaa retryrajan; Sol Repair korjaa, reitittää tai eskaloi. | BB-004–BB-006, BB-010 | Same-Validation LIFO-return, latest State, Work rerun 0, retry reset 0, bounded depth/attempt ja Graph Repairin jälkeinen human `needs_input`. |
+| RT-016 | Draft `ssp_v1` Graph Run alkaa tai GraphNode Option terminoituu; runtime projisoi Staten, ratkaisee hard `A(s)`:n ja pyytää bounded SSP-policyn. | BB-003–BB-005, BB-011 | Valid proper model → atomic policy decision/dispatch; explicit terminal → terminal fact; invalid/improper/non-convergent → 0 actionia ja 0 strategy fallbackia; observation ei mutatoi modelia. |
 
 ## Samanaikaisuusmalli
 
@@ -275,18 +310,21 @@ Repair palaa durable LIFO-framella samaan Validationiin uusimmalla Statella: Wor
 | Module plan stale/conflict | BB-009 | Commit estyy eikä project configia kirjoiteta. | Inspect/plan uudelleen nykytilasta. |
 | `tk` missing/incompatible/timeout/malformed | BB-010 | Preflight tai pending outbox estää Runin; ei provider-tehtävää tai seuraavaa transitionia. | Korjaa pinnattu prerequisite/store ja Resume sovittaa pending-operaatiot. |
 | Myöhäinen payload cancellationin jälkeen | BB-004–BB-006 | Payload hylätään, state-effect = 0. | Ei replayta; canonical cancelled-tila säilyy. |
+| Draft policy state/model/solver -virhe | BB-005/BB-011 | Persistoi exact typed failure, action/dispatch = 0 ja strategy fallback = 0. | Korjaa repository-backed Decision Model/feature mapping ja käynnistä uusi immutable Run. |
 
 ## Kanoniset lähteet
 
-ADR-023 ja runtime-lähde omistavat strict-v14 Graph/GraphNode/JobNode-control-semanticsin. `.ballet/project.json` omistaa project-local GraphNode-rakenteen, scoped candidate-säännöt, Luna/Sol-profile mappingit ja tracker-konfiguraation. Story/Release Map omistaa toimitusjärjestyksen ja tracker work-store toteutusissuet. UI lukee canonical Run API -projektiota eikä muodosta vaihtoehtoista control flow’ta.
+ADR-023 ja runtime-lähde omistavat active strict-v14 Graph/GraphNode/JobNode-control-semanticsin. Draft ADR-026 omistaa RT-016-ehdotuksen. `.ballet/project.json` omistaa nykyiset GraphNode-rakenteet/candidatet; future Decision Model pysyy repository-backed project datana ja UI-projektiot read-only-control-rajan ulkopuolella.
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-023`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016` ja `adr-023`; draft `adr-026`.
 
 ## Evidenssi
 
 Runtime-, State-, persistence-, queue-, adapter-, worktree- ja Run UI -testit kattavat säilyvät skenaariot. RT-008–RT-013:n historiallinen evidenssi säilyy `EVID-011`–`EVID-018`:ssä. RT-014/015:n strict-v14 runtime-evidenssi indeksoidaan `EVID-019`:ään. Deploy ja muu ulkoinen kirjoitus pysyvät erillisen ihmisvaltuutuksen takana.
+
+RT-016:n `TEST-021` / `EVID-021` ovat pending; nykyinen runtime ei toteuta `ssp_v1`:tä.
 
 ## Avoimet kysymykset
 

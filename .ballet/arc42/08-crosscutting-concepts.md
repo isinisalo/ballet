@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 13
+version: 14
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-010 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-011 kokoaa strict-v14:n scoped agent routing-, bounded repair-, immutable candidate- ja kolmitasoisen UI-scope-sopimuksen usean rakennusosan yhteiseksi rajaksi. ADR-025 muuttaa vain Job-tason authoring-projektiota: industrial flow näyttää samat invariantit kirjoittamatta candidate- tai runtime-tilaa.
+CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-012 on draft finite policy boundary; se ei korvaa CON-011:n active strict-v14-semanticsia ennen `adr-026`-hyväksyntää.
 
 ## Konseptikartta
 
@@ -36,6 +36,7 @@ CON-001–CON-010 säilyvät hyväksyttyinä tai historiallisina konsepteina. CO
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
 | CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää parent-orchestratorin vain read-only-junctionina. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
+| CON-012 | Draft finite policy boundary: Capability Graph omistaa possible actions/hard topology; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa explicit transitions/cost/terminals; policy solver tuottaa Q/V/actionin; Policy Projection on derived read-only rollout ja Execution Graph factual samples. Hard controls poistavat actionin `A(s)`:stä, probabilityt eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011 | QS-002, QS-012, QS-013, QS-021 | draft ADR-026, proposed config v15/snapshot v8/SQLite v11, RT-016 |
 
 ## Turvallisuus ja auktorisointi
 
@@ -61,6 +62,7 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 | Graph Node module | Koko, UTF-8, strict v4 schema, canonical hash, explicit mapping, peer-target-kielto, conflict, stale plan ja active Run. | Domain issue -lista. | Config-last ja rollback; ei puuttuvia referenssejä. |
 | `tk` adapteri | Capability probe, strict JSONL/Markdown, external-ref, parent/dependency, cycle, cwd/store, timeout ja output limit. | Preflight issue tai pending/error outbox. | Root Run/provider/transition ei etene; ulkoinen osittainen vaikutus sovitetaan Resume/startupissa. |
 | UI projection | Shared DTO ja exhaustive presentation mapping. | Unknown/explicit unavailable; ei arvattua tilaa. | Display-only; canonical data ei muutu. |
+| Draft SSP policy | Finite domains, exact state mapping, ppm-summa, positive microcost, explicit terminal, proper-policy/MEC, bounded convergence ja stable tie-break. | Typed model/state/solver issue. | Action/dispatch = 0, policy fallback = 0 ja project model ennallaan. |
 
 Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logirivi tai providerin teksti ei yksinään muuta control flow’ta. Retry on rajattu runtime-sääntö, ei yleinen “catch and try again” -käytäntö.
 
@@ -77,6 +79,8 @@ Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logi
 ## Determinismi ja provenance
 
 Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Scoped orchestratorin allowed target enum tulee samasta immutable snapshotista kuin runtime-validointi; providerin target-teksti ei voi laajentaa joukkoa. Graph Node Module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
+
+Draft CON-012 laajentaa saman provenance-periaatteen Decision Modeliin: canonical feature/state/action/transition/cost/terminal/solver JSON tuottaa model hashin. Stable ID -järjestys, fixed-point input, compensated successor summation, epsilon, iteration count, residual ja policy hash ovat decision evidenceä. Execution observation viittaa model hashin mutta ei kirjoita modelia.
 
 ## Evidenssi, observability ja tietoluokitus
 
@@ -108,6 +112,7 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 - Run-projektio näyttää Graph- tai GraphNode-Rootin immutable snapshotin ja canonical positionin ilman standalone JobNode Runia.
 - Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
 - Visuaalinen artwork, orbit, glow tai reittikorostus auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
+- Draft policy UI erottaa Configure-owned Capability Graph/Decision Modelin Run-owned Decision State/policy evidence/Execution Graphista. Expected Path on bounded projection, ei tallennettu Current Plan tai dispatch authority.
 - Prosenttia, ETA:a, elapsed-telemetriaa tai provider-tekstistä pääteltyä statusta ei esitetä, ellei tuleva kanoninen sopimus ja ADR sitä erikseen määritä.
 
 ## Versiointi ja yhteensopivuus
@@ -125,11 +130,13 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025` sekä niiden säilyttämät aiemmat invariantit.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023` ja `adr-025`; draft `adr-026`.
 
 ## Evidenssi
 
 Konseptit mapittuvat BB-, RT-, DEP- ja QS-tunnisteisiin. TRACEABILITY nimeää testit ja evidenssit; tämän dokumentaatiotyön conformance review tarkistaa, ettei kuvaus väitä runtime-sopimuksen muutosta.
+
+CON-012:n TEST-021/EVID-021 pysyy pending-tilassa.
 
 ## Avoimet kysymykset
 

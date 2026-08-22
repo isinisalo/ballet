@@ -3,8 +3,8 @@ id: arc42-section-12
 title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-21'
-version: 11
+updatedAt: '2026-08-22'
+version: 12
 tags:
   - arc42
   - glossary
@@ -19,9 +19,28 @@ Tämä osio määrittää project-, authoring-, runtime-, tracker-, provider-, p
 
 ## Tila
 
-Sanasto kuvaa toteutetun strict-v13/V3-rajan ja viiden Loopin project-local-oletuksen. Strict-v12, `LoopEdge` flow -reitit, providerin flow-target-valinta, continuous-learning-oletusloop sekä aiemmat Loop Engineer-, WorkLoopNode-, `Step`- ja `Transition`-mallit ovat vain historiallisia termejä.
+Active accepted baseline on strict-v14 `Graph → GraphNode → JobNode → Work/Validation`, Graph Node Module v4, Root Snapshot v7 ja SQLite v10. Alla erikseen merkitty policy-sanasto on draft `adr-026`:n terminologiaa eikä toteutettua runtimea. Strict-v13/Loop/Workflow/RunBook-termit säilyvät historiallisena audit trailina eivätkä ole current domainin nimiä.
 
-## Project ja authoring
+## Active strict-v14 ja draft policy -termit
+
+| Termi | Status | Määritelmä |
+| --- | --- | --- |
+| Graph | accepted | Project-global user-authored automation boundary, joka omistaa yhteisen Staten, Graph Orchestratorin/Repair Noden ja 1–40 GraphNodea. |
+| GraphNode | accepted | User-defined, stable-ID:llä viitattu capability ja runtime invocation boundary. Default-projektin nodejen nimet eivät ole platform primitivejä. Draft SMDP-mallissa yksi GraphNode on yksi Option/action. |
+| JobNode | accepted | GraphNoden aggregate child, joka omistaa täsmälleen yhden WorkNoden, yhden ValidationNoden ja bounded retryn. |
+| Capability Graph | draft | Repository-backed Graph/GraphNode-topologia ja hard candidate/admissibility metadata: mitä Optioneita voidaan ylipäänsä aloittaa. Ei probability-, cost- tai execution history -lähde. |
+| Decision Model | draft | Snapshotattava finite state/action/transition/cost/terminal/solver-konfiguraatio, josta SSP-policy ratkaistaan. Project truth, ei runtime observationista automaattisesti muuttuva malli. |
+| Decision State | draft | Decision epochissa canonical factseista johdettu bounded finite feature vector + state ID/hash. Ei sama asia kuin arbitrary project State eikä itsenäisesti patchattava workflow state. |
+| Decision epoch | draft | Graph-scope ennen ensimmäistä GraphNodea ja jokaisen GraphNode Optionin terminaalin jälkeen; runtime projisoi Staten ja valitsee/terminoi policyn perusteella. |
+| Admissible action set `A(s)` | draft | Snapshot-, candidate-, model-, permission-, human authorization- ja lifecycle-rajojen leikkaus. Poissuljettu action ei saa Q-arvoa. |
+| Option | draft | GraphNode temporaalisesti laajennettuna actionina: initiation set tulee hard admissibilitystä, internal policy GraphNode/Job-runtimesta ja termination canonical GraphNode outcome -rajasta. |
+| SSP goal | draft | Explicit absorbing `success` Decision State, jonka arvo on 0. `failure` ja `blocked` ovat explicit non-goal terminaleja, eivät halpoja actioneita. |
+| Proper policy | draft | Policy, joka saavuttaa success-terminalin probabilityllä 1 jokaisesta sallitusta nonterminal lähtötilasta. Failure/blocked tai suljettu non-goal recurrent class tekee policysta improperin. |
+| Policy Projection | draft | Current Decision Statesta johdettu bounded read-only rollout branch/cumulative probabilityineen. Ei Current Plan, workflow source of truth tai dispatch authority. |
+| Execution Graph | draft | Persistoitu factual option trajectory ja samplet `(state_before, action, cost/observations, outcome, state_after)` model/snapshot refs -viitteineen. Ei muuta Decision Modelia automaattisesti. |
+| `agent_v1` / `ssp_v1` | draft | Eksplisiittiset Graph-strategiat. Ensimmäinen käyttää current LLM candidate routingia, toinen Bellman SSP-policya; niiden välillä ei ole fallbackia. |
+
+## Historiallinen strict-v13 project ja authoring
 
 | Termi | Määritelmä |
 | --- | --- |
@@ -44,7 +63,7 @@ Sanasto kuvaa toteutetun strict-v13/V3-rajan ja viiden Loopin project-local-olet
 | ExecutionProfile | Project-local provider/model/reasoning/permission-kokoonpano, joka on erotettu Node-roolin primary instruction- ja skill-valinnoista. |
 | Resource closure | Kaikki target Loopin/Node-roolin deterministisesti tarvitsemat profiili-, instruction-, skill- ja schema-resurssit. |
 
-## Runtime ja control flow
+## Historiallinen strict-v13 runtime ja control flow
 
 | Termi | Määritelmä |
 | --- | --- |
@@ -123,11 +142,11 @@ Hyväksytyt Goalit/ADR:t, shared domain -sopimukset, `.ballet/project.json`, STA
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021` ja `adr-022`.
+`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021`, `adr-022` ja `adr-023`; draft `adr-026`.
 
 ## Evidenssi
 
-Termit esiintyvät project configissa, shared contracts -rajapinnoissa, runtime/tracker-toteutuksessa, instructions/skills-resursseissa ja STATE-CONTRACTissa. Legacy- ja platform-boundary-haut tarkistavat aktiivisten lähteiden strict-v13-yhdenmukaisuuden muuttamatta historiallista evidenssiä.
+Accepted active termit esiintyvät strict-v14 project configissa, shared contracts -rajapinnoissa ja runtime/persistencessä. Draft policy-termit traceutuvat ADR-026/QS-021/RT-016:een; niillä ei ole implementation-evidenssiä.
 
 ## Avoimet kysymykset
 

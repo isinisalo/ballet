@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 16
+version: 17
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023:n strict-v14 domain/routing ja ADR-024:n result-endpoint-raja säilyvät; käyttäjän eksplisiittisesti hyväksymä ADR-025 supersedoi niiden visuaalista päätöstä vain Job Node -canvasilla. Graph Engineering- ja Graph Node -canvaseilla ADR-024 jää ennalleen, eikä config-, runtime-, persistence- tai module-raja muutu.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023/025 ovat active baseline. ADR-026 on uusi draft: se ehdottaa Graph-scopeen explicit SSP/SMDP-policystrategiaa, mutta ei supersedoi accepted päätöstä ennen ihmishyväksyntää.
 
 ## Päätösindeksi
 
@@ -50,6 +50,7 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-22. ADR-023:n strict-v14 domai
 | adr-023 | accepted | Strict-v14 three-level Graph Node domain, scoped agent routing and bounded repair | [Kolmitasoinen Graph Node -domain ja agenttiohjattu reititys](../adr/adr-023-three-level-graph-node-orchestration.md) |
 | adr-024 | accepted | PASS/FAIL-result endpointsien canvas-projektio | [PASS/FAIL-result endpointsien canvas-projektio](../adr/adr-024-pass-fail-canvas-projektio.md) |
 | adr-025 | accepted | Job Node industrial flow -authoring-projektio | [Job Node authoring käyttää industrial flow -projektiota](../adr/adr-025-job-node-industrial-flow-canvas.md) |
+| adr-026 | draft | Graph-scope finite SSP/SMDP policy strategy | [Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa](../adr/adr-026-stochastic-ssp-smdp-policy-orchestration.md) |
 
 ## Supersession-suhteet
 
@@ -103,6 +104,10 @@ adr-023:n PASS/FAIL-result endpointit kolmella authoring-canvaksella
 adr-023/024:n Job Node -planet/result-projektio
         └── osittain superseded by ──▶ adr-025
             Graph/Graph Node säilyvät ennallaan; Job käyttää read-only industrial flow -projektiota
+
+adr-023:n Graph-scope LLM-only routing
+        └── draft proposal, ei vielä supersession ──▶ adr-026
+            hyväksyttynä explicit agent_v1 | ssp_v1; GraphNode/Job/repair/snapshot/worktree-invariantit säilyvät
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -125,6 +130,7 @@ adr-023/024:n Job Node -planet/result-projektio
 | adr-022, exact named RunBook ja strict-v13/v3/v9 | adr-023 | Scoped agent routing strict candidate-enumista, Graph/GraphNode Runeista ja v14/v4/v10-versioista korvaa start/transitions/repairEdges/scheduled-run-rajan. Bounded State, snapshot, tracker/outbox, worktree, ihmisvaltuutus ja repair call/return säilyvät. |
 | adr-023, PASS/FAIL-result endpointit kolmella authoring-canvaksella | adr-024 | Graph Engineering-, Graph Node- ja Job Node -canvasit eivät piirrä PASS/FAIL-tekstejä, yhteyspisteitä tai endpoint-viivoja. Validation-, domain-, runtime- ja inspector-sopimukset säilyvät. |
 | adr-023/024, Job Node -planet-projektio ja result-tekstikielto | adr-025 | Job Node projisoi Work/Validationin industrial flow -kortteina sekä näyttää read-only result/retry/orchestrator/exit-rakenteen; Graph/Graph Node -planetit ja ADR-024:n result-raja säilyvät. Runtime routing ja versiot eivät muutu. |
+| adr-023, Graph-scope LLM-only routing | adr-026 (draft; ei aktiivinen supersession) | Hyväksyttynä Graph valitsee explicit `agent_v1 | ssp_v1`; SSP käyttää bounded Decision Statea, GraphNode Optioneita, hard admissibilityä, explicit transition/cost/terminal-mallia ja proper-policy solveria. GraphNode-scope, Job-invariantit ja repair säilyvät. |
 
 ## Päätösten käyttö
 
@@ -144,11 +150,11 @@ Kaikki yllä indeksoidut ADR:t; `adr-011` määrittää indeksointi- ja source-o
 
 ## Evidenssi
 
-`npm run validate:arc42` ratkaisee jokaisen ADR-linkin ja tarkistaa viitatun frontmatter-ID:n. Dokumentaation conformance review tarkistaa, ettei hyväksyttyjen päätösten historiaa muuteta hiljaisesti; `adr-025` perustuu käyttäjän eksplisiittisiin Job-canvas-, placeholder- ja no-runtime-change-valintoihin.
+`npm run validate:arc42` ratkaisee jokaisen ADR-linkin ja tarkistaa viitatun frontmatter-ID:n. Dokumentaation conformance review tarkistaa, ettei hyväksyttyjen päätösten historiaa muuteta hiljaisesti. ADR-026:n status pysyy draftina ja EVID-021 pending-tilassa.
 
 ## Avoimet kysymykset
 
-- Ei päätöskohtaista avointa kysymystä. Uusi merkittävä valinta pysyy proposal-tilassa, kunnes ihminen hyväksyy sen.
+- ADR-026:n strategy coexistence, proper-policy/failure semantics, solver-bounds ja strict version cut vaativat projektin omistajan päätöksen.
 
 ## Seuraava katselmointiperuste
 

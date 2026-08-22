@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-22'
-version: 11
+version: 12
 tags:
   - yhteenveto
   - tavoitteet
@@ -44,7 +44,8 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 ## Nykytila tämän repositoryn perusteella
 
 - Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v14** -skeemaa.
-- Projektissa on **15 hyväksyttyä Goalia** ja 25 ADR-recordia. ADR-023 omistaa kolmitasoisen domain/routing-rajan ja ADR-025 Job Node -authoringin industrial flow -projektion; aiempien päätösten historia säilyy.
+- Projektissa on **15 hyväksyttyä Goalia** ja 26 ADR-recordia, joista ADR-026 on draft. ADR-023 omistaa kolmitasoisen domain/routing-rajan ja ADR-025 Job Node -authoringin industrial flow -projektion; aiempien päätösten historia säilyy.
+- `goal-016` ja `adr-026` ovat draft finite SSP/SMDP Graph-policy -ehdotuksia. Ne eivät vielä muuta accepted Goalien määrää, strict-v14-runtimea tai nykyistä agent routingia.
 - Paikallinen Graph Node Library sisältää **14 V4-pakettia**. Package/install/export ja content-derived provenance eivät muodosta runtime-aikaista package-riippuvuutta.
 - Graph Engineering näyttää globaalin Luna-orchestratorin, optional Sol Repair Noden ja GraphNode-planeetat ilman PASS/FAIL-endpointteja. Graph Node näyttää valitun Graph Noden orchestrator/repairin ja JobNode-planeetat ilman PASS/FAIL-endpointteja. Job Node näyttää Work/Validationin deterministic industrial flow'ssa, read-only result/retry/orchestrator/exit-rakenteen ja disabled Next job -placeholderin; runtime routing ei muutu.
 - Tavallinen tasojen välinen flow on scoped agent routing immutable snapshotin strict candidate-enumista. Providerin foreign target vaikuttaa nolla kertaa; bounded Repair käsittelee poikkeuksen ennen ihmiseskalaatiota.

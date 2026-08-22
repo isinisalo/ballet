@@ -4,7 +4,7 @@ title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 10
+version: 11
 tags:
   - arc42
   - requirements
@@ -20,6 +20,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 ## Tila ja väitteiden luokittelu
 
 - **Hyväksytty päätös:** `goal-001`–`goal-015` määrittävät tuotteen tarkoituksen ja laajuuden.
+- **Draft intentio:** `goal-016` / `REQ-016` ehdottaa Graph-scopeen geneeristä finite SSP/SMDP -policystrategiaa. Se ei muuta accepted strict-v14-runtimea ennen ihmishyväksyntää.
 - **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v14 Graph/GraphNode/JobNode-domainin, scoped agent routing/repair -runtimen ja kolme URL-ohjattua avaruuscanvasia.
 - **Hyväksytty target:** `goal-015` / `adr-023` määrittää viiden project-local GraphNoden, 17 aggregate JobNoden, Luna-orchestratorien, Sol Repair Nodejen ja Graph Node Module v4 -rajan; initiative-evidenssi on pending final gate/browser review.
 - **Paikallinen evidenssi:** toteutuksen ajantasaisuus osoitetaan testeillä, buildilla ja `validate:arc42`-tarkistuksella; yksittäisen initiative-työn tulokset kirjataan sen EVIDENCE-tiedostoon.
@@ -44,6 +45,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-013 | goal-013 | Authoroi valitun Loopin sisäinen Workflow erillisinä Job/Validation-nodeina ja eksplisiittisinä Pass/Fail Edgeinä sekä eskaloi retryrajan jälkeinen FAIL Graph Orchestratorille. | Strict-v12/v2 Workflow hard cut, kiinteät Job→Validation- ja retry-siirtymät, Workflow PASS/FAIL -endpointit ja canonical `view=workflow`. | QS-015 |
 | REQ-014 | goal-014 | Suorita Graph deterministisenä viiden Loopin RunBookina, pidä tavalliset transitionit erillään repair call/returnista ja sovita release-/implementation-työ fail-closedisti `tk`:hon. | Strict-v13/v3 hard cut, exact snapshot-transitionit, `GraphOrchestrationStateV1`, SQLite v9 tracker-outbox, GraphEngineeringStateV1 ja project-local DESIGN/PLAN/BUILD/DEPLOY/VERIFY-data. | QS-016, QS-017, QS-018 |
 | REQ-015 | goal-015 | Korvaa aktiivinen Loop/Workflow-malli kolmella Graph/GraphNode/JobNode-tasolla, anna scoped orchestratorien tehdä tasojen väliset päätökset ja käsittele vaikeat poikkeukset bounded Repair Nodella. | Strict-v14/v4/v7/v8/v9/v10 hard cut, scoped candidate-enumit, Luna/Sol-project profiles, Graph/GraphNode Runeja ja kolme suojattua avaruuscanvasia. | QS-019, QS-020 |
+| REQ-016 | goal-016 (draft) | Valitse Graph Runin seuraava user-defined GraphNode explicit finite SSP/SMDP -päätösmallista erottaen Capability Graph, Decision Model, Policy Projection ja Execution Graph. | Bounded Decision State, GraphNode Option, hard `A(s)`, snapshotted transition/cost/terminal model, proper-policy value iteration ja per-epoch evidence; explicit `agent_v1 | ssp_v1` ilman fallbackia. | QS-021 |
 
 Täydelliset mitattavat skenaariot ja evidenssistatukset ovat [osiossa 10](10-quality-requirements.md), ja päästä päähän -ketjut ovat [TRACEABILITYssa](TRACEABILITY.md).
 
@@ -81,7 +83,7 @@ Ballet omistaa yleiset Graph-, GraphNode-, aggregate JobNode-, scoped orchestrat
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016` ja `adr-023`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016` ja `adr-023`; draft `adr-026` odottaa ihmisarviota.
 
 ## Evidenssi
 
@@ -91,6 +93,7 @@ Goal-frontmatter, project-skeema, toteutuksen lähdeankkurit ja trace-matriisi o
 
 - Initiative-kohtaiset sidosryhmät, hyväksymismitat ja mahdollinen `needs_input` täsmennetään aina BRIEFissä.
 - Ensimmäinen end-to-end-pilotti määrittää menetelmäterveyden lähtöarvot.
+- Hyväksyykö projektin omistaja draft `goal-016` / `adr-026`:n strategy-, proper-policy-, solver-bound- ja strict version cut -valinnat?
 
 ## Seuraava katselmointiperuste
 

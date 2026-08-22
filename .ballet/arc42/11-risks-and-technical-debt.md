@@ -3,8 +3,8 @@ id: arc42-section-11
 title: Riskit ja tekninen velka
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-21'
-version: 11
+updatedAt: '2026-08-22'
+version: 12
 tags:
   - arc42
   - risks
@@ -20,7 +20,7 @@ Tämä osio ylläpitää arkkitehtuurin kannalta merkittävät riskit, teknisen 
 
 ## Tila
 
-RISK-001–RISK-014 säilyttävät aiemmat menetelmä-, module-, runtime- ja strict-v12-riskit. RISK-015–RISK-017 seuraavat strict-v13 RunBook -hard cutia, ulkoisen `tk`-prerequisiten sovitusta sekä Graph/Workflow-visuaalisen sopimuksen regressiota. `controlled` tarkoittaa, että arkkitehtuurivaste on olemassa; se ei tarkoita riskin mahdottomuutta.
+RISK-001–RISK-017 säilyttävät nykyiset riskit. RISK-018 on draft SSP/SMDP model/solver -riski: arkkitehtuurivaste on ehdotettu, mutta päätös, toteutus ja pilot evidence puuttuvat.
 
 ## Riskirekisteri
 
@@ -43,6 +43,7 @@ RISK-001–RISK-014 säilyttävät aiemmat menetelmä-, module-, runtime- ja str
 | RISK-015 | cross-layer strict cut | V13/v3/snapshot6/envelope6/outcome6/composition7/spec8/DB9-muutos voi jättää yhden kuluttajan vanhaan flow-, version- tai state-sopimukseen. | korkea / mahdollinen | ADR-022, QS-016/TEST-016, compile/schema/runtime/UI/module-matriisi, fail-closed vanha kanta ja aktiivinen legacy/boundary-haku. | controlled by EVID-016 and final gates; monitor pilot |
 | RISK-016 | ulkoinen tracker ja osittainen sovitus | Puuttuva tai yhteensopimaton `tk`, malformed output, timeout tai osittainen kirjoitus voi erottaa runtime-totuuden ticket-storesta tai luoda duplikaatteja. | korkea / mahdollinen | Pinnattu prerequisite, argv ilman shelliä, rajattu worktree, strict JSONL/Markdown-probe, SQLite v9 outbox/linkki, unique external-ref ja reconcile-before-progress. QS-018/TEST-018. | controlled by hermetic tests; live smoke pending |
 | RISK-017 | visuaalinen regressio | Graphin uusi pelkistetty kieli voi heikentää 40 Loopin luettavuutta tai vuotaa Workflow Engineeringin suojattuun avaruusteemaan. | keskisuuri / mahdollinen | Eri projektiot, deterministinen layered layout, päätös+outcome-tekstilabelit, pan/zoom ja desktop/narrow Graph + Workflow regression QA. QS-017/TEST-017. | technical/browser controlled; human visual acceptance pending |
+| RISK-018 | policy model mis-specification ja numeerinen routing failure | Bounded Decision State voi jättää Markov-relevantin faktan ulos, explicit priori/cost voi olla väärin kalibroitu tai solver voi hyväksyä improper/non-convergent-mallin; seurauksena inspectable mutta väärä tai turvallisesti pysähtyvä routing. | korkea / mahdollinen, ei toteutettu | Draft ADR-026: finite enum feature catalog, documented uncertainty, hard `A(s)`, exact ppm/microcost validation, proper-policy/MEC-check, bounded Bellman residual/time/size, stable tie/hash, 0 fallbackia, arbitrary-node metamorphic tests sekä pilotin calibration review. QS-021/TEST-021/EVID-021. | open; human decision and implementation/pilot evidence pending |
 
 ## Riskien arviointiperiaate
 
@@ -71,6 +72,7 @@ RISK-011 ei valtuuta sivutehtävänä tehtävää laajaa refaktorointia. Warning
 | RISK-015 | TEST-016, EVID-016, build ja active contract/boundary search | Versionoitu sopimus muuttuu, legacy reader havaitaan tai joku flow-target ratkaistaan providerilla. |
 | RISK-016 | TEST-018, EVID-018, tracker outbox metrics ja optional live smoke | Pending intent toistuu, duplicate external-ref havaitaan tai `tk`-revision käyttäytyminen muuttuu. |
 | RISK-017 | TEST-017, EVID-017 ja Graph/Workflow desktop+narrow QA | Layout, edge-semanttiikka tai Workflow-artwork muuttuu. |
+| RISK-018 | TEST-021/EVID-021, model calibration report, solver residual/proper-policy monitor ja Decision State Markov-gap review | Feature domain, prior/cost, terminal, solver bound tai GraphNode-setti muuttuu; observed transition/cost poikkeaa pilotissa olennaisesti mallista. |
 
 ## Kanoniset lähteet
 
@@ -78,7 +80,7 @@ Tämä osio omistaa project-level-arkkitehtuuririskit. Initiative-kohtaiset risk
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-020`, `adr-021` ja `adr-022`.
+`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-020`, `adr-021`, `adr-022` ja `adr-023`; draft `adr-026`.
 
 ## Evidenssi
 
@@ -91,6 +93,7 @@ Migration-findingit, validoinnit, Root Run -outcomet, lint-outputit ja initiativ
 - Tarvitaanko QS-013:n lisäksi käyttäjätesti RISK-012:n todellisen tulkintataajuuden mittaamiseen?
 - RISK-013 ja RISK-014 säilyvät historiallisina acceptance-vajeina, kunnes niiden nimetyt ihmisreviewt valmistuvat.
 - RISK-015 on teknisesti kontrolloitu final gateillä. RISK-016:n live-smoke, RISK-017:n ihmisvisual review ja kaikkien kolmen tuotantokaltainen pilotointi pysyvät avoimina.
+- RISK-018 pysyy open-tilassa vähintään ADR-026-ihmispäätökseen, TEST-021-toteutusevidenssiin ja domain expertin pilot calibration/Markov-gap review'hun asti.
 
 ## Seuraava katselmointiperuste
 

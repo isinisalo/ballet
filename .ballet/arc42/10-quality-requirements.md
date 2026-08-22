@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 15
+version: 16
 tags:
   - arc42
   - quality
@@ -20,7 +20,7 @@ Tämä osio määrittää arkkitehtuurin suunnitteluun, hyväksymiseen ja evalua
 
 ## Tila
 
-QS-001–QS-018 säilyttävät hyväksytyn laatuintention ja historiallisen evidenssin. `goal-015`:n acceptance intent ja käyttäjän 2026-08-22 toteutusvaltuutus tekevät QS-019–QS-020:sta prioriteetin 1 strict-v14 runtime/module- ja kolmitasoisen UI-acceptance-rajat. Tekninen final gate, browser-evidenssi ja ihmisvisual verdict kirjataan erikseen eikä pending-tulosta käsitellä onnistumisena.
+QS-001–QS-020 säilyttävät hyväksytyn/historiallisen quality intentin ja evidenssin. QS-021 on draft `goal-016`-skenaario: ehdotettu prioriteetti 1 ja mitta vaativat projektin omistajan hyväksynnän ennen toteutusta. Pending architecture/implementation-evidenssiä ei käsitellä onnistumisena.
 
 ## Laatupuu
 
@@ -50,6 +50,7 @@ flowchart TD
   recovery --> q18["QS-018 tk reconciliation"]
   integrity --> q19["QS-019 scoped routing and repair"]
   usability --> q20["QS-020 three-level authoring canvases"]
+  integrity --> q21["QS-021 finite SSP/SMDP policy"]
 ```
 
 Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voivat estää toiminnon, vaikka käytettävyys kärsisi. UI:n ymmärrettävyys ei oikeuta keksittyä runtime-telemetriaa.
@@ -79,6 +80,7 @@ Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voi
 | QS-018 | goal-006, goal-014 | Graph Run kohtaa puuttuvan/epäyhteensopivan `tk`:n, timeoutin, malformed outputin, invalidin store-graphin, osittaisen kirjoituksen, restartin/cancelin tai BUILD-claimin. | Runtime DB v9, hermetic fake CLI ja optional pinned live `tk` Run-worktreessä. | BB-004, BB-005, BB-010, RT-009, RT-013, DEP-002, DEP-004, CON-010 | Estä Run ennen epätäydellistä sovitusta, säilytä yksi external-ref/linkki restartien yli ja rajaa agentti work-storeen sekä yksi claim yhtä BUILD invocationia kohti. | Hermetic matriisi läpäisee success/timeout/malformed Markdown/JSONL/duplicate external-ref/dangling parent/dependency/cycle/partial write/restart/cancel/reconciliation -tapaukset; failed preflight jonottaa 0 provider-tehtävää; partial/restart tuottaa 1 ticketin per external-ref; pending outboxin aikana seuraavia transitioneja on 0; BUILD claimaa 0 tai 1 issuea invocationissa; live-smoke-status raportoidaan erikseen. | 1 | EVID-018 | hermetic verified; pinned live smoke pending |
 | QS-019 | goal-015 | Graph/GraphNode Run käynnistyy tai child/Validation/orchestrator/Repair palauttaa tuloksen, config/module/runtime-kanta avataan tai provider ehdottaa foreign targetia. | Strict-v14 config, Graph Node Module v4, snapshot v7, envelope/outcome v7, composition v8, ExecutionSpec v9 ja SQLite v10; Luna-orchestrator/Sol-repair ovat explicit project profiles. | BB-003–BB-006, BB-009, BB-010, RT-014, RT-015, CON-002, CON-003, CON-011 | Validoi scope ja exact enum, aja tasojen väliset päätökset orchestratorilla, pidä Work→Validation/retry kiinteinä, rajaa repair ja failaa legacy/missing mapping suljetusti ilman fallbackia tai aktiivisen snapshotin laajennusta. | Parseri hylkää 100 % legacy Loop/Workflow/Edge/start/schedule- ja väärän version fixtureistä; kaikki childit kuuluvat oman scopen candidate-unioniin ja PASS/FAIL ovat saavutettavia; out-of-snapshot-target vaikuttaa 0 kertaa; invalidi orchestrator yrittää enintään 3 kertaa; repair depth/attempt ≤ 3 ja transition count ≤ 256; same-Validation-return ajaa Workin uudelleen 0 kertaa ja nollaa retryä 0 kertaa; restart/cancel tuottaa 0 duplicate-vaikutusta; v9-kanta muuttuu 0 kertaa; kaikkien 14 v4-paketin roundtrip/hash/provenance/mapping läpäisee; Luna/Sol composition on tavustabiili ja fallbackien määrä 0. | 1 | EVID-019 | technical/conformance passed; live provider pilot open |
 | QS-020 | goal-015 | Operaattori navigoi Graph Engineeringiin, yhden Graph Noden tasolle ja yhden Job Noden tasolle 1/5/40 GraphNode- tai 1/17/64 JobNode-fixturellä tai valitsee Jobin Work/Validation-asetukset. | Canonical URL, 1440×900- ja 390×844-viewport, keyboard, reduced motion ja active Run -lukko. | BB-001, BB-002, RT-014, CON-005, CON-011 | Näytä Graph/Graph Node deterministic planet/multi-ring -canvaseina ja Job deterministic industrial flow -canvasina; pidä inspector/Sheet, scope ja runtime routing muuttumattomina. | Täsmälleen 3 canonical authoring-routea ja 2 Run-routea hyväksytään; legacy-route-aliaksia 0; Graph-canvasilla foreign Job/Work/Validation-nodeja 0 ja GraphNode-canvasilla peer/foreign-scope-nodeja 0; Job-flow näyttää exact Start/Take action/Verify Result/Result/retry/Orchestrator/Next job/Done/Escalate-rakenteen, `Human gate` 0 kertaa, vain Work/Validation ovat painikkeita, Next job on aina disabled ghost, `maxRetries=0` retry-return 0 kertaa ja runtime/config-versiomuutoksia 0; keyboard/a11y-nimet, inspectorit, Run-lukot ja back/forward-testit läpäisevät; 1440×900/390×844-koossa node-overlap, page horizontal overflow ja clipped core action ovat kaikki 0; tokenit, 24 px grid ja reduced-motion säilyvät. | 1 | EVID-020 | automated/browser/installed-app evidence passed 2026-08-22; human visual verdict pending |
+| QS-021 | goal-002, goal-006, goal-007, goal-016 (draft) | Graph Run käynnistyy `ssp_v1`-strategialla tai GraphNode Option terminoituu; config/snapshot/model on validi, invalidi, improper, non-convergent tai sisältää unauthorized/foreign actionin; node-ID:t vaihdetaan kokonaan. | Proposed strict v15 config, Snapshot v8, SQLite v11, 1–40 arbitrary GraphNodea, ≤1 024 finite statea ja bounded local solver ilman network/provider-fallbackia. | BB-001–BB-005, BB-011, RT-009, RT-010, RT-016, CON-002, CON-004, CON-005, CON-012 | Johda yksi bounded Decision State, muodosta hard `A(s)`, ratkaise explicit proper SSP-policy deterministic value iterationilla, committoi decision+dispatch atomisesti ja näytä Capability/Policy/Execution-projektiot eri totuusrajoina. | Parseri hylkää 100 % unknown feature/state/action, stale GraphNode, missing row, duplicate successor, ppm-summa ≠ 1 000 000, non-positive cost ja implicit terminal -fixtureistä; unauthorized/out-of-snapshot action saa 0 Q-arvoa ja 0 dispatchia; invalid/improper/non-convergent/time/size failure saa 0 actionia ja 0 `agent_v1` fallbackia; validissa mallissa residual ≤ 1e-9, selected policyn jokainen reachable bottom SCC sisältää successin, sama snapshot/state tuottaa 100 % samat ordered Q/V/action/iterations/residual/hash-arvot ja epsilon-tie valitaan stable ID -järjestyksellä; restart/cancel monistaa 0 decision/dispatch/observation-vaikutusta; Execution Graph observation muuttaa configured probability/cost-rivejä 0 kertaa; `discover/prototype/security-check/package/publish`-fixture ja täysin renamed variantti läpäisevät samat assertiot, ja niiden ID-osumia production platform branchingissa on 0. | 1 (draft; human approval required) | EVID-021 | architecture defined; decision and implementation evidence pending |
 <!-- quality-scenarios:end -->
 
 ## Priorisoinnin tulkinta
@@ -93,16 +95,17 @@ Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot; [
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023` ja `adr-025` sekä historialliset ADR-017–ADR-022-ketjut.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023` ja `adr-025`; draft `adr-026` sekä historialliset ADR-017–ADR-022-ketjut.
 
 ## Evidenssi
 
-EVID-001–EVID-020 ratkaistaan TRACEABILITYssa. EVID-014–EVID-018 säilyttävät aiempien hard cutien historiallisen evidenssin. EVID-019 indeksoi strict-v14 runtime/module/conformance-gatet ja EVID-020 Graph/Graph Node -avaruuscanvasien sekä Job industrial flow -canvasin UI/browser/ihmisacceptancen. Puuttuvia ihmis-, browser- tai live-smoke-osuuksia ei käsitellä onnistumisina.
+EVID-001–EVID-021 ratkaistaan TRACEABILITYssa. EVID-021 on pending ja indeksoi vasta hyväksytyn/toteutetun QS-021-evidenssin; architecture draft ei ole solver/runtime success.
 
 ## Avoimet kysymykset
 
 - Pilot-specific performance-, latency- tai usability-threshold vaatii ihmisen hyväksynnän initiative-BRIEFissä ennen priorisointia.
 - QS-012:n paikalliset fault-injection-testit tulee myöhemmin täydentää operatiivisella restart-evidenssillä ennen production-readiness-väitettä.
+- QS-021:n prioriteetti, proper-policy/failure semantics, 1 024/40/10 000/2 s -rajat ja fixed-point-esitys odottavat project owner -päätöstä.
 
 ## Seuraava katselmointiperuste
 

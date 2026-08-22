@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 14
+version: 15
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Nykyinen hard cut käyttää strict-v14 Graph/GraphNode/JobNode-sopimusta, Graph Node Module v4:ää, Root Snapshot/Task Envelope/outcome v7:ää, composition v8:aa, ExecutionSpec v9:ää ja SQLite schema v10:tä. Repositoryn oletusgraafissa on viisi GraphNodea ja 17 aggregate JobNodea. Scoped Luna-orchestratorit päättävät tasojen välisen reitityksen strict candidate-enumista; scoped Sol Repair Nodet käsittelevät rajatut poikkeukset ennen ihmiseskalaatiota. Graph/Graph Node käyttävät suojattua avaruusteemaa ja Job Node ADR-025:n industrial flow -projektiota samalla 24 px gridillä; runtime routing säilyy muuttumattomana. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
+12-osioinen baseline on hyväksytty. Nykyinen hard cut käyttää strict-v14 Graph/GraphNode/JobNode-sopimusta, Graph Node Module v4:ää, Root Snapshot/Task Envelope/outcome v7:ää, composition v8:aa, ExecutionSpec v9:ää ja SQLite schema v10:tä. Draft `goal-016` / `adr-026` ehdottaa Graph-scopeen explicit finite SSP/SMDP-policystrategiaa, mutta ei ole active runtime. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
 
 ## Osiot
 
@@ -59,6 +59,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Graph Engineering RunBook initiative](initiatives/graph-engineering-runbook/BRIEF.md): accepted `goal-014` / `adr-022` -rajan strict-v13/V3-, tracker-, viiden Loopin data-, Graph UI- ja conformance-evidenssi.
 - [Three-level Graph Node Engineering initiative](initiatives/three-level-graph-node-engineering/BRIEF.md): accepted `goal-015` / `adr-023` -rajan strict-v14/V4/V10-, scoped routing/repair-, kolmen canvasin ja conformance-evidenssi.
 - [Job Node industrial flow canvas initiative](initiatives/job-node-industrial-flow-canvas/BRIEF.md): accepted `adr-025` -päätöksen bounded UI-, a11y-, desktop/narrow- ja conformance-evidenssi ilman runtime-sopimusmuutosta.
+- [Stochastic Policy Orchestration initiative](initiatives/stochastic-policy-orchestration/BRIEF.md): draft `goal-016` / `adr-026` -design finite SSP/SMDP Graph-policyyn; human decision ja implementation evidence pending.
 
 ## Kanoninen omistajuus
 
@@ -75,11 +76,11 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 
 ## Työskentelysääntö
 
-Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Project-local GraphNodet ja JobNodet toteuttavat repositoryn menetelmän; Graph- ja Graph Node -orchestratorit valitsevat tasojen välisen dispatchin immutable snapshotin strict candidate-enumista. Work→Validation ja bounded retry ovat Job Noden kiinteitä invariantteja. Epäselvä WHAT/WHY, prioriteetti, merkittävä valinta tai viimeisen repair-rajan ylitys pysähtyy `needs_input`-tilaan. Merge/push eivät sisälly oletusflow'hun.
+Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Active runtime käyttää scoped agent routingia immutable candidate-enumista. Draft SSP-strategia ei ole fallback eikä implementation authority. Work→Validation ja bounded retry ovat Job Noden kiinteitä invariantteja. Epäselvä WHAT/WHY, prioriteetti tai merkittävä valinta pysähtyy `needs_input`-tilaan.
 
 ## Relevantit päätökset
 
-`goal-009`–`goal-015`, `adr-011`, `adr-013`–`adr-016`, `adr-023` ja `adr-025`.
+`goal-009`–`goal-015`, `adr-011`, `adr-013`–`adr-016`, `adr-023` ja `adr-025`; draft `goal-016` / `adr-026`.
 
 ## Evidenssi
 

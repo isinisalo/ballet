@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-22'
-version: 15
+version: 16
 tags:
   - architecture
   - arc42
@@ -20,6 +20,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 ## Tila
 
 - `goal-001`–`goal-015` omistavat hyväksytyn WHAT/WHY:n.
+- `goal-016` / `adr-026` on draft finite SSP/SMDP Graph-policy -ehdotus. Se erottaa Capability Graphin, Decision Modelin, Policy Projectionin ja Execution Graphin, mutta ei muuta active strict-v14-runtimea ennen ihmisapprovalia.
 - Virallisen [arc42-rakenteen 12 osiota](https://docs.arc42.org/home/) ovat kanonisesti `.ballet/arc42/`-hakemistossa.
 - `goal-009` ja `adr-011` hyväksyvät jatkuvan Ballet Methodin. `goal-015` / `adr-023` materialisoi repositoryn nykyisen oletusmenetelmän viideksi project-local GraphNodeksi ja 17 aggregate JobNodeksi muuttamatta platformin geneeristä 1–40 GraphNoden rajaa.
 - `goal-010` / `adr-016`:n säilyvä package trust -periaate toteutuu Graph Node Module v4 -rajassa: paketti materialisoidaan project-local-runtime-resursseiksi eikä ole live runtime dependency.
@@ -65,6 +66,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - Mitkä lähtöarvot ensimmäinen pilotti tuottaa METHOD-HEALTH-mittareille?
 - Hyväksyykö projektin omistaja `three-level-graph-node-engineering`-initiativen `EVID-019`–`EVID-020`-ketjun, conformance-gatejen ja kolmen canvasin visual QA:n jälkeen?
 - Hyväksyykö projektin omistaja `comprehensive-arc42-documentation`-draftin lopputarkistuksen jälkeen?
+- Hyväksyykö projektin omistaja `stochastic-policy-orchestration`-draftin explicit strategy-, proper-policy/failure-, solver-bound- ja strict version cut -päätökset?
 
 ## Seuraava katselmointiperuste
 
