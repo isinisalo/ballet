@@ -27,7 +27,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - Nykyinen implementation cut on strict project config v17, Graph Node Module v5, Root Execution Snapshot v10, policy observation v3, Task Envelope / node outcome v8, ExecutionSpec v10 / composition v9 ja SQLite schema v13. Compatibility-readereita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
 - `ProjectGraphNode` omistaa scoped orchestrator/repairin ja aggregate JobNodet. JobNode omistaa Work/Validation-lapset ja bounded retryn. Globaali ja paikalliset orchestratorit käyttävät project-datan Luna/medium/network-off-profiilia; Repair Nodet Sol/medium/network-off-profiilia. Platform ei hardkoodaa mallia eikä tee fallbackia.
 - `agent_v1` ja outcome-aware `ssp_v2` ovat eksplisiittiset strategiat sekä Graph- että GraphNode-scopeissa ilman fallbackia. `ssp_v2` ratkaisee GraphNode- ja JobNode-actionit scoped proper policylla, tallentaa semantic outcome + PASS/FAIL + actual projected state -havainnon sekä versionoidut measured/unknown cost-dimensiot ja ratkaisee seuraavan decision epochin actual statesta. Work→Validation, retry ja bounded same-Validation Repair säilyvät.
-- Authoring-UI käyttää kolmea canonical routea. Graph Engineering jakautuu Capability Graph / Decision Model -korttiosioihin ja Graph Node Jobs / Local Decision Model & Repair -osioihin. Job Node käyttää ADR-025/027:n industrial flow -projektiota. URL omistaa hierarkian, sectionin ja browser historyn.
+- Authoring-UI käyttää kolmea canonical routea. Graph Engineering jakautuu Capability Graph / Decision Model -korttiosioihin ja Graph Node Actions / Local Decision Model & Repair -osioihin. UI:n Action Node käyttää ADR-025/027:n industrial flow -projektiota; `Action Node` on nykyisen aggregate `JobNode`-sopimuksen käyttäjälle näkyvä MDP-termi. URL omistaa hierarkian, sectionin ja browser historyn.
 - Root Runin Graph/GraphNode-projektio ja live inspector tulevat canonical snapshot/persistencestä eivätkä muodosta uutta control statea. Standalone JobNode Run ja schedule eivät kuulu aktiiviseen malliin.
 - `comprehensive-arc42-documentation` on draft-initiative, kunnes projektin omistaja arvioi sen EVIDENCE/REVIEW-ketjun.
 
@@ -54,7 +54,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Relevantit päätökset
 
-`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` säilyttää State-, repair- ja continuation-invariantit. `adr-016` säilyttää package trust/materialisointi -periaatteen. `adr-023` omistaa säilyvän domain- ja Repair-rajan; `adr-025` ja `adr-027` omistavat Job Node industrial flow'n. Accepted `adr-028`–`adr-030` omistavat hierarchical policyn, capability-first-authoringin sekä offline calibration/promotion -hallinnan.
+`adr-011` määrittää source-of-truth- ja menetelmärajan. `adr-015` säilyttää State-, repair- ja continuation-invariantit. `adr-016` säilyttää package trust/materialisointi -periaatteen. `adr-023` omistaa säilyvän domain- ja Repair-rajan; `adr-025` ja `adr-027` omistavat Action Node industrial flow'n. Accepted `adr-028`–`adr-030` omistavat hierarchical policyn, capability-first-authoringin sekä offline calibration/promotion -hallinnan.
 
 ## Evidenssi
 

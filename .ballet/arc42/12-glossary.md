@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 16
+version: 17
 tags:
   - arc42
   - glossary
@@ -27,7 +27,9 @@ Active implementation on strict-v17 `Graph → GraphNode → JobNode → Work/Va
 | --- | --- | --- |
 | Graph | accepted | Project-global user-authored automation boundary, joka omistaa yhteisen Staten, Graph Orchestratorin/Repair Noden ja 1–40 GraphNodea. |
 | GraphNode | accepted | User-defined, stable-ID:llä viitattu capability ja runtime invocation boundary. Default-projektin nodejen nimet eivät ole platform primitivejä. SMDP-mallissa yksi GraphNode on yksi Option/action. |
-| JobNode | accepted | GraphNoden aggregate child, joka omistaa täsmälleen yhden WorkNoden, yhden ValidationNoden ja bounded retryn. |
+| JobNode | accepted | GraphNoden aggregate child, joka omistaa täsmälleen yhden WorkNoden, yhden ValidationNoden ja bounded retryn. Tämä on nykyinen vakaa schema-, API- ja runtime-tunniste. |
+| Action | accepted | MDP:n valinta `a ∈ A(s)`, jonka orchestrator voi tehdä kyseisessä Decision Statessa. `actionId` on policy- ja evidenssisopimuksen tunniste. |
+| Action Node | accepted | Käyttöliittymän termi nykyiselle `ProjectJobNode`-aggregaatille. Se on valitun MDP-actionin authoring- ja execution-projektio; se omistaa Work/Validation-parin ja bounded retryn. |
 | Capability Model / Capability Graph | review implementation | Intrinsic outcome -katalogi, scoped actions ja hard guardit yhdessä repository-backed Graph/GraphNode/JobNode-rakenteen kanssa: mitä järjestelmä voi tehdä ja mitkä actionit voidaan aloittaa. Ei probability-, cost- tai execution history -lähde. |
 | Decision Model | accepted | Snapshotattava finite state/action/transition/cost/terminal/solver-konfiguraatio, josta SSP-policy ratkaistaan. Project truth, ei runtime observationista automaattisesti muuttuva malli. |
 | Decision State | accepted | Decision epochissa canonical factseista johdettu bounded finite feature vector + state ID/hash. Ei sama asia kuin arbitrary project State eikä itsenäisesti patchattava workflow state. |
@@ -40,7 +42,7 @@ Active implementation on strict-v17 `Graph → GraphNode → JobNode → Work/Va
 | Execution Graph | accepted/refined | Persistoidut vain toteutuneet scoped observationit `(state_before, action, expected distribution, outcome, PASS/FAIL, actual projected state, model match)` model/snapshot refs -viitteineen. Ei muuta Decision Modelia automaattisesti. |
 | Model miss | review implementation | Observationin `outcome_miss`, `state_miss` tai `outside_support`; `match` tarkoittaa outcome- ja state-ennusteen osumaa. Luokka ei muuta prioreita, vaan seuraava policy ratkaistaan actual statesta. |
 | `agent_v1` / `ssp_v2` | review implementation | Eksplisiittiset Graph- ja GraphNode-strategiat. Ensimmäinen käyttää scoped LLM candidate routingia, toinen Bellman SSP-policya; niiden välillä ei ole fallbackia. |
-| Capability-first authoring | review implementation | Graphin Capability Graph / Decision Model ja GraphNoden Jobs / Local Decision Model & Repair -korttiosiot. Upper-level appearance/canvas ei ole domain dataa; Job industrial flow säilyy. |
+| Capability-first authoring | review implementation | Graphin Capability Graph / Decision Model ja GraphNoden Actions / Local Decision Model & Repair -korttiosiot. Upper-level appearance/canvas ei ole domain dataa; Action Node industrial flow säilyy. |
 
 ## Historiallinen strict-v13 project ja authoring
 
@@ -121,11 +123,11 @@ Active implementation on strict-v17 `Graph → GraphNode → JobNode → Work/Va
 
 | Termi | Määritelmä |
 | --- | --- |
-| Graph Node Module V5 | Nykyinen portable package-sopimus. Moduuli exporttaa GraphNoden ja JobNodejen intrinsic outcome -sopimukset, Work/Validation/Repair-resurssit, explicit local `agent_v1` -strategian ja provenance-datan, mutta ei probabilityja, costeja, project-specific transitioneita tai upper-level appearancea. V4-lukijaa ei ole. |
+| Graph Node Module V5 | Nykyinen portable package-sopimus. Moduuli exporttaa GraphNoden ja Action Nodejen (`ProjectJobNode`) intrinsic outcome -sopimukset, Work/Validation/Repair-resurssit, explicit local `agent_v1` -strategian ja provenance-datan, mutta ei probabilityja, costeja, project-specific transitioneita tai upper-level appearancea. V4-lukijaa ei ole. |
 | `externalWrites` | Module V5 permission metadata; arvo `requires-human-authorization` ilmaisee ulkoisen kirjoituksen portin. |
 | Graph Engineering | Project-global capability-first authoring: URL-omisteiset `Capability Graph`- ja `Decision Model` -korttiosiot. Se ei ole runtime-ohjain eikä upper-level planet canvas. |
-| Graph Node Engineering | Yhden GraphNoden capability-first authoring: URL-omisteiset `Jobs`- ja `Local Decision Model & Repair` -korttiosiot. |
-| Job Node industrial flow | ADR-025/027:n suojattu Work → Validation → bounded retry -authoring-projektio. Work/Validation-artwork säilyy tällä tasolla, mutta näkymä ei valitse seuraavaa JobNodea. |
+| Graph Node Engineering | Yhden GraphNoden capability-first authoring: URL-omisteiset `Actions`- ja `Local Decision Model & Repair` -korttiosiot. |
+| Action Node industrial flow | ADR-025/027:n suojattu Work → Validation → bounded retry -authoring-projektio. Work/Validation-artwork säilyy tällä tasolla, mutta näkymä ei valitse seuraavaa Action Nodea. |
 | Compile readiness | Scopekohtainen tieto siitä, että Decision Model läpäisee schema-, viite-, probability-, semantic outcome- ja proper-policy-validoinnin. Draftin voi tallentaa, mutta sitä ei saa käyttää Runissa. |
 | Loop Module Package V3 | Historiallinen strict-v13 portable package-sopimus, jonka Graph Node Module V4 ja V5 ovat korvanneet. |
 | Workflow Engineering | Historiallinen yhden Loopin editori ennen GraphNode/JobNode- ja capability-first-rajoja. |

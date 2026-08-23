@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  automationGraphNodePath, automationGraphPath, automationJobNodePath,
+  automationActionNodePath, automationGraphNodePath, automationGraphPath,
   routeFromPath, runGraphNodePath, runGraphPath, runOverviewPath
 } from "../src/workspace/routing";
 
@@ -10,11 +10,11 @@ describe("canonical Graph Engineering routing", () => {
       view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities"
     });
     expect(routeFromPath("/automation/graph/nodes/build")).toEqual({
-      view: "automation", engineeringLevel: "graph_node", graphNodeId: "build", engineeringSection: "jobs"
+      view: "automation", engineeringLevel: "graph_node", graphNodeId: "build", engineeringSection: "actions"
     });
-    expect(routeFromPath("/automation/graph/nodes/build/jobs/backend%20implementation")).toEqual({
-      view: "automation", engineeringLevel: "job_node",
-      graphNodeId: "build", jobNodeId: "backend implementation"
+    expect(routeFromPath("/automation/graph/nodes/build/actions/backend%20implementation")).toEqual({
+      view: "automation", engineeringLevel: "action_node",
+      graphNodeId: "build", actionNodeId: "backend implementation"
     });
   });
 
@@ -44,8 +44,8 @@ describe("canonical Graph Engineering routing", () => {
   it("builds encoded canonical paths", () => {
     expect(automationGraphPath()).toBe("/automation/graph");
     expect(automationGraphNodePath("build one")).toBe("/automation/graph/nodes/build%20one");
-    expect(automationJobNodePath("build one", "job two"))
-      .toBe("/automation/graph/nodes/build%20one/jobs/job%20two");
+    expect(automationActionNodePath("build one", "job two"))
+      .toBe("/automation/graph/nodes/build%20one/actions/job%20two");
     expect(runOverviewPath("root 1")).toBe("/run?run=root%201");
     expect(runGraphPath("graph one", "root 1")).toBe("/run/graphs/graph%20one?run=root%201");
     expect(runGraphNodePath("build one", "root 1"))

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProjectJobNode } from "@shared/api/workspace-contracts";
 import { jobFlowLayout, projectJobFlow } from "../src/workspace/automation/jobFlowProjection";
 
-describe("Job flow projection", () => {
+describe("Action flow projection", () => {
   it.each(["wide", "narrow"] as const)("produces a deterministic %s layout", (viewport) => {
     const first = jobFlowLayout(viewport, true);
     expect(jobFlowLayout(viewport, true)).toEqual(first);
@@ -50,7 +50,7 @@ describe("Job flow projection", () => {
 });
 
 const jobNode = (maxRetries: number): ProjectJobNode => ({
-  id: "job", description: "Job", nodeStyle: "terra", nodeSize: "medium",
+  id: "job", description: "Action", nodeStyle: "terra", nodeSize: "medium",
   capabilities: { accepts: [], provides: [] }, maxRetries,
   workNode: {
     id: "work", description: "Work", task: "Perform work.", type: "agent", nodeStyle: "sol", nodeSize: "large",

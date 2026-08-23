@@ -27,19 +27,19 @@ const automationRoute = (url: URL): RouteState | undefined => {
     view: "automation", engineeringLevel: "graph",
     engineeringSection: url.searchParams.get("section") === "decision-model" ? "decision-model" : "capabilities"
   };
-  const job = url.pathname.match(/^\/automation\/graph\/nodes\/([^/]+)\/jobs\/([^/]+)\/?$/);
-  if (job) return {
+  const action = url.pathname.match(/^\/automation\/graph\/nodes\/([^/]+)\/actions\/([^/]+)\/?$/);
+  if (action) return {
     view: "automation",
-    engineeringLevel: "job_node",
-    graphNodeId: decodeURIComponent(job[1]),
-    jobNodeId: decodeURIComponent(job[2])
+    engineeringLevel: "action_node",
+    graphNodeId: decodeURIComponent(action[1]),
+    actionNodeId: decodeURIComponent(action[2])
   };
   const graphNode = url.pathname.match(/^\/automation\/graph\/nodes\/([^/]+)\/?$/);
   if (graphNode) return {
     view: "automation",
     engineeringLevel: "graph_node",
     graphNodeId: decodeURIComponent(graphNode[1]),
-    engineeringSection: url.searchParams.get("section") === "local-decision-model" ? "local-decision-model" : "jobs"
+    engineeringSection: url.searchParams.get("section") === "local-decision-model" ? "local-decision-model" : "actions"
   };
   return undefined;
 };
@@ -103,10 +103,10 @@ export const skillDocumentPath = (relativePath: string) => `/skills?path=${encod
 export const skillCreatePath = () => "/skills?new=1";
 const sectionQuery = (section?: EngineeringSection) => section ? `?section=${encodeURIComponent(section)}` : "";
 export const automationGraphPath = (section?: "capabilities" | "decision-model") => `/automation/graph${sectionQuery(section)}`;
-export const automationGraphNodePath = (graphNodeId: string, section?: "jobs" | "local-decision-model") =>
+export const automationGraphNodePath = (graphNodeId: string, section?: "actions" | "local-decision-model") =>
   `/automation/graph/nodes/${encodeURIComponent(graphNodeId)}${sectionQuery(section)}`;
-export const automationJobNodePath = (graphNodeId: string, jobNodeId: string) =>
-  `${automationGraphNodePath(graphNodeId)}/jobs/${encodeURIComponent(jobNodeId)}`;
+export const automationActionNodePath = (graphNodeId: string, actionNodeId: string) =>
+  `${automationGraphNodePath(graphNodeId)}/actions/${encodeURIComponent(actionNodeId)}`;
 export const automationThemePath = () => "/automation/theme";
 export const runtimePath = () => "/runtimes";
 export const runOverviewPath = (rootRunId?: string) => `/run${rootRunId ? `?run=${encodeURIComponent(rootRunId)}` : ""}`;

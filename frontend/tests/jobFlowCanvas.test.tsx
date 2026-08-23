@@ -6,8 +6,8 @@ import { JobFlowCanvas } from "../src/workspace/automation/JobFlowCanvas";
 import type { ProjectJobNode } from "@shared/api/workspace-contracts";
 import { projectInstruction } from "./projectInstructionFixture";
 
-describe("Job Node engineering canvas", () => {
-  it("shows the industrial Job flow and opens only Work and Validation", async () => {
+describe("Action Node engineering canvas", () => {
+  it("shows the industrial Action flow and opens only Work and Validation", async () => {
     const user = userEvent.setup();
     const openWork = vi.fn();
     const openValidation = vi.fn();
@@ -51,7 +51,7 @@ describe("Job Node engineering canvas", () => {
 });
 
 const jobNode = (maxRetries = 2): ProjectJobNode => ({
-  id: "job", description: "Job", outcomes: [], capabilities: { accepts: [], provides: [] }, maxRetries,
+  id: "job", description: "Action", outcomes: [], capabilities: { accepts: [], provides: [] }, maxRetries,
   workNode: {
     id: "work", description: "Work", task: "Perform work.", type: "agent", nodeStyle: "sol", nodeSize: "large",
     executionProfileId: "luna-medium", primaryInstructionId: "project:work", skillIds: []

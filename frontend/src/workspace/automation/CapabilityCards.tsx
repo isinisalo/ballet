@@ -7,7 +7,7 @@ import { CollectionAddCard, OperationalStatus } from "@/components/shared/worksp
 type CapabilityNode = ProjectGraphNode | ProjectJobNode;
 
 export function CapabilityCards({ nodes, kind, locked, onAdd, onOpen, onEdit, onRename, onDelete, deleteIssues }: {
-  nodes: CapabilityNode[]; kind: "Graph Node" | "Job Node"; locked: boolean; onAdd: () => void;
+  nodes: CapabilityNode[]; kind: "Graph Node" | "Action Node"; locked: boolean; onAdd: () => void;
   onOpen: (id: string) => void; onEdit: (id: string) => void; onRename: (id: string) => void;
   onDelete: (id: string) => void; deleteIssues?: (id: string) => string[];
 }) {

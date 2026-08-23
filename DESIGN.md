@@ -155,21 +155,27 @@ spacing:
 
 ## Brand & Style
 
-Ballet is a local orchestration command center for project documents, ExecutionProfiles, instructions, skills, runtimes, Graphs, GraphNodes, aggregate JobNodes, Work and Validation roles, scoped Orchestrators and Repair Nodes, and Runs. The interface is dense, structured, technical, and calm under pressure.
+Ballet is a local orchestration command center for project documents, ExecutionProfiles, instructions, skills, runtimes, Graphs, GraphNodes, aggregate Action Nodes, Work and Validation roles, scoped Orchestrators and Repair Nodes, and Runs. The interface is dense, structured, technical, and calm under pressure.
 
 The visual system combines Modern Minimalism with Technical Industrialism. Dark tonal layers support long sessions; high-vibrancy signals identify current role, validation result, repair attention and blocking failure. UI decoration never creates runtime state.
 
 ## Implementation Status Boundary
 
-The active implementation baseline is strict project config v17, Graph Node Module v5, Root Snapshot v10, policy observation v3, Task Envelope and role outcome v8, composition v9, ExecutionSpec v10 and SQLite v13. Graph and GraphNode scopes each use an explicit `agent_v1` or outcome-aware `ssp_v2` strategy without fallback. The execution inspector presents measured or explicitly unknown provider-neutral option-cost dimensions and inclusive scope attribution without inventing scalar actual cost. The repository default remains `agent_v1` until calibrated policy inputs and the pilot are approved. There are no legacy readers, route aliases, dual writes, schedule UI or standalone JobNode Run.
+The active implementation baseline is strict project config v17, Graph Node Module v5, Root Snapshot v10, policy observation v3, Task Envelope and role outcome v8, composition v9, ExecutionSpec v10 and SQLite v13. Graph and GraphNode scopes each use an explicit `agent_v1` or outcome-aware `ssp_v2` strategy without fallback. The execution inspector presents measured or explicitly unknown provider-neutral option-cost dimensions and inclusive scope attribution without inventing scalar actual cost. The repository default remains `agent_v1` until calibrated policy inputs and the pilot are approved. There are no legacy readers, route aliases, dual writes, schedule UI or standalone Action Node Run.
 
 Authoring has exactly three canonical URL-owned levels:
 
 - `/automation/graph?section=capabilities|decision-model` — Graph Engineering.
-- `/automation/graph/nodes/:graphNodeId?section=jobs|local-decision-model` — Graph Node.
-- `/automation/graph/nodes/:graphNodeId/jobs/:jobNodeId` — Job Node.
+- `/automation/graph/nodes/:graphNodeId?section=actions|local-decision-model` — Graph Node.
+- `/automation/graph/nodes/:graphNodeId/actions/:actionNodeId` — Action Node.
 
 Run has Graph and GraphNode routes only. URL state owns the active level and IDs. Inspector selection remains ephemeral and never mutates topology.
+
+## MDP Terminology
+
+- `Action` is the MDP choice `a ∈ A(s)`: an option available to the orchestrator in the current decision state. Policy, Q/V and guard surfaces use this term directly.
+- `Action Node` is the user-facing authoring label for the existing aggregate `ProjectJobNode`. It owns one Work and one Validation role plus bounded retry; it is the executable projection of a selected action.
+- `jobNodes` and `jobNodeId` remain stable internal schema, API and runtime identifiers in the current strict contract. This is a terminology change, not a compatibility alias, dual write or persistence migration.
 
 ## Colors
 
@@ -177,7 +183,7 @@ The palette is dark-only. Do not expose light/system theme until this document c
 
 - **Primary / Electric Blue:** primary commands, selected navigation and focused fields.
 - **Secondary / Emerald:** running Work/Validation, PASS, healthy state and go-forward semantics.
-- **Canvas Flow / Mint:** the fixed Job flow and retry-return connections. Always pair connection semantics with exact icon/text where a connection is rendered.
+- **Canvas Flow / Mint:** the fixed Action flow and retry-return connections. Always pair connection semantics with exact icon/text where a connection is rendered.
 - **Tertiary / Amber:** IDs, warnings, queued/human-wait states, retry and repair attention.
 - **Error:** FAIL, blocked/failed Runs, invalid config and destructive actions only.
 - **Surfaces:** application `#0c0e11`, primary panels `#111316`, sidebar/compact headers `#1a1c1f`, elevated interactive surfaces `#1e2023`/`#282a2d`, subtle borders `#414755`.
@@ -192,24 +198,24 @@ Use Inter for interface text and Geist for identifiers, target enums, paths, tim
 - `body-md` is default application copy.
 - `label-caps` identifies metadata and status groups.
 - `code-md` displays exact technical values and definitions.
-- Exact IDs remain readable in cards and the Job flow; long values truncate visually only when their full value remains available through accessible text or a title.
+- Exact IDs remain readable in cards and the Action flow; long values truncate visually only when their full value remains available through accessible text or a title.
 
 ## Layout & Spacing
 
 - Desktop uses a 12-column fluid grid and a sidebar near 280px. Primary canvas space stays fluid.
 - Use the 4px spacing unit, 8/16px related-control rhythm and 20px primary-panel padding.
 - Compact desktop controls are 28px; default controls 32px; narrow controls at least 40px and form text at least 16px.
-- Graph and GraphNode Engineering use a compact header, URL-owned section tabs and responsive card/panel grids. Job Node uses a dominant flow canvas plus a 22–24rem inspector; narrow viewports move the same inspector content into a Sheet without page-level horizontal overflow.
+- Graph and GraphNode Engineering use a compact header, URL-owned section tabs and responsive card/panel grids. Action Node uses a dominant flow canvas plus a 22–24rem inspector; narrow viewports move the same inspector content into a Sheet without page-level horizontal overflow.
 - Avoid empty decorative zones. Keep actions adjacent to the object or scope they affect.
 
-## Capability-first Engineering and Protected Job Flow
+## Capability-first Engineering and Protected Action Node Flow
 
-Graph Engineering and Graph Node use the same compact cyber-industrial card language as Execution Profiles and Skills: tonal panels, thin tokenized borders, exact mono IDs, concise status badges and adjacent actions. Cards are authoring projections and never create runtime state. Only Job Node uses the dark 24px technical grid and ADR-025 as refined by ADR-027's protected industrial flow language.
+Graph Engineering and Graph Node use the same compact cyber-industrial card language as Execution Profiles and Skills: tonal panels, thin tokenized borders, exact mono IDs, concise status badges and adjacent actions. Cards are authoring projections and never create runtime state. Only Action Node uses the dark 24px technical grid and ADR-025 as refined by ADR-027's protected industrial flow language.
 
 ### Graph Engineering
 
 - `Capability Graph` shows responsive GraphNode cards with exact ID, description, accepts/provides, intrinsic outcome contracts, readiness and adjacent open/edit/rename/delete actions.
-- `Decision Model` is a scoped decision dashboard: current projected state and read-only Q/V evidence first, then a state/action matrix of configured immediate costs, a focused rule inspector and factual Model Health. The same component derives Graph actions from configured GraphNodes and GraphNode actions from that node's configured JobNodes without a frontend action catalog.
+- `Decision Model` is a scoped decision dashboard: current projected state and read-only Q/V evidence first, then a state/action matrix of configured immediate costs, a focused rule inspector and factual Model Health. The same component derives Graph actions from configured GraphNodes and GraphNode actions from that node's configured Action Nodes without a frontend action catalog.
 - Matrix state headers and action headers remain visible where practical; 1–20 action columns preserve configured order and scroll only inside the matrix. A selected cell opens the rule inspector alongside the matrix on desktop and in a Sheet on narrow viewports.
 - The focused rule inspector edits human-readable cost units and percentage branches while preserving exact `expectedCostMicros` and `probabilityPpm` integers. Q(s,a) and V(s) remain read-only solver evidence, never immediate-cost inputs.
 - State features/catalog, action guards, solver/projection settings, scoped Repair and exact schema detail remain fully available under the collapsed `Advanced Model` area instead of dominating the primary workflow.
@@ -218,30 +224,30 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 
 ### Graph Node
 
-- `Jobs` shows only the selected GraphNode's JobNode cards with intrinsic outcomes, capability contracts, readiness and full CRUD.
-- `Local Decision Model & Repair` uses the same scoped policy editor with JobNode actions.
-- JobNode rename updates every local policy reference atomically. Referenced deletion is blocked and names each repair location.
-- Upper-level appearance, artwork and multi-ring data do not belong to GraphNode or JobNode aggregate contracts.
+- `Actions` shows only the selected GraphNode's Action Node cards with intrinsic outcomes, capability contracts, readiness and full CRUD.
+- `Local Decision Model & Repair` uses the same scoped policy editor with Action Node actions.
+- Action Node rename updates every local policy reference atomically. Referenced deletion is blocked and names each repair location.
+- Upper-level appearance, artwork and multi-ring data do not belong to GraphNode or Action Node aggregate contracts.
 
-### Job Node
+### Action Node
 
 - Render one deterministic authoring flow: `Start → Work ID → Validation ID → Pass?`, with `Pass?` and `Retry?` on the same level, `Pass?` branching to `Continue` or `Retry?`, and `Retry?` branching back to Work or down to `Escalate`.
 - Project Work and Validation as the only interactive cards. Show only each exact node ID in the visible card; keep Work/Validation role context in the accessible name. Preserve configured artwork as a compact emblem and configured size as the card width.
 - Show structurally incomplete Work/Validation definitions as dashed ghost cards that remain selectable for repair.
-- `Pass?` and `Retry?` show only their question text and share a horizontal level. A dashed, non-interactive `Retry count X` ghost marker floats to the left of `Retry?`, where `X` is the configured Job Node `maxRetries` value shown in Job Node settings; it does not represent persisted runtime state.
+- `Pass?` and `Retry?` show only their question text and share a horizontal level. A dashed, non-interactive `Retry count X` ghost marker floats to the left of `Retry?`, where `X` is the configured Action Node `maxRetries` value shown in Action Node settings; it does not represent persisted runtime state.
 - Normal flow and the enabled `Yes` retry return use the 1.5px mint flow token; the retry return remains dashed and exhausted FAIL is Error semantic. Graph Node Orchestrator owns runtime routing and candidate decisions but is not rendered in this canvas.
 - Show Start, Continue and Escalate as fixed non-interactive circular semantic markers; Continue and Escalate share a horizontal level. Continue means current Graph Node PASS; Escalate means the bounded-failure handoff owned by Graph Node routing.
 - Route the dashed retry edge directly from Retry? to Work, outside the Retry count ghost marker.
 - `maxRetries = 0` omits the active retry-return link. No Human gate, freeform edge authoring or runtime action belongs to this canvas.
-- Work and Validation selection open their settings/instructions. Job aggregate settings open from the compact header command; narrow viewports use the same inspector content in a Sheet.
+- Work and Validation selection open their settings/instructions. Action Node aggregate settings open from the compact header command; narrow viewports use the same inspector content in a Sheet.
 
 ## Layout & Interaction
 
-- Use a responsive, stable-order card grid for 1/5/40 GraphNodes and 1/17/64 JobNodes. Use deterministic wide/narrow static placement only for Job flow.
+- Use a responsive, stable-order card grid for 1/5/40 GraphNodes and 1/17/64 Action Nodes. Use deterministic wide/narrow static placement only for Action flow.
 - Acceptance is zero card overlap, zero page-level horizontal overflow and zero clipped core action at 1440×900 and 390×844.
-- Card actions and Job flow Work/Validation are keyboard focusable with exact accessible names. Job flow's fixed semantic markers are not focus targets.
+- Card actions and Action flow Work/Validation are keyboard focusable with exact accessible names. Action flow's fixed semantic markers are not focus targets.
 - Breadcrumbs navigate to the parent and Graph Engineering. Browser back/forward must reproduce URL-owned scope.
-- Do not add decorative graph geometry, freeform topology, Bézier routes or hybrid level controls. Job flow does not render a parent-scope reference or a Next job target; runtime routing remains owned by the local scoped strategy.
+- Do not add decorative graph geometry, freeform topology, Bézier routes or hybrid level controls. Action flow does not render a parent-scope reference or a Next action target; runtime routing remains owned by the local scoped strategy.
 - Active Run locks authoring mutations but keeps inspection and navigation available.
 
 ## Inspectors & Authoring
@@ -250,13 +256,13 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 - Repair inspector exposes explicit ExecutionProfile, instruction, skills, attempt/depth limits and bounded outcomes. It never presents expanded permission or active-snapshot mutation controls.
 - Work inspector exposes agent/human type, task, appearance, explicit profile/instruction/skills and capability/State contract.
 - Validation inspector exposes criteria, appearance, explicit composition and PASS/FAIL contract. FAIL repair input contains no target ID.
-- Job aggregate settings expose identity, capability, intrinsic outcomes and `maxRetries` without aggregate appearance or duplicated child composition.
+- Action Node aggregate settings expose identity, capability, intrinsic outcomes and `maxRetries` without aggregate appearance or duplicated child composition.
 - Blank authoring/import requires an explicit profile and instruction mapping. Never choose the first profile or instruction silently.
 - Work, Validation and Repair instructions must not name sibling node IDs. Only same-level Orchestrator instructions and candidate rules know routing targets.
 
 ## Graph Node Modules
 
-Graph Node Module v5 UI supports inspect, plan, install, export and remove for exactly one GraphNode plus its aggregate Jobs, intrinsic outcomes, explicit local `agent_v1` strategy, optional Repair and resource closure. It exports no probability, cost or project-specific transition data and no upper-level appearance. Show package hash, provenance, conflicts and explicit profile/instruction mapping. Peer-GraphNode-targets are project-global and must not appear as package-owned routes.
+Graph Node Module v5 UI supports inspect, plan, install, export and remove for exactly one GraphNode plus its aggregate Action Nodes, intrinsic outcomes, explicit local `agent_v1` strategy, optional Repair and resource closure. It exports no probability, cost or project-specific transition data and no upper-level appearance. Show package hash, provenance, conflicts and explicit profile/instruction mapping. Peer-GraphNode-targets are project-global and must not appear as package-owned routes.
 
 ## Run Control Surface
 
@@ -269,7 +275,7 @@ Human Work returns a Work outcome. Human Validation returns `PASS | FAIL`; FAIL 
 - **ExecutionProfiles:** compact provider/model/reasoning/network controls; no implicit fallback.
 - **Project Instructions:** responsive Markdown preview/edit with exact `project:<id>`, path, validation state and explicit Save.
 - **Project Skills:** list `.agents/skills/**/SKILL.md` with project ID, path and validation state; invalid paths remain visible blocking errors.
-- **Canvas Theme:** one `/automation/theme` workspace using only the fixed Job flow artwork/connection token language. Theme identity, cloning, assignment and per-size renderers are outside the current boundary.
+- **Canvas Theme:** one `/automation/theme` workspace using only the fixed Action flow artwork/connection token language. Theme identity, cloning, assignment and per-size renderers are outside the current boundary.
 - **Global Ballet Mode:** one text-first Ballet menu for Run and Configure. Configure contains documents, instructions, skills, profiles, theme and Graph Engineering; Run contains Overview, active Graph Runs and GraphNode Runs.
 
 ## Do's and Don'ts
@@ -278,8 +284,8 @@ Human Work returns a Work outcome. Human Validation returns `PASS | FAIL`; FAIL 
 - Do prefer dense, scannable, work-focused surfaces.
 - Do use exact entity IDs, scope, status, target enum and timestamps.
 - Do distinguish strategy, readiness, Repair and outcome semantics with exact text/status plus existing tokens, not a new palette.
-- Don't introduce one-off colors, ornamental backgrounds, decorative gradients or shape language beyond standard cards and the protected Job industrial-flow contract.
+- Don't introduce one-off colors, ornamental backgrounds, decorative gradients or shape language beyond standard cards and the protected Action Node industrial-flow contract.
 - Don't use signal colors as passive decoration.
 - Don't hide operational state behind vague labels.
-- Don't combine Graph, GraphNode and JobNode authoring scopes in one section.
+- Don't combine Graph, GraphNode and Action Node authoring scopes in one section.
 - Don't present configured transition predictions as factual execution or actual state.

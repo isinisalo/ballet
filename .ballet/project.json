@@ -165,342 +165,77 @@
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
         "strategy": {
-          "kind": "agent_v1",
-          "orchestrator": {
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:graph-node-orchestrator",
-            "skillIds": [],
-            "id": "design-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-            "maxTransitions": 256,
-            "maxRouteAttempts": 3,
-            "routing": {
-              "start": {
-                "id": "design-start",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-01-introduction-and-goals"
-                    },
-                    "description": "Allowed initial Job Node for design."
-                  }
-                ]
+          "kind": "ssp_v2",
+          "id": "design-policy",
+          "description": "Outcome-aware finite SSP policy for design.",
+          "capabilityModel": {
+            "version": 2,
+            "outcomes": [],
+            "actions": [
+              {
+                "actionId": "design-01-introduction-and-goals",
+                "guards": []
               },
-              "continuation": [
-                {
-                  "id": "design-01-introduction-and-goals-pass-route",
-                  "sourceId": "design-01-introduction-and-goals",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-02-constraints"
-                      },
-                      "description": "Allowed PASS continuation after design-01-introduction-and-goals."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-01-introduction-and-goals-fail-route",
-                  "sourceId": "design-01-introduction-and-goals",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-01-introduction-and-goals."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-02-constraints-pass-route",
-                  "sourceId": "design-02-constraints",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-03-context-and-scope"
-                      },
-                      "description": "Allowed PASS continuation after design-02-constraints."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-02-constraints-fail-route",
-                  "sourceId": "design-02-constraints",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-02-constraints."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-03-context-and-scope-pass-route",
-                  "sourceId": "design-03-context-and-scope",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-04-solution-strategy"
-                      },
-                      "description": "Allowed PASS continuation after design-03-context-and-scope."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-03-context-and-scope-fail-route",
-                  "sourceId": "design-03-context-and-scope",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-03-context-and-scope."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-04-solution-strategy-pass-route",
-                  "sourceId": "design-04-solution-strategy",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-05-building-block-view"
-                      },
-                      "description": "Allowed PASS continuation after design-04-solution-strategy."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-04-solution-strategy-fail-route",
-                  "sourceId": "design-04-solution-strategy",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-04-solution-strategy."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-05-building-block-view-pass-route",
-                  "sourceId": "design-05-building-block-view",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-06-runtime-view"
-                      },
-                      "description": "Allowed PASS continuation after design-05-building-block-view."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-05-building-block-view-fail-route",
-                  "sourceId": "design-05-building-block-view",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-05-building-block-view."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-06-runtime-view-pass-route",
-                  "sourceId": "design-06-runtime-view",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-07-deployment-view"
-                      },
-                      "description": "Allowed PASS continuation after design-06-runtime-view."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-06-runtime-view-fail-route",
-                  "sourceId": "design-06-runtime-view",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-06-runtime-view."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-07-deployment-view-pass-route",
-                  "sourceId": "design-07-deployment-view",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-08-crosscutting-concepts"
-                      },
-                      "description": "Allowed PASS continuation after design-07-deployment-view."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-07-deployment-view-fail-route",
-                  "sourceId": "design-07-deployment-view",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-07-deployment-view."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-08-crosscutting-concepts-pass-route",
-                  "sourceId": "design-08-crosscutting-concepts",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-09-architecture-decisions"
-                      },
-                      "description": "Allowed PASS continuation after design-08-crosscutting-concepts."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-08-crosscutting-concepts-fail-route",
-                  "sourceId": "design-08-crosscutting-concepts",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-08-crosscutting-concepts."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-09-architecture-decisions-pass-route",
-                  "sourceId": "design-09-architecture-decisions",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-10-quality-requirements"
-                      },
-                      "description": "Allowed PASS continuation after design-09-architecture-decisions."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-09-architecture-decisions-fail-route",
-                  "sourceId": "design-09-architecture-decisions",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-09-architecture-decisions."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-10-quality-requirements-pass-route",
-                  "sourceId": "design-10-quality-requirements",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-11-risks-and-technical-debt"
-                      },
-                      "description": "Allowed PASS continuation after design-10-quality-requirements."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-10-quality-requirements-fail-route",
-                  "sourceId": "design-10-quality-requirements",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-10-quality-requirements."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-11-risks-and-technical-debt-pass-route",
-                  "sourceId": "design-11-risks-and-technical-debt",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "design-12-glossary"
-                      },
-                      "description": "Allowed PASS continuation after design-11-risks-and-technical-debt."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-11-risks-and-technical-debt-fail-route",
-                  "sourceId": "design-11-risks-and-technical-debt",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-11-risks-and-technical-debt."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-12-glossary-pass-route",
-                  "sourceId": "design-12-glossary",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "PASS"
-                      },
-                      "description": "Allowed PASS continuation after design-12-glossary."
-                    }
-                  ]
-                },
-                {
-                  "id": "design-12-glossary-fail-route",
-                  "sourceId": "design-12-glossary",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after design-12-glossary."
-                    }
-                  ]
-                }
-              ],
-              "repair": []
+              {
+                "actionId": "design-02-constraints",
+                "guards": []
+              },
+              {
+                "actionId": "design-03-context-and-scope",
+                "guards": []
+              },
+              {
+                "actionId": "design-04-solution-strategy",
+                "guards": []
+              },
+              {
+                "actionId": "design-05-building-block-view",
+                "guards": []
+              },
+              {
+                "actionId": "design-06-runtime-view",
+                "guards": []
+              },
+              {
+                "actionId": "design-07-deployment-view",
+                "guards": []
+              },
+              {
+                "actionId": "design-08-crosscutting-concepts",
+                "guards": []
+              },
+              {
+                "actionId": "design-09-architecture-decisions",
+                "guards": []
+              },
+              {
+                "actionId": "design-10-quality-requirements",
+                "guards": []
+              },
+              {
+                "actionId": "design-11-risks-and-technical-debt",
+                "guards": []
+              },
+              {
+                "actionId": "design-12-glossary",
+                "guards": []
+              }
+            ]
+          },
+          "model": {
+            "version": 2,
+            "features": [],
+            "states": [],
+            "stateActions": [],
+            "solver": {
+              "algorithm": "ssp_value_iteration_v2",
+              "epsilon": 0.000001,
+              "maxIterations": 1000,
+              "maxSolveMillis": 250
+            },
+            "projection": {
+              "maxDecisionEpochs": 8,
+              "maxProjectionNodes": 64
             }
           }
         },

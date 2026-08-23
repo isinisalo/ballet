@@ -21,12 +21,12 @@ export const createGenericJobNode = (input: NodeInput): ProjectJobNode => ({
 });
 
 export const createGenericGraphNode = (input: NodeInput): ProjectGraphNode => {
-  const job = createGenericJobNode({ ...input, id: `${input.id}-job`, description: `Aggregate job for ${input.id}.` });
+  const job = createGenericJobNode({ ...input, id: `${input.id}-action`, description: `Aggregate action for ${input.id}.` });
   return {
     id: input.id, description: input.description, capabilities: { accepts: [], provides: [] }, outcomes: [],
     stateContract: { description: "Uses the bounded Graph State contract configured for this capability." },
     strategy: { kind: "agent_v1", orchestrator: {
-      id: `${input.id}-orchestrator`, description: `Routes aggregate Job Nodes within ${input.id}.`,
+      id: `${input.id}-orchestrator`, description: `Routes aggregate Action Nodes within ${input.id}.`,
       executionProfileId: input.executionProfileId, primaryInstructionId: input.primaryInstructionId, skillIds: [],
       maxTransitions: 256, maxRouteAttempts: 3,
       routing: {

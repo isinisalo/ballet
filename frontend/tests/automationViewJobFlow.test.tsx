@@ -6,7 +6,7 @@ import { AutomationView } from "../src/workspace/automation/AutomationView";
 import { emptyData } from "../src/workspace/types";
 import { projectInstruction } from "./projectInstructionFixture";
 
-describe("Automation Job flow integration", () => {
+describe("Automation Action flow integration", () => {
   beforeEach(() => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
   });
@@ -14,14 +14,17 @@ describe("Automation Job flow integration", () => {
     const user = userEvent.setup();
     render(<AutomationView
       data={appData()}
-      level="job_node"
+      level="action_node"
       graphNodeId="graph-node"
-      jobNodeId="job"
+      actionNodeId="job"
       saveAutomation={vi.fn(async (value) => value)}
       navigate={vi.fn()}
       setNavigationBlocker={vi.fn()}
     />);
 
+    expect(screen.getByRole("region", { name: "Action flow job" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByText("Action Node · job")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Work Node, work" }));
     const workInspector = screen.getByRole("complementary", { name: "Work inspector" });
     expect(within(workInspector).getByText("Work · work")).toBeInTheDocument();
@@ -31,14 +34,29 @@ describe("Automation Job flow integration", () => {
     expect(within(validationInspector).getByText("Validation · validation")).toBeInTheDocument();
   });
 
+  it("uses MDP action terminology on the Graph Node authoring level", () => {
+    render(<AutomationView
+      data={appData()}
+      level="graph_node"
+      graphNodeId="graph-node"
+      saveAutomation={vi.fn(async (value) => value)}
+      navigate={vi.fn()}
+      setNavigationBlocker={vi.fn()}
+    />);
+
+    expect(screen.getByText("Action Nodes and local action space")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add Action Node" })).toBeInTheDocument();
+  });
+
   it("opens the same Work settings in a narrow-viewport Sheet", async () => {
     const user = userEvent.setup();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
     render(<AutomationView
       data={appData()}
-      level="job_node"
+      level="action_node"
       graphNodeId="graph-node"
-      jobNodeId="job"
+      actionNodeId="job"
       saveAutomation={vi.fn(async (value) => value)}
       navigate={vi.fn()}
       setNavigationBlocker={vi.fn()}
@@ -56,9 +74,9 @@ describe("Automation Job flow integration", () => {
     data.activeRootRuns = [activeGraphNodeRun()];
     render(<AutomationView
       data={data}
-      level="job_node"
+      level="action_node"
       graphNodeId="graph-node"
-      jobNodeId="job"
+      actionNodeId="job"
       saveAutomation={vi.fn(async (value) => value)}
       navigate={vi.fn()}
       setNavigationBlocker={vi.fn()}
@@ -104,13 +122,13 @@ const automation = (): ProjectAutomationConfig => ({
       id: "graph-node", description: "Graph Node", outcomes: [],
       capabilities: { accepts: [], provides: [] }, stateContract: { description: "Uses shared state." },
       strategy: { kind: "agent_v1", orchestrator: {
-        id: "graph-node-orchestrator", description: "Routes Jobs.",
+        id: "graph-node-orchestrator", description: "Routes Action Nodes.",
         executionProfileId: "luna-medium", primaryInstructionId: "project:graph", skillIds: [],
         maxTransitions: 256, maxRouteAttempts: 3,
         routing: { start: { id: "job-start", candidates: [{ target: { jobNodeId: "job" }, description: "Start job." }] }, continuation: [], repair: [] }
       } },
       jobNodes: [{
-        id: "job", description: "Job", outcomes: [],
+        id: "job", description: "Action", outcomes: [],
         capabilities: { accepts: [], provides: [] }, maxRetries: 2,
         workNode: {
           id: "work", description: "Work", task: "Perform work.", type: "agent", nodeStyle: "sol", nodeSize: "large",

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 type CreateInput = { id: string; description: string; executionProfileId: string; primaryInstructionId: string };
 
 export const GraphNodeCreateDialog = (props: SharedCreateProps) => <NodeCreateDialog {...props} entity="Graph Node" />;
-export const JobNodeCreateDialog = (props: SharedCreateProps) => <NodeCreateDialog {...props} entity="Job Node" />;
+export const ActionNodeCreateDialog = (props: SharedCreateProps) => <NodeCreateDialog {...props} entity="Action Node" />;
 
 interface SharedCreateProps {
   open: boolean; onOpenChange: (open: boolean) => void; profiles: ExecutionProfile[];
@@ -42,7 +42,7 @@ function NodeCreateDialog({ open, onOpenChange, profiles, instructions, existing
 }
 
 export const GraphNodeRenameDialog = (props: SharedRenameProps) => <NodeRenameDialog {...props} entity="Graph Node" />;
-export const JobNodeRenameDialog = (props: SharedRenameProps) => <NodeRenameDialog {...props} entity="Job Node" />;
+export const ActionNodeRenameDialog = (props: SharedRenameProps) => <NodeRenameDialog {...props} entity="Action Node" />;
 
 interface SharedRenameProps {
   open: boolean; onOpenChange: (open: boolean) => void; currentId: string;

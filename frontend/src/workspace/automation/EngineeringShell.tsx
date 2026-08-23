@@ -2,21 +2,21 @@ import type { ReactNode } from "react";
 import { ChevronRight, Orbit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { EngineeringLevel, EngineeringSection } from "../types";
-import { automationGraphNodePath, automationGraphPath, automationJobNodePath } from "../routing";
+import { automationActionNodePath, automationGraphNodePath, automationGraphPath } from "../routing";
 import type { WorkspaceNavigation } from "../useWorkspaceNavigation";
 
 const labels: Record<EngineeringLevel, string> = {
   graph: "Graph Engineering",
   graph_node: "Graph Node",
-  job_node: "Job Node"
+  action_node: "Action Node"
 };
 
 export function EngineeringShell({
   level,
   graphNodeId,
   graphNodeTitle,
-  jobNodeId,
-  jobNodeTitle,
+  actionNodeId,
+  actionNodeTitle,
   actions,
   section,
   navigate,
@@ -25,8 +25,8 @@ export function EngineeringShell({
   level: EngineeringLevel;
   graphNodeId?: string;
   graphNodeTitle?: string;
-  jobNodeId?: string;
-  jobNodeTitle?: string;
+  actionNodeId?: string;
+  actionNodeTitle?: string;
   actions?: ReactNode;
   section?: EngineeringSection;
   navigate: WorkspaceNavigation["navigate"];
@@ -40,7 +40,7 @@ export function EngineeringShell({
             <Orbit className="size-4 shrink-0 text-secondary" aria-hidden="true" />
             <h1 id="engineering-title" className="truncate font-heading text-base font-medium sm:text-lg">{labels[level]}</h1>
             <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-              {level === "graph" ? "Graph Nodes and global routing" : level === "graph_node" ? "Job Nodes and local routing" : "Action, verification and outcomes"}
+              {level === "graph" ? "Graph Nodes and global action space" : level === "graph_node" ? "Action Nodes and local action space" : "Action, verification and outcomes"}
             </span>
           </div>
           {actions ? <div className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto">{actions}</div> : null}
@@ -55,10 +55,10 @@ export function EngineeringShell({
               <span className="truncate">{graphNodeTitle ?? graphNodeId}</span>
             </Button>
           </> : null}
-          {graphNodeId && jobNodeId ? <>
+          {graphNodeId && actionNodeId ? <>
             <ChevronRight className="size-3 shrink-0" />
-            <Button type="button" variant="ghost" size="xs" className="h-6 max-w-52 px-1.5" onClick={() => navigate(automationJobNodePath(graphNodeId, jobNodeId))}>
-              <span className="truncate text-foreground">{jobNodeTitle ?? jobNodeId}</span>
+            <Button type="button" variant="ghost" size="xs" className="h-6 max-w-52 px-1.5" onClick={() => navigate(automationActionNodePath(graphNodeId, actionNodeId))}>
+              <span className="truncate text-foreground">{actionNodeTitle ?? actionNodeId}</span>
             </Button>
           </> : null}
         </nav>

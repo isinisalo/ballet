@@ -6,16 +6,16 @@ export type AutomationSelection = "none" | "settings" | "work" | "validation";
 export const automationInspectorModel = (
   selection: AutomationSelection,
   graphNode: ProjectGraphNode | undefined,
-  jobNode: ProjectJobNode | undefined,
+  actionNode: ProjectJobNode | undefined,
   locked: boolean
 ): EngineeringInspectorModel | undefined => {
-  if (!graphNode || !jobNode || selection === "none") return undefined;
+  if (!graphNode || !actionNode || selection === "none") return undefined;
   if (selection === "settings") return {
-    key: `${jobNode.id}:settings`, role: "Job Node", title: jobNode.description, id: jobNode.id,
-    description: jobNode.description, maxRetries: jobNode.maxRetries,
-    accepts: jobNode.capabilities.accepts, provides: jobNode.capabilities.provides, locked
+    key: `${actionNode.id}:settings`, role: "Action Node", title: actionNode.description, id: actionNode.id,
+    description: actionNode.description, maxRetries: actionNode.maxRetries,
+    accepts: actionNode.capabilities.accepts, provides: actionNode.capabilities.provides, locked
   };
-  const node = selection === "work" ? jobNode.workNode : jobNode.validationNode;
+  const node = selection === "work" ? actionNode.workNode : actionNode.validationNode;
   return {
     key: node.id, role: selection === "work" ? "Work" : "Validation", title: node.description,
     id: node.id, description: node.description, task: node.task, nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
@@ -26,10 +26,10 @@ export const automationInspectorModel = (
 
 export const updateAutomationSelection = (
   config: ProjectAutomationConfig, selection: AutomationSelection, graphNodeId: string | undefined,
-  jobNodeId: string | undefined, field: string, value: string | number
+  actionNodeId: string | undefined, field: string, value: string | number
 ): ProjectAutomationConfig => ({
   ...config, graph: { ...config.graph, graphNodes: config.graph.graphNodes.map((graphNode) => graphNode.id !== graphNodeId ? graphNode : ({
-    ...graphNode, jobNodes: graphNode.jobNodes.map((jobNode) => jobNode.id !== jobNodeId ? jobNode : updateJob(jobNode, selection, field, value))
+    ...graphNode, jobNodes: graphNode.jobNodes.map((actionNode) => actionNode.id !== actionNodeId ? actionNode : updateJob(actionNode, selection, field, value))
   })) }
 });
 

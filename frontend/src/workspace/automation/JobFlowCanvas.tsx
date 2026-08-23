@@ -18,7 +18,7 @@ export function JobFlowCanvas({ job, selected, locked, onWork, onValidation }: {
   const markerPrefix = useId().replaceAll(":", "");
   const point = (key: keyof typeof layout.points) => ({ left: layout.points[key].x, top: layout.points[key].y });
   return (
-    <section className="job-flow-grid job-flow-canvas min-h-0 min-w-0 flex-1 overflow-auto" aria-label={`Job flow ${job.id}`}>
+    <section className="job-flow-grid job-flow-canvas min-h-0 min-w-0 flex-1 overflow-auto" aria-label={`Action flow ${job.id}`}>
       <div className="job-flow-legend">AUTHORING FLOW <span>· runtime routing remains in Graph Node settings</span></div>
       <div className="job-flow-stage" style={{ width: layout.width, height: layout.height }}>
         <FlowEdges edges={layout.edges} markerPrefix={markerPrefix} width={layout.width} height={layout.height} />
