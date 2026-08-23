@@ -24,7 +24,7 @@ import {
 import type { ExecutionProfile, ProjectConfiguration, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 import { validateProjectConfigSchema } from "./project-config-schema-validation.js";
-import { capabilityGraphSchema, sspDecisionModelSchema } from "./decision-model-schemas.js";
+import { sspDecisionStrategySchema } from "./decision-model-schemas.js";
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -150,11 +150,18 @@ export const projectValidationNodeSchema = z.discriminatedUnion("type", [
   z.object({ ...executableFields, type: z.literal("human") }).strict()
 ]);
 const capabilitiesSchema = z.object({ accepts: capabilityListSchema, provides: capabilityListSchema }).strict();
+const intrinsicOutcomesSchema = z.array(z.object({
+  outcomeId: entityIdSchema,
+  result: z.enum(["PASS", "FAIL"])
+}).strict()).max(64).refine(
+  (outcomes) => new Set(outcomes.map(({ outcomeId }) => outcomeId)).size === outcomes.length,
+  "Intrinsic outcome ids must be unique."
+);
 const jobNodeSchema = z.object({
-  ...appearanceFields,
   id: entityIdSchema,
   description: descriptionSchema,
   capabilities: capabilitiesSchema,
+  outcomes: intrinsicOutcomesSchema,
   maxRetries: z.number().int().min(0).max(maxJobRetriesLimit),
   workNode: projectWorkNodeSchema,
   validationNode: projectValidationNodeSchema
@@ -192,7 +199,6 @@ const routingSchema = <T extends z.ZodTypeAny>(target: T) => {
   }).strict();
 };
 const orchestratorSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
-  ...appearanceFields,
   ...compositionFields,
   id: entityIdSchema,
   description: descriptionSchema,
@@ -202,15 +208,9 @@ const orchestratorSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
 }).strict();
 const graphStrategySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("agent_v1"), orchestrator: orchestratorSchema(graphTargetSchema) }).strict(),
-  z.object({
-    kind: z.literal("ssp_v1"), ...appearanceFields,
-    id: entityIdSchema, description: descriptionSchema,
-    capabilityGraph: capabilityGraphSchema,
-    model: sspDecisionModelSchema
-  }).strict()
+  sspDecisionStrategySchema
 ]);
 const repairNodeSchema = z.object({
-  ...appearanceFields,
   ...compositionFields,
   id: entityIdSchema,
   description: descriptionSchema,
@@ -226,12 +226,15 @@ const initialStateSchema = jsonValueSchema.refine((value) =>
   new TextEncoder().encode(JSON.stringify(value)).byteLength <= maxProjectStateBytes,
 `Initial Graph state must not exceed ${maxProjectStateBytes} bytes.`);
 const graphNodeSchema = z.object({
-  ...appearanceFields,
   id: entityIdSchema,
   description: descriptionSchema,
   capabilities: capabilitiesSchema,
+  outcomes: intrinsicOutcomesSchema,
   stateContract: z.object({ description: descriptionSchema }).strict(),
-  orchestrator: orchestratorSchema(graphNodeTargetSchema),
+  strategy: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("agent_v1"), orchestrator: orchestratorSchema(graphNodeTargetSchema) }).strict(),
+    sspDecisionStrategySchema
+  ]),
   repairNode: repairNodeSchema.optional(),
   jobNodes: z.array(jobNodeSchema).min(1).max(maxGraphNodeJobNodes)
 }).strict();
@@ -254,13 +257,30 @@ export const projectIssueTrackerSchema = z.object({
 }).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
 
 export const automationConfigSchema = z.object({
-  version: z.literal(15),
+  version: z.literal(16),
   graph: graphSchema
 }).strict() as z.ZodType<ProjectAutomationConfig>;
 
+export const policyPreviewRequestSchema = z.object({
+  config: automationConfigSchema,
+  scope: z.enum(["graph", "graph_node"]),
+  graphNodeId: entityIdSchema.optional()
+}).strict().superRefine((value, context) => {
+  if (value.scope === "graph_node" && !value.graphNodeId) context.addIssue({
+    code: "custom", path: ["graphNodeId"], message: "Graph Node policy preview requires graphNodeId."
+  });
+});
+
 export const projectConfigSchema = z.object({
-  version: z.literal(15),
+  version: z.literal(16),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
   graph: graphSchema
-}).strict().superRefine(validateProjectConfigSchema) as z.ZodType<ProjectConfiguration>;
+}).strict() as z.ZodType<ProjectConfiguration>;
+
+export const projectConfigReadinessSchema = z.object({
+  version: z.literal(16),
+  executionProfiles: z.array(executionProfileSchema),
+  issueTracker: projectIssueTrackerSchema,
+  graph: graphSchema
+}).strict().superRefine(validateProjectConfigSchema);

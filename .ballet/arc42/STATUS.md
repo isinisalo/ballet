@@ -3,8 +3,8 @@ id: arc42-project-status
 title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-22'
-version: 26
+updatedAt: '2026-08-23'
+version: 28
 tags:
   - arc42
   - status
@@ -19,58 +19,58 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 
 ## Tila
 
-- `goal-001`–`goal-016` ovat accepted.
+- `goal-001`–`goal-016` ovat accepted. `goal-017` ja `goal-018` ovat review-tilassa Portti A:n implementation/acceptance-rajalla.
 - `goal-016`, `adr-026` ja `QS-021` hyväksyvät Graph-scopeen explicit `agent_v1 | ssp_v1` -strategian, proper-policy-semanticsin, fixed-point mallin ja v15/v8/v11 strict cutin.
-- `adr-023` omistaa säilyvän Graph/GraphNode/JobNode-domainin, GraphNode-scope agent routingin ja bounded Repair Noden. `adr-025` ja review-tilainen `adr-027` omistavat Job Node -authoringin industrial flow -projektion; Graph/Graph Node -avaruuscanvasit säilyvät.
-- Nykyinen hard cut on Project Config v15, Graph Node Module v4, Root Snapshot v8, Task Envelope/Outcome v7, composition v8, ExecutionSpec v9 ja SQLite v11. Compatibility-lukijoita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
+- `adr-023` omistaa säilyvän Graph/GraphNode/JobNode-domainin ja bounded Repair Noden. `adr-025` ja review-tilainen `adr-027` omistavat Job Node industrial flow'n. Review-tilaiset `adr-028` ja `adr-029` dokumentoivat hierarchical policy- ja capability-first-upper-level-muutokset.
+- Nykyinen Portti A implementation cut on Project Config v16, Graph Node Module v5, Root Snapshot v9, Task Envelope/Outcome v8, composition v9, ExecutionSpec v10 ja SQLite v12. Compatibility-lukijoita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
 - Oletusprojekti sisältää viisi GraphNodea ja 17 aggregate JobNodea, joilla jokaisella on erillinen Work- ja Validation-lapsi. Viiden Graph Noden nimet ja arc42-/release-menettely ovat project-local-dataa.
-- Oletusprojekti käyttää Graph-scope `agent_v1`:ssä Luna/medium/network-off-profiilia; viisi paikallista GraphNode-orchestratoria käyttävät samaa profiilia ja globaalilla sekä jokaisella Graph Nodella on explicit Sol/medium/network-off Repair Node. `ssp_v1` ei kutsu Graph LLM:ää. Platform ei hardkoodaa malleja eikä GraphNode-nimiä eikä tee fallbackia.
+- Oletusprojekti käyttää edelleen `agent_v1`:tä molemmissa scopeissa, explicit Luna/medium/network-off-orchestratoreita ja Sol/medium/network-off Repair Nodeja. `ssp_v2` on eksplisiittinen global/local-vaihtoehto eikä kutsu LLM:ää routing-päätökseen. Platform ei hardkoodaa malleja eikä GraphNode-nimiä eikä tee fallbackia.
 - Julkiset Run-rajat ovat Graph Run ja GraphNode Run. Standalone JobNode Run ja schedule on poistettu. GraphNode Run käyttää Graph-tasoa vain repair-eskalaatioon.
-- Canonical authoring-reitit ovat `/automation/graph`, `/automation/graph/nodes/:graphNodeId` ja `/automation/graph/nodes/:graphNodeId/jobs/:jobNodeId`; Run-reitit ovat `/run/graphs/:graphId` ja `/run/graph-nodes/:graphNodeId`.
-- Kaikki kolme canvasia käyttävät suojattua 24 px gridia ja samoja tokeneita. Graph/Graph Node käyttävät planet/multi-ring/spoke-kieltä; Job Node käyttää deterministic industrial flow'ta, jossa exact Work/Validation ID -kortit, Pass?/Retry?-junctionit, Retry count -ghost ja Continue/Escalate-ympyrät ovat näkyviä, mutta vain Work/Validation ovat valittavia.
+- Canonical authoring-reitit ovat `/automation/graph?section=capabilities|decision-model`, `/automation/graph/nodes/:graphNodeId?section=jobs|local-decision-model` ja `/automation/graph/nodes/:graphNodeId/jobs/:jobNodeId`; Run-reitit ovat `/run/graphs/:graphId` ja `/run/graph-nodes/:graphNodeId`.
+- Graph/Graph Node käyttävät responsive capability/decision-model-kortteja. Job Node säilyttää suojatun 24 px gridin ja deterministic industrial flow'n, jossa exact Work/Validation ID -kortit, Pass?/Retry?-junctionit, Retry count -ghost ja Continue/Escalate-ympyrät ovat näkyviä, mutta vain Work/Validation ovat valittavia.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat edelleen täsmällisen ihmisvaltuutuksen.
 
 ## Toteutettu fakta, evidenssi ja avoin riski
 
 | Luokka | Nykytila |
 | --- | --- |
-| Hyväksytty päätös | `goal-015` / `adr-023` määrittää kolmitasoisen domain/GraphNode-runtime-rajan, `adr-025` ja review-tilainen `adr-027` Job industrial flow -projektion ja `goal-016` / `adr-026` Graph strategy/policy -rajan. State-, snapshot-, worktree-, tracker/outbox-, ihmisvaltuutus- ja same-Validation repair-return -invariantit säilyvät. |
-| Toteutettu fakta | Strict v15 domain/config, Snapshot v8, SQLite v11, agent/SSP strategy union, pure Decision State/admissibility/solver, append-only policy evidence, Graph/GraphNode Run services, 14 v4-pakettia ja kolme canonical routea löytyvät työpuusta. |
-| Paikallinen evidenssi | Aiempi TGNE-EVID-001–005 säilyy Graph/Graph Node -baseline-evidenssinä. ADR-025/027:n unit/component/integration-, full gate-, desktop/narrow-browser- ja installed-app-evidenssi on kerätty ja indeksoitu `job-node-industrial-flow-canvas`-initiativeen. |
-| Avoin riski | Uuden Job-flow'n ihmisvisual verdict ja ensimmäinen tuotantokaltainen Luna/Sol-pilotti puuttuvat. Ne eivät valtuuta releasea tai external writea. |
-| Policy core | `stochastic-policy-orchestration` toteuttaa Capability Graph / Decision Model / Execution Graph -rajan, bounded Decision Staten, GraphNode Optionin, hard `A(s)`:n, explicit priors/costit, proper-policy value iterationin, structured Configure-editorin, bounded Policy Projectionin ja factual Run-trajectoryn. |
-| Policy evidence | SPO-EVID-000–006: human approval, arbitrary/full-rename schema, bounded sources, hard guard, solver, immutable snapshot, atomic SQLite evidence, outcome deviation, restart, full editor/projection sekä desktop/narrow browser QA. Max-bound/cross-host, human calibration/usability, cancel-race ja pilot ovat review-rajalla. |
+| Hyväksytty päätös | `goal-015` / `adr-023`, `adr-025/027` ja `goal-016` / `adr-026` omistavat säilyvät domain-, Job-flow- ja finite policy -rajat. `adr-028/029` ovat review-tilassa eivätkä vielä valtuuta Portti B:tä. |
+| Toteutettu fakta | Strict v16 domain/config, Snapshot v9, SQLite v12, explicit agent/SSP v2 scoped union, outcome-aware compiler/solver/projector/evidence, Graph/GraphNode Run services, 14 v5-pakettia, capability-first cards ja protected Job flow löytyvät työpuusta. |
+| Paikallinen evidenssi | Portti A:n 49/189 full suite, focused Job-flow 3/11, arc42/lint/build/DESIGN/module/boundary/diff/release/startup-portit sekä capability-first desktop/narrow/40/64 browser-mittarit ovat passed. In-app browser ei navigoinut localhostiin final restartin jälkeen, joten narrow Job-flow’n post-fix screenshot ja ihmisvisual review puuttuvat. |
+| Avoin riski | Probability/cost/outcome-kalibrointi, `ssp_v2` end-to-end-pilotti, restart/resume-pilottievidenssi, final human review ja Portti B approval puuttuvat. Ne eivät valtuuta agenttipoistoa, releasea tai external writea. Lintin non-blocking warning baseline nousi 8:sta 15:een. |
+| Policy Portti A | `outcome-aware-hierarchical-policy` lisää semantic outcomes, scoped `P(o,s'|s,a)`:n, global/local proper policyn, projector-owned actual Staten, neljä model-miss-luokkaa ja immutable provenance -ketjun ilman prior mutationia. |
+| UI Portti A | `capability-first-authoring` lisää Capability Graph / Decision Model ja Jobs / Local Decision Model & Repair -osiot sekä scoped Run current decision/projection/execution -pinnat. |
 
 ## Kanoniset lähteet
 
-Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY.md), State-raja [STATE-CONTRACTissa](STATE-CONTRACT.md), active UI-baseline [job-node-industrial-flow-canvas](initiatives/job-node-industrial-flow-canvas/BRIEF.md)-initiativessa ja accepted policy core [stochastic-policy-orchestration](initiatives/stochastic-policy-orchestration/BRIEF.md)-initiativessa.
+Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY.md), State-raja [STATE-CONTRACTissa](STATE-CONTRACT.md), Job-flow-baseline [job-node-industrial-flow-canvas](initiatives/job-node-industrial-flow-canvas/BRIEF.md)-initiativessa sekä Portti A:n review-jälki [outcome-aware-hierarchical-policy](initiatives/outcome-aware-hierarchical-policy/BRIEF.md)- ja [capability-first-authoring](initiatives/capability-first-authoring/BRIEF.md)-initiativeissa.
 
 ## Relevantit päätökset
 
-`goal-015`, `goal-016`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`, `adr-026` ja `adr-027`.
+`goal-015`–`goal-018`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`–`adr-029`.
 
 ## Evidenssi
 
-- `.ballet/project.json` on strict v15 ja määrittää explicit `agent_v1`-strategian, viisi GraphNodea, 17 JobNodea, scoped candidate-säännöt sekä explicit Luna/Sol-mappingit.
-- `.ballet/graph-node-library/**` sisältää 14 strict-v4-pakettia.
+- `.ballet/project.json` on strict v16 ja määrittää explicit `agent_v1`-strategian molemmissa scopeissa, viisi GraphNodea, 17 JobNodea, intrinsic outcome -draftit, scoped candidate-säännöt sekä Luna/Sol-mappingit.
+- `.ballet/graph-node-library/**` sisältää 14 strict-v5-pakettia.
 - `TEST-019` / `EVID-019` omistaa domain/runtime/module/conformance-evidenssin.
 - `TEST-020` / `EVID-020` omistaa canonical route-, scope-, a11y-, layout-, browser- ja visual-evidenssin.
 - `npm run validate:arc42` on deterministinen repository-conformance-gate.
-- `TEST-021` / `EVID-021` omistaa accepted policy-ketjun; core implementation passed ja full gate/projection/pilot ovat pending.
+- `TEST-022`–`TEST-024` / `EVID-022`–`EVID-024` omistavat Portti A:n review-ketjut; implementation/startup/capability-first browser evidence on paikallisesti passed, kalibroitu pilotti, post-fix Job-flow screenshot ja human review pending.
 
 ## Avoimet kysymykset
 
-- Hyväksyykö projektin omistaja desktop- ja narrow-selainevidenssin Graph/Graph Node -avaruusteeman sekä Job industrial flow'n kompaktiuden ja ymmärrettävyyden?
-- Millainen success/failure/repair-jakauma ensimmäisessä tuotantokaltaisessa Graph Runissa todentaa Luna-routerin ja Sol-repairin käytännön fitnessin?
+- Hyväksyykö projektin omistaja capability-first desktop/narrow-selainevidenssin ja ADR-029:n?
+- Mitkä outcome-katalogit, probabilityt, costit ja bounded featuret hyväksytään ensimmäiseen `ssp_v2`-pilottiin?
 - Pinned tracker/provider live-smoke raportoidaan erikseen eikä hermetic testi korvaa sitä.
 - Mitkä ensimmäisen pilotin featuret, priors/costit ja observed cost dimensions domain expert hyväksyy?
 
 ## Nykyinen handoff
 
-- Initiative: `stochastic-policy-orchestration`.
-- Status: `review`; accepted architecture, generic runtime-core ja full gate/conformance ovat valmiit; projection/benchmark/cancel-race/pilot ovat seuraavan slicen raja.
-- Muuttunut stable chain: `goal-016`, `REQ-016`, `QS-021`, `adr-026`, `CON-012`, `BB-011`, `RT-016`, `RISK-018`, `TEST-021`, `EVID-021`.
-- Seuraava yksi hyväksytty toimi: editor/projection/benchmark/cancel-race/pilot-slicen rajaus.
+- Initiativet: `outcome-aware-hierarchical-policy` ja `capability-first-authoring`.
+- Status: `review`; Portti A implementation ja standardigatet on rakennettu ja ajettu, calibrated pilot, post-fix Job-flow screenshot, ihmisreview ja Portti B ovat erilliset rajat.
+- Muuttunut stable chain: `goal-017`/`goal-018`, `REQ-017`/`REQ-018`, `QS-022`–`QS-024`, `adr-028`/`adr-029`, `CON-005`/`CON-012`, `BB-001`/`BB-003`–`BB-005`/`BB-011`, `RT-017`/`RT-018`, `TEST-022`–`TEST-024`, `EVID-022`–`EVID-024`.
+- Seuraava yksi hyväksytty toimi: project owner kalibroi ja hyväksyy ensimmäisen `ssp_v2`-pilottimallin; narrow Job-flow’n post-fix screenshot voidaan täydentää, kun in-app browser navigoi localhostiin jälleen.
 - Stop condition: deploy/release/merge/push vaatii erillisen täsmällisen valtuutuksen.
 
 ## Seuraava katselmointiperuste

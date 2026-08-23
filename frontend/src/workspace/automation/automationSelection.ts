@@ -1,137 +1,41 @@
-import {
-  routeTargetKey,
-  type ProjectAutomationConfig,
-  type ProjectGraphNode,
-  type ProjectJobNode,
-  type ProjectOrchestrator,
-  type ProjectRepairNode,
-  type ProjectValidationNode,
-  type ProjectWorkNode
-} from "@shared/api/workspace-contracts";
-import type { EngineeringLevel } from "../types";
+import type { ProjectAutomationConfig, ProjectGraphNode, ProjectJobNode } from "@shared/api/workspace-contracts";
 import type { EngineeringInspectorModel } from "./EngineeringInspector";
 
-export type AutomationSelection = "none" | "settings" | "orchestrator" | "repair" | "work" | "validation";
+export type AutomationSelection = "none" | "settings" | "work" | "validation";
 
-export function automationInspectorModel(
-  level: EngineeringLevel,
+export const automationInspectorModel = (
   selection: AutomationSelection,
-  config: ProjectAutomationConfig,
   graphNode: ProjectGraphNode | undefined,
   jobNode: ProjectJobNode | undefined,
   locked: boolean
-): EngineeringInspectorModel | undefined {
-  if (selection === "none") return undefined;
-  if (level === "graph") {
-    if (selection === "settings") return {
-      key: "graph-settings", role: "Graph", title: config.graph.name, id: config.graph.id,
-      description: config.graph.state.description, locked
-    };
-    if (selection === "repair" && config.graph.repairNode) return repairModel(config.graph.repairNode, "Graph Repair Node", locked);
-    return config.graph.strategy.kind === "agent_v1"
-      ? orchestratorModel(config.graph.strategy.orchestrator, "Graph Orchestrator", locked)
-      : {
-          key: `SSP Policy:${config.graph.strategy.id}`, role: "SSP Policy", title: config.graph.strategy.description,
-          id: config.graph.strategy.id, description: config.graph.strategy.description,
-          nodeStyle: config.graph.strategy.nodeStyle, nodeSize: config.graph.strategy.nodeSize,
-          candidates: config.graph.strategy.capabilityGraph.actions.map((action) => ({
-            label: action.graphNodeId,
-            values: action.guards.length ? action.guards.map((guard) => `${guard.featureId}=${guard.allowedValues.join("|")}`) : ["admissible"]
-          })), locked
-        };
-  }
-  if (!graphNode) return undefined;
-  if (level === "graph_node") {
-    if (selection === "settings") return metadataModel(graphNode, "Graph Node", locked);
-    if (selection === "repair" && graphNode.repairNode) return repairModel(graphNode.repairNode, "Graph Node Repair Node", locked);
-    return orchestratorModel(graphNode.orchestrator, "Graph Node Orchestrator", locked);
-  }
-  if (!jobNode) return undefined;
-  if (selection === "settings") return { ...metadataModel(jobNode, "Job Node", locked), maxRetries: jobNode.maxRetries };
-  if (selection === "validation") return executableModel(jobNode.validationNode, "Validation Node", "Verify Result", locked);
-  return executableModel(jobNode.workNode, "Work Node", "Take action", locked);
-}
-
-export function updateAutomationSelection(
-  config: ProjectAutomationConfig,
-  level: EngineeringLevel,
-  selection: AutomationSelection,
-  graphNodeId: string | undefined,
-  jobNodeId: string | undefined,
-  field: string,
-  value: string | number
-): ProjectAutomationConfig {
-  if (level === "graph") {
-    if (selection === "settings") return {
-      ...config, graph: { ...config.graph, state: { ...config.graph.state, description: String(value) } }
-    };
-    if (selection === "repair") {
-      const node = config.graph.repairNode;
-      return node ? { ...config, graph: { ...config.graph, repairNode: { ...node, [field]: value } } } : config;
-    }
-    const strategy = config.graph.strategy;
-    return strategy.kind === "agent_v1"
-      ? { ...config, graph: { ...config.graph, strategy: {
-          kind: "agent_v1", orchestrator: { ...strategy.orchestrator, [field]: value }
-        } } }
-      : { ...config, graph: { ...config.graph, strategy: { ...strategy, [field]: value } } };
-  }
-  const graphNodeIndex = config.graph.graphNodes.findIndex((node) => node.id === graphNodeId);
-  if (graphNodeIndex < 0) return config;
-  const graphNode = config.graph.graphNodes[graphNodeIndex];
-  let nextGraphNode: ProjectGraphNode;
-  if (level === "graph_node") {
-    if (selection === "settings") nextGraphNode = { ...graphNode, [field]: value };
-    else {
-      const key = selection === "repair" ? "repairNode" : "orchestrator";
-      const node = graphNode[key];
-      if (!node) return config;
-      nextGraphNode = { ...graphNode, [key]: { ...node, [field]: value } };
-    }
-  } else {
-    const jobIndex = graphNode.jobNodes.findIndex((node) => node.id === jobNodeId);
-    if (jobIndex < 0) return config;
-    const job = graphNode.jobNodes[jobIndex];
-    const nextJob = selection === "settings" ? { ...job, [field]: value }
-      : selection === "validation" ? { ...job, validationNode: { ...job.validationNode, [field]: value } }
-        : { ...job, workNode: { ...job.workNode, [field]: value } };
-    nextGraphNode = { ...graphNode, jobNodes: graphNode.jobNodes.map((node, index) => index === jobIndex ? nextJob : node) };
-  }
-  return {
-    ...config,
-    graph: { ...config.graph, graphNodes: config.graph.graphNodes.map((node, index) => index === graphNodeIndex ? nextGraphNode : node) }
+): EngineeringInspectorModel | undefined => {
+  if (!graphNode || !jobNode || selection === "none") return undefined;
+  if (selection === "settings") return {
+    key: `${jobNode.id}:settings`, role: "Job Node", title: jobNode.description, id: jobNode.id,
+    description: jobNode.description, maxRetries: jobNode.maxRetries,
+    accepts: jobNode.capabilities.accepts, provides: jobNode.capabilities.provides, locked
   };
-}
+  const node = selection === "work" ? jobNode.workNode : jobNode.validationNode;
+  return {
+    key: node.id, role: selection === "work" ? "Work" : "Validation", title: node.description,
+    id: node.id, description: node.description, task: node.task, nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
+    executionProfileId: node.type === "agent" ? node.executionProfileId : undefined,
+    primaryInstructionId: node.type === "agent" ? node.primaryInstructionId : undefined, locked
+  };
+};
 
-const metadataModel = (node: ProjectGraphNode | ProjectJobNode, role: string, locked: boolean): EngineeringInspectorModel => ({
-  key: `${role}:${node.id}`, role, title: node.description, id: node.id, description: node.description,
-  nodeStyle: node.nodeStyle, nodeSize: node.nodeSize, accepts: node.capabilities.accepts,
-  provides: node.capabilities.provides, locked
+export const updateAutomationSelection = (
+  config: ProjectAutomationConfig, selection: AutomationSelection, graphNodeId: string | undefined,
+  jobNodeId: string | undefined, field: string, value: string | number
+): ProjectAutomationConfig => ({
+  ...config, graph: { ...config.graph, graphNodes: config.graph.graphNodes.map((graphNode) => graphNode.id !== graphNodeId ? graphNode : ({
+    ...graphNode, jobNodes: graphNode.jobNodes.map((jobNode) => jobNode.id !== jobNodeId ? jobNode : updateJob(jobNode, selection, field, value))
+  })) }
 });
 
-const executableModel = (
-  node: ProjectWorkNode | ProjectValidationNode, role: string, title: string, locked: boolean
-): EngineeringInspectorModel => ({
-  key: `${role}:${node.id}`, role, title, id: node.id, description: node.description,
-  task: node.task, nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
-  ...(node.type === "agent" ? { executionProfileId: node.executionProfileId, primaryInstructionId: node.primaryInstructionId } : {}),
-  locked
-});
-
-const repairModel = (node: ProjectRepairNode, role: string, locked: boolean): EngineeringInspectorModel => ({
-  key: `${role}:${node.id}`, role, title: node.description, id: node.id, description: node.description,
-  task: node.task, nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
-  executionProfileId: node.executionProfileId, primaryInstructionId: node.primaryInstructionId,
-  maxRepairDepth: node.maxRepairDepth, maxRepairAttempts: node.maxRepairAttempts, locked
-});
-
-const orchestratorModel = <T>(node: ProjectOrchestrator<T>, role: string, locked: boolean): EngineeringInspectorModel => ({
-  key: `${role}:${node.id}`, role, title: node.description, id: node.id, description: node.description,
-  nodeStyle: node.nodeStyle, nodeSize: node.nodeSize, executionProfileId: node.executionProfileId,
-  primaryInstructionId: node.primaryInstructionId, maxTransitions: node.maxTransitions,
-  maxRouteAttempts: node.maxRouteAttempts,
-  candidates: [node.routing.start, ...node.routing.continuation, ...node.routing.repair].map((rule) => ({
-    label: rule.id, values: rule.candidates.map((candidate) => routeTargetKey(candidate.target as never))
-  })),
-  locked
-});
+const updateJob = (job: ProjectJobNode, selection: AutomationSelection, field: string, value: string | number): ProjectJobNode => {
+  if (selection === "settings") return { ...job, [field]: value };
+  if (selection === "work") return { ...job, workNode: { ...job.workNode, [field]: value } } as ProjectJobNode;
+  if (selection === "validation") return { ...job, validationNode: { ...job.validationNode, [field]: value } } as ProjectJobNode;
+  return job;
+};

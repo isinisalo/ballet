@@ -133,7 +133,7 @@ export class RootRunStore {
 }
 
 const assertSnapshot = (value: RootExecutionSnapshot): RootExecutionSnapshot => {
-  if (value.version !== 8 || !["graph","graph_node"].includes(value.rootKind)
+  if (value.version !== 9 || !["graph","graph_node"].includes(value.rootKind)
     || !value.graph || !Array.isArray(value.graph.graphNodes)) {
     throw new Error("Root execution snapshot v8 is invalid.");
   }

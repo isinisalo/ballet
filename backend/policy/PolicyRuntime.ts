@@ -1,31 +1,31 @@
 import type {
-  AdmissibleActionSetV1,
-  DecisionProjectionContextV1,
-  DecisionStateV1,
+  AdmissibleActionSetV2,
+  DecisionProjectionContextV2,
+  DecisionStateV2,
   PolicyDecisionStatus,
-  ProjectSspGraphStrategyV1,
-  SspPolicySolutionV1
+  ProjectSspDecisionStrategyV2,
+  SspPolicySolutionV2
 } from "../../shared/domain/decisionModel.js";
 import { resolveAdmissibleActions, resolveAllAdmissibleActions } from "./AdmissibleActionResolver.js";
 import { DecisionStateProjectionError, projectDecisionState } from "./DecisionStateProjector.js";
 import { solvePolicy } from "./SspPolicySolver.js";
 
 export interface PolicyRuntimeEvaluation {
-  state?: DecisionStateV1;
-  admissible: AdmissibleActionSetV1;
+  state?: DecisionStateV2;
+  admissible: AdmissibleActionSetV2;
   status: PolicyDecisionStatus;
   terminal?: "success" | "failure" | "blocked";
-  solution?: SspPolicySolutionV1;
+  solution?: SspPolicySolutionV2;
   message?: string;
 }
 
 export const evaluatePolicyDecision = (input: {
-  strategy: ProjectSspGraphStrategyV1;
-  context: DecisionProjectionContextV1;
+  strategy: ProjectSspDecisionStrategyV2;
+  context: DecisionProjectionContextV2;
   snapshotGraphNodeIds: readonly string[];
   modelSha256: string;
 }): PolicyRuntimeEvaluation => {
-  let state: DecisionStateV1;
+  let state: DecisionStateV2;
   try {
     state = projectDecisionState(input.strategy.model, input.context);
   } catch (error) {

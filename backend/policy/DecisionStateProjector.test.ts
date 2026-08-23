@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { DecisionProjectionContextV1, ProjectSspDecisionModelV1 } from "../../shared/domain/decisionModel.js";
+import type { DecisionProjectionContextV2, ProjectSspDecisionModelV2 } from "../../shared/domain/decisionModel.js";
 import { DecisionStateProjectionError, projectDecisionState } from "./DecisionStateProjector.js";
 
-const model: ProjectSspDecisionModelV1 = {
-  version: 1,
+const model: ProjectSspDecisionModelV2 = {
+  version: 2,
   features: [
     { id: "epoch", domain: ["start"], missingValue: "start", source: { kind: "runtime", fact: "epoch_kind" } },
     { id: "phase", domain: ["unknown", "ready"], missingValue: "unknown", source: { kind: "project_state", pointer: "/phase" } },
@@ -15,17 +15,17 @@ const model: ProjectSspDecisionModelV1 = {
     { id: "ready-authorized", values: { epoch: "start", phase: "ready", permit: "yes" } }
   ],
   stateActions: [],
-  solver: { algorithm: "ssp_value_iteration_v1", epsilon: 1e-9, maxIterations: 10_000, maxSolveMillis: 2_000 },
+  solver: { algorithm: "ssp_value_iteration_v2", epsilon: 1e-9, maxIterations: 10_000, maxSolveMillis: 2_000 },
   projection: { maxDecisionEpochs: 20, maxProjectionNodes: 100 }
 };
 
-const context = (overrides: Partial<DecisionProjectionContextV1> = {}): DecisionProjectionContextV1 => ({
-  epochKind: "start", graphNodeInvocationCount: 0, stateRevision: 3,
+const context = (overrides: Partial<DecisionProjectionContextV2> = {}): DecisionProjectionContextV2 => ({
+  epochKind: "start", actionInvocationCount: 0, stateRevision: 3,
   projectState: { phase: "ready", permit: "no" }, authorizationFacts: { permit: "yes" },
   evidenceRefs: ["graph-state:3"], ...overrides
 });
 
-describe("bounded Decision State projection", () => {
+describe("bounded Decision State projection v2", () => {
   it("keeps project State and authorization facts as distinct canonical sources", () => {
     expect(projectDecisionState(model, context())).toMatchObject({
       stateId: "ready-authorized", features: { epoch: "start", phase: "ready", permit: "yes" },

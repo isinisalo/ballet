@@ -18,7 +18,7 @@ export interface ExecutionProfile {
 }
 
 export interface ProjectConfiguration {
-  version: 15;
+  version: 16;
   executionProfiles: ExecutionProfile[];
   issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;

@@ -3,8 +3,8 @@ id: arc42-section-01
 title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-22'
-version: 12
+updatedAt: '2026-08-23'
+version: 13
 tags:
   - arc42
   - requirements
@@ -19,10 +19,10 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 
 ## Tila ja väitteiden luokittelu
 
-- **Hyväksytty päätös:** `goal-001`–`goal-016` määrittävät tuotteen tarkoituksen ja laajuuden.
+- **Hyväksytty päätös:** `goal-001`–`goal-016` määrittävät hyväksytyn tuotteen tarkoituksen ja laajuuden. Review-tilaiset `goal-017` ja `goal-018` omistavat Portti A:n hierarchical policy- ja capability-first-tavoitteet.
 - **Toteutettu policy-intentio:** `goal-016` / `REQ-016` tuo Graph-scopeen geneerisen finite SSP/SMDP -policystrategian explicit `agent_v1 | ssp_v1` -valintana.
-- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v15 Graph/GraphNode/JobNode-domainin, scoped agent routing/repair -runtimen, SSP-policy coren ja kolme URL-ohjattua avaruuscanvasia.
-- **Hyväksytty target:** `goal-015` / `adr-023` määrittää viiden project-local GraphNoden, 17 aggregate JobNoden, Luna-orchestratorien, Sol Repair Nodejen ja Graph Node Module v4 -rajan; initiative-evidenssi on pending final gate/browser review.
+- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v16 Graph/GraphNode/JobNode-domainin, explicit agent/SSP scoped routingin, outcome-aware policy coren, capability-first upper-level-authoringin ja säilyvän Job industrial flow'n.
+- **Hyväksytty domain:** `goal-015` / `adr-023` määrittää viiden project-local GraphNoden, 17 aggregate JobNoden sekä Luna/Sol-profiilien säilyvän baseline-intention; Portti A:n portable package on Graph Node Module v5 ja upper-level-projektio on ADR-029:n review-rajalla.
 - **Paikallinen evidenssi:** toteutuksen ajantasaisuus osoitetaan testeillä, buildilla ja `validate:arc42`-tarkistuksella; yksittäisen initiative-työn tulokset kirjataan sen EVIDENCE-tiedostoon.
 - **Avoin riski:** ensimmäisen tuotantokaltaisen pilotin mitatut menetelmä- ja palautumisarvot puuttuvat vielä; katso [osio 11](11-risks-and-technical-debt.md).
 
@@ -46,6 +46,8 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-014 | goal-014 | Suorita Graph deterministisenä viiden Loopin RunBookina, pidä tavalliset transitionit erillään repair call/returnista ja sovita release-/implementation-työ fail-closedisti `tk`:hon. | Strict-v13/v3 hard cut, exact snapshot-transitionit, `GraphOrchestrationStateV1`, SQLite v9 tracker-outbox, GraphEngineeringStateV1 ja project-local DESIGN/PLAN/BUILD/DEPLOY/VERIFY-data. | QS-016, QS-017, QS-018 |
 | REQ-015 | goal-015 | Korvaa aktiivinen Loop/Workflow-malli kolmella Graph/GraphNode/JobNode-tasolla, anna scoped orchestratorien tehdä tasojen väliset päätökset ja käsittele vaikeat poikkeukset bounded Repair Nodella. | Strict-v14/v4/v7/v8/v9/v10 hard cut, scoped candidate-enumit, Luna/Sol-project profiles, Graph/GraphNode Runeja ja kolme suojattua avaruuscanvasia. | QS-019, QS-020 |
 | REQ-016 | goal-016 | Valitse Graph Runin seuraava user-defined GraphNode explicit finite SSP/SMDP -päätösmallista erottaen Capability Graph, Decision Model, Policy Projection ja Execution Graph. | Bounded Decision State, GraphNode Option, hard `A(s)`, snapshotted transition/cost/terminal model, proper-policy value iteration ja per-epoch evidence; explicit `agent_v1 | ssp_v1` ilman fallbackia. | QS-021 |
+| REQ-017 | goal-017 | Käytä outcome-aware finite SSP/SMDP v2 -policya sekä GraphNode-optionin että sen JobNode-actionin valintaan ja pidä actual state canonical projectorin omistuksessa. | Scoped `P(outcome,nextState|state,action)`, intrinsic outcomes, proper global/local policy, model-miss observation, immutable provenance ja explicit `agent_v1 | ssp_v2` Portti A:ssa. | QS-022, QS-023 |
+| REQ-018 | goal-018 | Näytä mitä järjestelmä voi tehdä capability-first-korteilla ja authoroi global/local policy omissa URL-omisteisissa osioissaan säilyttäen Job flow'n. | Capability Graph / Decision Model ja Jobs / Local Decision Model & Repair -osiot, atominen CRUD, scoped Run evidence ja ADR-025/027 Job-flow. | QS-024 |
 
 Täydelliset mitattavat skenaariot ja evidenssistatukset ovat [osiossa 10](10-quality-requirements.md), ja päästä päähän -ketjut ovat [TRACEABILITYssa](TRACEABILITY.md).
 
@@ -83,7 +85,7 @@ Ballet omistaa yleiset Graph-, GraphNode-, aggregate JobNode-, scoped orchestrat
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023` ja `adr-026`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-026` sekä review-tilaiset `adr-028` ja `adr-029`.
 
 ## Evidenssi
 

@@ -7,10 +7,10 @@ import {
 describe("canonical Graph Engineering routing", () => {
   it("parses exactly the three engineering levels", () => {
     expect(routeFromPath("/automation/graph")).toEqual({
-      view: "automation", engineeringLevel: "graph"
+      view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities"
     });
     expect(routeFromPath("/automation/graph/nodes/build")).toEqual({
-      view: "automation", engineeringLevel: "graph_node", graphNodeId: "build"
+      view: "automation", engineeringLevel: "graph_node", graphNodeId: "build", engineeringSection: "jobs"
     });
     expect(routeFromPath("/automation/graph/nodes/build/jobs/backend%20implementation")).toEqual({
       view: "automation", engineeringLevel: "job_node",
@@ -21,9 +21,14 @@ describe("canonical Graph Engineering routing", () => {
   it("rejects Loop, Workflow and query aliases", () => {
     expect(routeFromPath("/automation/loops")).toEqual({ view: "projects" });
     expect(routeFromPath("/automation/graph?view=workflow&id=build")).toEqual({
-      view: "automation", engineeringLevel: "graph"
+      view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities"
     });
     expect(routeFromPath("/run/loops/build")).toEqual({ view: "projects" });
+  });
+
+  it("keeps capability and decision-model sections in the URL", () => {
+    expect(routeFromPath("/automation/graph?section=decision-model")).toMatchObject({ engineeringSection: "decision-model" });
+    expect(routeFromPath("/automation/graph/nodes/build?section=local-decision-model")).toMatchObject({ engineeringSection: "local-decision-model" });
   });
 
   it("parses Graph and GraphNode Run routes", () => {

@@ -6,31 +6,32 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-export function GraphNodeCreateDialog({ open, onOpenChange, profiles, instructions, existingIds, onCreate }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  profiles: ExecutionProfile[];
-  instructions: ProjectInstruction[];
-  existingIds: string[];
-  onCreate: (input: { id: string; description: string; executionProfileId: string; primaryInstructionId: string }) => void;
-}) {
+type CreateInput = { id: string; description: string; executionProfileId: string; primaryInstructionId: string };
+
+export const GraphNodeCreateDialog = (props: SharedCreateProps) => <NodeCreateDialog {...props} entity="Graph Node" />;
+export const JobNodeCreateDialog = (props: SharedCreateProps) => <NodeCreateDialog {...props} entity="Job Node" />;
+
+interface SharedCreateProps {
+  open: boolean; onOpenChange: (open: boolean) => void; profiles: ExecutionProfile[];
+  instructions: ProjectInstruction[]; existingIds: string[]; onCreate: (input: CreateInput) => void;
+}
+
+function NodeCreateDialog({ open, onOpenChange, profiles, instructions, existingIds, onCreate, entity }: SharedCreateProps & { entity: string }) {
   const [id, setId] = useState("");
   const [description, setDescription] = useState("");
   const [profile, setProfile] = useState("");
   const [instruction, setInstruction] = useState("");
   useEffect(() => { if (!open) { setId(""); setDescription(""); setProfile(""); setInstruction(""); } }, [open]);
-  const issue = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ? "Graph Node ID must be lowercase kebab-case."
-    : existingIds.includes(id) ? `Graph Node ${id} already exists.`
-      : !description.trim() ? "Description is required."
-        : !profile ? "Choose the Graph Node Orchestrator execution profile explicitly."
-          : !instruction ? "Choose the Graph Node Orchestrator instruction explicitly." : "";
+  const issue = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ? `${entity} ID must be lowercase kebab-case.`
+    : existingIds.includes(id) ? `${entity} ${id} already exists.` : !description.trim() ? "Description is required."
+      : !profile ? "Choose an execution profile." : !instruction ? "Choose an instruction." : "";
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="sm:max-w-lg">
-    <DialogHeader><DialogTitle>Add Graph Node</DialogTitle><DialogDescription>Create an arbitrary capability. No platform purpose or ordering is assigned.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>Add {entity}</DialogTitle><DialogDescription>Create a capability action. Probability and cost priors are never generated automatically.</DialogDescription></DialogHeader>
     <div className="grid gap-3">
-      <Field label="Graph Node ID"><Input value={id} onChange={(event) => setId(event.target.value)} placeholder="threat-model" /></Field>
-      <Field label="Description"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe what this configured capability can do." /></Field>
-      <Field label="Orchestrator profile"><Select value={profile} values={profiles.map(({ id }) => id)} onChange={setProfile} placeholder="Choose profile" /></Field>
-      <Field label="Orchestrator instruction"><Select value={instruction} values={instructions.flatMap(({ id, valid }) => id && valid ? [id] : [])} onChange={setInstruction} placeholder="Choose instruction" /></Field>
+      <Field label={`${entity} ID`}><Input autoFocus value={id} onChange={(event) => setId(event.target.value)} placeholder={entity === "Graph Node" ? "threat-model" : "inspect-boundaries"} /></Field>
+      <Field label="Description"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe what this capability can do." /></Field>
+      <Field label="Execution profile"><Select value={profile} values={profiles.map(({ id: value }) => value)} onChange={setProfile} placeholder="Choose profile" /></Field>
+      <Field label="Instruction"><Select value={instruction} values={instructions.flatMap(({ id: value, valid }) => value && valid ? [value] : [])} onChange={setInstruction} placeholder="Choose instruction" /></Field>
       {issue && id ? <Alert variant="destructive"><AlertDescription>{issue}</AlertDescription></Alert> : null}
     </div>
     <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button disabled={Boolean(issue)} onClick={() => {
@@ -40,16 +41,22 @@ export function GraphNodeCreateDialog({ open, onOpenChange, profiles, instructio
   </DialogContent></Dialog>;
 }
 
-export function GraphNodeRenameDialog({ open, onOpenChange, currentId, existingIds, onRename }: {
-  open: boolean; onOpenChange: (open: boolean) => void; currentId: string; existingIds: string[]; onRename: (id: string) => void;
-}) {
+export const GraphNodeRenameDialog = (props: SharedRenameProps) => <NodeRenameDialog {...props} entity="Graph Node" />;
+export const JobNodeRenameDialog = (props: SharedRenameProps) => <NodeRenameDialog {...props} entity="Job Node" />;
+
+interface SharedRenameProps {
+  open: boolean; onOpenChange: (open: boolean) => void; currentId: string;
+  existingIds: string[]; onRename: (id: string) => void;
+}
+
+function NodeRenameDialog({ open, onOpenChange, currentId, existingIds, onRename, entity }: SharedRenameProps & { entity: string }) {
   const [id, setId] = useState(currentId);
   useEffect(() => { if (open) setId(currentId); }, [currentId, open]);
-  const issue = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ? "Graph Node ID must be lowercase kebab-case."
-    : id !== currentId && existingIds.includes(id) ? `Graph Node ${id} already exists.` : "";
+  const issue = !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ? `${entity} ID must be lowercase kebab-case.`
+    : id !== currentId && existingIds.includes(id) ? `${entity} ${id} already exists.` : "";
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent>
-    <DialogHeader><DialogTitle>Rename Graph Node</DialogTitle><DialogDescription>Capability, candidate, guard-domain and Decision Model action references are updated atomically in this draft.</DialogDescription></DialogHeader>
-    <Field label="Graph Node ID"><Input value={id} onChange={(event) => setId(event.target.value)} /></Field>
+    <DialogHeader><DialogTitle>Rename {entity}</DialogTitle><DialogDescription>All scoped policy references are updated atomically in this draft.</DialogDescription></DialogHeader>
+    <Field label={`${entity} ID`}><Input autoFocus value={id} onChange={(event) => setId(event.target.value)} /></Field>
     {issue ? <Alert variant="destructive"><AlertDescription>{issue}</AlertDescription></Alert> : null}
     <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><Button disabled={Boolean(issue) || id === currentId} onClick={() => { onRename(id); onOpenChange(false); }}>Rename</Button></DialogFooter>
   </DialogContent></Dialog>;

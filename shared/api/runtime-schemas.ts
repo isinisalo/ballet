@@ -38,6 +38,7 @@ export const validationNodeOutcomeSchema = z.object({
   summary,
   checks: checksSchema,
   decision: z.enum(["PASS", "FAIL"]),
+  outcomeId: z.string().min(1).optional(),
   evidence: jsonValueSchema,
   feedback: summary.optional(),
   expectedCorrection: summary.optional(),
@@ -63,7 +64,7 @@ export const orchestratorNodeOutcomeSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     role: z.literal("orchestrator"), state: z.literal("completed"), action: z.literal("complete"),
-    summary, result: z.enum(["PASS", "FAIL"]), reason: summary
+    summary, result: z.enum(["PASS", "FAIL"]), outcomeId: z.string().min(1).optional(), reason: summary
   }).strict(),
   z.object({
     role: z.literal("orchestrator"), state: z.literal("completed"), action: z.literal("delegate_repair"),
@@ -98,10 +99,10 @@ export const canonicalNodeOutcomeSchema = z.union([
   workNodeOutcomeSchema, validationNodeOutcomeSchema, orchestratorNodeOutcomeSchema, repairNodeOutcomeSchema
 ]) satisfies z.ZodType<CanonicalNodeOutcome>;
 export const nodeOutcomeSchemaIds = {
-  work: "work-node-outcome-v7",
-  validation: "validation-node-outcome-v7",
-  orchestrator: "orchestrator-node-outcome-v7",
-  repair: "repair-node-outcome-v7"
+  work: "work-node-outcome-v8",
+  validation: "validation-node-outcome-v8",
+  orchestrator: "orchestrator-node-outcome-v8",
+  repair: "repair-node-outcome-v8"
 } as const;
 export const nodeOutcomeSchemaForRole = (role: NodeRunRole) => ({
   work: workNodeOutcomeSchema,
@@ -165,61 +166,74 @@ const decisionStateSchema = z.object({
   sourceStateRevision: z.number().int().min(0), evidenceRefs: z.array(z.string())
 }).strict();
 const excludedDecisionActionSchema = z.object({
-  graphNodeId: z.string(),
-  reasonCode: z.enum(["outside_snapshot", "outside_capability_graph", "outside_state_model", "guard_denied"])
+  actionId: z.string(),
+  reasonCode: z.enum(["outside_snapshot", "outside_capability_model", "outside_state_model", "guard_denied"])
 }).strict();
-const policyActionValueSchema = z.object({ graphNodeId: z.string(), qMicros: z.number().finite() }).strict();
+const policyActionValueSchema = z.object({ actionId: z.string(), qMicros: z.number().finite() }).strict();
+const decisionScope = z.enum(["graph", "graph_node"]);
+const transitionSchema = z.object({
+  outcomeId: z.string(), expectedNextStateId: z.string(), probabilityPpm: z.number().int().min(1).max(1_000_000)
+}).strict();
 export const policyDecisionRecordSchema = z.object({
-  policyDecisionId: z.string(), rootRunId: z.string(), epoch: z.number().int().min(1),
-  epochKind: z.enum(["start", "continuation"]), previousGraphNodeInvocationId: z.string().optional(),
+  policyDecisionId: z.string(), rootRunId: z.string(), scope: decisionScope, scopeKey: z.string(),
+  graphNodeInvocationId: z.string().optional(), epoch: z.number().int().min(1),
+  epochKind: z.enum(["start", "continuation"]), previousActionInvocationId: z.string().optional(),
   state: decisionStateSchema.optional(), admissibleActionIds: z.array(z.string()),
-  excludedActions: z.array(excludedDecisionActionSchema), selectedGraphNodeId: z.string().optional(),
+  excludedActions: z.array(excludedDecisionActionSchema), selectedActionId: z.string().optional(),
   actionValues: z.array(policyActionValueSchema), stateValueMicros: z.number().finite().optional(),
   tiedActionIds: z.array(z.string()), solverStatus: z.enum([
     "converged", "policy_model_invalid", "policy_goal_unreachable", "policy_no_proper_policy",
     "policy_not_converged", "terminal", "decision_state_invalid"
-  ]), solverAlgorithm: z.literal("ssp_value_iteration_v1"), iterations: z.number().int().min(0),
-  residual: z.number().finite().min(0), epsilon: z.number().finite().positive(), modelVersion: z.literal(1), modelSha256: z.string(),
+  ]), solverAlgorithm: z.literal("ssp_value_iteration_v2"), iterations: z.number().int().min(0),
+  residual: z.number().finite().min(0), epsilon: z.number().finite().positive(), modelVersion: z.literal(2), modelSha256: z.string(),
   policySha256: z.string().optional(), snapshotSha256: z.string(), message: z.string().optional(), createdAt: timestamp
 }).strict();
 export const policyOptionObservationSchema = z.object({
-  policyObservationId: z.string(), rootRunId: z.string(), policyDecisionId: z.string(),
-  graphNodeInvocationId: z.string(), stateBefore: decisionStateSchema, action: z.string(),
+  policyObservationId: z.string(), rootRunId: z.string(), policyDecisionId: z.string(), scope: decisionScope,
+  scopeKey: z.string(), actionInvocationId: z.string(), graphNodeInvocationId: z.string().optional(),
+  jobNodeInvocationId: z.string().optional(), stateBefore: decisionStateSchema, actionId: z.string(),
   configuredExpectedCostMicros: z.number().int().positive(), actualCostMicros: z.number().int().min(0).optional(),
-  verifiedOutcome: z.enum(["PASS", "FAIL"]), stateAfter: decisionStateSchema.optional(),
+  expectedOutcomeDistribution: z.array(transitionSchema), observedOutcomeId: z.string(),
+  verifiedResult: z.enum(["PASS", "FAIL"]), actualState: decisionStateSchema.optional(),
+  modelMatch: z.enum(["match", "outcome_miss", "state_miss", "outside_support"]),
   durationMillis: z.number().int().min(0), modelSha256: z.string(), snapshotSha256: z.string(), createdAt: timestamp
 }).strict();
 const policyProjectionNodeSchema = z.object({
   projectionNodeId: z.string(), stateId: z.string(), depth: z.number().int().min(0),
-  cumulativeProbabilityPpm: z.number().int().min(0).max(1_000_000), selectedGraphNodeId: z.string().optional(),
+  cumulativeProbabilityPpm: z.number().int().min(0).max(1_000_000), selectedActionId: z.string().optional(),
   expectedRemainingCostMicros: z.number().finite().optional(), configuredExpectedCostMicros: z.number().int().positive().optional(),
   actionValues: z.array(policyActionValueSchema), terminal: z.enum(["success", "failure", "blocked"]).optional(),
   cutoff: z.enum(["cycle", "epoch_limit", "node_limit", "solver_error"]).optional(), message: z.string().optional()
 }).strict();
 const policyProjectionSchema = z.object({
-  derived: z.literal(true), source: z.enum(["configure_draft", "run_snapshot"]), sourceDecisionStateId: z.string(),
-  modelVersion: z.literal(1), modelSha256: z.string(), solverStatus: z.enum([
+  derived: z.literal(true), source: z.enum(["configure_draft", "run_snapshot"]), scope: decisionScope,
+  sourceDecisionStateId: z.string(), modelVersion: z.literal(2), modelSha256: z.string(), solverStatus: z.enum([
     "converged", "policy_model_invalid", "policy_goal_unreachable", "policy_no_proper_policy", "policy_not_converged"
   ]), nodes: z.array(policyProjectionNodeSchema), edges: z.array(z.object({
-    fromProjectionNodeId: z.string(), toProjectionNodeId: z.string(), probabilityPpm: z.number().int().min(1).max(1_000_000),
+    fromProjectionNodeId: z.string(), toProjectionNodeId: z.string(), outcomeId: z.string(),
+    probabilityPpm: z.number().int().min(1).max(1_000_000),
     cumulativeProbabilityPpm: z.number().int().min(0).max(1_000_000), configuredPrior: z.literal(true)
-  }).strict()), truncated: z.boolean(), maxDecisionEpochs: z.number().int().min(1).max(20),
+  }).strict()), mostLikelyRolloutNodeIds: z.array(z.string()), truncated: z.boolean(),
+  maxDecisionEpochs: z.number().int().min(1).max(20),
   maxProjectionNodes: z.number().int().min(1).max(100)
 }).strict();
 const executionGraphOccurrenceSchema = z.object({
-  occurrenceId: z.string(), epoch: z.number().int().min(1), policyDecisionId: z.string(),
-  graphNodeInvocationId: z.string().optional(), graphNodeId: z.string(), status: z.enum(["selected", "running", "observed"]),
+  occurrenceId: z.string(), scope: decisionScope, scopeKey: z.string(), epoch: z.number().int().min(1),
+  policyDecisionId: z.string(), actionInvocationId: z.string().optional(), graphNodeInvocationId: z.string().optional(),
+  jobNodeInvocationId: z.string().optional(), actionId: z.string(), status: z.enum(["selected", "running", "observed"]),
   decisionStateBefore: decisionStateSchema.optional(), expectedRemainingCostMicros: z.number().finite().optional(),
   selectedActionValueMicros: z.number().finite().optional(), configuredExpectedCostMicros: z.number().int().positive().optional(),
-  expectedOutcomeDistribution: z.array(z.object({ nextStateId: z.string(), probabilityPpm: z.number().int().min(1).max(1_000_000) }).strict()),
-  actualCostMicros: z.number().int().min(0).optional(), actualOutcome: z.enum(["PASS", "FAIL"]).optional(),
-  decisionStateAfter: decisionStateSchema.optional(), durationMillis: z.number().int().min(0).optional(),
+  expectedOutcomeDistribution: z.array(transitionSchema), actualCostMicros: z.number().int().min(0).optional(),
+  observedOutcomeId: z.string().optional(), verifiedResult: z.enum(["PASS", "FAIL"]).optional(),
+  actualState: decisionStateSchema.optional(), modelMatch: z.enum(["match", "outcome_miss", "state_miss", "outside_support"]).optional(),
+  durationMillis: z.number().int().min(0).optional(),
   modelSha256: z.string(), snapshotSha256: z.string(), createdAt: timestamp
 }).strict();
 const policyTelemetrySchema = z.object({
-  graphNodeId: z.string(), stateId: z.string(), observationCount: z.number().int().min(1),
-  outcomeCounts: z.object({ PASS: z.number().int().min(0).optional(), FAIL: z.number().int().min(0).optional() }).strict(),
-  observedNextStateCounts: z.record(z.string(), z.number().int().min(1)), meanActualCostMicros: z.number().min(0).optional(),
+  scope: decisionScope, scopeKey: z.string(), actionId: z.string(), stateId: z.string(), observationCount: z.number().int().min(1),
+  resultCounts: z.object({ PASS: z.number().int().min(0).optional(), FAIL: z.number().int().min(0).optional() }).strict(),
+  outcomeCounts: z.record(z.string(), z.number().int().min(1)), observedNextStateCounts: z.record(z.string(), z.number().int().min(1)),
+  modelMissCount: z.number().int().min(0), meanActualCostMicros: z.number().min(0).optional(),
   meanDurationMillis: z.number().min(0)
 }).strict();
 export const repairRequestSchema = z.object({
@@ -246,7 +260,7 @@ export const rootRunOrchestrationProjectionSchema = z.object({
   requests: z.array(routingRequestSchema), decisions: z.array(routingDecisionSchema),
   pendingRequest: routingRequestSchema.optional(), selectedDecision: routingDecisionSchema.optional(),
   policyDecisions: z.array(policyDecisionRecordSchema), policyObservations: z.array(policyOptionObservationSchema),
-  policyProjection: policyProjectionSchema.optional(), executionGraph: z.array(executionGraphOccurrenceSchema),
+  policyProjections: z.record(z.string(), policyProjectionSchema), executionGraph: z.array(executionGraphOccurrenceSchema),
   policyTelemetry: z.array(policyTelemetrySchema)
 }).strict();
 export const rootRunRepairProjectionSchema = z.object({

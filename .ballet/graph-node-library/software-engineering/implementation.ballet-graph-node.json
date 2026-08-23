@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "category": "software-engineering",
     "description": "Implement one bounded change. Done when requested behavior, tests, architecture conformance and concrete check evidence are complete without external release actions.",
@@ -103,8 +103,6 @@
   "graphNode": {
     "key": "implementation",
     "description": "Implement one bounded change. Done when requested behavior, tests, architecture conformance and concrete check evidence are complete without external release actions.",
-    "nodeStyle": "terra",
-    "nodeSize": "medium",
     "capabilities": {
       "accepts": [
         "implementation:change.requested"
@@ -116,65 +114,10 @@
     "stateContract": {
       "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "task"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "task-pass-route",
-            "sourceJobNode": "task",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after task."
-              }
-            ]
-          },
-          {
-            "key": "task-fail-route",
-            "sourceJobNode": "task",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after task."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -185,8 +128,6 @@
       {
         "key": "task",
         "description": "Implement one bounded change. Done when requested behavior, tests, architecture conformance and concrete check evidence are complete without external release actions.",
-        "nodeStyle": "terra",
-        "nodeSize": "medium",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -212,8 +153,82 @@
           "nodeStyle": "luna",
           "task": "Independently validate the diff, behavior, tests and architecture conformance for the bounded request. Do not edit the implementation or authorize release, deploy, merge or push.",
           "type": "human"
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "task"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "task-pass-route",
+              "sourceJobNode": "task",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after task."
+                }
+              ]
+            },
+            {
+              "key": "task-fail-route",
+              "sourceJobNode": "task",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after task."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

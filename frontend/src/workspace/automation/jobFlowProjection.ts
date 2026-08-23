@@ -57,7 +57,7 @@ const narrowLayout = (retryEnabled: boolean): JobFlowLayout => ({
   height: 650,
   points: {
     start: { x: 260, y: 56 }, work: { x: 260, y: 170 }, validation: { x: 260, y: 300 },
-    result: { x: 260, y: 430 }, retry: { x: 145, y: 430 }, retryCount: { x: 72, y: 430 },
+    result: { x: 260, y: 430 }, retry: { x: 145, y: 430 }, retryCount: { x: 72, y: 360 },
     escalate: { x: 145, y: 580 }, continue: { x: 260, y: 580 }
   },
   edges: [

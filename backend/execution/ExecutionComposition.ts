@@ -8,8 +8,8 @@ import type {
   ExecutionPromptEvidence, ExecutionResourceEvidence, ExecutionResourceSnapshot,
   NodeRunRole, RootExecutionSnapshot
 } from "../../shared/domain/runtime.js";
-import type { TaskEnvelopeV7 } from "../../shared/domain/taskEnvelope.js";
-import { serializeTaskEnvelopeV7 } from "../integration/TaskEnvelopeV7.js";
+import type { TaskEnvelopeV8 } from "../../shared/domain/taskEnvelope.js";
+import { serializeTaskEnvelopeV8 } from "../integration/TaskEnvelopeV8.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import { ExecutionCompositionError } from "./ExecutionCompositionError.js";
 import { SYSTEM_EXECUTION_INSTRUCTION_ID } from "./SystemExecutionContract.js";
@@ -21,8 +21,8 @@ export {
 } from "./ExecutionResourceCatalog.js";
 export { SYSTEM_EXECUTION_INSTRUCTION, SYSTEM_EXECUTION_INSTRUCTION_ID } from "./SystemExecutionContract.js";
 
-export const EXECUTION_COMPOSITION_VERSION = 8 as const;
-export const NODE_OUTCOME_SCHEMA_VERSION = 7 as const;
+export const EXECUTION_COMPOSITION_VERSION = 9 as const;
+export const NODE_OUTCOME_SCHEMA_VERSION = 8 as const;
 export const MAX_EXECUTION_PROMPT_BYTES = 512 * 1024;
 export const NODE_OUTCOME_SCHEMA_IDS = nodeOutcomeSchemaIds;
 export const NODE_OUTCOME_SCHEMA_SHA256: Readonly<Record<NodeRunRole, string>> = {
@@ -34,10 +34,10 @@ export const NODE_OUTCOME_SCHEMA_SHA256: Readonly<Record<NodeRunRole, string>> =
 
 export const composeExecutionPrompt = (
   snapshot: RootExecutionSnapshot,
-  envelopeInput: TaskEnvelopeV7
+  envelopeInput: TaskEnvelopeV8
 ): ExecutionPromptEvidence => {
   assertEnvelopeSnapshot(snapshot, envelopeInput);
-  const envelope = serializeTaskEnvelopeV7(envelopeInput);
+  const envelope = serializeTaskEnvelopeV8(envelopeInput);
   const composition = resolveComposition(snapshot, envelope.envelope);
   const profile = snapshot.executionProfiles.find((candidate) => candidate.id === composition.executionProfileId);
   if (!profile) throw new ExecutionCompositionError(
@@ -51,15 +51,17 @@ export const composeExecutionPrompt = (
     nodeOutcomeJsonSchemaForRole(envelope.envelope.role),
     envelope.envelope.role === "orchestrator" || envelope.envelope.role === "repair"
       ? envelope.envelope.allowedCandidates.map(({ key }) => key)
-      : []
+      : [],
+    envelope.envelope.role === "validation" || envelope.envelope.role === "orchestrator"
+      ? envelope.envelope.allowedOutcomes.map(({ outcomeId }) => outcomeId) : []
   );
   const outputSchemaJson = canonicalJson(outputSchema);
   const prompt = [
     section("SYSTEM", system.id, system.content),
     section("PRIMARY", primary.id, primary.content),
     ...skills.map((skill) => section("SKILL", skill.id, skill.content)),
-    section("TASK-ENVELOPE", "v7", envelope.serialized),
-    section("OUTPUT-SCHEMA", "v7", outputSchemaJson)
+    section("TASK-ENVELOPE", "v8", envelope.serialized),
+    section("OUTPUT-SCHEMA", "v8", outputSchemaJson)
   ].join("\n\n");
   const promptBytes = Buffer.byteLength(prompt, "utf8");
   if (promptBytes > MAX_EXECUTION_PROMPT_BYTES) throw new ExecutionCompositionError(
@@ -69,7 +71,7 @@ export const composeExecutionPrompt = (
   const graphNodeId = "graphNode" in envelope.envelope ? envelope.envelope.graphNode?.id : undefined;
   const jobNodeId = "jobNode" in envelope.envelope ? envelope.envelope.jobNode.id : undefined;
   return {
-    compositionVersion: 8,
+    compositionVersion: 9,
     graphNodeId,
     jobNodeId,
     nodeRole: envelope.envelope.role,
@@ -80,9 +82,9 @@ export const composeExecutionPrompt = (
     resources: [system, primary, ...skills].map(resourceEvidence),
     prompt,
     promptSha256: sha256(prompt),
-    taskEnvelopeVersion: 7,
+    taskEnvelopeVersion: 8,
     taskEnvelopeSha256: envelope.sha256,
-    outputSchemaVersion: 7,
+    outputSchemaVersion: 8,
     outputSchemaId: NODE_OUTCOME_SCHEMA_IDS[envelope.envelope.role],
     outputSchema,
     outputSchemaSha256: sha256(outputSchemaJson)
@@ -100,7 +102,7 @@ export const runtimeForNode = (snapshot: RootExecutionSnapshot, executionProfile
 
 const resolveComposition = (
   snapshot: RootExecutionSnapshot,
-  envelope: TaskEnvelopeV7
+  envelope: TaskEnvelopeV8
 ): ProjectExecutionComposition & { id: string } => {
   const graphNode = resolveGraphNode(snapshot, envelope);
   if (envelope.role === "orchestrator") {
@@ -110,7 +112,11 @@ const resolveComposition = (
       );
       return snapshot.graph.strategy.orchestrator;
     }
-    return requireGraphNode(graphNode).orchestrator;
+    const strategy = requireGraphNode(graphNode).strategy;
+    if (strategy.kind !== "agent_v1") throw new ExecutionCompositionError(
+      "missing_resource", "SSP Graph Node scope has no agent orchestrator composition."
+    );
+    return strategy.orchestrator;
   }
   if (envelope.role === "repair") {
     const repair = envelope.scope === "graph" ? snapshot.graph.repairNode : requireGraphNode(graphNode).repairNode;
@@ -130,7 +136,7 @@ const resolveComposition = (
   );
 };
 
-const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV7): void => {
+const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV8): void => {
   if (envelope.run.rootRunId.length === 0) throw new ExecutionCompositionError("missing_resource", "Task Envelope has no Root Run.");
   const graphNode = resolveGraphNode(snapshot, envelope);
   if ("graphNode" in envelope && envelope.graphNode) {
@@ -146,8 +152,19 @@ const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskE
       || node.id !== identity.id || node.description !== identity.description || node.task !== envelope.task) {
       throw new ExecutionCompositionError("missing_resource", `Task Envelope ${envelope.role} Node is outside the snapshot.`);
     }
+    if (envelope.role === "validation" && canonicalJson(envelope.allowedOutcomes as unknown as JsonValue)
+      !== canonicalJson(job.outcomes as unknown as JsonValue)) {
+      throw new ExecutionCompositionError("missing_resource", "Validation outcome enum differs from the immutable Job Node contract.");
+    }
   }
-  if (envelope.role === "orchestrator") assertCandidateSet(snapshot, graphNode, envelope);
+  if (envelope.role === "orchestrator") {
+    assertCandidateSet(snapshot, graphNode, envelope);
+    const expectedOutcomes = envelope.scope === "graph_node" ? graphNode?.outcomes ?? [] : [];
+    if (canonicalJson(envelope.allowedOutcomes as unknown as JsonValue)
+      !== canonicalJson(expectedOutcomes as unknown as JsonValue)) {
+      throw new ExecutionCompositionError("missing_resource", "Orchestrator outcome enum differs from the immutable Graph Node contract.");
+    }
+  }
   if (envelope.role === "repair") {
     const repair = envelope.scope === "graph" ? snapshot.graph.repairNode : graphNode?.repairNode;
     if (!repair || repair.task !== envelope.task) {
@@ -159,12 +176,14 @@ const assertEnvelopeSnapshot = (snapshot: RootExecutionSnapshot, envelope: TaskE
 const assertCandidateSet = (
   snapshot: RootExecutionSnapshot,
   graphNode: ProjectGraphNode | undefined,
-  envelope: Extract<TaskEnvelopeV7, { role: "orchestrator" }>
+  envelope: Extract<TaskEnvelopeV8, { role: "orchestrator" }>
 ): void => {
+  const localGraphNode = envelope.scope === "graph_node" ? requireGraphNode(graphNode) : undefined;
   const routing = envelope.scope === "graph"
     ? snapshot.graph.strategy.kind === "agent_v1" ? snapshot.graph.strategy.orchestrator.routing
       : undefined
-    : requireGraphNode(graphNode).orchestrator.routing;
+    : localGraphNode?.strategy.kind === "agent_v1"
+      ? localGraphNode.strategy.orchestrator.routing : undefined;
   if (!routing) throw new ExecutionCompositionError("missing_resource", "SSP Graph scope cannot produce an agent routing envelope.");
   const rule = envelope.request.kind === "start"
     ? routing.start
@@ -182,7 +201,7 @@ const assertCandidateSet = (
   }
 };
 
-const resolveGraphNode = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV7): ProjectGraphNode | undefined => {
+const resolveGraphNode = (snapshot: RootExecutionSnapshot, envelope: TaskEnvelopeV8): ProjectGraphNode | undefined => {
   const id = "graphNode" in envelope ? envelope.graphNode?.id : undefined;
   return id ? snapshot.graph.graphNodes.find((candidate) => candidate.id === id) : undefined;
 };
@@ -206,7 +225,7 @@ const resourceEvidence = (resource: ExecutionResourceSnapshot): ExecutionResourc
   relativePath: resource.relativePath, sourceSha256: resource.sourceSha256
 });
 const section = (kind: string, id: string, content: string): string =>
-  `<<< BALLET EXECUTION COMPOSITION V8 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
+  `<<< BALLET EXECUTION COMPOSITION V9 · ${kind} · ${id} >>>\n${content}\n<<< END BALLET ${kind} >>>`;
 const sortedIds = (ids: readonly string[]): string[] => [...ids].sort(compareUtf8);
 const compareUtf8 = (left: string, right: string): number => Buffer.compare(Buffer.from(left), Buffer.from(right));
 function sha256(value: string): string {
@@ -218,19 +237,25 @@ function schemaHash(role: NodeRunRole): string {
 
 export const constrainRouteTargetSchema = (
   source: Record<string, JsonValue>,
-  allowedTargets: readonly string[]
-): Record<string, JsonValue> => constrainSchemaValue(source, allowedTargets) as Record<string, JsonValue>;
+  allowedTargets: readonly string[],
+  allowedOutcomes: readonly string[] = []
+): Record<string, JsonValue> => constrainSchemaValue(source, allowedTargets, allowedOutcomes) as Record<string, JsonValue>;
 
-const constrainSchemaValue = (value: JsonValue, allowedTargets: readonly string[]): JsonValue => {
-  if (Array.isArray(value)) return value.map((entry) => constrainSchemaValue(entry, allowedTargets));
+const constrainSchemaValue = (value: JsonValue, allowedTargets: readonly string[], allowedOutcomes: readonly string[]): JsonValue => {
+  if (Array.isArray(value)) return value.map((entry) => constrainSchemaValue(entry, allowedTargets, allowedOutcomes));
   if (!value || typeof value !== "object") return value;
   const result = Object.fromEntries(Object.entries(value)
-    .map(([key, entry]) => [key, constrainSchemaValue(entry, allowedTargets)])) as Record<string, JsonValue>;
-  if (allowedTargets.length > 0 && result.properties && !Array.isArray(result.properties)
-    && typeof result.properties === "object") {
+    .map(([key, entry]) => [key, constrainSchemaValue(entry, allowedTargets, allowedOutcomes)])) as Record<string, JsonValue>;
+  if (result.properties && !Array.isArray(result.properties) && typeof result.properties === "object") {
     const properties = result.properties as Record<string, JsonValue>;
-    if (properties.target && typeof properties.target === "object" && !Array.isArray(properties.target)) {
+    if (allowedTargets.length > 0 && properties.target && typeof properties.target === "object" && !Array.isArray(properties.target)) {
       properties.target = { ...(properties.target as Record<string, JsonValue>), enum: [...allowedTargets] };
+    }
+    if (allowedOutcomes.length > 0 && properties.outcomeId && typeof properties.outcomeId === "object"
+      && !Array.isArray(properties.outcomeId)) {
+      properties.outcomeId = { ...(properties.outcomeId as Record<string, JsonValue>), enum: [...allowedOutcomes] };
+      const required = Array.isArray(result.required) ? result.required.filter((entry): entry is string => typeof entry === "string") : [];
+      result.required = [...new Set([...required, "outcomeId"])];
     }
   }
   return result;

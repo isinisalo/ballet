@@ -9,7 +9,7 @@ import { localDatabaseTableNames } from "./RuntimeSchema.js";
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("LocalDatabase schema v11", () => {
+describe("LocalDatabase schema v12", () => {
   it("creates only the GraphNode runtime inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -20,7 +20,7 @@ describe("LocalDatabase schema v11", () => {
     expect(tables).not.toEqual(expect.arrayContaining([
       "loop_invocations", "job_runs", "loop_schedule_state", "orchestration_requests", "orchestrator_routes"
     ]));
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("11");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("12");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
     database.close();
   });
@@ -42,14 +42,17 @@ describe("LocalDatabase schema v11", () => {
       "root_run_id", "revision", "state_json", "state_hash", "patch_json", "source_node_run_id"
     ]));
     expect(columns(connection, "policy_decisions")).toEqual(expect.arrayContaining([
-      "policy_decision_id", "root_run_id", "epoch", "state_json", "admissible_action_ids_json",
-      "excluded_actions_json", "selected_graph_node_id", "action_values_json", "state_value_micros",
-      "solver_status", "iterations", "residual", "model_version", "model_sha256", "policy_sha256", "snapshot_sha256"
+      "policy_decision_id", "root_run_id", "scope", "scope_key", "graph_node_invocation_id", "epoch",
+      "state_json", "admissible_action_ids_json", "excluded_actions_json", "selected_action_id",
+      "action_values_json", "state_value_micros", "solver_status", "iterations", "residual",
+      "model_version", "model_sha256", "policy_sha256", "snapshot_sha256"
     ]));
     expect(columns(connection, "policy_option_observations")).toEqual(expect.arrayContaining([
-      "policy_observation_id", "policy_decision_id", "graph_node_invocation_id", "state_before_json",
-      "action", "configured_expected_cost_micros", "actual_cost_micros", "verified_outcome",
-      "state_after_json", "duration_millis", "model_sha256", "snapshot_sha256"
+      "policy_observation_id", "policy_decision_id", "scope", "scope_key", "action_invocation_id",
+      "graph_node_invocation_id", "job_node_invocation_id", "state_before_json", "action_id",
+      "configured_expected_cost_micros", "expected_outcome_distribution_json", "actual_cost_micros",
+      "observed_outcome_id", "verified_result", "actual_state_json", "model_match", "duration_millis",
+      "model_sha256", "snapshot_sha256"
     ]));
     database.close();
   });
@@ -77,20 +80,20 @@ describe("LocalDatabase schema v11", () => {
     untouched.close();
   });
 
-  it("rejects schema v10 with archive guidance and does not mutate it", async () => {
+  it("rejects schema v11 with archive guidance and does not mutate it", async () => {
     const filename = path.join(await temporaryRoot(), "state.sqlite");
     const previous = new Database(filename);
     previous.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '10');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '11');
       CREATE TABLE loop_invocations (loop_run_id TEXT PRIMARY KEY);
     `);
     previous.close();
     expect(() => new LocalDatabase(filename).connection()).toThrow(
-      "Unsupported Ballet state schema 10; expected 11."
+      "Unsupported Ballet state schema 11; expected 12."
     );
     const untouched = new Database(filename, { readonly: true });
-    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("10");
+    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("11");
     expect(untouched.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all())
       .toContain("loop_invocations");
     untouched.close();
@@ -101,7 +104,7 @@ const columns = (connection: Database.Database, table: string): string[] =>
   (connection.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(({ name }) => name);
 const createDatabase = async () => new LocalDatabase(path.join(await temporaryRoot(), "state.sqlite"));
 const temporaryRoot = async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v11-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v12-"));
   roots.push(root);
   return root;
 };

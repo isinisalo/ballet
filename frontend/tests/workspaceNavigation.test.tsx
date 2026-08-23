@@ -16,7 +16,7 @@ describe("workspace navigation blocker", () => {
 
     expect(confirm).toHaveBeenCalledWith("Discard theme changes?");
     expect(window.location.pathname).toBe("/automation/graph");
-    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph" });
+    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities" });
 
     confirm.mockReturnValue(true);
     act(() => result.current.navigate("/execution-profiles"));
@@ -45,7 +45,7 @@ describe("workspace navigation blocker", () => {
       window.history.back();
       await traversed;
     });
-    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph" });
+    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);

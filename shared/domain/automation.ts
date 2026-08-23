@@ -1,4 +1,4 @@
-export const projectConfigurationVersion = 15 as const;
+export const projectConfigurationVersion = 16 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxJobRetriesLimit = 100;
 export const maxProjectGraphNodes = 40;
@@ -70,6 +70,11 @@ export interface ProjectNodeCapabilities {
   provides: string[];
 }
 
+export interface ProjectIntrinsicOutcome {
+  outcomeId: string;
+  result: NodeResult;
+}
+
 export interface ProjectStateDefinition {
   description: string;
   initial: JsonValue;
@@ -111,10 +116,11 @@ export interface ProjectHumanValidationNode extends ProjectExecutableNodeBase {
 
 export type ProjectValidationNode = ProjectAgentValidationNode | ProjectHumanValidationNode;
 
-export interface ProjectJobNode extends ProjectNodeAppearance {
+export interface ProjectJobNode {
   id: string;
   description: string;
   capabilities: ProjectNodeCapabilities;
+  outcomes: ProjectIntrinsicOutcome[];
   /** Additional Work executions after the first Work execution. */
   maxRetries: number;
   workNode: ProjectWorkNode;
@@ -158,7 +164,7 @@ export interface ProjectCandidateRouting<TTarget> {
   repair: ProjectRepairCandidateRule<TTarget>[];
 }
 
-export interface ProjectOrchestrator<TTarget> extends ProjectExecutionComposition, ProjectNodeAppearance {
+export interface ProjectOrchestrator<TTarget> extends ProjectExecutionComposition {
   id: string;
   description: string;
   maxTransitions: number;
@@ -166,7 +172,7 @@ export interface ProjectOrchestrator<TTarget> extends ProjectExecutionCompositio
   routing: ProjectCandidateRouting<TTarget>;
 }
 
-export interface ProjectRepairNode extends ProjectExecutionComposition, ProjectNodeAppearance {
+export interface ProjectRepairNode extends ProjectExecutionComposition {
   id: string;
   description: string;
   task: string;
@@ -174,12 +180,22 @@ export interface ProjectRepairNode extends ProjectExecutionComposition, ProjectN
   maxRepairAttempts: number;
 }
 
-export interface ProjectGraphNode extends ProjectNodeAppearance {
+export interface ProjectAgentGraphNodeStrategyV1 {
+  kind: "agent_v1";
+  orchestrator: ProjectOrchestrator<ProjectGraphNodeRouteTarget>;
+}
+
+export type ProjectGraphNodeDecisionStrategyV2 =
+  | ProjectAgentGraphNodeStrategyV1
+  | import("./decisionModel.js").ProjectSspDecisionStrategyV2;
+
+export interface ProjectGraphNode {
   id: string;
   description: string;
   capabilities: ProjectNodeCapabilities;
+  outcomes: ProjectIntrinsicOutcome[];
   stateContract: ProjectStateContract;
-  orchestrator: ProjectOrchestrator<ProjectGraphNodeRouteTarget>;
+  strategy: ProjectGraphNodeDecisionStrategyV2;
   repairNode?: ProjectRepairNode;
   jobNodes: ProjectJobNode[];
 }
@@ -188,7 +204,7 @@ export interface ProjectGraph {
   id: string;
   name: string;
   state: ProjectStateDefinition;
-  strategy: import("./decisionModel.js").ProjectGraphDecisionStrategyV1;
+  strategy: import("./decisionModel.js").ProjectGraphDecisionStrategyV2;
   repairNode?: ProjectRepairNode;
   graphNodes: ProjectGraphNode[];
 }
@@ -201,8 +217,6 @@ export interface ProjectAutomationConfig {
 export const defaultProjectOrchestrator = <TTarget>(): ProjectOrchestrator<TTarget> => ({
   id: "orchestrator",
   description: "Selects the next allowed target from the immutable candidate set.",
-  nodeStyle: "luna",
-  nodeSize: "medium",
   executionProfileId: "",
   primaryInstructionId: "",
   skillIds: [],

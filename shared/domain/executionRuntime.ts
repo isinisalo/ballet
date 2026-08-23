@@ -40,18 +40,24 @@ export interface ExecutionResourceSnapshot {
 export interface ExecutionRuntimeBinding { executionProfileId: string; runtime: ExecutionRuntimeSnapshot; }
 
 export interface RootExecutionSnapshot {
-  version: 8;
+  version: 9;
   rootKind: "graph" | "graph_node";
   rootGraphNodeId?: string;
   project: ExecutionProjectSnapshot;
   issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;
   graphDecision: {
-    strategyKind: "agent_v1" | "ssp_v1";
-    modelVersion?: 1;
+    strategyKind: "agent_v1" | "ssp_v2";
+    modelVersion?: 2;
     modelSha256?: string;
-    capabilityGraphSha256?: string;
+    capabilityModelSha256?: string;
   };
+  graphNodeDecisions: Record<string, {
+    strategyKind: "agent_v1" | "ssp_v2";
+    modelVersion?: 2;
+    modelSha256?: string;
+    capabilityModelSha256?: string;
+  }>;
   theme: CanvasTheme;
   executionProfiles: ExecutionProfile[];
   runtimes: ExecutionRuntimeBinding[];
@@ -61,7 +67,7 @@ export interface RootExecutionSnapshot {
 
 export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content">;
 export interface ExecutionPromptEvidence {
-  compositionVersion: 8;
+  compositionVersion: 9;
   graphNodeId?: string;
   jobNodeId?: string;
   nodeRole: NodeRunRole;
@@ -71,14 +77,14 @@ export interface ExecutionPromptEvidence {
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
-  taskEnvelopeVersion: 7;
+  taskEnvelopeVersion: 8;
   taskEnvelopeSha256: string;
-  outputSchemaVersion: 7;
+  outputSchemaVersion: 8;
   outputSchemaId:
-    | "work-node-outcome-v7"
-    | "validation-node-outcome-v7"
-    | "orchestrator-node-outcome-v7"
-    | "repair-node-outcome-v7";
+    | "work-node-outcome-v8"
+    | "validation-node-outcome-v8"
+    | "orchestrator-node-outcome-v8"
+    | "repair-node-outcome-v8";
   outputSchema: Record<string, JsonValue>;
   outputSchemaSha256: string;
 }
@@ -86,7 +92,7 @@ export interface ExecutionPromptEvidence {
 export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type ExecutionTaskKind = "node_execution";
 export interface ExecutionSpec {
-  version: 9;
+  version: 10;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;

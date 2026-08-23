@@ -18,11 +18,11 @@ import type {
   WorkNodeOutcome
 } from "./runtime.js";
 import type {
-  ExecutionGraphOccurrenceV1,
-  PolicyDecisionRecordV1,
-  PolicyOptionObservationV1,
-  PolicyProjectionV1,
-  PolicyTelemetryV1
+  ExecutionGraphOccurrenceV2,
+  PolicyDecisionRecordV2,
+  PolicyOptionObservationV2,
+  PolicyProjectionV2,
+  PolicyTelemetryV2
 } from "./decisionModel.js";
 
 export type BalletMode = "configure" | "run";
@@ -66,11 +66,11 @@ export interface RootRunOrchestrationProjection {
   decisions: RoutingDecision[];
   pendingRequest?: RoutingRequest;
   selectedDecision?: RoutingDecision;
-  policyDecisions: PolicyDecisionRecordV1[];
-  policyObservations: PolicyOptionObservationV1[];
-  policyProjection?: PolicyProjectionV1;
-  executionGraph: ExecutionGraphOccurrenceV1[];
-  policyTelemetry: PolicyTelemetryV1[];
+  policyDecisions: PolicyDecisionRecordV2[];
+  policyObservations: PolicyOptionObservationV2[];
+  policyProjections: Record<string, PolicyProjectionV2>;
+  executionGraph: ExecutionGraphOccurrenceV2[];
+  policyTelemetry: PolicyTelemetryV2[];
 }
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";

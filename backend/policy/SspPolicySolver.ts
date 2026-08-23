@@ -4,21 +4,21 @@ import {
   maxDecisionStates,
   maxDecisionTransitions,
   sspProbabilityScale,
-  type DecisionOptionModelRowV1,
-  type ProjectSspDecisionModelV1,
-  type SspPolicySolutionV1,
+  type DecisionOptionModelRowV2,
+  type ProjectSspDecisionModelV2,
+  type SspPolicySolutionV2,
   type SspSolverStatus
 } from "../../shared/domain/decisionModel.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 
 export interface SolvePolicyInput {
-  model: ProjectSspDecisionModelV1;
+  model: ProjectSspDecisionModelV2;
   currentStateId: string;
   admissibleActionsByState: Readonly<Record<string, readonly string[]>>;
   modelSha256: string;
 }
 
-export const solvePolicy = (input: SolvePolicyInput): SspPolicySolutionV1 => {
+export const solvePolicy = (input: SolvePolicyInput): SspPolicySolutionV2 => {
   const invalid = validateInput(input);
   if (invalid) return failure("policy_model_invalid", input, invalid);
   const states = [...input.model.states].sort((left, right) => left.id.localeCompare(right.id));
@@ -34,7 +34,7 @@ export const solvePolicy = (input: SolvePolicyInput): SspPolicySolutionV1 => {
     return failure("policy_no_proper_policy", input, `No proper policy reaches success almost surely from state ${input.currentStateId}.`);
   }
   const usable = new Map([...rows].map(([stateId, candidates]) => [stateId,
-    candidates.filter((row) => row.successors.every((successor) => winning.has(successor.nextStateId)))
+    candidates.filter((row) => row.successors.every((successor) => winning.has(successor.expectedNextStateId)))
   ]));
   const values = new Map([...winning].map((stateId) => [stateId, 0]));
   const started = performance.now();
@@ -69,14 +69,14 @@ export const solvePolicy = (input: SolvePolicyInput): SspPolicySolutionV1 => {
     return failure("policy_no_proper_policy", input, "The converged selected policy has a non-goal recurrent class.", iterations, residual, values);
   }
   const currentRows = usable.get(input.currentStateId) ?? [];
-  const actionValues = currentRows.map((row) => ({ graphNodeId: row.graphNodeId, qMicros: qValue(row, values) }))
-    .sort((left, right) => left.graphNodeId.localeCompare(right.graphNodeId));
+  const actionValues = currentRows.map((row) => ({ actionId: row.actionId, qMicros: qValue(row, values) }))
+    .sort((left, right) => left.actionId.localeCompare(right.actionId));
   const minimum = Math.min(...actionValues.map(({ qMicros }) => qMicros));
   const tiedActionIds = actionValues.filter(({ qMicros }) => Math.abs(qMicros - minimum) <= input.model.solver.epsilon)
-    .map(({ graphNodeId }) => graphNodeId).sort();
+    .map(({ actionId }) => actionId).sort();
   const stateValues = Object.fromEntries([...values].sort(([left], [right]) => left.localeCompare(right)));
   const policyDocument = Object.fromEntries([...policy.selectedRows].sort(([left], [right]) => left.localeCompare(right))
-    .map(([stateId, row]) => [stateId, row.graphNodeId]));
+    .map(([stateId, row]) => [stateId, row.actionId]));
   return {
     status: "converged", selectedActionId: tiedActionIds[0], actionValues, stateValues,
     stateValueMicros: values.get(input.currentStateId), tiedActionIds, iterations, residual,
@@ -99,42 +99,42 @@ const validateInput = (input: SolvePolicyInput): string | undefined => {
   for (const row of input.model.stateActions) {
     if (!states.has(row.stateId)) return `Action row references unknown state ${row.stateId}.`;
     if (input.model.states.find(({ id }) => id === row.stateId)?.terminal) return `Terminal state ${row.stateId} cannot have actions.`;
-    const rowKey = `${row.stateId}\u0000${row.graphNodeId}`;
-    if (rowKeys.has(rowKey)) return `Duplicate state/action row ${row.stateId}/${row.graphNodeId}.`;
+    const rowKey = `${row.stateId}\u0000${row.actionId}`;
+    if (rowKeys.has(rowKey)) return `Duplicate state/action row ${row.stateId}/${row.actionId}.`;
     rowKeys.add(rowKey);
     const rowCount = (rowCounts.get(row.stateId) ?? 0) + 1;
     rowCounts.set(row.stateId, rowCount);
     if (rowCount > maxDecisionActionsPerState) return `State ${row.stateId} exceeds the ${maxDecisionActionsPerState} action limit.`;
     if (!Number.isSafeInteger(row.expectedCostMicros) || row.expectedCostMicros <= 0) return "Expected costs must be positive safe integers.";
-    if (new Set(row.successors.map(({ nextStateId }) => nextStateId)).size !== row.successors.length) return "Transition successors must be unique.";
-    if (row.successors.some(({ nextStateId, probabilityPpm }) => !states.has(nextStateId)
+    if (new Set(row.successors.map(({ outcomeId, expectedNextStateId }) => `${outcomeId}\u0000${expectedNextStateId}`)).size !== row.successors.length) return "Outcome/state transition branches must be unique.";
+    if (row.successors.some(({ expectedNextStateId, probabilityPpm }) => !states.has(expectedNextStateId)
       || !Number.isSafeInteger(probabilityPpm) || probabilityPpm <= 0)) return "Transition probabilities or successors are invalid.";
     if (row.successors.reduce((sum, { probabilityPpm }) => sum + probabilityPpm, 0) !== sspProbabilityScale) {
-      return `Transition probabilities for ${row.stateId}/${row.graphNodeId} do not sum to ${sspProbabilityScale}.`;
+      return `Transition probabilities for ${row.stateId}/${row.actionId} do not sum to ${sspProbabilityScale}.`;
     }
   }
   return undefined;
 };
 
-const rowsByState = (input: SolvePolicyInput): Map<string, DecisionOptionModelRowV1[]> => {
+const rowsByState = (input: SolvePolicyInput): Map<string, DecisionOptionModelRowV2[]> => {
   const allowed = new Map(Object.entries(input.admissibleActionsByState)
     .map(([stateId, actions]) => [stateId, new Set(actions)]));
-  const rows = new Map<string, DecisionOptionModelRowV1[]>();
+  const rows = new Map<string, DecisionOptionModelRowV2[]>();
   for (const row of [...input.model.stateActions].sort((left, right) => left.stateId.localeCompare(right.stateId)
-    || left.graphNodeId.localeCompare(right.graphNodeId))) {
-    if (!allowed.get(row.stateId)?.has(row.graphNodeId)) continue;
+    || left.actionId.localeCompare(right.actionId))) {
+    if (!allowed.get(row.stateId)?.has(row.actionId)) continue;
     rows.set(row.stateId, [...(rows.get(row.stateId) ?? []), row]);
   }
   return rows;
 };
 
-const reverseReachable = (goals: Set<string>, rows: Map<string, DecisionOptionModelRowV1[]>): Set<string> => {
+const reverseReachable = (goals: Set<string>, rows: Map<string, DecisionOptionModelRowV2[]>): Set<string> => {
   const result = new Set(goals);
   let changed = true;
   while (changed) {
     changed = false;
     for (const [stateId, actions] of rows) if (!result.has(stateId)
-      && actions.some((action) => action.successors.some(({ nextStateId }) => result.has(nextStateId)))) {
+      && actions.some((action) => action.successors.some(({ expectedNextStateId }) => result.has(expectedNextStateId)))) {
       result.add(stateId); changed = true;
     }
   }
@@ -142,7 +142,7 @@ const reverseReachable = (goals: Set<string>, rows: Map<string, DecisionOptionMo
 };
 
 const almostSureWinning = (
-  stateIds: string[], goals: Set<string>, stateById: Map<string, { terminal?: string }>, rows: Map<string, DecisionOptionModelRowV1[]>
+  stateIds: string[], goals: Set<string>, stateById: Map<string, { terminal?: string }>, rows: Map<string, DecisionOptionModelRowV2[]>
 ): Set<string> => {
   let candidate = new Set(stateIds.filter((id) => !stateById.get(id)?.terminal || goals.has(id)));
   while (true) {
@@ -151,8 +151,8 @@ const almostSureWinning = (
     while (changed) {
       changed = false;
       for (const stateId of candidate) if (!attractor.has(stateId) && (rows.get(stateId) ?? []).some((action) =>
-        action.successors.every(({ nextStateId }) => candidate.has(nextStateId))
-        && action.successors.some(({ nextStateId }) => attractor.has(nextStateId)))) {
+        action.successors.every(({ expectedNextStateId }) => candidate.has(expectedNextStateId))
+        && action.successors.some(({ expectedNextStateId }) => attractor.has(expectedNextStateId)))) {
         attractor.add(stateId); changed = true;
       }
     }
@@ -161,11 +161,12 @@ const almostSureWinning = (
   }
 };
 
-const qValue = (row: DecisionOptionModelRowV1, values: Map<string, number>): number => {
+const qValue = (row: DecisionOptionModelRowV2, values: Map<string, number>): number => {
   let sum = 0;
   let compensation = 0;
-  for (const successor of [...row.successors].sort((left, right) => left.nextStateId.localeCompare(right.nextStateId))) {
-    const term = successor.probabilityPpm / sspProbabilityScale * (values.get(successor.nextStateId) ?? Number.POSITIVE_INFINITY);
+  for (const successor of [...row.successors].sort((left, right) =>
+    left.expectedNextStateId.localeCompare(right.expectedNextStateId) || left.outcomeId.localeCompare(right.outcomeId))) {
+    const term = successor.probabilityPpm / sspProbabilityScale * (values.get(successor.expectedNextStateId) ?? Number.POSITIVE_INFINITY);
     const adjusted = term - compensation;
     const next = sum + adjusted;
     compensation = next - sum - adjusted;
@@ -175,23 +176,23 @@ const qValue = (row: DecisionOptionModelRowV1, values: Map<string, number>): num
 };
 
 const selectPolicy = (
-  stateIds: string[], goals: Set<string>, rows: Map<string, DecisionOptionModelRowV1[]>, values: Map<string, number>, epsilon: number
+  stateIds: string[], goals: Set<string>, rows: Map<string, DecisionOptionModelRowV2[]>, values: Map<string, number>, epsilon: number
 ) => {
-  const selectedRows = new Map<string, DecisionOptionModelRowV1>();
+  const selectedRows = new Map<string, DecisionOptionModelRowV2>();
   for (const stateId of [...stateIds].sort()) {
     if (goals.has(stateId)) continue;
     const ranked = (rows.get(stateId) ?? []).map((row) => ({ row, q: qValue(row, values) }))
-      .sort((left, right) => left.q - right.q || left.row.graphNodeId.localeCompare(right.row.graphNodeId));
+      .sort((left, right) => left.q - right.q || left.row.actionId.localeCompare(right.row.actionId));
     if (ranked.length === 0) continue;
     const minimum = ranked[0]!.q;
     selectedRows.set(stateId, ranked.filter(({ q }) => Math.abs(q - minimum) <= epsilon)
-      .sort((left, right) => left.row.graphNodeId.localeCompare(right.row.graphNodeId))[0]!.row);
+      .sort((left, right) => left.row.actionId.localeCompare(right.row.actionId))[0]!.row);
   }
   return { selectedRows };
 };
 
 const selectedPolicyIsProper = (
-  current: string, goals: Set<string>, policy: Map<string, DecisionOptionModelRowV1>
+  current: string, goals: Set<string>, policy: Map<string, DecisionOptionModelRowV2>
 ): boolean => {
   const reachable = new Set<string>();
   const queue = [current];
@@ -199,14 +200,14 @@ const selectedPolicyIsProper = (
     const state = queue.pop()!;
     if (reachable.has(state)) continue;
     reachable.add(state);
-    for (const successor of policy.get(state)?.successors ?? []) queue.push(successor.nextStateId);
+    for (const successor of policy.get(state)?.successors ?? []) queue.push(successor.expectedNextStateId);
   }
   const remaining = new Set([...reachable].filter((state) => !goals.has(state)));
   let changed = true;
   while (changed) {
     changed = false;
     for (const state of [...remaining]) if ((policy.get(state)?.successors ?? []).some((successor) =>
-      goals.has(successor.nextStateId) || !remaining.has(successor.nextStateId))) {
+      goals.has(successor.expectedNextStateId) || !remaining.has(successor.expectedNextStateId))) {
       remaining.delete(state); changed = true;
     }
   }
@@ -216,7 +217,7 @@ const selectedPolicyIsProper = (
 const failure = (
   status: Exclude<SspSolverStatus, "converged">, input: SolvePolicyInput, message: string,
   iterations = 0, residual = 0, values: Map<string, number> = new Map()
-): SspPolicySolutionV1 => ({
+): SspPolicySolutionV2 => ({
   status, actionValues: [], stateValues: Object.fromEntries([...values].filter(([, value]) => Number.isFinite(value))
     .sort(([left], [right]) => left.localeCompare(right))), tiedActionIds: [], iterations, residual,
   epsilon: input.model.solver.epsilon, modelVersion: input.model.version, modelSha256: input.modelSha256, message

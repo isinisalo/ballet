@@ -103,27 +103,39 @@ export class LocalRunService {
     const tasks = this.options.executions.listByRoot(rootRunId);
     const state = this.options.database.readRootState(rootRunId);
     const persistedOrchestration = this.options.database.readRootOrchestration(rootRunId);
-    const strategy = root.executionSnapshot.graph.strategy;
-    const latestPolicyDecision = persistedOrchestration.policyDecisions.at(-1);
-    const policyProjection = strategy.kind === "ssp_v1" && latestPolicyDecision?.state
-      && latestPolicyDecision.solverStatus === "converged"
-      ? derivePolicyProjection({
-          strategy,
-          currentStateId: latestPolicyDecision.state.stateId,
-          snapshotGraphNodeIds: root.executionSnapshot.graph.graphNodes.map(({ id }) => id),
-          modelSha256: latestPolicyDecision.modelSha256,
-          source: "run_snapshot"
-        })
-      : undefined;
+    const strategies = Object.fromEntries([
+      ...(root.executionSnapshot.graph.strategy.kind === "ssp_v2"
+        ? [["graph", root.executionSnapshot.graph.strategy] as const] : []),
+      ...graphNodeInvocations.flatMap((invocation) => {
+        const graphNode = root.executionSnapshot.graph.graphNodes.find(({ id }) => id === invocation.graphNodeId);
+        return graphNode?.strategy.kind === "ssp_v2"
+          ? [[invocation.graphNodeInvocationId, graphNode.strategy] as const] : [];
+      })
+    ]);
+    const latestByScope = new Map<string, typeof persistedOrchestration.policyDecisions[number]>();
+    for (const decision of persistedOrchestration.policyDecisions) latestByScope.set(decision.scopeKey, decision);
+    const policyProjections = Object.fromEntries([...latestByScope].flatMap(([scopeKey, decision]) => {
+      const strategy = strategies[scopeKey];
+      if (!strategy || !decision.state || decision.solverStatus !== "converged") return [];
+      const actionIds = decision.scope === "graph"
+        ? root.executionSnapshot.graph.graphNodes.map(({ id }) => id)
+        : root.executionSnapshot.graph.graphNodes.find(({ id }) => id === graphNodeInvocations.find(
+          ({ graphNodeInvocationId }) => graphNodeInvocationId === scopeKey
+        )?.graphNodeId)?.jobNodes.map(({ id }) => id) ?? [];
+      return [[scopeKey, derivePolicyProjection({
+        strategy, scope: decision.scope, currentStateId: decision.state.stateId,
+        snapshotActionIds: actionIds, modelSha256: decision.modelSha256, source: "run_snapshot"
+      })]];
+    }));
     const orchestration = {
       ...persistedOrchestration,
-      policyProjection,
-      executionGraph: strategy.kind === "ssp_v1" ? reconstructExecutionGraph({
-        strategy,
+      policyProjections,
+      executionGraph: reconstructExecutionGraph({
+        strategies,
         decisions: persistedOrchestration.policyDecisions,
         observations: persistedOrchestration.policyObservations,
         invocations: graphNodeInvocations
-      }) : [],
+      }),
       policyTelemetry: summarizePolicyTelemetry(persistedOrchestration.policyObservations)
     };
     const repair = this.options.database.readRootRepair(rootRunId);
@@ -210,7 +222,7 @@ export class LocalRunService {
       const taskId = randomUUID();
       const evidence = composeExecutionPrompt(root.executionSnapshot, this.options.database.buildTaskEnvelope(node.nodeRunId));
       const spec = {
-        version: 9 as const,
+        version: 10 as const,
         taskId,
         kind: "node_execution" as const,
         rootRunId,

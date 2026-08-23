@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -89,223 +89,219 @@
     "strategy": {
       "kind": "agent_v1",
       "orchestrator": {
-      "id": "graph-orchestrator",
-      "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-      "primaryInstructionId": "project:graph-orchestrator",
-      "skillIds": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "id": "graph-start",
-          "candidates": [
+        "id": "graph-orchestrator",
+        "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
+        "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+        "primaryInstructionId": "project:graph-orchestrator",
+        "skillIds": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "id": "graph-start",
+            "candidates": [
+              {
+                "target": {
+                  "graphNodeId": "design"
+                },
+                "description": "Begin from the approved desired-state Graph Node."
+              }
+            ]
+          },
+          "continuation": [
             {
-              "target": {
-                "graphNodeId": "design"
-              },
-              "description": "Begin from the approved desired-state Graph Node."
+              "id": "design-pass-routes",
+              "sourceId": "design",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "plan"
+                  },
+                  "description": "success: PASS success routes design to plan."
+                }
+              ]
+            },
+            {
+              "id": "design-fail-routes",
+              "sourceId": "design",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "design"
+                  },
+                  "description": "failure: FAIL failure routes design to design."
+                }
+              ]
+            },
+            {
+              "id": "plan-pass-routes",
+              "sourceId": "plan",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "build"
+                  },
+                  "description": "success: PASS success routes plan to build."
+                }
+              ]
+            },
+            {
+              "id": "plan-fail-routes",
+              "sourceId": "plan",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "design"
+                  },
+                  "description": "failure: FAIL failure routes plan to design."
+                }
+              ]
+            },
+            {
+              "id": "build-pass-routes",
+              "sourceId": "build",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "build"
+                  },
+                  "description": "more_work: PASS more_work routes build to build."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "deploy"
+                  },
+                  "description": "success: PASS success routes build to deploy."
+                }
+              ]
+            },
+            {
+              "id": "build-fail-routes",
+              "sourceId": "build",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "build"
+                  },
+                  "description": "implementation_defect: FAIL implementation_defect routes build to build."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "plan"
+                  },
+                  "description": "invalid_plan: FAIL invalid_plan routes build to plan."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "design"
+                  },
+                  "description": "invalid_design: FAIL invalid_design routes build to design."
+                }
+              ]
+            },
+            {
+              "id": "deploy-pass-routes",
+              "sourceId": "deploy",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "verify"
+                  },
+                  "description": "success: PASS success routes deploy to verify."
+                }
+              ]
+            },
+            {
+              "id": "deploy-fail-routes",
+              "sourceId": "deploy",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "deploy"
+                  },
+                  "description": "transient_deployment_error: FAIL transient_deployment_error routes deploy to deploy."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "build"
+                  },
+                  "description": "implementation_defect: FAIL implementation_defect routes deploy to build."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "plan"
+                  },
+                  "description": "invalid_plan: FAIL invalid_plan routes deploy to plan."
+                }
+              ]
+            },
+            {
+              "id": "verify-pass-routes",
+              "sourceId": "verify",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "plan"
+                  },
+                  "description": "more_work: PASS more_work routes verify to plan."
+                },
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "complete: PASS complete routes verify to DONE."
+                }
+              ]
+            },
+            {
+              "id": "verify-fail-routes",
+              "sourceId": "verify",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "graphNodeId": "build"
+                  },
+                  "description": "implementation_defect: FAIL implementation_defect routes verify to build."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "plan"
+                  },
+                  "description": "invalid_plan: FAIL invalid_plan routes verify to plan."
+                },
+                {
+                  "target": {
+                    "graphNodeId": "design"
+                  },
+                  "description": "invalid_design: FAIL invalid_design routes verify to design."
+                },
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "End the Graph Run when repair and rerouting cannot produce a valid result."
+                }
+              ]
             }
-          ]
-        },
-        "continuation": [
-          {
-            "id": "design-pass-routes",
-            "sourceId": "design",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "plan"
-                },
-                "description": "success: PASS success routes design to plan."
-              }
-            ]
-          },
-          {
-            "id": "design-fail-routes",
-            "sourceId": "design",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "design"
-                },
-                "description": "failure: FAIL failure routes design to design."
-              }
-            ]
-          },
-          {
-            "id": "plan-pass-routes",
-            "sourceId": "plan",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "build"
-                },
-                "description": "success: PASS success routes plan to build."
-              }
-            ]
-          },
-          {
-            "id": "plan-fail-routes",
-            "sourceId": "plan",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "design"
-                },
-                "description": "failure: FAIL failure routes plan to design."
-              }
-            ]
-          },
-          {
-            "id": "build-pass-routes",
-            "sourceId": "build",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "build"
-                },
-                "description": "more_work: PASS more_work routes build to build."
-              },
-              {
-                "target": {
-                  "graphNodeId": "deploy"
-                },
-                "description": "success: PASS success routes build to deploy."
-              }
-            ]
-          },
-          {
-            "id": "build-fail-routes",
-            "sourceId": "build",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "build"
-                },
-                "description": "implementation_defect: FAIL implementation_defect routes build to build."
-              },
-              {
-                "target": {
-                  "graphNodeId": "plan"
-                },
-                "description": "invalid_plan: FAIL invalid_plan routes build to plan."
-              },
-              {
-                "target": {
-                  "graphNodeId": "design"
-                },
-                "description": "invalid_design: FAIL invalid_design routes build to design."
-              }
-            ]
-          },
-          {
-            "id": "deploy-pass-routes",
-            "sourceId": "deploy",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "verify"
-                },
-                "description": "success: PASS success routes deploy to verify."
-              }
-            ]
-          },
-          {
-            "id": "deploy-fail-routes",
-            "sourceId": "deploy",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "deploy"
-                },
-                "description": "transient_deployment_error: FAIL transient_deployment_error routes deploy to deploy."
-              },
-              {
-                "target": {
-                  "graphNodeId": "build"
-                },
-                "description": "implementation_defect: FAIL implementation_defect routes deploy to build."
-              },
-              {
-                "target": {
-                  "graphNodeId": "plan"
-                },
-                "description": "invalid_plan: FAIL invalid_plan routes deploy to plan."
-              }
-            ]
-          },
-          {
-            "id": "verify-pass-routes",
-            "sourceId": "verify",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "plan"
-                },
-                "description": "more_work: PASS more_work routes verify to plan."
-              },
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "complete: PASS complete routes verify to DONE."
-              }
-            ]
-          },
-          {
-            "id": "verify-fail-routes",
-            "sourceId": "verify",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "build"
-                },
-                "description": "implementation_defect: FAIL implementation_defect routes verify to build."
-              },
-              {
-                "target": {
-                  "graphNodeId": "plan"
-                },
-                "description": "invalid_plan: FAIL invalid_plan routes verify to plan."
-              },
-              {
-                "target": {
-                  "graphNodeId": "design"
-                },
-                "description": "invalid_design: FAIL invalid_design routes verify to design."
-              },
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "End the Graph Run when repair and rerouting cannot produce a valid result."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
+          ],
+          "repair": []
+        }
       }
     },
     "repairNode": {
       "id": "graph-repair",
       "description": "Repairs difficult Graph state or worktree failures before human escalation.",
       "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
       "primaryInstructionId": "project:repair-node",
       "skillIds": [],
@@ -316,8 +312,6 @@
       {
         "id": "design",
         "description": "Define the complete desired system state through all twelve canonical arc42 sections.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [
             "graph:desired-state.requested"
@@ -329,351 +323,10 @@
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "orchestrator": {
-          "id": "design-orchestrator",
-          "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:graph-node-orchestrator",
-          "skillIds": [],
-          "maxTransitions": 256,
-          "maxRouteAttempts": 3,
-          "routing": {
-            "start": {
-              "id": "design-start",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNodeId": "design-01-introduction-and-goals"
-                  },
-                  "description": "Allowed initial Job Node for design."
-                }
-              ]
-            },
-            "continuation": [
-              {
-                "id": "design-01-introduction-and-goals-pass-route",
-                "sourceId": "design-01-introduction-and-goals",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-02-constraints"
-                    },
-                    "description": "Allowed PASS continuation after design-01-introduction-and-goals."
-                  }
-                ]
-              },
-              {
-                "id": "design-01-introduction-and-goals-fail-route",
-                "sourceId": "design-01-introduction-and-goals",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-01-introduction-and-goals."
-                  }
-                ]
-              },
-              {
-                "id": "design-02-constraints-pass-route",
-                "sourceId": "design-02-constraints",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-03-context-and-scope"
-                    },
-                    "description": "Allowed PASS continuation after design-02-constraints."
-                  }
-                ]
-              },
-              {
-                "id": "design-02-constraints-fail-route",
-                "sourceId": "design-02-constraints",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-02-constraints."
-                  }
-                ]
-              },
-              {
-                "id": "design-03-context-and-scope-pass-route",
-                "sourceId": "design-03-context-and-scope",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-04-solution-strategy"
-                    },
-                    "description": "Allowed PASS continuation after design-03-context-and-scope."
-                  }
-                ]
-              },
-              {
-                "id": "design-03-context-and-scope-fail-route",
-                "sourceId": "design-03-context-and-scope",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-03-context-and-scope."
-                  }
-                ]
-              },
-              {
-                "id": "design-04-solution-strategy-pass-route",
-                "sourceId": "design-04-solution-strategy",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-05-building-block-view"
-                    },
-                    "description": "Allowed PASS continuation after design-04-solution-strategy."
-                  }
-                ]
-              },
-              {
-                "id": "design-04-solution-strategy-fail-route",
-                "sourceId": "design-04-solution-strategy",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-04-solution-strategy."
-                  }
-                ]
-              },
-              {
-                "id": "design-05-building-block-view-pass-route",
-                "sourceId": "design-05-building-block-view",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-06-runtime-view"
-                    },
-                    "description": "Allowed PASS continuation after design-05-building-block-view."
-                  }
-                ]
-              },
-              {
-                "id": "design-05-building-block-view-fail-route",
-                "sourceId": "design-05-building-block-view",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-05-building-block-view."
-                  }
-                ]
-              },
-              {
-                "id": "design-06-runtime-view-pass-route",
-                "sourceId": "design-06-runtime-view",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-07-deployment-view"
-                    },
-                    "description": "Allowed PASS continuation after design-06-runtime-view."
-                  }
-                ]
-              },
-              {
-                "id": "design-06-runtime-view-fail-route",
-                "sourceId": "design-06-runtime-view",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-06-runtime-view."
-                  }
-                ]
-              },
-              {
-                "id": "design-07-deployment-view-pass-route",
-                "sourceId": "design-07-deployment-view",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-08-crosscutting-concepts"
-                    },
-                    "description": "Allowed PASS continuation after design-07-deployment-view."
-                  }
-                ]
-              },
-              {
-                "id": "design-07-deployment-view-fail-route",
-                "sourceId": "design-07-deployment-view",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-07-deployment-view."
-                  }
-                ]
-              },
-              {
-                "id": "design-08-crosscutting-concepts-pass-route",
-                "sourceId": "design-08-crosscutting-concepts",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-09-architecture-decisions"
-                    },
-                    "description": "Allowed PASS continuation after design-08-crosscutting-concepts."
-                  }
-                ]
-              },
-              {
-                "id": "design-08-crosscutting-concepts-fail-route",
-                "sourceId": "design-08-crosscutting-concepts",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-08-crosscutting-concepts."
-                  }
-                ]
-              },
-              {
-                "id": "design-09-architecture-decisions-pass-route",
-                "sourceId": "design-09-architecture-decisions",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-10-quality-requirements"
-                    },
-                    "description": "Allowed PASS continuation after design-09-architecture-decisions."
-                  }
-                ]
-              },
-              {
-                "id": "design-09-architecture-decisions-fail-route",
-                "sourceId": "design-09-architecture-decisions",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-09-architecture-decisions."
-                  }
-                ]
-              },
-              {
-                "id": "design-10-quality-requirements-pass-route",
-                "sourceId": "design-10-quality-requirements",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-11-risks-and-technical-debt"
-                    },
-                    "description": "Allowed PASS continuation after design-10-quality-requirements."
-                  }
-                ]
-              },
-              {
-                "id": "design-10-quality-requirements-fail-route",
-                "sourceId": "design-10-quality-requirements",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-10-quality-requirements."
-                  }
-                ]
-              },
-              {
-                "id": "design-11-risks-and-technical-debt-pass-route",
-                "sourceId": "design-11-risks-and-technical-debt",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "design-12-glossary"
-                    },
-                    "description": "Allowed PASS continuation after design-11-risks-and-technical-debt."
-                  }
-                ]
-              },
-              {
-                "id": "design-11-risks-and-technical-debt-fail-route",
-                "sourceId": "design-11-risks-and-technical-debt",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-11-risks-and-technical-debt."
-                  }
-                ]
-              },
-              {
-                "id": "design-12-glossary-pass-route",
-                "sourceId": "design-12-glossary",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "PASS"
-                    },
-                    "description": "Allowed PASS continuation after design-12-glossary."
-                  }
-                ]
-              },
-              {
-                "id": "design-12-glossary-fail-route",
-                "sourceId": "design-12-glossary",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after design-12-glossary."
-                  }
-                ]
-              }
-            ],
-            "repair": []
-          }
-        },
         "repairNode": {
           "id": "design-repair",
           "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
           "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "nodeStyle": "sol",
-          "nodeSize": "medium",
           "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
           "primaryInstructionId": "project:repair-node",
           "skillIds": [],
@@ -684,8 +337,6 @@
           {
             "id": "design-01-introduction-and-goals",
             "description": "Maintain arc42 01 Introduction and Goals.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -717,13 +368,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-02-constraints",
             "description": "Maintain arc42 02 Constraints.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -754,13 +404,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-03-context-and-scope",
             "description": "Maintain arc42 03 Context and Scope.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -792,13 +441,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-04-solution-strategy",
             "description": "Maintain arc42 04 Solution Strategy.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -830,13 +478,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-05-building-block-view",
             "description": "Maintain arc42 05 Building Block View.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -868,13 +515,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-06-runtime-view",
             "description": "Maintain arc42 06 Runtime View.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -906,13 +552,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-07-deployment-view",
             "description": "Maintain arc42 07 Deployment View.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -944,13 +589,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-08-crosscutting-concepts",
             "description": "Maintain arc42 08 Crosscutting Concepts.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -982,13 +626,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-09-architecture-decisions",
             "description": "Maintain arc42 09 Architecture Decisions.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1020,13 +663,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-10-quality-requirements",
             "description": "Maintain arc42 10 Quality Requirements.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1058,13 +700,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-11-risks-and-technical-debt",
             "description": "Maintain arc42 11 Risks and Technical Debt.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1096,13 +737,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "design-12-glossary",
             "description": "Maintain arc42 12 Glossary.",
-            "nodeStyle": "sol",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1134,15 +774,355 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
+            },
+            "outcomes": []
+          }
+        ],
+        "outcomes": [],
+        "strategy": {
+          "kind": "agent_v1",
+          "orchestrator": {
+            "id": "design-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-node-orchestrator",
+            "skillIds": [],
+            "maxTransitions": 256,
+            "maxRouteAttempts": 3,
+            "routing": {
+              "start": {
+                "id": "design-start",
+                "candidates": [
+                  {
+                    "target": {
+                      "jobNodeId": "design-01-introduction-and-goals"
+                    },
+                    "description": "Allowed initial Job Node for design."
+                  }
+                ]
+              },
+              "continuation": [
+                {
+                  "id": "design-01-introduction-and-goals-pass-route",
+                  "sourceId": "design-01-introduction-and-goals",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-02-constraints"
+                      },
+                      "description": "Allowed PASS continuation after design-01-introduction-and-goals."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-01-introduction-and-goals-fail-route",
+                  "sourceId": "design-01-introduction-and-goals",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-01-introduction-and-goals."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-02-constraints-pass-route",
+                  "sourceId": "design-02-constraints",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-03-context-and-scope"
+                      },
+                      "description": "Allowed PASS continuation after design-02-constraints."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-02-constraints-fail-route",
+                  "sourceId": "design-02-constraints",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-02-constraints."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-03-context-and-scope-pass-route",
+                  "sourceId": "design-03-context-and-scope",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-04-solution-strategy"
+                      },
+                      "description": "Allowed PASS continuation after design-03-context-and-scope."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-03-context-and-scope-fail-route",
+                  "sourceId": "design-03-context-and-scope",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-03-context-and-scope."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-04-solution-strategy-pass-route",
+                  "sourceId": "design-04-solution-strategy",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-05-building-block-view"
+                      },
+                      "description": "Allowed PASS continuation after design-04-solution-strategy."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-04-solution-strategy-fail-route",
+                  "sourceId": "design-04-solution-strategy",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-04-solution-strategy."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-05-building-block-view-pass-route",
+                  "sourceId": "design-05-building-block-view",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-06-runtime-view"
+                      },
+                      "description": "Allowed PASS continuation after design-05-building-block-view."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-05-building-block-view-fail-route",
+                  "sourceId": "design-05-building-block-view",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-05-building-block-view."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-06-runtime-view-pass-route",
+                  "sourceId": "design-06-runtime-view",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-07-deployment-view"
+                      },
+                      "description": "Allowed PASS continuation after design-06-runtime-view."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-06-runtime-view-fail-route",
+                  "sourceId": "design-06-runtime-view",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-06-runtime-view."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-07-deployment-view-pass-route",
+                  "sourceId": "design-07-deployment-view",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-08-crosscutting-concepts"
+                      },
+                      "description": "Allowed PASS continuation after design-07-deployment-view."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-07-deployment-view-fail-route",
+                  "sourceId": "design-07-deployment-view",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-07-deployment-view."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-08-crosscutting-concepts-pass-route",
+                  "sourceId": "design-08-crosscutting-concepts",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-09-architecture-decisions"
+                      },
+                      "description": "Allowed PASS continuation after design-08-crosscutting-concepts."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-08-crosscutting-concepts-fail-route",
+                  "sourceId": "design-08-crosscutting-concepts",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-08-crosscutting-concepts."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-09-architecture-decisions-pass-route",
+                  "sourceId": "design-09-architecture-decisions",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-10-quality-requirements"
+                      },
+                      "description": "Allowed PASS continuation after design-09-architecture-decisions."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-09-architecture-decisions-fail-route",
+                  "sourceId": "design-09-architecture-decisions",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-09-architecture-decisions."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-10-quality-requirements-pass-route",
+                  "sourceId": "design-10-quality-requirements",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-11-risks-and-technical-debt"
+                      },
+                      "description": "Allowed PASS continuation after design-10-quality-requirements."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-10-quality-requirements-fail-route",
+                  "sourceId": "design-10-quality-requirements",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-10-quality-requirements."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-11-risks-and-technical-debt-pass-route",
+                  "sourceId": "design-11-risks-and-technical-debt",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "design-12-glossary"
+                      },
+                      "description": "Allowed PASS continuation after design-11-risks-and-technical-debt."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-11-risks-and-technical-debt-fail-route",
+                  "sourceId": "design-11-risks-and-technical-debt",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-11-risks-and-technical-debt."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-12-glossary-pass-route",
+                  "sourceId": "design-12-glossary",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "PASS"
+                      },
+                      "description": "Allowed PASS continuation after design-12-glossary."
+                    }
+                  ]
+                },
+                {
+                  "id": "design-12-glossary-fail-route",
+                  "sourceId": "design-12-glossary",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after design-12-glossary."
+                    }
+                  ]
+                }
+              ],
+              "repair": []
             }
           }
-        ]
+        }
       },
       {
         "id": "plan",
         "description": "Select the next release and materialize executable tk work.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [
             "graph:desired-state.defined",
@@ -1155,91 +1135,10 @@
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "orchestrator": {
-          "id": "plan-orchestrator",
-          "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:graph-node-orchestrator",
-          "skillIds": [],
-          "maxTransitions": 256,
-          "maxRouteAttempts": 3,
-          "routing": {
-            "start": {
-              "id": "plan-start",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNodeId": "plan-select-release"
-                  },
-                  "description": "Allowed initial Job Node for plan."
-                }
-              ]
-            },
-            "continuation": [
-              {
-                "id": "plan-select-release-pass-route",
-                "sourceId": "plan-select-release",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "plan-materialize-work"
-                    },
-                    "description": "Allowed PASS continuation after plan-select-release."
-                  }
-                ]
-              },
-              {
-                "id": "plan-select-release-fail-route",
-                "sourceId": "plan-select-release",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after plan-select-release."
-                  }
-                ]
-              },
-              {
-                "id": "plan-materialize-work-pass-route",
-                "sourceId": "plan-materialize-work",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "PASS"
-                    },
-                    "description": "Allowed PASS continuation after plan-materialize-work."
-                  }
-                ]
-              },
-              {
-                "id": "plan-materialize-work-fail-route",
-                "sourceId": "plan-materialize-work",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after plan-materialize-work."
-                  }
-                ]
-              }
-            ],
-            "repair": []
-          }
-        },
         "repairNode": {
           "id": "plan-repair",
           "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
           "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "nodeStyle": "sol",
-          "nodeSize": "medium",
           "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
           "primaryInstructionId": "project:repair-node",
           "skillIds": [],
@@ -1250,8 +1149,6 @@
           {
             "id": "plan-select-release",
             "description": "Select the first eligible planned release.",
-            "nodeStyle": "terra",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1282,13 +1179,12 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
-            }
+            },
+            "outcomes": []
           },
           {
             "id": "plan-materialize-work",
             "description": "Materialize the selected release work idempotently.",
-            "nodeStyle": "terra",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1319,15 +1215,95 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
+            },
+            "outcomes": []
+          }
+        ],
+        "outcomes": [],
+        "strategy": {
+          "kind": "agent_v1",
+          "orchestrator": {
+            "id": "plan-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-node-orchestrator",
+            "skillIds": [],
+            "maxTransitions": 256,
+            "maxRouteAttempts": 3,
+            "routing": {
+              "start": {
+                "id": "plan-start",
+                "candidates": [
+                  {
+                    "target": {
+                      "jobNodeId": "plan-select-release"
+                    },
+                    "description": "Allowed initial Job Node for plan."
+                  }
+                ]
+              },
+              "continuation": [
+                {
+                  "id": "plan-select-release-pass-route",
+                  "sourceId": "plan-select-release",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "jobNodeId": "plan-materialize-work"
+                      },
+                      "description": "Allowed PASS continuation after plan-select-release."
+                    }
+                  ]
+                },
+                {
+                  "id": "plan-select-release-fail-route",
+                  "sourceId": "plan-select-release",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after plan-select-release."
+                    }
+                  ]
+                },
+                {
+                  "id": "plan-materialize-work-pass-route",
+                  "sourceId": "plan-materialize-work",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "PASS"
+                      },
+                      "description": "Allowed PASS continuation after plan-materialize-work."
+                    }
+                  ]
+                },
+                {
+                  "id": "plan-materialize-work-fail-route",
+                  "sourceId": "plan-materialize-work",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after plan-materialize-work."
+                    }
+                  ]
+                }
+              ],
+              "repair": []
             }
           }
-        ]
+        }
       },
       {
         "id": "build",
         "description": "Implement exactly one ready issue per invocation.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [
             "graph:release.planned",
@@ -1341,65 +1317,10 @@
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "orchestrator": {
-          "id": "build-orchestrator",
-          "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:graph-node-orchestrator",
-          "skillIds": [],
-          "maxTransitions": 256,
-          "maxRouteAttempts": 3,
-          "routing": {
-            "start": {
-              "id": "build-start",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNodeId": "build-one-ready-issue"
-                  },
-                  "description": "Allowed initial Job Node for build."
-                }
-              ]
-            },
-            "continuation": [
-              {
-                "id": "build-one-ready-issue-pass-route",
-                "sourceId": "build-one-ready-issue",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "PASS"
-                    },
-                    "description": "Allowed PASS continuation after build-one-ready-issue."
-                  }
-                ]
-              },
-              {
-                "id": "build-one-ready-issue-fail-route",
-                "sourceId": "build-one-ready-issue",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after build-one-ready-issue."
-                  }
-                ]
-              }
-            ],
-            "repair": []
-          }
-        },
         "repairNode": {
           "id": "build-repair",
           "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
           "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "nodeStyle": "sol",
-          "nodeSize": "medium",
           "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
           "primaryInstructionId": "project:repair-node",
           "skillIds": [],
@@ -1410,8 +1331,6 @@
           {
             "id": "build-one-ready-issue",
             "description": "Implement exactly one ready issue.",
-            "nodeStyle": "terra",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1442,15 +1361,69 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
+            },
+            "outcomes": []
+          }
+        ],
+        "outcomes": [],
+        "strategy": {
+          "kind": "agent_v1",
+          "orchestrator": {
+            "id": "build-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-node-orchestrator",
+            "skillIds": [],
+            "maxTransitions": 256,
+            "maxRouteAttempts": 3,
+            "routing": {
+              "start": {
+                "id": "build-start",
+                "candidates": [
+                  {
+                    "target": {
+                      "jobNodeId": "build-one-ready-issue"
+                    },
+                    "description": "Allowed initial Job Node for build."
+                  }
+                ]
+              },
+              "continuation": [
+                {
+                  "id": "build-one-ready-issue-pass-route",
+                  "sourceId": "build-one-ready-issue",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "PASS"
+                      },
+                      "description": "Allowed PASS continuation after build-one-ready-issue."
+                    }
+                  ]
+                },
+                {
+                  "id": "build-one-ready-issue-fail-route",
+                  "sourceId": "build-one-ready-issue",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after build-one-ready-issue."
+                    }
+                  ]
+                }
+              ],
+              "repair": []
             }
           }
-        ]
+        }
       },
       {
         "id": "deploy",
         "description": "Deploy the selected release only with exact human authorization.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [
             "graph:release.built"
@@ -1462,65 +1435,10 @@
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "orchestrator": {
-          "id": "deploy-orchestrator",
-          "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:graph-node-orchestrator",
-          "skillIds": [],
-          "maxTransitions": 256,
-          "maxRouteAttempts": 3,
-          "routing": {
-            "start": {
-              "id": "deploy-start",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNodeId": "deploy-release"
-                  },
-                  "description": "Allowed initial Job Node for deploy."
-                }
-              ]
-            },
-            "continuation": [
-              {
-                "id": "deploy-release-pass-route",
-                "sourceId": "deploy-release",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "PASS"
-                    },
-                    "description": "Allowed PASS continuation after deploy-release."
-                  }
-                ]
-              },
-              {
-                "id": "deploy-release-fail-route",
-                "sourceId": "deploy-release",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after deploy-release."
-                  }
-                ]
-              }
-            ],
-            "repair": []
-          }
-        },
         "repairNode": {
           "id": "deploy-repair",
           "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
           "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "nodeStyle": "sol",
-          "nodeSize": "medium",
           "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
           "primaryInstructionId": "project:repair-node",
           "skillIds": [],
@@ -1531,8 +1449,6 @@
           {
             "id": "deploy-release",
             "description": "Deploy one explicitly authorized release.",
-            "nodeStyle": "terra",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1563,15 +1479,69 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
+            },
+            "outcomes": []
+          }
+        ],
+        "outcomes": [],
+        "strategy": {
+          "kind": "agent_v1",
+          "orchestrator": {
+            "id": "deploy-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-node-orchestrator",
+            "skillIds": [],
+            "maxTransitions": 256,
+            "maxRouteAttempts": 3,
+            "routing": {
+              "start": {
+                "id": "deploy-start",
+                "candidates": [
+                  {
+                    "target": {
+                      "jobNodeId": "deploy-release"
+                    },
+                    "description": "Allowed initial Job Node for deploy."
+                  }
+                ]
+              },
+              "continuation": [
+                {
+                  "id": "deploy-release-pass-route",
+                  "sourceId": "deploy-release",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "PASS"
+                      },
+                      "description": "Allowed PASS continuation after deploy-release."
+                    }
+                  ]
+                },
+                {
+                  "id": "deploy-release-fail-route",
+                  "sourceId": "deploy-release",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after deploy-release."
+                    }
+                  ]
+                }
+              ],
+              "repair": []
             }
           }
-        ]
+        }
       },
       {
         "id": "verify",
         "description": "Verify the deployment against design, acceptance and ticket evidence.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [
             "graph:release.deployed"
@@ -1584,65 +1554,10 @@
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "orchestrator": {
-          "id": "verify-orchestrator",
-          "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:graph-node-orchestrator",
-          "skillIds": [],
-          "maxTransitions": 256,
-          "maxRouteAttempts": 3,
-          "routing": {
-            "start": {
-              "id": "verify-start",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNodeId": "verify-release"
-                  },
-                  "description": "Allowed initial Job Node for verify."
-                }
-              ]
-            },
-            "continuation": [
-              {
-                "id": "verify-release-pass-route",
-                "sourceId": "verify-release",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "PASS"
-                    },
-                    "description": "Allowed PASS continuation after verify-release."
-                  }
-                ]
-              },
-              {
-                "id": "verify-release-fail-route",
-                "sourceId": "verify-release",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Allowed FAIL terminal after verify-release."
-                  }
-                ]
-              }
-            ],
-            "repair": []
-          }
-        },
         "repairNode": {
           "id": "verify-repair",
           "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
           "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "nodeStyle": "sol",
-          "nodeSize": "medium",
           "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
           "primaryInstructionId": "project:repair-node",
           "skillIds": [],
@@ -1653,8 +1568,6 @@
           {
             "id": "verify-release",
             "description": "Verify the deployed release.",
-            "nodeStyle": "terra",
-            "nodeSize": "large",
             "capabilities": {
               "accepts": [],
               "provides": []
@@ -1687,9 +1600,65 @@
               ],
               "nodeStyle": "luna",
               "nodeSize": "small"
+            },
+            "outcomes": []
+          }
+        ],
+        "outcomes": [],
+        "strategy": {
+          "kind": "agent_v1",
+          "orchestrator": {
+            "id": "verify-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
+            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+            "primaryInstructionId": "project:graph-node-orchestrator",
+            "skillIds": [],
+            "maxTransitions": 256,
+            "maxRouteAttempts": 3,
+            "routing": {
+              "start": {
+                "id": "verify-start",
+                "candidates": [
+                  {
+                    "target": {
+                      "jobNodeId": "verify-release"
+                    },
+                    "description": "Allowed initial Job Node for verify."
+                  }
+                ]
+              },
+              "continuation": [
+                {
+                  "id": "verify-release-pass-route",
+                  "sourceId": "verify-release",
+                  "result": "PASS",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "PASS"
+                      },
+                      "description": "Allowed PASS continuation after verify-release."
+                    }
+                  ]
+                },
+                {
+                  "id": "verify-release-fail-route",
+                  "sourceId": "verify-release",
+                  "result": "FAIL",
+                  "candidates": [
+                    {
+                      "target": {
+                        "terminal": "FAIL"
+                      },
+                      "description": "Allowed FAIL terminal after verify-release."
+                    }
+                  ]
+                }
+              ],
+              "repair": []
             }
           }
-        ]
+        }
       }
     ]
   }

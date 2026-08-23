@@ -1,4 +1,5 @@
 import type { ProjectAutomationConfig, ProjectExecutionComposition } from "../../shared/domain/automation.js";
+import type { PolicyPreviewRequestV2 } from "../../shared/api/workspace-contracts.js";
 import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import {
   AutomationConflictError,
@@ -11,7 +12,7 @@ import {
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
-import type { PolicyPreviewResultV1 } from "../../shared/domain/decisionModel.js";
+import type { PolicyPreviewResultV2 } from "../../shared/domain/decisionModel.js";
 import { decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
 import { evaluatePolicyDecision } from "../policy/PolicyRuntime.js";
 import { derivePolicyProjection } from "../policy/PolicyProjection.js";
@@ -38,26 +39,36 @@ export class AutomationService {
     return saveProjectAutomationConfig(this.root(), config);
   }
 
-  previewPolicy(config: ProjectAutomationConfig): PolicyPreviewResultV1 {
+  previewPolicy(input: PolicyPreviewRequestV2): PolicyPreviewResultV2 {
+    const { config } = input;
     const loaded = this.projectConfigurations.load(this.root());
-    const issues = validateProjectAutomationConfig(config, loaded.config?.executionProfiles ?? []);
+    const allIssues = validateProjectAutomationConfig(config, loaded.config?.executionProfiles ?? []);
+    const graphNodeIndex = input.graphNodeId
+      ? config.graph.graphNodes.findIndex(({ id }) => id === input.graphNodeId) : -1;
+    const issuePrefix = input.scope === "graph" ? "graph.strategy" : `graph.graphNodes.${graphNodeIndex}.strategy`;
+    const issues = allIssues.filter(({ path }) => path.startsWith(issuePrefix));
     if (issues.length) return { issues };
-    if (config.graph.strategy.kind !== "ssp_v1") return {
-      issues: [{ path: "graph.strategy", message: "Policy Preview requires the explicit ssp_v1 orchestration strategy." }]
+    const graphNode = input.scope === "graph_node" ? config.graph.graphNodes[graphNodeIndex] : undefined;
+    if (input.scope === "graph_node" && !graphNode) return {
+      issues: [{ path: "graphNodeId", message: `Graph Node ${String(input.graphNodeId)} was not found.` }]
     };
-    const strategy = config.graph.strategy;
+    const strategy = graphNode?.strategy ?? config.graph.strategy;
+    if (strategy.kind !== "ssp_v2") return {
+      issues: [{ path: issuePrefix, message: "Policy Preview requires the explicit ssp_v2 strategy." }]
+    };
+    const actionIds = graphNode ? graphNode.jobNodes.map(({ id }) => id) : config.graph.graphNodes.map(({ id }) => id);
     const modelSha256 = decisionModelSha256(strategy.model);
     const evaluation = evaluatePolicyDecision({
       strategy,
       context: {
         epochKind: "start",
-        graphNodeInvocationCount: 0,
+        actionInvocationCount: 0,
         stateRevision: 0,
         projectState: config.graph.state.initial,
         authorizationFacts: config.graph.state.initial,
         evidenceRefs: ["configure:draft-unsnapshotted"]
       },
-      snapshotGraphNodeIds: config.graph.graphNodes.map(({ id }) => id),
+      snapshotGraphNodeIds: actionIds,
       modelSha256
     });
     return {
@@ -65,19 +76,22 @@ export class AutomationService {
       preview: {
         derived: true,
         persisted: false,
+        scope: input.scope,
+        scopeKey: graphNode?.id ?? "graph",
         state: evaluation.state,
         admissibleActionIds: evaluation.admissible.actionIds,
         excludedActions: evaluation.admissible.excludedActions,
-        selectedGraphNodeId: evaluation.solution?.selectedActionId,
+        selectedActionId: evaluation.solution?.selectedActionId,
         actionValues: evaluation.solution?.actionValues ?? [],
         expectedRemainingCostMicros: evaluation.solution?.stateValueMicros,
         solverStatus: evaluation.status,
-        modelVersion: 1,
+        modelVersion: 2,
         modelSha256,
         projection: evaluation.state && evaluation.status === "converged" ? derivePolicyProjection({
           strategy,
+          scope: input.scope,
           currentStateId: evaluation.state.stateId,
-          snapshotGraphNodeIds: config.graph.graphNodes.map(({ id }) => id),
+          snapshotActionIds: actionIds,
           modelSha256,
           source: "configure_draft"
         }) : undefined,
@@ -123,7 +137,8 @@ const compositions = (graph: ProjectAutomationConfig["graph"]): Array<{ path: st
     ? [{ path: "graph.strategy.orchestrator", composition: graph.strategy.orchestrator }] : []),
   ...(graph.repairNode ? [{ path: "graph.repairNode", composition: graph.repairNode }] : []),
   ...graph.graphNodes.flatMap((graphNode) => [
-    { path: `${graphNode.id}.orchestrator`, composition: graphNode.orchestrator },
+    ...(graphNode.strategy.kind === "agent_v1"
+      ? [{ path: `${graphNode.id}.strategy.orchestrator`, composition: graphNode.strategy.orchestrator }] : []),
     ...(graphNode.repairNode ? [{ path: `${graphNode.id}.repairNode`, composition: graphNode.repairNode }] : []),
     ...graphNode.jobNodes.flatMap((jobNode) => [
       ...(jobNode.workNode.type === "agent" ? [{ path: `${graphNode.id}.${jobNode.id}.work`, composition: jobNode.workNode }] : []),

@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { graphNodeModulePackageV4Schema } from "../../shared/api/graph-node-module-schemas.js";
+import { graphNodeModulePackageV5Schema } from "../../shared/api/graph-node-module-schemas.js";
 import type {
   ProjectExecutionComposition,
   ProjectGraphNode,
@@ -12,18 +12,18 @@ import type {
   ProjectWorkNode
 } from "../../shared/domain/automation.js";
 import type {
-  GraphNodeModuleCompositionV4,
+  GraphNodeModuleCompositionV5,
   GraphNodeModuleExportResult,
-  GraphNodeModuleGraphNodeV4,
+  GraphNodeModuleGraphNodeV5,
   GraphNodeModuleInspection,
   GraphNodeModuleInstallPlan,
   GraphNodeModuleIssue,
   GraphNodeModuleLibraryEntry,
-  GraphNodeModulePackageV4,
-  GraphNodeModuleResourceV4,
+  GraphNodeModulePackageV5,
+  GraphNodeModuleResourceV5,
   InstalledGraphNodeModuleStatus,
-  InstalledGraphNodeModuleV4,
-  InstalledGraphNodeModulesFileV4
+  InstalledGraphNodeModuleV5,
+  InstalledGraphNodeModulesFileV5
 } from "../../shared/domain/graphNodeModules.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
@@ -46,10 +46,10 @@ export class GraphNodeModuleService {
     }
     const raw = JSON.stringify(value);
     if (Buffer.byteLength(raw, "utf8") > 524_288) return invalidInspection(source, raw, "PACKAGE_TOO_LARGE", "Package exceeds 524288 bytes.");
-    if (isRecord(value) && (value.format !== "ballet-graph-node-module" || value.version !== 4)) {
-      return invalidInspection(source, raw, "SCHEMA_DOWNGRADE", "Only Graph Node Module v4 packages are accepted.");
+    if (isRecord(value) && (value.format !== "ballet-graph-node-module" || value.version !== 5)) {
+      return invalidInspection(source, raw, "SCHEMA_DOWNGRADE", "Only Graph Node Module v5 packages are accepted.");
     }
-    const parsed = graphNodeModulePackageV4Schema.safeParse(value);
+    const parsed = graphNodeModulePackageV5Schema.safeParse(value);
     if (!parsed.success) return {
       valid: false, source, sizeBytes: Buffer.byteLength(raw, "utf8"),
       issues: parsed.error.issues.map((issue) => ({
@@ -115,8 +115,14 @@ export class GraphNodeModuleService {
         written.push(filename);
       }
       const next = installGraphNode(loaded.config, plan.graphNode);
-      this.projects.putAutomation(this.root(), { version: 15, graph: next.graph });
-      const record: InstalledGraphNodeModuleV4 = {
+      this.projects.putAutomation(this.root(), { version: 16, graph: next.graph });
+      const persistedGraphNode = this.projects.load(this.root()).config?.graph.graphNodes.find(
+        ({ id }) => id === plan.graphNode.id
+      );
+      if (!persistedGraphNode) throw new GraphNodeModuleError("Installed Graph Node was not persisted.", [{
+        code: "GRAPH_NODE_NOT_FOUND", path: "graphNode.id", message: plan.graphNode.id
+      }]);
+      const record: InstalledGraphNodeModuleV5 = {
         moduleId: pkg.manifest.id, moduleVersion: pkg.manifest.version, title: pkg.manifest.title,
         source: input.source, packageSha256: inspection.sha256!, graphNodeId: plan.graphNode.id,
         installedAt: new Date().toISOString(), profileMappings: Object.fromEntries(plan.profileMappings.map((mapping) => [mapping.slot.key, mapping.selectedProfileId!])),
@@ -125,7 +131,7 @@ export class GraphNodeModuleService {
           kind: resource.kind, resourceId: resource.resourceId, relativePath: resource.relativePath,
           installedSha256: resource.sha256
         })),
-        installedContentSha256: contentHash(plan.graphNode, plan.resources.map(({ relativePath, sha256: digest }) => ({ relativePath, sha256: digest })))
+        installedContentSha256: contentHash(persistedGraphNode, plan.resources.map(({ relativePath, sha256: digest }) => ({ relativePath, sha256: digest })))
       };
       const installed = await this.readInstalled();
       installed.installed.push(record);
@@ -188,7 +194,7 @@ export class GraphNodeModuleService {
         }
       } }
     };
-    this.projects.putAutomation(this.root(), { version: 15, graph: nextGraph });
+    this.projects.putAutomation(this.root(), { version: 16, graph: nextGraph });
     for (const resource of record.ownedResources) await unlink(path.join(this.root(), resource.relativePath)).catch(() => undefined);
     installed.installed = installed.installed.filter((candidate) => candidate.graphNodeId !== graphNodeId);
     await this.writeInstalled(installed);
@@ -207,15 +213,15 @@ export class GraphNodeModuleService {
     });
     const slotByProfile = new Map(profileIds.map((profileId, index) => [profileId, profileSlots[index].key]));
     const resourceIds = [...new Set(compositionValues.flatMap((composition) => [composition.primaryInstructionId, ...composition.skillIds]))];
-    const resources = resourceIds.map((resourceId): GraphNodeModuleResourceV4 => {
+    const resources = resourceIds.map((resourceId): GraphNodeModuleResourceV5 => {
       const instruction = catalog.instructions.find((entry) => entry.id === resourceId);
       if (instruction) return { kind: "instruction", key: localResourceKey(resourceId), title: instruction.title, metadata: {}, body: instruction.body };
       const skill = catalog.skills.find((entry) => entry.id === resourceId);
       if (skill) return { kind: "skill", key: localResourceKey(resourceId), name: skill.name, description: skill.description, metadata: skill.metadata, body: skill.body };
       throw new GraphNodeModuleError("Referenced resource is missing.", [{ code: "INVALID_SCHEMA", path: resourceId, message: resourceId }]);
     });
-    const pkg: GraphNodeModulePackageV4 = {
-      format: "ballet-graph-node-module", version: 4,
+    const pkg: GraphNodeModulePackageV5 = {
+      format: "ballet-graph-node-module", version: 5,
       manifest: { id: graphNode.id, title: input.title ?? graphNode.description, description: input.description ?? graphNode.description, version: input.version ?? "1.0.0", category: input.category, tags: input.tags ?? [] },
       permissions: { network: profileSlots.some((slot) => slot.network === "required") ? "required" : "forbidden", externalWrites: false },
       profileSlots,
@@ -224,12 +230,12 @@ export class GraphNodeModuleService {
       resources,
       graphNode: dematerializeGraphNode(graphNode, slotByProfile)
     };
-    const parsed = graphNodeModulePackageV4Schema.parse(pkg);
+    const parsed = graphNodeModulePackageV5Schema.parse(pkg);
     const canonicalJson = canonical(parsed);
     return { package: parsed, canonicalJson, sha256: sha256(canonicalJson), filename: `${graphNode.id}.ballet-graph-node.json` };
   }
 
-  private createPlan(pkg: GraphNodeModulePackageV4, packageSha256: string, source: string, mappings: Record<string, string>, project: ProjectConfiguration): GraphNodeModuleInstallPlan {
+  private createPlan(pkg: GraphNodeModulePackageV5, packageSha256: string, source: string, mappings: Record<string, string>, project: ProjectConfiguration): GraphNodeModuleInstallPlan {
     const issues: GraphNodeModuleIssue[] = [];
     const profileMappings = pkg.profileSlots.map((slot) => {
       const candidates = project.executionProfiles.filter((profile) => slot.providers.includes(profile.provider) && networkCompatible(slot.network, profile)).map(profileCandidate);
@@ -255,14 +261,14 @@ export class GraphNodeModuleService {
     return { ...base, planHash: sha256(canonical(base)) };
   }
 
-  private async readInstalled(): Promise<InstalledGraphNodeModulesFileV4> {
+  private async readInstalled(): Promise<InstalledGraphNodeModulesFileV5> {
     const source = await readFile(installedPath(this.root()), "utf8").catch(() => undefined);
-    if (!source) return { version: 4, installed: [] };
-    const value = JSON.parse(source) as InstalledGraphNodeModulesFileV4;
-    if (value.version !== 4 || !Array.isArray(value.installed)) throw new GraphNodeModuleError("Installed module registry is invalid.", [{ code: "INVALID_SCHEMA", path: ".ballet/graph-node-modules.json", message: "Expected version 4." }]);
+    if (!source) return { version: 5, installed: [] };
+    const value = JSON.parse(source) as InstalledGraphNodeModulesFileV5;
+    if (value.version !== 5 || !Array.isArray(value.installed)) throw new GraphNodeModuleError("Installed module registry is invalid.", [{ code: "INVALID_SCHEMA", path: ".ballet/graph-node-modules.json", message: "Expected version 5." }]);
     return value;
   }
-  private async writeInstalled(value: InstalledGraphNodeModulesFileV4) {
+  private async writeInstalled(value: InstalledGraphNodeModulesFileV5) {
     const filename = installedPath(this.root());
     await mkdir(path.dirname(filename), { recursive: true });
     const temporary = `${filename}.${process.pid}.${randomUUID()}.tmp`;
@@ -280,20 +286,20 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 const walk = async (directory: string): Promise<string[]> => (await readdir(directory, { withFileTypes: true })).flatMap((entry) => entry.isDirectory() ? [] : [path.join(directory, entry.name)]).concat((await Promise.all((await readdir(directory, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => walk(path.join(directory, entry.name))))).flat());
 const profileCandidate = (profile: ExecutionProfile) => ({ id: profile.id, name: profile.name, provider: profile.provider, networkAccess: profile.networkAccess });
 const networkCompatible = (requirement: string, profile: ExecutionProfile) => requirement === "optional" || (requirement === "required") === profile.networkAccess;
-const moduleRemapping = (pkg: GraphNodeModulePackageV4) => ({
+const moduleRemapping = (pkg: GraphNodeModulePackageV5) => ({
   graphNode: { [pkg.graphNode.key]: pkg.manifest.id },
-  nodes: Object.fromEntries([pkg.graphNode.orchestrator, ...(pkg.graphNode.repairNode ? [pkg.graphNode.repairNode] : []), ...pkg.graphNode.jobNodes.flatMap((job) => [job, job.workNode, job.validationNode])].map((node) => [node.key, `${pkg.manifest.id}-${node.key}`])),
-  rules: Object.fromEntries([pkg.graphNode.orchestrator.routing.start, ...pkg.graphNode.orchestrator.routing.continuation, ...pkg.graphNode.orchestrator.routing.repair].map((rule) => [rule.key, `${pkg.manifest.id}-${rule.key}`])),
+  nodes: Object.fromEntries([pkg.graphNode.strategy.orchestrator, ...(pkg.graphNode.repairNode ? [pkg.graphNode.repairNode] : []), ...pkg.graphNode.jobNodes.flatMap((job) => [job, job.workNode, job.validationNode])].map((node) => [node.key, `${pkg.manifest.id}-${node.key}`])),
+  rules: Object.fromEntries([pkg.graphNode.strategy.orchestrator.routing.start, ...pkg.graphNode.strategy.orchestrator.routing.continuation, ...pkg.graphNode.strategy.orchestrator.routing.repair].map((rule) => [rule.key, `${pkg.manifest.id}-${rule.key}`])),
   instructions: Object.fromEntries(pkg.resources.filter((resource) => resource.kind === "instruction").map((resource) => [resource.key, `project:${pkg.manifest.id}-${resource.key}`])),
   skills: Object.fromEntries(pkg.resources.filter((resource) => resource.kind === "skill").map((resource) => [resource.key, `project:${pkg.manifest.id}-${resource.key}`]))
 });
 type Remapping = ReturnType<typeof moduleRemapping>;
-const composition = (value: GraphNodeModuleCompositionV4, remap: Remapping, profiles: Map<string, string>): ProjectExecutionComposition => ({
+const composition = (value: GraphNodeModuleCompositionV5, remap: Remapping, profiles: Map<string, string>): ProjectExecutionComposition => ({
   executionProfileId: profiles.get(value.profileSlot) ?? "",
   primaryInstructionId: remap.instructions[value.primaryInstruction],
   skillIds: value.skills.map((key) => remap.skills[key])
 });
-const materializeExecutable = <T extends GraphNodeModuleGraphNodeV4["jobNodes"][number]["workNode"] | GraphNodeModuleGraphNodeV4["jobNodes"][number]["validationNode"]>(value: T, remap: Remapping, profiles: Map<string, string>): ProjectWorkNode | ProjectValidationNode => {
+const materializeExecutable = <T extends GraphNodeModuleGraphNodeV5["jobNodes"][number]["workNode"] | GraphNodeModuleGraphNodeV5["jobNodes"][number]["validationNode"]>(value: T, remap: Remapping, profiles: Map<string, string>): ProjectWorkNode | ProjectValidationNode => {
   const base = {
     id: remap.nodes[value.key], description: value.description, task: value.task,
     nodeStyle: value.nodeStyle, nodeSize: value.nodeSize
@@ -302,24 +308,25 @@ const materializeExecutable = <T extends GraphNodeModuleGraphNodeV4["jobNodes"][
     ? { ...base, type: "human" }
     : { ...base, type: "agent", ...composition(value, remap, profiles) };
 };
-const materializeGraphNode = (value: GraphNodeModuleGraphNodeV4, remap: Remapping, profiles: Map<string, string>): ProjectGraphNode => ({
-  id: remap.graphNode[value.key], description: value.description, nodeStyle: value.nodeStyle, nodeSize: value.nodeSize,
+const materializeGraphNode = (value: GraphNodeModuleGraphNodeV5, remap: Remapping, profiles: Map<string, string>): ProjectGraphNode => ({
+  id: remap.graphNode[value.key], description: value.description,
   capabilities: structuredClone(value.capabilities), stateContract: { ...value.stateContract },
-  orchestrator: {
-    id: remap.nodes[value.orchestrator.key], description: value.orchestrator.description,
-    nodeStyle: value.orchestrator.nodeStyle, nodeSize: value.orchestrator.nodeSize,
-    ...composition(value.orchestrator, remap, profiles), maxTransitions: value.orchestrator.maxTransitions,
-    maxRouteAttempts: value.orchestrator.maxRouteAttempts,
+  outcomes: structuredClone(value.outcomes),
+  strategy: { kind: "agent_v1", orchestrator: {
+    id: remap.nodes[value.strategy.orchestrator.key], description: value.strategy.orchestrator.description,
+    ...composition(value.strategy.orchestrator, remap, profiles), maxTransitions: value.strategy.orchestrator.maxTransitions,
+    maxRouteAttempts: value.strategy.orchestrator.maxRouteAttempts,
     routing: {
-      start: { id: remap.rules[value.orchestrator.routing.start.key], candidates: value.orchestrator.routing.start.candidates.map((candidate) => materializeCandidate(candidate, remap)) },
-      continuation: value.orchestrator.routing.continuation.map((rule) => ({ id: remap.rules[rule.key], sourceId: remap.nodes[rule.sourceJobNode], result: rule.result, candidates: rule.candidates.map((candidate) => materializeCandidate(candidate, remap)) })),
-      repair: value.orchestrator.routing.repair.map((rule) => ({ id: remap.rules[rule.key], sourceId: remap.nodes[rule.sourceJobNode], capability: rule.capability, candidates: rule.candidates.map((candidate) => materializeCandidate(candidate, remap)) }))
+      start: { id: remap.rules[value.strategy.orchestrator.routing.start.key], candidates: value.strategy.orchestrator.routing.start.candidates.map((candidate) => materializeCandidate(candidate, remap)) },
+      continuation: value.strategy.orchestrator.routing.continuation.map((rule) => ({ id: remap.rules[rule.key], sourceId: remap.nodes[rule.sourceJobNode], result: rule.result, candidates: rule.candidates.map((candidate) => materializeCandidate(candidate, remap)) })),
+      repair: value.strategy.orchestrator.routing.repair.map((rule) => ({ id: remap.rules[rule.key], sourceId: remap.nodes[rule.sourceJobNode], capability: rule.capability, candidates: rule.candidates.map((candidate) => materializeCandidate(candidate, remap)) }))
     }
-  },
-  ...(value.repairNode ? { repairNode: { id: remap.nodes[value.repairNode.key], description: value.repairNode.description, task: value.repairNode.task, nodeStyle: value.repairNode.nodeStyle, nodeSize: value.repairNode.nodeSize, ...composition(value.repairNode, remap, profiles), maxRepairDepth: value.repairNode.maxRepairDepth, maxRepairAttempts: value.repairNode.maxRepairAttempts } } : {}),
+  } },
+  ...(value.repairNode ? { repairNode: { id: remap.nodes[value.repairNode.key], description: value.repairNode.description, task: value.repairNode.task, ...composition(value.repairNode, remap, profiles), maxRepairDepth: value.repairNode.maxRepairDepth, maxRepairAttempts: value.repairNode.maxRepairAttempts } } : {}),
   jobNodes: value.jobNodes.map((job): ProjectJobNode => ({
-    id: remap.nodes[job.key], description: job.description, nodeStyle: job.nodeStyle, nodeSize: job.nodeSize,
+    id: remap.nodes[job.key], description: job.description,
     capabilities: structuredClone(job.capabilities), maxRetries: job.maxRetries,
+    outcomes: structuredClone(job.outcomes),
     workNode: materializeExecutable(job.workNode, remap, profiles) as ProjectWorkNode,
     validationNode: materializeExecutable(job.validationNode, remap, profiles) as ProjectValidationNode
   }))
@@ -345,19 +352,23 @@ const installGraphNode = (config: ProjectConfiguration, graphNode: ProjectGraphN
     ); })()
   }
 });
-const renderResource = (resourceId: string, resource: GraphNodeModuleResourceV4) => {
+const renderResource = (resourceId: string, resource: GraphNodeModuleResourceV5) => {
   const localId = resourceId.slice(8);
   const title = resource.kind === "instruction" ? resource.title : resource.name;
   return `---\nid: ${localId}\ntitle: ${JSON.stringify(title)}\ncreatedAt: ${new Date().toISOString().slice(0, 10)}\nupdatedAt: ${new Date().toISOString().slice(0, 10)}\n---\n${resource.body.startsWith("\n") ? "" : "\n"}${resource.body.trimEnd()}\n`;
 };
 const contentHash = (graphNode: ProjectGraphNode, resources: Array<{ relativePath: string; sha256: string }>) => sha256(canonical({ graphNode, resources: [...resources].sort((a, b) => a.relativePath.localeCompare(b.relativePath)) }));
-const graphNodeCompositions = (node: ProjectGraphNode): ProjectExecutionComposition[] => [node.orchestrator, ...(node.repairNode ? [node.repairNode] : []), ...node.jobNodes.flatMap((job) => [...(job.workNode.type === "agent" ? [job.workNode] : []), ...(job.validationNode.type === "agent" ? [job.validationNode] : [])])];
+const graphNodeCompositions = (node: ProjectGraphNode): ProjectExecutionComposition[] => [
+  ...(node.strategy.kind === "agent_v1" ? [node.strategy.orchestrator] : []),
+  ...(node.repairNode ? [node.repairNode] : []),
+  ...node.jobNodes.flatMap((job) => [...(job.workNode.type === "agent" ? [job.workNode] : []), ...(job.validationNode.type === "agent" ? [job.validationNode] : [])])
+];
 const localResourceKey = (resourceId: string) => resourceId.slice(8).replace(/^[^-]+-/, "");
 const dematerializeComposition = (value: ProjectExecutionComposition, slots: Map<string, string>) => ({ profileSlot: slots.get(value.executionProfileId)!, primaryInstruction: localResourceKey(value.primaryInstructionId), skills: value.skillIds.map(localResourceKey) });
 const dematerializeExecutable = (
   value: ProjectWorkNode | ProjectValidationNode,
   slots: Map<string, string>
-): GraphNodeModuleGraphNodeV4["jobNodes"][number]["workNode"] => {
+): GraphNodeModuleGraphNodeV5["jobNodes"][number]["workNode"] => {
   const base = {
     key: value.id, description: value.description, task: value.task,
     nodeStyle: value.nodeStyle, nodeSize: value.nodeSize
@@ -366,25 +377,35 @@ const dematerializeExecutable = (
     ? { ...base, type: "human" }
     : { ...base, type: "agent", ...dematerializeComposition(value, slots) };
 };
-const dematerializeGraphNode = (node: ProjectGraphNode, slots: Map<string, string>): GraphNodeModuleGraphNodeV4 => ({
-  key: node.id, description: node.description, nodeStyle: node.nodeStyle, nodeSize: node.nodeSize,
+const dematerializeGraphNode = (node: ProjectGraphNode, slots: Map<string, string>): GraphNodeModuleGraphNodeV5 => ({
+  key: node.id, description: node.description,
   capabilities: structuredClone(node.capabilities), stateContract: { ...node.stateContract },
-  orchestrator: {
-    key: node.orchestrator.id, description: node.orchestrator.description, nodeStyle: node.orchestrator.nodeStyle,
-    nodeSize: node.orchestrator.nodeSize, ...dematerializeComposition(node.orchestrator, slots),
-    maxTransitions: node.orchestrator.maxTransitions, maxRouteAttempts: node.orchestrator.maxRouteAttempts,
+  outcomes: structuredClone(node.outcomes),
+  strategy: { kind: "agent_v1", orchestrator: {
+    key: requireAgentStrategy(node).orchestrator.id, description: requireAgentStrategy(node).orchestrator.description,
+    ...dematerializeComposition(requireAgentStrategy(node).orchestrator, slots),
+    maxTransitions: requireAgentStrategy(node).orchestrator.maxTransitions,
+    maxRouteAttempts: requireAgentStrategy(node).orchestrator.maxRouteAttempts,
     routing: {
-      start: { key: node.orchestrator.routing.start.id, candidates: node.orchestrator.routing.start.candidates.map(dematerializeCandidate) },
-      continuation: node.orchestrator.routing.continuation.map((rule) => ({ key: rule.id, sourceJobNode: rule.sourceId, result: rule.result, candidates: rule.candidates.map(dematerializeCandidate) })),
-      repair: node.orchestrator.routing.repair.map((rule) => ({ key: rule.id, sourceJobNode: rule.sourceId, capability: rule.capability, candidates: rule.candidates.map(dematerializeCandidate) }))
+      start: { key: requireAgentStrategy(node).orchestrator.routing.start.id, candidates: requireAgentStrategy(node).orchestrator.routing.start.candidates.map(dematerializeCandidate) },
+      continuation: requireAgentStrategy(node).orchestrator.routing.continuation.map((rule) => ({ key: rule.id, sourceJobNode: rule.sourceId, result: rule.result, candidates: rule.candidates.map(dematerializeCandidate) })),
+      repair: requireAgentStrategy(node).orchestrator.routing.repair.map((rule) => ({ key: rule.id, sourceJobNode: rule.sourceId, capability: rule.capability, candidates: rule.candidates.map(dematerializeCandidate) }))
     }
-  },
-  ...(node.repairNode ? { repairNode: { key: node.repairNode.id, description: node.repairNode.description, task: node.repairNode.task, nodeStyle: node.repairNode.nodeStyle, nodeSize: node.repairNode.nodeSize, ...dematerializeComposition(node.repairNode, slots), maxRepairDepth: node.repairNode.maxRepairDepth, maxRepairAttempts: node.repairNode.maxRepairAttempts } } : {}),
+  } },
+  ...(node.repairNode ? { repairNode: { key: node.repairNode.id, description: node.repairNode.description, task: node.repairNode.task, ...dematerializeComposition(node.repairNode, slots), maxRepairDepth: node.repairNode.maxRepairDepth, maxRepairAttempts: node.repairNode.maxRepairAttempts } } : {}),
   jobNodes: node.jobNodes.map((job) => ({
-    key: job.id, description: job.description, nodeStyle: job.nodeStyle, nodeSize: job.nodeSize,
+    key: job.id, description: job.description,
     capabilities: structuredClone(job.capabilities), maxRetries: job.maxRetries,
+    outcomes: structuredClone(job.outcomes),
     workNode: dematerializeExecutable(job.workNode, slots),
     validationNode: dematerializeExecutable(job.validationNode, slots)
   }))
 });
+const requireAgentStrategy = (node: ProjectGraphNode) => {
+  if (node.strategy.kind !== "agent_v1") throw new GraphNodeModuleError(
+    "Graph Node Module v5 exports intrinsic contracts but not project-specific local Decision Models.",
+    [{ code: "INVALID_SCHEMA", path: "graphNode.strategy", message: "Select explicit local agent_v1 before export." }]
+  );
+  return node.strategy;
+};
 const dematerializeCandidate = (candidate: { target: ProjectGraphNodeRouteTarget; description: string }) => ({ target: "jobNodeId" in candidate.target ? { jobNode: candidate.target.jobNodeId } : { terminal: candidate.target.terminal }, description: candidate.description });

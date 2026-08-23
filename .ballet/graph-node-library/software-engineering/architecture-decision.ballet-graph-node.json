@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "category": "software-engineering",
     "description": "Resolve one architecture-significant choice. Done when its decision drivers, alternatives, decision status, consequences and supersession boundary are explicit and human-approved where required.",
@@ -103,8 +103,6 @@
   "graphNode": {
     "key": "architecture-decision",
     "description": "Resolve one architecture-significant choice. Done when its decision drivers, alternatives, decision status, consequences and supersession boundary are explicit and human-approved where required.",
-    "nodeStyle": "terra",
-    "nodeSize": "medium",
     "capabilities": {
       "accepts": [
         "architecture:decision.requested"
@@ -116,65 +114,10 @@
     "stateContract": {
       "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "task"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "task-pass-route",
-            "sourceJobNode": "task",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after task."
-              }
-            ]
-          },
-          {
-            "key": "task-fail-route",
-            "sourceJobNode": "task",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after task."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -185,8 +128,6 @@
       {
         "key": "task",
         "description": "Resolve one architecture-significant choice. Done when its decision drivers, alternatives, decision status, consequences and supersession boundary are explicit and human-approved where required.",
-        "nodeStyle": "terra",
-        "nodeSize": "medium",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -212,8 +153,82 @@
           "nodeStyle": "luna",
           "task": "Accept or reject the proposed architecture decision, or explicitly confirm that no new decision is needed. Unmentioned external actions and decision changes remain unauthorized.",
           "type": "human"
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "task"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "task-pass-route",
+              "sourceJobNode": "task",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after task."
+                }
+              ]
+            },
+            {
+              "key": "task-fail-route",
+              "sourceJobNode": "task",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after task."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

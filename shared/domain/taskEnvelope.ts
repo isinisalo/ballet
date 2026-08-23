@@ -1,7 +1,7 @@
 import type { JsonValue, NodeResult } from "./automation.js";
 import type { OrchestrationScope, WorkNodeOutcome } from "./runtime.js";
 
-export const taskEnvelopeVersion = 7 as const;
+export const taskEnvelopeVersion = 8 as const;
 export const maxTaskEnvelopeBytes = 384 * 1024;
 export const maxRelevantHistoryEntries = 8;
 export const maxRelevantHistoryBytes = 64 * 1024;
@@ -26,6 +26,7 @@ export interface TaskEnvelopeHistoryEntry {
   stateRevision: number;
 }
 export interface TaskEnvelopeRouteCandidate { key: string; description: string; }
+export interface TaskEnvelopeOutcomeCandidate { outcomeId: string; result: NodeResult; }
 
 interface TaskEnvelopeBase {
   version: typeof taskEnvelopeVersion;
@@ -37,7 +38,7 @@ interface TaskEnvelopeBase {
   relevantHistory: TaskEnvelopeHistoryEntry[];
 }
 
-export interface WorkTaskEnvelopeV7 extends TaskEnvelopeBase {
+export interface WorkTaskEnvelopeV8 extends TaskEnvelopeBase {
   role: "work";
   graphNode: TaskEnvelopeNodeIdentity;
   jobNode: TaskEnvelopeNodeIdentity;
@@ -46,17 +47,18 @@ export interface WorkTaskEnvelopeV7 extends TaskEnvelopeBase {
   previousValidationFeedback?: { feedback: string; expectedCorrection: string };
 }
 
-export interface ValidationTaskEnvelopeV7 extends TaskEnvelopeBase {
+export interface ValidationTaskEnvelopeV8 extends TaskEnvelopeBase {
   role: "validation";
   graphNode: TaskEnvelopeNodeIdentity;
   jobNode: TaskEnvelopeNodeIdentity;
   validationNode: TaskEnvelopeNodeIdentity;
   workAttempt: number;
   workOutcome: WorkNodeOutcome;
+  allowedOutcomes: TaskEnvelopeOutcomeCandidate[];
   repairReturn?: { repairRequestId: string; repairResultId: string; stateRevision: number; summary: string };
 }
 
-export interface OrchestratorTaskEnvelopeV7 extends TaskEnvelopeBase {
+export interface OrchestratorTaskEnvelopeV8 extends TaskEnvelopeBase {
   role: "orchestrator";
   scope: OrchestrationScope;
   graphNode?: TaskEnvelopeNodeIdentity;
@@ -69,10 +71,11 @@ export interface OrchestratorTaskEnvelopeV7 extends TaskEnvelopeBase {
     evidence: JsonValue;
   };
   allowedCandidates: TaskEnvelopeRouteCandidate[];
+  allowedOutcomes: TaskEnvelopeOutcomeCandidate[];
   repairAvailable: boolean;
 }
 
-export interface RepairTaskEnvelopeV7 extends TaskEnvelopeBase {
+export interface RepairTaskEnvelopeV8 extends TaskEnvelopeBase {
   role: "repair";
   scope: OrchestrationScope;
   graphNode?: TaskEnvelopeNodeIdentity;
@@ -89,8 +92,8 @@ export interface RepairTaskEnvelopeV7 extends TaskEnvelopeBase {
   parentEscalationAvailable: boolean;
 }
 
-export type TaskEnvelopeV7 =
-  | WorkTaskEnvelopeV7
-  | ValidationTaskEnvelopeV7
-  | OrchestratorTaskEnvelopeV7
-  | RepairTaskEnvelopeV7;
+export type TaskEnvelopeV8 =
+  | WorkTaskEnvelopeV8
+  | ValidationTaskEnvelopeV8
+  | OrchestratorTaskEnvelopeV8
+  | RepairTaskEnvelopeV8;

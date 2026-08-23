@@ -1,10 +1,10 @@
 import type { JsonValue } from "../../shared/domain/automation.js";
 import type {
-  DecisionFeatureDefinitionV1,
-  DecisionProjectionContextV1,
+  DecisionFeatureDefinitionV2,
+  DecisionProjectionContextV2,
   DecisionRuntimeFact,
-  DecisionStateV1,
-  ProjectSspDecisionModelV1
+  DecisionStateV2,
+  ProjectSspDecisionModelV2
 } from "../../shared/domain/decisionModel.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 
@@ -17,9 +17,9 @@ export class DecisionStateProjectionError extends Error {
 }
 
 export const projectDecisionState = (
-  model: ProjectSspDecisionModelV1,
-  context: DecisionProjectionContextV1
-): DecisionStateV1 => {
+  model: ProjectSspDecisionModelV2,
+  context: DecisionProjectionContextV2
+): DecisionStateV2 => {
   const features = Object.fromEntries([...model.features]
     .sort((left, right) => left.id.localeCompare(right.id))
     .map((definition) => [definition.id, projectFeature(definition, context)]));
@@ -38,8 +38,8 @@ export const projectDecisionState = (
 };
 
 const projectFeature = (
-  definition: DecisionFeatureDefinitionV1,
-  context: DecisionProjectionContextV1
+  definition: DecisionFeatureDefinitionV2,
+  context: DecisionProjectionContextV2
 ): string => {
   const raw = definition.source.kind === "runtime"
     ? runtimeFact(definition.source.fact, context)
@@ -55,12 +55,13 @@ const projectFeature = (
 
 const runtimeFact = (
   fact: DecisionRuntimeFact,
-  context: DecisionProjectionContextV1
+  context: DecisionProjectionContextV2
 ): JsonValue | undefined => {
   if (fact === "epoch_kind") return context.epochKind;
-  if (fact === "previous_graph_node_id") return context.previousGraphNodeId;
-  if (fact === "previous_graph_node_result") return context.previousGraphNodeResult;
-  if (fact === "graph_node_invocation_count") return context.graphNodeInvocationCount;
+  if (fact === "previous_action_id") return context.previousActionId;
+  if (fact === "previous_action_result") return context.previousActionResult;
+  if (fact === "previous_outcome_id") return context.previousOutcomeId;
+  if (fact === "action_invocation_count") return context.actionInvocationCount;
   return undefined;
 };
 

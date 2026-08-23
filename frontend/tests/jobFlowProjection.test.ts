@@ -13,6 +13,7 @@ describe("Job flow projection", () => {
     expect(first.points.escalate.y).toBe(first.points.continue.y);
     expect(first.points.retryCount.x).toBeLessThan(first.points.retry.x);
     expect(first.points.retryCount.x).toBe(viewport === "wide" ? 70 : 72);
+    expect(first.points.retryCount.y).toBe(viewport === "wide" ? 430 : 360);
     expect(first.edges.some((edge) => edge.id === "result-continue")).toBe(true);
     expect(first.edges.some((edge) => edge.id === "retry-work")).toBe(true);
     expect(first.edges.find((edge) => edge.id === "retry-work")?.tone).toBe("retry");

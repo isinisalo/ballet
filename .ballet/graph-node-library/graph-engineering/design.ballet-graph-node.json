@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "id": "design",
     "title": "DESIGN",
@@ -79,13 +79,15 @@
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:desired-state.defined",
-        "description": "PASS success routes design to plan."
+        "description": "PASS success routes design to plan.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.requested",
-        "description": "FAIL failure routes design to design."
+        "description": "FAIL failure routes design to design.",
+        "outcomeId": "failure"
       }
     ]
   },
@@ -291,8 +293,6 @@
   "graphNode": {
     "key": "design",
     "description": "Define the complete desired system state through all twelve canonical arc42 sections.",
-    "nodeStyle": "sol",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "graph:desired-state.requested"
@@ -304,351 +304,10 @@
     "stateContract": {
       "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "01-introduction-and-goals"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "01-introduction-and-goals-pass-route",
-            "sourceJobNode": "01-introduction-and-goals",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "02-constraints"
-                },
-                "description": "Allowed PASS continuation after 01-introduction-and-goals."
-              }
-            ]
-          },
-          {
-            "key": "01-introduction-and-goals-fail-route",
-            "sourceJobNode": "01-introduction-and-goals",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 01-introduction-and-goals."
-              }
-            ]
-          },
-          {
-            "key": "02-constraints-pass-route",
-            "sourceJobNode": "02-constraints",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "03-context-and-scope"
-                },
-                "description": "Allowed PASS continuation after 02-constraints."
-              }
-            ]
-          },
-          {
-            "key": "02-constraints-fail-route",
-            "sourceJobNode": "02-constraints",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 02-constraints."
-              }
-            ]
-          },
-          {
-            "key": "03-context-and-scope-pass-route",
-            "sourceJobNode": "03-context-and-scope",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "04-solution-strategy"
-                },
-                "description": "Allowed PASS continuation after 03-context-and-scope."
-              }
-            ]
-          },
-          {
-            "key": "03-context-and-scope-fail-route",
-            "sourceJobNode": "03-context-and-scope",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 03-context-and-scope."
-              }
-            ]
-          },
-          {
-            "key": "04-solution-strategy-pass-route",
-            "sourceJobNode": "04-solution-strategy",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "05-building-block-view"
-                },
-                "description": "Allowed PASS continuation after 04-solution-strategy."
-              }
-            ]
-          },
-          {
-            "key": "04-solution-strategy-fail-route",
-            "sourceJobNode": "04-solution-strategy",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 04-solution-strategy."
-              }
-            ]
-          },
-          {
-            "key": "05-building-block-view-pass-route",
-            "sourceJobNode": "05-building-block-view",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "06-runtime-view"
-                },
-                "description": "Allowed PASS continuation after 05-building-block-view."
-              }
-            ]
-          },
-          {
-            "key": "05-building-block-view-fail-route",
-            "sourceJobNode": "05-building-block-view",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 05-building-block-view."
-              }
-            ]
-          },
-          {
-            "key": "06-runtime-view-pass-route",
-            "sourceJobNode": "06-runtime-view",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "07-deployment-view"
-                },
-                "description": "Allowed PASS continuation after 06-runtime-view."
-              }
-            ]
-          },
-          {
-            "key": "06-runtime-view-fail-route",
-            "sourceJobNode": "06-runtime-view",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 06-runtime-view."
-              }
-            ]
-          },
-          {
-            "key": "07-deployment-view-pass-route",
-            "sourceJobNode": "07-deployment-view",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "08-crosscutting-concepts"
-                },
-                "description": "Allowed PASS continuation after 07-deployment-view."
-              }
-            ]
-          },
-          {
-            "key": "07-deployment-view-fail-route",
-            "sourceJobNode": "07-deployment-view",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 07-deployment-view."
-              }
-            ]
-          },
-          {
-            "key": "08-crosscutting-concepts-pass-route",
-            "sourceJobNode": "08-crosscutting-concepts",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "09-architecture-decisions"
-                },
-                "description": "Allowed PASS continuation after 08-crosscutting-concepts."
-              }
-            ]
-          },
-          {
-            "key": "08-crosscutting-concepts-fail-route",
-            "sourceJobNode": "08-crosscutting-concepts",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 08-crosscutting-concepts."
-              }
-            ]
-          },
-          {
-            "key": "09-architecture-decisions-pass-route",
-            "sourceJobNode": "09-architecture-decisions",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "10-quality-requirements"
-                },
-                "description": "Allowed PASS continuation after 09-architecture-decisions."
-              }
-            ]
-          },
-          {
-            "key": "09-architecture-decisions-fail-route",
-            "sourceJobNode": "09-architecture-decisions",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 09-architecture-decisions."
-              }
-            ]
-          },
-          {
-            "key": "10-quality-requirements-pass-route",
-            "sourceJobNode": "10-quality-requirements",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "11-risks-and-technical-debt"
-                },
-                "description": "Allowed PASS continuation after 10-quality-requirements."
-              }
-            ]
-          },
-          {
-            "key": "10-quality-requirements-fail-route",
-            "sourceJobNode": "10-quality-requirements",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 10-quality-requirements."
-              }
-            ]
-          },
-          {
-            "key": "11-risks-and-technical-debt-pass-route",
-            "sourceJobNode": "11-risks-and-technical-debt",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "12-glossary"
-                },
-                "description": "Allowed PASS continuation after 11-risks-and-technical-debt."
-              }
-            ]
-          },
-          {
-            "key": "11-risks-and-technical-debt-fail-route",
-            "sourceJobNode": "11-risks-and-technical-debt",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 11-risks-and-technical-debt."
-              }
-            ]
-          },
-          {
-            "key": "12-glossary-pass-route",
-            "sourceJobNode": "12-glossary",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after 12-glossary."
-              }
-            ]
-          },
-          {
-            "key": "12-glossary-fail-route",
-            "sourceJobNode": "12-glossary",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after 12-glossary."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -659,8 +318,6 @@
       {
         "key": "01-introduction-and-goals",
         "description": "Maintain arc42 01 Introduction and Goals.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -692,13 +349,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "02-constraints",
         "description": "Maintain arc42 02 Constraints.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -729,13 +394,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "03-context-and-scope",
         "description": "Maintain arc42 03 Context and Scope.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -767,13 +440,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "04-solution-strategy",
         "description": "Maintain arc42 04 Solution Strategy.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -805,13 +486,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "05-building-block-view",
         "description": "Maintain arc42 05 Building Block View.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -843,13 +532,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "06-runtime-view",
         "description": "Maintain arc42 06 Runtime View.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -881,13 +578,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "07-deployment-view",
         "description": "Maintain arc42 07 Deployment View.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -919,13 +624,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "08-crosscutting-concepts",
         "description": "Maintain arc42 08 Crosscutting Concepts.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -957,13 +670,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "09-architecture-decisions",
         "description": "Maintain arc42 09 Architecture Decisions.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -995,13 +716,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "10-quality-requirements",
         "description": "Maintain arc42 10 Quality Requirements.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -1033,13 +762,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "11-risks-and-technical-debt",
         "description": "Maintain arc42 11 Risks and Technical Debt.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -1071,13 +808,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "12-glossary",
         "description": "Maintain arc42 12 Glossary.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -1109,8 +854,368 @@
           "skills": [
             "conformance-review"
           ]
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "01-introduction-and-goals"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "01-introduction-and-goals-pass-route",
+              "sourceJobNode": "01-introduction-and-goals",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "02-constraints"
+                  },
+                  "description": "Allowed PASS continuation after 01-introduction-and-goals."
+                }
+              ]
+            },
+            {
+              "key": "01-introduction-and-goals-fail-route",
+              "sourceJobNode": "01-introduction-and-goals",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 01-introduction-and-goals."
+                }
+              ]
+            },
+            {
+              "key": "02-constraints-pass-route",
+              "sourceJobNode": "02-constraints",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "03-context-and-scope"
+                  },
+                  "description": "Allowed PASS continuation after 02-constraints."
+                }
+              ]
+            },
+            {
+              "key": "02-constraints-fail-route",
+              "sourceJobNode": "02-constraints",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 02-constraints."
+                }
+              ]
+            },
+            {
+              "key": "03-context-and-scope-pass-route",
+              "sourceJobNode": "03-context-and-scope",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "04-solution-strategy"
+                  },
+                  "description": "Allowed PASS continuation after 03-context-and-scope."
+                }
+              ]
+            },
+            {
+              "key": "03-context-and-scope-fail-route",
+              "sourceJobNode": "03-context-and-scope",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 03-context-and-scope."
+                }
+              ]
+            },
+            {
+              "key": "04-solution-strategy-pass-route",
+              "sourceJobNode": "04-solution-strategy",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "05-building-block-view"
+                  },
+                  "description": "Allowed PASS continuation after 04-solution-strategy."
+                }
+              ]
+            },
+            {
+              "key": "04-solution-strategy-fail-route",
+              "sourceJobNode": "04-solution-strategy",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 04-solution-strategy."
+                }
+              ]
+            },
+            {
+              "key": "05-building-block-view-pass-route",
+              "sourceJobNode": "05-building-block-view",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "06-runtime-view"
+                  },
+                  "description": "Allowed PASS continuation after 05-building-block-view."
+                }
+              ]
+            },
+            {
+              "key": "05-building-block-view-fail-route",
+              "sourceJobNode": "05-building-block-view",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 05-building-block-view."
+                }
+              ]
+            },
+            {
+              "key": "06-runtime-view-pass-route",
+              "sourceJobNode": "06-runtime-view",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "07-deployment-view"
+                  },
+                  "description": "Allowed PASS continuation after 06-runtime-view."
+                }
+              ]
+            },
+            {
+              "key": "06-runtime-view-fail-route",
+              "sourceJobNode": "06-runtime-view",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 06-runtime-view."
+                }
+              ]
+            },
+            {
+              "key": "07-deployment-view-pass-route",
+              "sourceJobNode": "07-deployment-view",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "08-crosscutting-concepts"
+                  },
+                  "description": "Allowed PASS continuation after 07-deployment-view."
+                }
+              ]
+            },
+            {
+              "key": "07-deployment-view-fail-route",
+              "sourceJobNode": "07-deployment-view",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 07-deployment-view."
+                }
+              ]
+            },
+            {
+              "key": "08-crosscutting-concepts-pass-route",
+              "sourceJobNode": "08-crosscutting-concepts",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "09-architecture-decisions"
+                  },
+                  "description": "Allowed PASS continuation after 08-crosscutting-concepts."
+                }
+              ]
+            },
+            {
+              "key": "08-crosscutting-concepts-fail-route",
+              "sourceJobNode": "08-crosscutting-concepts",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 08-crosscutting-concepts."
+                }
+              ]
+            },
+            {
+              "key": "09-architecture-decisions-pass-route",
+              "sourceJobNode": "09-architecture-decisions",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "10-quality-requirements"
+                  },
+                  "description": "Allowed PASS continuation after 09-architecture-decisions."
+                }
+              ]
+            },
+            {
+              "key": "09-architecture-decisions-fail-route",
+              "sourceJobNode": "09-architecture-decisions",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 09-architecture-decisions."
+                }
+              ]
+            },
+            {
+              "key": "10-quality-requirements-pass-route",
+              "sourceJobNode": "10-quality-requirements",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "11-risks-and-technical-debt"
+                  },
+                  "description": "Allowed PASS continuation after 10-quality-requirements."
+                }
+              ]
+            },
+            {
+              "key": "10-quality-requirements-fail-route",
+              "sourceJobNode": "10-quality-requirements",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 10-quality-requirements."
+                }
+              ]
+            },
+            {
+              "key": "11-risks-and-technical-debt-pass-route",
+              "sourceJobNode": "11-risks-and-technical-debt",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "12-glossary"
+                  },
+                  "description": "Allowed PASS continuation after 11-risks-and-technical-debt."
+                }
+              ]
+            },
+            {
+              "key": "11-risks-and-technical-debt-fail-route",
+              "sourceJobNode": "11-risks-and-technical-debt",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 11-risks-and-technical-debt."
+                }
+              ]
+            },
+            {
+              "key": "12-glossary-pass-route",
+              "sourceJobNode": "12-glossary",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after 12-glossary."
+                }
+              ]
+            },
+            {
+              "key": "12-glossary-fail-route",
+              "sourceJobNode": "12-glossary",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after 12-glossary."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

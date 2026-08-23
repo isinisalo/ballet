@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "id": "deploy",
     "title": "DEPLOY",
@@ -79,25 +79,29 @@
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:release.deployed",
-        "description": "PASS success routes deploy to verify."
+        "description": "PASS success routes deploy to verify.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:release.built",
-        "description": "FAIL transient_deployment_error routes deploy to deploy."
+        "description": "FAIL transient_deployment_error routes deploy to deploy.",
+        "outcomeId": "failure"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:release.planned",
-        "description": "FAIL implementation_defect routes deploy to build."
+        "description": "FAIL implementation_defect routes deploy to build.",
+        "outcomeId": "failure"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.defined",
-        "description": "FAIL invalid_plan routes deploy to plan."
+        "description": "FAIL invalid_plan routes deploy to plan.",
+        "outcomeId": "failure"
       }
     ]
   },
@@ -165,8 +169,6 @@
   "graphNode": {
     "key": "deploy",
     "description": "Deploy the selected release only with exact human authorization.",
-    "nodeStyle": "terra",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "graph:release.built"
@@ -178,65 +180,10 @@
     "stateContract": {
       "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "release"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "release-pass-route",
-            "sourceJobNode": "release",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after release."
-              }
-            ]
-          },
-          {
-            "key": "release-fail-route",
-            "sourceJobNode": "release",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after release."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -247,8 +194,6 @@
       {
         "key": "release",
         "description": "Deploy one explicitly authorized release.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -279,8 +224,82 @@
           "skills": [
             "conformance-review"
           ]
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "release"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "release-pass-route",
+              "sourceJobNode": "release",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after release."
+                }
+              ]
+            },
+            {
+              "key": "release-fail-route",
+              "sourceJobNode": "release",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after release."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

@@ -68,6 +68,7 @@ export interface ValidationNodeOutcome extends CheckedOutcomeBase {
   role: "validation";
   state: "completed";
   decision: NodeResult;
+  outcomeId?: string;
   evidence: JsonValue;
   feedback?: string;
   expectedCorrection?: string;
@@ -89,6 +90,7 @@ export type OrchestratorNodeOutcome =
       state: "completed";
       action: "complete";
       result: NodeResult;
+      outcomeId?: string;
       reason: string;
     }
   | OutcomeBase & {
@@ -173,7 +175,7 @@ export interface GraphNodeInvocation {
   rootRunId: string;
   parentGraphNodeInvocationId?: string;
   policyDecisionId?: string;
-  source: "orchestrator" | "repair" | "root";
+  source: "orchestrator" | "policy" | "repair" | "root";
   status: InvocationStatus;
   input?: JsonValue;
   snapshot: ProjectGraphNode;
@@ -191,6 +193,7 @@ export interface JobNodeInvocation {
   graphNodeInvocationId: string;
   graphNodeId: string;
   jobNodeId: string;
+  policyDecisionId?: string;
   workAttempt: number;
   status: InvocationStatus;
   stateRevisionBefore: number;

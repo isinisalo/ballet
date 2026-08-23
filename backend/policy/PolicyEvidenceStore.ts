@@ -1,25 +1,24 @@
 import type Database from "better-sqlite3";
-import type { NodeResult } from "../../shared/domain/automation.js";
-import type { PolicyDecisionRecordV1, PolicyOptionObservationV1 } from "../../shared/domain/decisionModel.js";
+import type { PolicyDecisionRecordV2, PolicyOptionObservationV2 } from "../../shared/domain/decisionModel.js";
 
 type Row = Record<string, unknown>;
 
 export class PolicyEvidenceStore {
   constructor(private readonly connection: () => Database.Database) {}
 
-  listDecisions(rootRunId: string): PolicyDecisionRecordV1[] {
+  listDecisions(rootRunId: string): PolicyDecisionRecordV2[] {
     return (this.connection().prepare(
-      "SELECT * FROM policy_decisions WHERE root_run_id = ? ORDER BY epoch"
+      "SELECT * FROM policy_decisions WHERE root_run_id = ? ORDER BY created_at, rowid"
     ).all(rootRunId) as Row[]).map(mapPolicyDecision);
   }
 
-  listObservations(rootRunId: string): PolicyOptionObservationV1[] {
+  listObservations(rootRunId: string): PolicyOptionObservationV2[] {
     return (this.connection().prepare(
       "SELECT * FROM policy_option_observations WHERE root_run_id = ? ORDER BY created_at, rowid"
     ).all(rootRunId) as Row[]).map(mapPolicyObservation);
   }
 
-  requireDecision(policyDecisionId: string): PolicyDecisionRecordV1 {
+  requireDecision(policyDecisionId: string): PolicyDecisionRecordV2 {
     const row = this.connection().prepare(
       "SELECT * FROM policy_decisions WHERE policy_decision_id = ?"
     ).get(policyDecisionId) as Row | undefined;
@@ -27,67 +26,82 @@ export class PolicyEvidenceStore {
     return mapPolicyDecision(row);
   }
 
-  insertDecision(decision: PolicyDecisionRecordV1): void {
+  insertDecision(decision: PolicyDecisionRecordV2): void {
     this.connection().prepare(`
       INSERT INTO policy_decisions (
-        policy_decision_id, root_run_id, epoch, epoch_kind, previous_graph_node_invocation_id,
-        state_json, admissible_action_ids_json, excluded_actions_json, selected_graph_node_id,
-        action_values_json, state_value_micros, tied_action_ids_json, solver_status, solver_algorithm,
-        iterations, residual, epsilon, model_version, model_sha256, policy_sha256, snapshot_sha256, message, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(decision.policyDecisionId, decision.rootRunId, decision.epoch, decision.epochKind,
-      decision.previousGraphNodeInvocationId ?? null, decision.state ? JSON.stringify(decision.state) : null,
+        policy_decision_id, root_run_id, scope, scope_key, graph_node_invocation_id, epoch, epoch_kind,
+        previous_action_invocation_id, state_json, admissible_action_ids_json, excluded_actions_json,
+        selected_action_id, action_values_json, state_value_micros, tied_action_ids_json, solver_status,
+        solver_algorithm, iterations, residual, epsilon, model_version, model_sha256, policy_sha256,
+        snapshot_sha256, message, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      decision.policyDecisionId, decision.rootRunId, decision.scope, decision.scopeKey,
+      decision.graphNodeInvocationId ?? null, decision.epoch, decision.epochKind,
+      decision.previousActionInvocationId ?? null, decision.state ? JSON.stringify(decision.state) : null,
       JSON.stringify(decision.admissibleActionIds), JSON.stringify(decision.excludedActions),
-      decision.selectedGraphNodeId ?? null, JSON.stringify(decision.actionValues),
-      decision.stateValueMicros ?? null, JSON.stringify(decision.tiedActionIds), decision.solverStatus,
-      decision.solverAlgorithm, decision.iterations, decision.residual, decision.epsilon, decision.modelVersion,
-      decision.modelSha256, decision.policySha256 ?? null, decision.snapshotSha256,
-      decision.message ?? null, decision.createdAt);
+      decision.selectedActionId ?? null, JSON.stringify(decision.actionValues), decision.stateValueMicros ?? null,
+      JSON.stringify(decision.tiedActionIds), decision.solverStatus, decision.solverAlgorithm, decision.iterations,
+      decision.residual, decision.epsilon, decision.modelVersion, decision.modelSha256,
+      decision.policySha256 ?? null, decision.snapshotSha256, decision.message ?? null, decision.createdAt
+    );
   }
 
-  insertObservation(observation: PolicyOptionObservationV1): void {
+  insertObservation(observation: PolicyOptionObservationV2): void {
     this.connection().prepare(`
       INSERT INTO policy_option_observations (
-        policy_observation_id, root_run_id, policy_decision_id, graph_node_invocation_id,
-        state_before_json, action, configured_expected_cost_micros, actual_cost_micros,
-        verified_outcome, state_after_json, duration_millis, model_sha256, snapshot_sha256, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(observation.policyObservationId, observation.rootRunId, observation.policyDecisionId,
-      observation.graphNodeInvocationId, JSON.stringify(observation.stateBefore), observation.action,
-      observation.configuredExpectedCostMicros, observation.actualCostMicros ?? null,
-      observation.verifiedOutcome, observation.stateAfter ? JSON.stringify(observation.stateAfter) : null,
-      observation.durationMillis, observation.modelSha256, observation.snapshotSha256, observation.createdAt);
+        policy_observation_id, root_run_id, policy_decision_id, scope, scope_key, action_invocation_id,
+        graph_node_invocation_id, job_node_invocation_id, state_before_json, action_id,
+        configured_expected_cost_micros, expected_outcome_distribution_json, actual_cost_micros,
+        observed_outcome_id, verified_result, actual_state_json, model_match, duration_millis,
+        model_sha256, snapshot_sha256, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      observation.policyObservationId, observation.rootRunId, observation.policyDecisionId,
+      observation.scope, observation.scopeKey, observation.actionInvocationId,
+      observation.graphNodeInvocationId ?? null, observation.jobNodeInvocationId ?? null,
+      JSON.stringify(observation.stateBefore), observation.actionId, observation.configuredExpectedCostMicros,
+      JSON.stringify(observation.expectedOutcomeDistribution), observation.actualCostMicros ?? null,
+      observation.observedOutcomeId, observation.verifiedResult,
+      observation.actualState ? JSON.stringify(observation.actualState) : null, observation.modelMatch,
+      observation.durationMillis, observation.modelSha256, observation.snapshotSha256, observation.createdAt
+    );
   }
 }
 
-const mapPolicyDecision = (row: Row): PolicyDecisionRecordV1 => ({
+const mapPolicyDecision = (row: Row): PolicyDecisionRecordV2 => ({
   policyDecisionId: String(row.policy_decision_id), rootRunId: String(row.root_run_id),
-  epoch: Number(row.epoch), epochKind: row.epoch_kind as PolicyDecisionRecordV1["epochKind"],
-  previousGraphNodeInvocationId: optional(row.previous_graph_node_invocation_id),
-  state: row.state_json ? JSON.parse(String(row.state_json)) as PolicyDecisionRecordV1["state"] : undefined,
+  scope: row.scope as PolicyDecisionRecordV2["scope"], scopeKey: String(row.scope_key),
+  graphNodeInvocationId: optional(row.graph_node_invocation_id), epoch: Number(row.epoch),
+  epochKind: row.epoch_kind as PolicyDecisionRecordV2["epochKind"],
+  previousActionInvocationId: optional(row.previous_action_invocation_id),
+  state: row.state_json ? JSON.parse(String(row.state_json)) as PolicyDecisionRecordV2["state"] : undefined,
   admissibleActionIds: JSON.parse(String(row.admissible_action_ids_json)) as string[],
-  excludedActions: JSON.parse(String(row.excluded_actions_json)) as PolicyDecisionRecordV1["excludedActions"],
-  selectedGraphNodeId: optional(row.selected_graph_node_id),
-  actionValues: JSON.parse(String(row.action_values_json)) as PolicyDecisionRecordV1["actionValues"],
+  excludedActions: JSON.parse(String(row.excluded_actions_json)) as PolicyDecisionRecordV2["excludedActions"],
+  selectedActionId: optional(row.selected_action_id),
+  actionValues: JSON.parse(String(row.action_values_json)) as PolicyDecisionRecordV2["actionValues"],
   stateValueMicros: row.state_value_micros == null ? undefined : Number(row.state_value_micros),
   tiedActionIds: JSON.parse(String(row.tied_action_ids_json)) as string[],
-  solverStatus: row.solver_status as PolicyDecisionRecordV1["solverStatus"],
-  solverAlgorithm: "ssp_value_iteration_v1", iterations: Number(row.iterations),
-  residual: Number(row.residual), epsilon: Number(row.epsilon), modelVersion: 1, modelSha256: String(row.model_sha256),
+  solverStatus: row.solver_status as PolicyDecisionRecordV2["solverStatus"],
+  solverAlgorithm: "ssp_value_iteration_v2", iterations: Number(row.iterations), residual: Number(row.residual),
+  epsilon: Number(row.epsilon), modelVersion: 2, modelSha256: String(row.model_sha256),
   policySha256: optional(row.policy_sha256), snapshotSha256: String(row.snapshot_sha256),
   message: optional(row.message), createdAt: String(row.created_at)
 });
 
-const mapPolicyObservation = (row: Row): PolicyOptionObservationV1 => ({
+const mapPolicyObservation = (row: Row): PolicyOptionObservationV2 => ({
   policyObservationId: String(row.policy_observation_id), rootRunId: String(row.root_run_id),
-  policyDecisionId: String(row.policy_decision_id), graphNodeInvocationId: String(row.graph_node_invocation_id),
-  stateBefore: JSON.parse(String(row.state_before_json)) as PolicyOptionObservationV1["stateBefore"],
-  action: String(row.action), configuredExpectedCostMicros: Number(row.configured_expected_cost_micros),
+  policyDecisionId: String(row.policy_decision_id), scope: row.scope as PolicyOptionObservationV2["scope"],
+  scopeKey: String(row.scope_key), actionInvocationId: String(row.action_invocation_id),
+  graphNodeInvocationId: optional(row.graph_node_invocation_id), jobNodeInvocationId: optional(row.job_node_invocation_id),
+  stateBefore: JSON.parse(String(row.state_before_json)) as PolicyOptionObservationV2["stateBefore"],
+  actionId: String(row.action_id), configuredExpectedCostMicros: Number(row.configured_expected_cost_micros),
+  expectedOutcomeDistribution: JSON.parse(String(row.expected_outcome_distribution_json)) as PolicyOptionObservationV2["expectedOutcomeDistribution"],
   actualCostMicros: row.actual_cost_micros == null ? undefined : Number(row.actual_cost_micros),
-  verifiedOutcome: row.verified_outcome as NodeResult,
-  stateAfter: row.state_after_json ? JSON.parse(String(row.state_after_json)) as PolicyOptionObservationV1["stateAfter"] : undefined,
-  durationMillis: Number(row.duration_millis), modelSha256: String(row.model_sha256),
-  snapshotSha256: String(row.snapshot_sha256), createdAt: String(row.created_at)
+  observedOutcomeId: String(row.observed_outcome_id), verifiedResult: row.verified_result as PolicyOptionObservationV2["verifiedResult"],
+  actualState: row.actual_state_json ? JSON.parse(String(row.actual_state_json)) as PolicyOptionObservationV2["actualState"] : undefined,
+  modelMatch: row.model_match as PolicyOptionObservationV2["modelMatch"], durationMillis: Number(row.duration_millis),
+  modelSha256: String(row.model_sha256), snapshotSha256: String(row.snapshot_sha256), createdAt: String(row.created_at)
 });
 
 const optional = (value: unknown): string | undefined => value == null ? undefined : String(value);

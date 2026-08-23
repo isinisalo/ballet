@@ -8,7 +8,8 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import { resolveExecutionResources } from "../execution/ExecutionResourceCatalog.js";
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { GraphRunStateError } from "../runtime/GraphRunErrors.js";
-import { capabilityGraphSha256, decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
+import { capabilityModelSha256, decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
+import { validateProjectAutomationConfig } from "../automation/validateAutomationConfig.js";
 
 export class GraphExecutionPlanner {
   constructor(
@@ -23,8 +24,12 @@ export class GraphExecutionPlanner {
   ): Promise<RootExecutionSnapshot> {
     const loaded = new ProjectConfigurationRepository().load(workspace.path);
     if (!loaded.config || loaded.issues.length > 0) {
-      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v15 is unavailable.");
+      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v16 is unavailable.");
     }
+    const readinessIssues = validateProjectAutomationConfig(
+      { version: 16, graph: loaded.config.graph }, loaded.config.executionProfiles
+    );
+    if (readinessIssues.length) throw new GraphRunStateError(readinessIssues[0]!.message);
     const selected = kind === "graph"
       ? loaded.config.graph.graphNodes
       : loaded.config.graph.graphNodes.filter(({ id }) => id === targetId);
@@ -56,7 +61,7 @@ export class GraphExecutionPlanner {
     const theme = await new CanvasThemeRepository().load(workspace.path);
     if (theme.issues.length > 0) throw new GraphRunStateError(theme.issues[0]!.message);
     return {
-      version: 8,
+      version: 9,
       rootKind: kind,
       ...(kind === "graph_node" ? { rootGraphNodeId: targetId } : {}),
       project: {
@@ -67,12 +72,20 @@ export class GraphExecutionPlanner {
       },
       issueTracker: structuredClone(loaded.config.issueTracker),
       graph,
-      graphDecision: graph.strategy.kind === "ssp_v1" ? {
-        strategyKind: "ssp_v1",
+      graphDecision: graph.strategy.kind === "ssp_v2" ? {
+        strategyKind: "ssp_v2",
         modelVersion: graph.strategy.model.version,
         modelSha256: decisionModelSha256(graph.strategy.model),
-        capabilityGraphSha256: capabilityGraphSha256(graph.strategy.capabilityGraph)
+        capabilityModelSha256: capabilityModelSha256(graph.strategy.capabilityModel)
       } : { strategyKind: "agent_v1" },
+      graphNodeDecisions: Object.fromEntries(graph.graphNodes.map((graphNode) => [graphNode.id,
+        graphNode.strategy.kind === "ssp_v2" ? {
+          strategyKind: "ssp_v2" as const,
+          modelVersion: graphNode.strategy.model.version,
+          modelSha256: decisionModelSha256(graphNode.strategy.model),
+          capabilityModelSha256: capabilityModelSha256(graphNode.strategy.capabilityModel)
+        } : { strategyKind: "agent_v1" as const }
+      ])),
       theme: theme.theme,
       executionProfiles: structuredClone(profiles),
       runtimes,
@@ -87,7 +100,7 @@ const collectCompositions = (graph: ProjectGraph): Array<ProjectExecutionComposi
     ? [graph.strategy.orchestrator] : [];
   if (graph.repairNode) result.push(graph.repairNode);
   for (const graphNode of graph.graphNodes) {
-    result.push(graphNode.orchestrator);
+    if (graphNode.strategy.kind === "agent_v1") result.push(graphNode.strategy.orchestrator);
     if (graphNode.repairNode) result.push(graphNode.repairNode);
     for (const job of graphNode.jobNodes) {
       if (job.workNode.type === "agent") result.push(job.workNode);

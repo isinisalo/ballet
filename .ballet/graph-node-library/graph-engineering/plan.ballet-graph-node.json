@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "id": "plan",
     "title": "PLAN",
@@ -80,13 +80,15 @@
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:release.planned",
-        "description": "PASS success routes plan to build."
+        "description": "PASS success routes plan to build.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.requested",
-        "description": "FAIL failure routes plan to design."
+        "description": "FAIL failure routes plan to design.",
+        "outcomeId": "failure"
       }
     ]
   },
@@ -153,8 +155,6 @@
   "graphNode": {
     "key": "plan",
     "description": "Select the next release and materialize executable tk work.",
-    "nodeStyle": "terra",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "graph:desired-state.defined",
@@ -167,91 +167,10 @@
     "stateContract": {
       "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "select-release"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "select-release-pass-route",
-            "sourceJobNode": "select-release",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "materialize-work"
-                },
-                "description": "Allowed PASS continuation after select-release."
-              }
-            ]
-          },
-          {
-            "key": "select-release-fail-route",
-            "sourceJobNode": "select-release",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after select-release."
-              }
-            ]
-          },
-          {
-            "key": "materialize-work-pass-route",
-            "sourceJobNode": "materialize-work",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after materialize-work."
-              }
-            ]
-          },
-          {
-            "key": "materialize-work-fail-route",
-            "sourceJobNode": "materialize-work",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after materialize-work."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -262,8 +181,6 @@
       {
         "key": "select-release",
         "description": "Select the first eligible planned release.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -294,13 +211,21 @@
           "skills": [
             "conformance-review"
           ]
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "materialize-work",
         "description": "Materialize the selected release work idempotently.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -331,8 +256,108 @@
           "skills": [
             "conformance-review"
           ]
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "select-release"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "select-release-pass-route",
+              "sourceJobNode": "select-release",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "materialize-work"
+                  },
+                  "description": "Allowed PASS continuation after select-release."
+                }
+              ]
+            },
+            {
+              "key": "select-release-fail-route",
+              "sourceJobNode": "select-release",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after select-release."
+                }
+              ]
+            },
+            {
+              "key": "materialize-work-pass-route",
+              "sourceJobNode": "materialize-work",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after materialize-work."
+                }
+              ]
+            },
+            {
+              "key": "materialize-work-fail-route",
+              "sourceJobNode": "materialize-work",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after materialize-work."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

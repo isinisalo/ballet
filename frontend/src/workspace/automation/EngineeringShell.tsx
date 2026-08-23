@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ChevronRight, Orbit } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { EngineeringLevel } from "../types";
+import type { EngineeringLevel, EngineeringSection } from "../types";
 import { automationGraphNodePath, automationGraphPath, automationJobNodePath } from "../routing";
 import type { WorkspaceNavigation } from "../useWorkspaceNavigation";
 
@@ -18,6 +18,7 @@ export function EngineeringShell({
   jobNodeId,
   jobNodeTitle,
   actions,
+  section,
   navigate,
   children
 }: {
@@ -27,6 +28,7 @@ export function EngineeringShell({
   jobNodeId?: string;
   jobNodeTitle?: string;
   actions?: ReactNode;
+  section?: EngineeringSection;
   navigate: WorkspaceNavigation["navigate"];
   children: ReactNode;
 }) {
@@ -44,12 +46,12 @@ export function EngineeringShell({
           {actions ? <div className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto">{actions}</div> : null}
         </div>
         <nav aria-label="Engineering breadcrumb" className="no-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto font-mono text-[0.6875rem] text-muted-foreground">
-          <Button type="button" variant="ghost" size="xs" className="h-6 px-1.5" onClick={() => navigate(automationGraphPath())}>
+          <Button type="button" variant="ghost" size="xs" className="h-6 px-1.5" onClick={() => navigate(automationGraphPath(level === "graph" && section === "decision-model" ? section : undefined))}>
             Graph Engineering
           </Button>
           {graphNodeId ? <>
             <ChevronRight className="size-3 shrink-0" />
-            <Button type="button" variant="ghost" size="xs" className="h-6 max-w-52 px-1.5" onClick={() => navigate(automationGraphNodePath(graphNodeId))}>
+            <Button type="button" variant="ghost" size="xs" className="h-6 max-w-52 px-1.5" onClick={() => navigate(automationGraphNodePath(graphNodeId, level === "graph_node" && section === "local-decision-model" ? section : undefined))}>
               <span className="truncate">{graphNodeTitle ?? graphNodeId}</span>
             </Button>
           </> : null}

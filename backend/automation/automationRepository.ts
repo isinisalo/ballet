@@ -1,5 +1,4 @@
 import { defaultProjectAutomationConfig, type ProjectAutomationConfig } from "../../shared/domain/automation.js";
-import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import { AutomationValidationError, validateProjectAutomationConfig } from "./validateAutomationConfig.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 
@@ -15,7 +14,7 @@ export const loadProjectAutomationConfigWithIssues = async (
     issues: loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
   };
   const value: ProjectAutomationConfig = {
-    version: 15,
+    version: 16,
     graph: loaded.config.graph
   };
   const issues = validateProjectAutomationConfig(value, loaded.config.executionProfiles);
@@ -34,19 +33,13 @@ export const loadProjectAutomationConfig = async (
 
 export const saveProjectAutomationConfig = async (
   root: string,
-  config: ProjectAutomationConfig,
-  executionProfiles?: readonly ExecutionProfile[]
+  config: ProjectAutomationConfig
 ): Promise<ProjectAutomationConfig> => {
   const loaded = repository.load(root);
   if (!loaded.config) throw new AutomationValidationError(
     "Project config is invalid.",
     loaded.issues.map((issue) => ({ path: issue.path, message: issue.message }))
   );
-  const issues = validateProjectAutomationConfig(config, executionProfiles ?? loaded.config.executionProfiles);
-  if (issues.length > 0) {
-    throw new AutomationValidationError("Automation config is invalid.", issues);
-  }
-
   repository.putAutomation(root, config);
   return config;
 };

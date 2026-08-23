@@ -23,6 +23,7 @@ import {
   canvasThemeSchema,
   projectDocumentCreateSchema,
   projectDocumentSaveSchema,
+  policyPreviewRequestSchema,
   type MutableCollectionName
 } from "../../shared/api/workspace-schemas.js";
 import {
@@ -59,8 +60,8 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
     res.json(saved);
   }));
   router.post("/automation/policy-preview", route(async (req, res) => {
-    const config = parseBody(automationConfigSchema, req);
-    res.json(options.store.previewPolicy(config));
+    const input = parseBody(policyPreviewRequestSchema, req);
+    res.json(options.store.previewPolicy(input));
   }));
   router.put("/canvas-theme", route(async (req, res) => {
     res.json(await options.store.updateCanvasTheme(parseBody(canvasThemeSchema, req)));

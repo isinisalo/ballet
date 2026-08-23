@@ -1,5 +1,5 @@
 import type { BalletMode } from "@shared/api/workspace-contracts";
-import type { ProjectDocumentCreateKind, RouteState } from "./types";
+import type { EngineeringSection, ProjectDocumentCreateKind, RouteState } from "./types";
 
 const projectDocumentCollectionSegment: Record<ProjectDocumentCreateKind, string> = {
   adr: "adrs",
@@ -23,7 +23,10 @@ const documentCollectionRoute = (view: "skills", url: URL): RouteState => {
 };
 
 const automationRoute = (url: URL): RouteState | undefined => {
-  if (url.pathname === "/automation/graph") return { view: "automation", engineeringLevel: "graph" };
+  if (url.pathname === "/automation/graph") return {
+    view: "automation", engineeringLevel: "graph",
+    engineeringSection: url.searchParams.get("section") === "decision-model" ? "decision-model" : "capabilities"
+  };
   const job = url.pathname.match(/^\/automation\/graph\/nodes\/([^/]+)\/jobs\/([^/]+)\/?$/);
   if (job) return {
     view: "automation",
@@ -35,7 +38,8 @@ const automationRoute = (url: URL): RouteState | undefined => {
   if (graphNode) return {
     view: "automation",
     engineeringLevel: "graph_node",
-    graphNodeId: decodeURIComponent(graphNode[1])
+    graphNodeId: decodeURIComponent(graphNode[1]),
+    engineeringSection: url.searchParams.get("section") === "local-decision-model" ? "local-decision-model" : "jobs"
   };
   return undefined;
 };
@@ -97,9 +101,10 @@ export const executionProfilePath = (id?: string) => `/execution-profiles${id ? 
 export const executionProfileCreatePath = () => "/execution-profiles?new=1";
 export const skillDocumentPath = (relativePath: string) => `/skills?path=${encodeURIComponent(relativePath)}`;
 export const skillCreatePath = () => "/skills?new=1";
-export const automationGraphPath = () => "/automation/graph";
-export const automationGraphNodePath = (graphNodeId: string) =>
-  `/automation/graph/nodes/${encodeURIComponent(graphNodeId)}`;
+const sectionQuery = (section?: EngineeringSection) => section ? `?section=${encodeURIComponent(section)}` : "";
+export const automationGraphPath = (section?: "capabilities" | "decision-model") => `/automation/graph${sectionQuery(section)}`;
+export const automationGraphNodePath = (graphNodeId: string, section?: "jobs" | "local-decision-model") =>
+  `/automation/graph/nodes/${encodeURIComponent(graphNodeId)}${sectionQuery(section)}`;
 export const automationJobNodePath = (graphNodeId: string, jobNodeId: string) =>
   `${automationGraphNodePath(graphNodeId)}/jobs/${encodeURIComponent(jobNodeId)}`;
 export const automationThemePath = () => "/automation/theme";

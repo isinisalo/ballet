@@ -15,6 +15,7 @@ export type View =
 
 export type SaveCollection = "skills";
 export type EngineeringLevel = "graph" | "graph_node" | "job_node";
+export type EngineeringSection = "capabilities" | "decision-model" | "jobs" | "local-decision-model";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -23,6 +24,7 @@ export interface RouteState {
   documentPath?: string;
   executionProfileId?: string;
   engineeringLevel?: EngineeringLevel;
+  engineeringSection?: EngineeringSection;
   graphNodeId?: string;
   jobNodeId?: string;
   runTargetKind?: "graph" | "graph_node";

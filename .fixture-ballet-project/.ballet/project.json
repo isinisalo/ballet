@@ -1,5 +1,5 @@
 {
-  "version": 15,
+  "version": 16,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -28,8 +28,6 @@
       "orchestrator": {
       "id": "fixture-graph-orchestrator",
       "description": "Route the fixture Graph from its Graph Node to a terminal.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
       "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
       "primaryInstructionId": "project:reviewer",
       "skillIds": [],
@@ -83,8 +81,6 @@
       {
         "id": "review-node",
         "description": "Review the fixture project.",
-        "nodeStyle": "terra",
-        "nodeSize": "medium",
         "capabilities": {
           "accepts": [
             "fixture:review.requested"
@@ -93,14 +89,18 @@
             "fixture:review.completed"
           ]
         },
+        "outcomes": [
+          { "outcomeId": "success", "result": "PASS" },
+          { "outcomeId": "failure", "result": "FAIL" }
+        ],
         "stateContract": {
           "description": "Bounded fixture review references."
         },
-        "orchestrator": {
+        "strategy": {
+          "kind": "agent_v1",
+          "orchestrator": {
           "id": "review-node-orchestrator",
           "description": "Route the fixture review Job Node to a terminal.",
-          "nodeStyle": "luna",
-          "nodeSize": "medium",
           "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
           "primaryInstructionId": "project:reviewer",
           "skillIds": [],
@@ -148,17 +148,20 @@
             ],
             "repair": []
           }
+          }
         },
         "jobNodes": [
           {
             "id": "review-job",
             "description": "Run and validate the fixture review.",
-            "nodeStyle": "terra",
-            "nodeSize": "medium",
             "capabilities": {
               "accepts": [],
               "provides": []
             },
+            "outcomes": [
+              { "outcomeId": "success", "result": "PASS" },
+              { "outcomeId": "failure", "result": "FAIL" }
+            ],
             "maxRetries": 3,
             "workNode": {
               "id": "review-work",

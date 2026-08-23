@@ -3,8 +3,8 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-22'
-version: 17
+updatedAt: '2026-08-23'
+version: 18
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Nykyinen hard cut käyttää strict-v15 Graph/GraphNode/JobNode/strategy-sopimusta, Graph Node Module v4:ää, Root Snapshot v8:aa, Task Envelope/outcome v7:ää, composition v8:aa, ExecutionSpec v9:ää ja SQLite schema v11:tä. `goal-016` / `adr-026` hyväksyy Graph-scopeen explicit `agent_v1 | ssp_v1` -strategian ilman fallbackia. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
+12-osioinen baseline on hyväksytty. Nykyinen Portti A -implementation käyttää strict-v16 Graph/GraphNode/JobNode/strategy-sopimusta, explicit scoped `agent_v1 | ssp_v2` -strategioita ilman fallbackia, Graph Node Module v5:tä, Root Snapshot v9:ää, Task Envelope/outcome v8:aa, composition v9:ää, ExecutionSpec v10:tä ja SQLite schema v12:ta. `goal-017` / `adr-028` ja `goal-018` / `adr-029` ovat review-tilassa; agenttiroutingin poistava strict cut odottaa kalibroitua onnistunutta pilottia ja eksplisiittistä ihmishyväksyntää. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
 
 ## Osiot
 
@@ -60,6 +60,8 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Three-level Graph Node Engineering initiative](initiatives/three-level-graph-node-engineering/BRIEF.md): accepted `goal-015` / `adr-023` -rajan strict-v14/V4/V10-, scoped routing/repair-, kolmen canvasin ja conformance-evidenssi.
 - [Job Node industrial flow canvas initiative](initiatives/job-node-industrial-flow-canvas/BRIEF.md): accepted `adr-025` ja review-tilaisen `adr-027`:n bounded UI-, a11y-, desktop/narrow- ja conformance-evidenssi ilman runtime-sopimusmuutosta.
 - [Stochastic Policy Orchestration initiative](initiatives/stochastic-policy-orchestration/BRIEF.md): accepted `goal-016` / `adr-026` finite SSP/SMDP Graph-policy; core implementation evidence on kerätty ja projection/pilot/conformance ovat review-rajalla.
+- [Outcome-aware hierarchical policy initiative](initiatives/outcome-aware-hierarchical-policy/BRIEF.md): review-tilainen `goal-017` / `adr-028` scoped outcome-aware `ssp_v2`, proper-policy-, projection-, observation- ja pilotointiketju.
+- [Capability-first authoring initiative](initiatives/capability-first-authoring/BRIEF.md): review-tilainen `goal-018` / `adr-029` upper-level card authoring ja Run-policy/evidence-projektio ADR-025/027:n Job-flow'ta muuttamatta.
 
 ## Kanoninen omistajuus
 
@@ -76,15 +78,15 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 
 ## Työskentelysääntö
 
-Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Active Graph runtime käyttää explicit `agent_v1`- tai `ssp_v1`-strategiaa ilman fallbackia; GraphNode-scope käyttää scoped agent routingia immutable candidate-enumista. Work→Validation ja bounded retry ovat Job Noden kiinteitä invariantteja. Epäselvä WHAT/WHY, prioriteetti tai merkittävä valinta pysähtyy `needs_input`-tilaan.
+Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Active Graph ja GraphNode runtime käyttävät kumpikin eksplisiittistä `agent_v1`- tai `ssp_v2`-strategiaa ilman runtime-fallbackia. `ssp_v2` ratkaisee GraphNode-optionin tai JobNode-actionin scopekohtaisesta proper policysta; Work→Validation, bounded retry ja scoped Repair ovat Job Noden kiinteitä invariantteja. Epäselvä WHAT/WHY, prioriteetti, projisoimaton state tai merkittävä valinta pysähtyy `needs_input`-tilaan.
 
 ## Relevantit päätökset
 
-`goal-009`–`goal-016`, `adr-011`, `adr-013`–`adr-016`, `adr-023`, `adr-025`–`adr-027` ja `adr-026`.
+`goal-009`–`goal-018`, `adr-011`, `adr-013`–`adr-016` ja `adr-023`–`adr-029`.
 
 ## Evidenssi
 
-Virallinen [arc42-dokumentaatio](https://docs.arc42.org/home/) määrittää osiorakenteen. Paikallinen `npm run validate:arc42` tarkistaa dokumentti- ja trace-sopimuksen, strict-v15 Graph/strategy-konfiguraation sekä project-local-menetelmäresurssit.
+Virallinen [arc42-dokumentaatio](https://docs.arc42.org/home/) määrittää osiorakenteen. Paikallinen `npm run validate:arc42` tarkistaa dokumentti- ja trace-sopimuksen, strict-v16 scoped strategy -konfiguraation sekä project-local-menetelmäresurssit.
 
 ## Avoimet kysymykset
 

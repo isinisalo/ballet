@@ -5,7 +5,8 @@ import type {
   ExecutionProfileSaveRequest,
   CanvasTheme,
   ProjectAutomationConfig,
-  PolicyPreviewResultV1,
+  PolicyPreviewResultV2,
+  PolicyPreviewRequestV2,
   InstalledGraphNodeModuleStatus,
   GraphNodeModuleExportRequest,
   GraphNodeModuleExportResult,
@@ -39,10 +40,10 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(config)
     }),
-  previewPolicy: (config: ProjectAutomationConfig) =>
-    request<PolicyPreviewResultV1>("/api/automation/policy-preview", {
+  previewPolicy: (input: PolicyPreviewRequestV2) =>
+    request<PolicyPreviewResultV2>("/api/automation/policy-preview", {
       method: "POST",
-      body: JSON.stringify(config)
+      body: JSON.stringify(input)
     }),
   listGraphNodeModuleLibrary: () => request<GraphNodeModuleLibraryEntry[]>("/api/graph-node-modules/library"),
   inspectGraphNodeModule: (input: GraphNodeModuleInspectRequest) =>

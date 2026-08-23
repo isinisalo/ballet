@@ -10,12 +10,12 @@ import type {
   CanonicalNodeOutcome, ControlFlowEvent, GraphNodeInvocation, GraphNodeInvocationDetails,
   GraphStateRevisionMetadata, JobNodeInvocation, NodeRun, OrchestrationScope, RepairFrame,
   RepairNodeOutcome, RepairRequest, RepairResult, RootExecutionSnapshot, RoutingDecision,
-  RoutingRequest, ValidationNodeOutcome, PolicyDecisionRecordV1, PolicyOptionObservationV1
+  RoutingRequest, ValidationNodeOutcome, PolicyDecisionRecordV2, PolicyOptionObservationV2
 } from "../shared/domain/runtime.js";
 import type {
   RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection
 } from "../shared/domain/runs.js";
-import type { TaskEnvelopeV7, TaskEnvelopeHistoryEntry } from "../shared/domain/taskEnvelope.js";
+import type { TaskEnvelopeV8, TaskEnvelopeHistoryEntry } from "../shared/domain/taskEnvelope.js";
 import {
   hasRepairCapacity, resolveOrchestratorOutcome, resolveRepairOutcome, resolveValidation
 } from "./runtime/GraphRoutingEngine.js";
@@ -47,13 +47,14 @@ export class RuntimeDatabase {
       this.connection().prepare("UPDATE root_runs SET status = 'running', updated_at = ? WHERE root_run_id = ?")
         .run(now(), rootRunId);
       if (root.kind === "graph") {
-        if (snapshot.graph.strategy.kind === "ssp_v1") this.requestPolicyDecision(rootRunId);
+        if (snapshot.graph.strategy.kind === "ssp_v2") this.requestPolicyDecision(rootRunId, "graph");
         else this.requestOrchestrator(rootRunId, "graph", "start", undefined, undefined, undefined, {});
         return;
       }
       const graphNode = requireGraphNode(snapshot, String(root.target_id));
       const invocation = this.createGraphNodeInvocation(rootRunId, graphNode, "root", undefined, 0);
-      this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
+      if (graphNode.strategy.kind === "ssp_v2") this.requestPolicyDecision(rootRunId, "graph_node", invocation);
+      else this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
     })();
   }
 
@@ -130,6 +131,7 @@ export class RuntimeDatabase {
       if (node.role !== outcome.role || !["queued","running","waiting_for_input"].includes(node.status)) {
         throw new Error(`Node Run ${nodeRunId} cannot accept this ${outcome.role} outcome.`);
       }
+      this.assertSemanticOutcome(node, outcome);
       if (hasPatch(outcome)) this.applyPatch(rootRunId, nodeRunId, outcome.statePatch, outcome);
       const stateRevision = this.stateRevision(rootRunId);
       const at = now();
@@ -151,6 +153,25 @@ export class RuntimeDatabase {
       else if (outcome.role === "orchestrator") this.afterOrchestrator(node, outcome);
       else this.afterRepair(node, outcome);
     })();
+  }
+
+  private assertSemanticOutcome(node: NodeRun, outcome: CanonicalNodeOutcome): void {
+    const snapshot = this.snapshot(node.rootRunId);
+    const graphNode = node.graphNodeId ? requireGraphNode(snapshot, node.graphNodeId) : undefined;
+    if (outcome.role === "validation" && graphNode?.strategy.kind === "ssp_v2") {
+      const job = requireJob(graphNode, node.jobNodeId);
+      const contract = job.outcomes.find(({ outcomeId }) => outcomeId === outcome.outcomeId);
+      if (!contract || contract.result !== outcome.decision) throw new Error(
+        `Validation outcome ${String(outcome.outcomeId)} is outside Job Node ${job.id}'s snapshotted outcome contract.`
+      );
+    }
+    if (outcome.role === "orchestrator" && outcome.state === "completed" && outcome.action === "complete"
+      && node.scope === "graph_node" && snapshot.graph.strategy.kind === "ssp_v2") {
+      const contract = graphNode?.outcomes.find(({ outcomeId }) => outcomeId === outcome.outcomeId);
+      if (!contract || contract.result !== outcome.result) throw new Error(
+        `Graph Node outcome ${String(outcome.outcomeId)} is outside the snapshotted outcome contract.`
+      );
+    }
   }
 
   resumeNode(rootRunId: string, nodeRunId: string, response: string): void {
@@ -201,13 +222,13 @@ export class RuntimeDatabase {
     })();
   }
 
-  buildTaskEnvelope(nodeRunId: string): TaskEnvelopeV7 {
+  buildTaskEnvelope(nodeRunId: string): TaskEnvelopeV8 {
     const node = this.getNodeRun(nodeRunId);
     if (!node) throw new Error(`Node Run ${nodeRunId} was not found.`);
     const snapshot = this.snapshot(node.rootRunId);
     const state = this.currentState(node.rootRunId);
     const base = {
-      version: 7 as const,
+      version: 8 as const,
       run: {
         rootRunId: node.rootRunId,
         graphNodeInvocationId: node.graphNodeInvocationId,
@@ -236,7 +257,7 @@ export class RuntimeDatabase {
         ...base, role: "validation", task: job.validationNode.task,
         graphNode: identity(graphNode!), jobNode: identity(job), validationNode: identity(job.validationNode),
         workAttempt: this.jobInvocation(node.jobNodeInvocationId!).workAttempt,
-        workOutcome,
+        workOutcome, allowedOutcomes: [...job.outcomes],
         ...this.repairReturn(node.jobNodeInvocationId!)
       };
     }
@@ -247,13 +268,14 @@ export class RuntimeDatabase {
         : Boolean(graphNode?.repairNode || snapshot.graph.repairNode);
       return {
         ...base, role: "orchestrator", task: request.scope === "graph"
-          ? requireAgentGraphStrategy(snapshot).orchestrator.description : graphNode!.orchestrator.description,
+          ? requireAgentGraphStrategy(snapshot).orchestrator.description : requireAgentGraphNodeStrategy(graphNode!).orchestrator.description,
         scope: request.scope, ...(graphNode ? { graphNode: identity(graphNode) } : {}),
         request: {
           id: request.routingRequestId, kind: request.kind, sourceChildId: request.sourceChildId,
           result: request.result, requestedCapability: request.requestedCapability, evidence: request.evidence
         },
         allowedCandidates: request.candidateKeys.map((key) => ({ key, description: key })),
+        allowedOutcomes: graphNode?.outcomes ?? [],
         repairAvailable
       };
     }
@@ -305,6 +327,7 @@ export class RuntimeDatabase {
       selectedDecision: [...decisions].reverse().find(({ valid }) => valid),
       policyDecisions: this.policyEvidence.listDecisions(rootRunId),
       policyObservations: this.policyEvidence.listObservations(rootRunId),
+      policyProjections: {},
       executionGraph: [],
       policyTelemetry: []
     };
@@ -356,7 +379,7 @@ export class RuntimeDatabase {
     const job = requireJob(graphNode, node.jobNodeId);
     const resolution = resolveValidation(outcome.decision, jobInvocation.workAttempt, job.maxRetries);
     if (resolution === "pass") {
-      this.completeJob(node, "PASS");
+      this.completeJob(node, outcome);
       return;
     }
     if (resolution === "retry_work") {
@@ -375,10 +398,18 @@ export class RuntimeDatabase {
       graphNodeInvocationId: node.graphNodeInvocationId, jobNodeInvocationId: node.jobNodeInvocationId,
       sourceNodeRunId: node.nodeRunId
     });
-    this.requestOrchestrator(
-      node.rootRunId, "graph_node", "repair",
-      this.graphNodeInvocation(node.graphNodeInvocationId!), node.jobNodeId, "FAIL",
-      outcome.evidence, outcome.repairRequest?.requestedCapability, node.nodeRunId
+    if (graphNode.strategy.kind === "ssp_v2" && outcome.repairRequest && graphNode.repairNode) {
+      this.createRepair(
+        node.rootRunId, "graph_node", graphNode.id, node.nodeRunId,
+        node.jobNodeInvocationId!, node.graphNodeInvocationId!, node.nodeDefinitionId,
+        outcome.repairRequest.requestedCapability, outcome.evidence, []
+      );
+      return;
+    }
+    if (graphNode.strategy.kind === "ssp_v2") this.completeJob(node, outcome);
+    else this.requestOrchestrator(
+      node.rootRunId, "graph_node", "repair", this.graphNodeInvocation(node.graphNodeInvocationId!),
+      node.jobNodeId, "FAIL", outcome.evidence, outcome.repairRequest?.requestedCapability, node.nodeRunId
     );
   }
 
@@ -389,7 +420,8 @@ export class RuntimeDatabase {
     const graphNode = request.graphNodeId ? requireGraphNode(snapshot, request.graphNodeId) : undefined;
     const repairDefinition = request.scope === "graph" ? snapshot.graph.repairNode : graphNode?.repairNode ?? snapshot.graph.repairNode;
     const maxAttempts = request.scope === "graph"
-      ? requireAgentGraphStrategy(snapshot).orchestrator.maxRouteAttempts : graphNode!.orchestrator.maxRouteAttempts;
+      ? requireAgentGraphStrategy(snapshot).orchestrator.maxRouteAttempts
+      : requireAgentGraphNodeStrategy(graphNode!).orchestrator.maxRouteAttempts;
     const resolution = resolveOrchestratorOutcome({
       outcome, candidateKeys: request.candidateKeys, attempt: request.attempt,
       maxAttempts: Math.min(3, maxAttempts), repairAvailable: Boolean(repairDefinition)
@@ -435,6 +467,13 @@ export class RuntimeDatabase {
       outcome, candidateKeys: request.candidateKeys, scope: request.scope,
       parentEscalationAvailable: request.scope === "graph_node" && Boolean(snapshot.graph.repairNode)
     });
+    const policyControlled = request.scope === "graph"
+      ? snapshot.graph.strategy.kind === "ssp_v2"
+      : requireGraphNode(snapshot, request.graphNodeId!).strategy.kind === "ssp_v2";
+    if (policyControlled && resolution.kind === "dispatch") {
+      this.pausePolicy(node.rootRunId, "repair_routing_forbidden", "Repair cannot select an SSP action; it must return to the same Validation Node.");
+      return;
+    }
     if (resolution.kind === "needs_input") {
       this.connection().prepare(
         "UPDATE repair_requests SET status = 'needs_input', updated_at = ? WHERE repair_request_id = ?"
@@ -457,7 +496,8 @@ export class RuntimeDatabase {
     this.returnFromRepair(request, outcome, node.nodeRunId);
   }
 
-  private completeJob(node: NodeRun, result: NodeResult): void {
+  private completeJob(node: NodeRun, outcome: ValidationNodeOutcome): void {
+    const result = outcome.decision;
     const at = now();
     this.connection().prepare(`
       UPDATE job_node_invocations SET status = 'completed', state_revision_after = ?,
@@ -475,9 +515,21 @@ export class RuntimeDatabase {
       }, node.nodeRunId);
       return;
     }
-    this.requestOrchestrator(
-      node.rootRunId, "graph_node", "continuation",
-      this.graphNodeInvocation(node.graphNodeInvocationId!), node.jobNodeId, result, {}, undefined, node.nodeRunId
+    const graphInvocation = this.graphNodeInvocation(node.graphNodeInvocationId!);
+    const graphNode = requireGraphNode(this.snapshot(node.rootRunId), graphInvocation.graphNodeId);
+    if (graphNode.strategy.kind === "ssp_v2") {
+      if (!outcome.outcomeId) {
+        this.pausePolicy(node.rootRunId, "semantic_outcome_missing", "Validation did not produce a semantic outcome.");
+        return;
+      }
+      const jobInvocation = this.jobInvocation(node.jobNodeInvocationId!);
+      this.recordPolicyObservation(node.rootRunId, "graph_node", graphInvocation, result, outcome.outcomeId, jobInvocation);
+      this.requestPolicyDecision(
+        node.rootRunId, "graph_node", graphInvocation, jobInvocation, result, outcome.outcomeId
+      );
+    } else this.requestOrchestrator(
+      node.rootRunId, "graph_node", "continuation", graphInvocation,
+      node.jobNodeId, result, {}, undefined, node.nodeRunId
     );
   }
 
@@ -506,9 +558,15 @@ export class RuntimeDatabase {
       }, request.sourceNodeRunId ?? "");
     } else if (root.kind === "graph_node") {
       this.terminalize(rootRunId, result === "PASS" ? "completed" : "failed", outcome);
-    } else if (this.snapshot(rootRunId).graph.strategy.kind === "ssp_v1") {
-      this.recordPolicyObservation(rootRunId, invocation, result);
-      this.requestPolicyDecision(rootRunId, invocation, result);
+    } else if (this.snapshot(rootRunId).graph.strategy.kind === "ssp_v2") {
+      const outcomeId = outcome.role === "orchestrator" && outcome.state === "completed"
+        && outcome.action === "complete" ? outcome.outcomeId : undefined;
+      if (!outcomeId) {
+        this.pausePolicy(rootRunId, "semantic_outcome_missing", "Graph Node completion did not produce a semantic outcome.");
+        return;
+      }
+      this.recordPolicyObservation(rootRunId, "graph", invocation, result, outcomeId);
+      this.requestPolicyDecision(rootRunId, "graph", invocation, undefined, result, outcomeId);
     } else {
       this.requestOrchestrator(rootRunId, "graph", "continuation", undefined, invocation.graphNodeId, result, {});
     }
@@ -530,7 +588,8 @@ export class RuntimeDatabase {
     const graphNode = scope === "graph_node"
       ? requireGraphNode(snapshot, invocation?.graphNodeId ?? this.rootRow(rootRunId).target_id as string)
       : undefined;
-    const orchestrator = scope === "graph" ? requireAgentGraphStrategy(snapshot).orchestrator : graphNode!.orchestrator;
+    const orchestrator = scope === "graph" ? requireAgentGraphStrategy(snapshot).orchestrator
+      : requireAgentGraphNodeStrategy(graphNode!).orchestrator;
     const candidates = ruleCandidates(
       orchestrator.routing as Parameters<typeof ruleCandidates>[0],
       kind, sourceChildId, result, requestedCapability
@@ -578,7 +637,8 @@ export class RuntimeDatabase {
     if (scope === "graph" && target.startsWith("graph-node:")) {
       const graphNode = requireGraphNode(snapshot, target.slice("graph-node:".length));
       const invocation = this.createGraphNodeInvocation(rootRunId, graphNode, source, undefined, this.openFrames(rootRunId).length);
-      this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
+      if (graphNode.strategy.kind === "ssp_v2") this.requestPolicyDecision(rootRunId, "graph_node", invocation);
+      else this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
       this.event(rootRunId, "graph_node_dispatched", { graphNodeInvocationId: invocation.graphNodeInvocationId });
       return;
     }
@@ -625,16 +685,22 @@ export class RuntimeDatabase {
     return this.graphNodeInvocation(id);
   }
 
-  private createJob(rootRunId: string, graphNode: ProjectGraphNode, job: ProjectJobNode, graphInvocation: GraphNodeInvocation): void {
+  private createJob(
+    rootRunId: string,
+    graphNode: ProjectGraphNode,
+    job: ProjectJobNode,
+    graphInvocation: GraphNodeInvocation,
+    policyDecisionId?: string
+  ): void {
     const id = randomUUID();
     const at = now();
     this.connection().prepare(`
       INSERT INTO job_node_invocations (
         job_node_invocation_id, root_run_id, graph_node_invocation_id, graph_node_id, job_node_id,
-        work_attempt, status, state_revision_before, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 1, 'running', ?, ?, ?)
+        policy_decision_id, work_attempt, status, state_revision_before, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 1, 'running', ?, ?, ?)
     `).run(id, rootRunId, graphInvocation.graphNodeInvocationId, graphNode.id, job.id,
-      this.stateRevision(rootRunId), at, at);
+      policyDecisionId ?? null, this.stateRevision(rootRunId), at, at);
     this.event(rootRunId, "job_node_dispatched", {
       graphNodeInvocationId: graphInvocation.graphNodeInvocationId, jobNodeInvocationId: id
     });
@@ -837,41 +903,56 @@ export class RuntimeDatabase {
 
   private requestPolicyDecision(
     rootRunId: string,
-    previousInvocation?: GraphNodeInvocation,
-    previousResult?: NodeResult
+    scope: OrchestrationScope,
+    graphInvocation?: GraphNodeInvocation,
+    previousJobInvocation?: JobNodeInvocation,
+    previousResult?: NodeResult,
+    previousOutcomeId?: string
   ): void {
     const snapshot = this.snapshot(rootRunId);
-    if (snapshot.graph.strategy.kind !== "ssp_v1" || !snapshot.graphDecision.modelSha256) {
-      throw new Error("Root snapshot has no SSP decision strategy.");
-    }
+    const graphNode = scope === "graph_node"
+      ? requireGraphNode(snapshot, graphInvocation?.graphNodeId ?? String(this.rootRow(rootRunId).target_id))
+      : undefined;
+    const strategy = graphNode?.strategy ?? snapshot.graph.strategy;
+    const decisionSnapshot = graphNode ? snapshot.graphNodeDecisions[graphNode.id] : snapshot.graphDecision;
+    if (strategy.kind !== "ssp_v2" || !decisionSnapshot?.modelSha256) throw new Error(
+      `${scope} snapshot has no ssp_v2 decision strategy.`
+    );
+    const scopeKey = scope === "graph" ? "graph" : graphInvocation!.graphNodeInvocationId;
     const epoch = Number((this.connection().prepare(
-      "SELECT COUNT(*) count FROM policy_decisions WHERE root_run_id = ?"
-    ).get(rootRunId) as DbRow).count) + 1;
+      "SELECT COUNT(*) count FROM policy_decisions WHERE root_run_id = ? AND scope_key = ?"
+    ).get(rootRunId, scopeKey) as DbRow).count) + 1;
     const evaluation = evaluatePolicyDecision({
-      strategy: snapshot.graph.strategy,
-      context: this.policyProjectionContext(rootRunId, previousInvocation, previousResult),
-      snapshotGraphNodeIds: snapshot.graph.graphNodes.map(({ id }) => id),
-      modelSha256: snapshot.graphDecision.modelSha256
+      strategy,
+      context: this.policyProjectionContext(
+        rootRunId, scope, graphInvocation, previousJobInvocation, previousResult, previousOutcomeId
+      ),
+      snapshotGraphNodeIds: graphNode ? graphNode.jobNodes.map(({ id }) => id)
+        : snapshot.graph.graphNodes.map(({ id }) => id),
+      modelSha256: decisionSnapshot.modelSha256
     });
     const solution = evaluation.solution;
-    const decision: PolicyDecisionRecordV1 = {
-      policyDecisionId: randomUUID(), rootRunId, epoch,
-      epochKind: previousInvocation ? "continuation" : "start",
-      previousGraphNodeInvocationId: previousInvocation?.graphNodeInvocationId,
+    const previousActionInvocationId = scope === "graph"
+      ? graphInvocation?.graphNodeInvocationId : previousJobInvocation?.jobNodeInvocationId;
+    const decision: PolicyDecisionRecordV2 = {
+      policyDecisionId: randomUUID(), rootRunId, scope, scopeKey,
+      graphNodeInvocationId: graphInvocation?.graphNodeInvocationId, epoch,
+      epochKind: previousActionInvocationId ? "continuation" : "start",
+      previousActionInvocationId,
       state: evaluation.state,
       admissibleActionIds: evaluation.admissible.actionIds,
       excludedActions: evaluation.admissible.excludedActions,
-      selectedGraphNodeId: solution?.selectedActionId,
+      selectedActionId: solution?.selectedActionId,
       actionValues: solution?.actionValues ?? [],
       stateValueMicros: solution?.stateValueMicros,
       tiedActionIds: solution?.tiedActionIds ?? [],
       solverStatus: evaluation.status,
-      solverAlgorithm: "ssp_value_iteration_v1",
+      solverAlgorithm: "ssp_value_iteration_v2",
       iterations: solution?.iterations ?? 0,
       residual: solution?.residual ?? 0,
-      epsilon: snapshot.graph.strategy.model.solver.epsilon,
-      modelVersion: snapshot.graph.strategy.model.version,
-      modelSha256: snapshot.graphDecision.modelSha256,
+      epsilon: strategy.model.solver.epsilon,
+      modelVersion: strategy.model.version,
+      modelSha256: decisionSnapshot.modelSha256,
       policySha256: solution?.policySha256,
       snapshotSha256: snapshot.project.snapshotHash,
       message: evaluation.message,
@@ -879,63 +960,146 @@ export class RuntimeDatabase {
     };
     this.policyEvidence.insertDecision(decision);
     if (evaluation.terminal) {
-      this.event(rootRunId, "policy_decided", {});
-      this.terminalizePolicy(rootRunId, evaluation.terminal);
+      this.event(rootRunId, "policy_decided", { graphNodeInvocationId: graphInvocation?.graphNodeInvocationId });
+      if (scope === "graph") this.terminalizePolicy(rootRunId, evaluation.terminal);
+      else this.completeGraphNodePolicy(rootRunId, graphInvocation!, evaluation.state!.stateId);
       return;
     }
-    if (evaluation.status !== "converged" || !decision.selectedGraphNodeId) {
+    if (evaluation.status !== "converged" || !decision.selectedActionId) {
       this.event(rootRunId, "policy_invalid", {});
       this.pausePolicy(rootRunId, evaluation.status, evaluation.message ?? "SSP policy did not produce an action.");
       return;
     }
-    const graphNode = requireGraphNode(snapshot, decision.selectedGraphNodeId);
-    const invocation = this.createGraphNodeInvocation(rootRunId, graphNode, "orchestrator", undefined, 0, decision.policyDecisionId);
-    this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
-    this.event(rootRunId, "policy_decided", { graphNodeInvocationId: invocation.graphNodeInvocationId });
-    this.event(rootRunId, "graph_node_dispatched", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+    if (scope === "graph") {
+      const selectedGraphNode = requireGraphNode(snapshot, decision.selectedActionId);
+      const invocation = this.createGraphNodeInvocation(
+        rootRunId, selectedGraphNode, "policy", undefined, 0, decision.policyDecisionId
+      );
+      if (selectedGraphNode.strategy.kind === "ssp_v2") this.requestPolicyDecision(rootRunId, "graph_node", invocation);
+      else this.requestOrchestrator(rootRunId, "graph_node", "start", invocation, undefined, undefined, {});
+      this.event(rootRunId, "policy_decided", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+      this.event(rootRunId, "graph_node_dispatched", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+      return;
+    }
+    const job = requireJob(graphNode, decision.selectedActionId);
+    this.createJob(rootRunId, graphNode!, job, graphInvocation!, decision.policyDecisionId);
+    this.event(rootRunId, "policy_decided", { graphNodeInvocationId: graphInvocation!.graphNodeInvocationId });
   }
 
-  private recordPolicyObservation(rootRunId: string, invocation: GraphNodeInvocation, result: NodeResult): void {
-    if (!invocation.policyDecisionId) throw new Error("SSP Graph Node invocation has no policy decision reference.");
+  private recordPolicyObservation(
+    rootRunId: string,
+    scope: OrchestrationScope,
+    graphInvocation: GraphNodeInvocation,
+    result: NodeResult,
+    outcomeId: string,
+    jobInvocation?: JobNodeInvocation
+  ): void {
+    const policyDecisionId = scope === "graph" ? graphInvocation.policyDecisionId : jobInvocation?.policyDecisionId;
+    if (!policyDecisionId) throw new Error(`${scope} action invocation has no policy decision reference.`);
     const snapshot = this.snapshot(rootRunId);
-    if (snapshot.graph.strategy.kind !== "ssp_v1" || !snapshot.graphDecision.modelSha256) return;
-    const decision = this.policyEvidence.requireDecision(invocation.policyDecisionId);
+    const graphNode = scope === "graph_node" ? requireGraphNode(snapshot, graphInvocation.graphNodeId) : undefined;
+    const strategy = graphNode?.strategy ?? snapshot.graph.strategy;
+    const decisionSnapshot = graphNode ? snapshot.graphNodeDecisions[graphNode.id] : snapshot.graphDecision;
+    if (strategy.kind !== "ssp_v2" || !decisionSnapshot?.modelSha256) return;
+    const decision = this.policyEvidence.requireDecision(policyDecisionId);
     if (!decision.state) throw new Error("Dispatched policy decision has no Decision State.");
-    const configured = snapshot.graph.strategy.model.stateActions.find((row) =>
-      row.stateId === decision.state!.stateId && row.graphNodeId === invocation.graphNodeId);
+    const actionId = scope === "graph" ? graphInvocation.graphNodeId : jobInvocation!.jobNodeId;
+    const configured = strategy.model.stateActions.find((row) =>
+      row.stateId === decision.state!.stateId && row.actionId === actionId);
     if (!configured) throw new Error("Dispatched policy action is absent from the immutable Decision Model.");
-    let stateAfter;
+    let actualState;
     try {
-      stateAfter = projectDecisionState(snapshot.graph.strategy.model,
-        this.policyProjectionContext(rootRunId, invocation, result));
+      actualState = projectDecisionState(strategy.model, this.policyProjectionContext(
+        rootRunId, scope, graphInvocation, jobInvocation, result, outcomeId
+      ));
     } catch { /* The following decision attempt persists the exact projection failure. */ }
-    const observation: PolicyOptionObservationV1 = {
+    const matchingOutcome = configured.successors.filter((branch) => branch.outcomeId === outcomeId);
+    const matchingState = actualState
+      ? configured.successors.filter((branch) => branch.expectedNextStateId === actualState!.stateId) : [];
+    const exact = actualState && configured.successors.some((branch) =>
+      branch.outcomeId === outcomeId && branch.expectedNextStateId === actualState!.stateId);
+    const modelMatch = exact ? "match" as const : matchingOutcome.length
+      ? "state_miss" as const : matchingState.length ? "outcome_miss" as const : "outside_support" as const;
+    const actionInvocationId = scope === "graph"
+      ? graphInvocation.graphNodeInvocationId : jobInvocation!.jobNodeInvocationId;
+    const createdAt = scope === "graph" ? graphInvocation.createdAt : jobInvocation!.createdAt;
+    const observation: PolicyOptionObservationV2 = {
       policyObservationId: randomUUID(), rootRunId, policyDecisionId: decision.policyDecisionId,
-      graphNodeInvocationId: invocation.graphNodeInvocationId, stateBefore: decision.state,
-      action: invocation.graphNodeId, configuredExpectedCostMicros: configured.expectedCostMicros,
-      verifiedOutcome: result, stateAfter,
-      durationMillis: Math.max(0, Date.parse(now()) - Date.parse(invocation.createdAt)),
-      modelSha256: snapshot.graphDecision.modelSha256,
+      scope, scopeKey: decision.scopeKey, actionInvocationId,
+      graphNodeInvocationId: graphInvocation.graphNodeInvocationId,
+      jobNodeInvocationId: jobInvocation?.jobNodeInvocationId,
+      stateBefore: decision.state, actionId, configuredExpectedCostMicros: configured.expectedCostMicros,
+      expectedOutcomeDistribution: structuredClone(configured.successors), observedOutcomeId: outcomeId,
+      verifiedResult: result, actualState, modelMatch,
+      durationMillis: Math.max(0, Date.parse(now()) - Date.parse(createdAt)),
+      modelSha256: decisionSnapshot.modelSha256,
       snapshotSha256: snapshot.project.snapshotHash,
       createdAt: now()
     };
     this.policyEvidence.insertObservation(observation);
-    this.event(rootRunId, "policy_observed", { graphNodeInvocationId: invocation.graphNodeInvocationId });
+    this.event(rootRunId, "policy_observed", {
+      graphNodeInvocationId: graphInvocation.graphNodeInvocationId,
+      jobNodeInvocationId: jobInvocation?.jobNodeInvocationId
+    });
   }
 
-  private policyProjectionContext(rootRunId: string, invocation?: GraphNodeInvocation, result?: NodeResult) {
+  private policyProjectionContext(
+    rootRunId: string,
+    scope: OrchestrationScope,
+    graphInvocation?: GraphNodeInvocation,
+    jobInvocation?: JobNodeInvocation,
+    result?: NodeResult,
+    outcomeId?: string
+  ) {
+    const previousActionId = scope === "graph" ? graphInvocation?.graphNodeId : jobInvocation?.jobNodeId;
+    const actionInvocationCount = scope === "graph" ? Number((this.connection().prepare(
+      "SELECT COUNT(*) count FROM graph_node_invocations WHERE root_run_id = ?"
+    ).get(rootRunId) as DbRow).count) : Number((this.connection().prepare(
+      "SELECT COUNT(*) count FROM job_node_invocations WHERE graph_node_invocation_id = ?"
+    ).get(graphInvocation?.graphNodeInvocationId ?? "") as DbRow).count);
     return {
-      epochKind: invocation ? "continuation" as const : "start" as const,
-      previousGraphNodeId: invocation?.graphNodeId,
-      previousGraphNodeResult: result,
-      graphNodeInvocationCount: Number((this.connection().prepare(
-        "SELECT COUNT(*) count FROM graph_node_invocations WHERE root_run_id = ?"
-      ).get(rootRunId) as DbRow).count),
+      epochKind: previousActionId ? "continuation" as const : "start" as const,
+      previousActionId, previousActionResult: result, previousOutcomeId: outcomeId, actionInvocationCount,
       stateRevision: this.stateRevision(rootRunId), projectState: this.currentState(rootRunId),
       authorizationFacts: this.currentState(rootRunId),
       evidenceRefs: [`graph-state:${this.stateRevision(rootRunId)}`,
-        ...(invocation ? [`graph-node-invocation:${invocation.graphNodeInvocationId}`] : [])]
+        ...(graphInvocation ? [`graph-node-invocation:${graphInvocation.graphNodeInvocationId}`] : []),
+        ...(jobInvocation ? [`job-node-invocation:${jobInvocation.jobNodeInvocationId}`] : [])]
     };
+  }
+
+  private completeGraphNodePolicy(rootRunId: string, invocation: GraphNodeInvocation, stateId: string): void {
+    const snapshot = this.snapshot(rootRunId);
+    const graphNode = requireGraphNode(snapshot, invocation.graphNodeId);
+    if (graphNode.strategy.kind !== "ssp_v2") throw new Error("Graph Node is not configured for ssp_v2.");
+    const terminal = graphNode.strategy.model.states.find(({ id }) => id === stateId);
+    const contract = graphNode.outcomes.find(({ outcomeId }) => outcomeId === terminal?.emitsOutcomeId);
+    if (!terminal?.terminal || !contract) {
+      this.pausePolicy(rootRunId, "semantic_outcome_missing", `Local terminal ${stateId} has no Graph Node outcome contract.`);
+      return;
+    }
+    const at = now();
+    this.connection().prepare(`
+      UPDATE graph_node_invocations SET status = 'completed', completion_state_revision = ?,
+        completed_at = ?, updated_at = ? WHERE graph_node_invocation_id = ?
+    `).run(this.stateRevision(rootRunId), at, at, invocation.graphNodeInvocationId);
+    const outcome: Extract<CanonicalNodeOutcome, { role: "orchestrator" }> = {
+      role: "orchestrator", state: "completed", action: "complete", result: contract.result,
+      outcomeId: contract.outcomeId, summary: `Local SSP policy reached ${terminal.terminal}.`,
+      reason: `Terminal Decision State ${stateId}.`
+    };
+    if (String(this.rootRow(rootRunId).kind) === "graph_node") {
+      this.terminalize(rootRunId, terminal.terminal === "success" ? "completed"
+        : terminal.terminal === "failure" ? "failed" : "blocked", outcome);
+      return;
+    }
+    if (snapshot.graph.strategy.kind === "ssp_v2") {
+      this.recordPolicyObservation(rootRunId, "graph", invocation, contract.result, contract.outcomeId);
+      this.requestPolicyDecision(rootRunId, "graph", invocation, undefined, contract.result, contract.outcomeId);
+    } else this.requestOrchestrator(
+      rootRunId, "graph", "continuation", undefined,
+      invocation.graphNodeId, contract.result, {}, undefined, undefined
+    );
   }
 
   private terminalizePolicy(rootRunId: string, terminal: "success" | "failure" | "blocked"): void {
@@ -1019,7 +1183,7 @@ export class RuntimeDatabase {
   private snapshot(rootRunId: string): RootExecutionSnapshot {
     const source = String(this.rootRow(rootRunId).execution_snapshot_json);
     const value = JSON.parse(source) as RootExecutionSnapshot;
-    if (value.version !== 8) throw new Error("Persisted Root snapshot is not v8.");
+    if (value.version !== 9) throw new Error("Persisted Root snapshot is not v9.");
     return value;
   }
   private rootRow(rootRunId: string): DbRow {
@@ -1178,6 +1342,10 @@ const requireAgentGraphStrategy = (snapshot: RootExecutionSnapshot) => {
   if (snapshot.graph.strategy.kind !== "agent_v1") throw new Error("Graph scope is not configured for agent routing.");
   return snapshot.graph.strategy;
 };
+const requireAgentGraphNodeStrategy = (graphNode: ProjectGraphNode) => {
+  if (graphNode.strategy.kind !== "agent_v1") throw new Error("Graph Node scope is not configured for agent routing.");
+  return graphNode.strategy;
+};
 const requireJob = (graphNode: ProjectGraphNode | undefined, id: string | undefined): ProjectJobNode => {
   const job = graphNode?.jobNodes.find((candidate) => candidate.id === id);
   if (!job) throw new Error(`Job Node ${String(id)} is outside the immutable snapshot.`);
@@ -1224,7 +1392,7 @@ const mapGraphNodeInvocation = (row: DbRow): GraphNodeInvocation => ({
 const mapJobNodeInvocation = (row: DbRow): JobNodeInvocation => ({
   jobNodeInvocationId: String(row.job_node_invocation_id), rootRunId: String(row.root_run_id),
   graphNodeInvocationId: String(row.graph_node_invocation_id), graphNodeId: String(row.graph_node_id),
-  jobNodeId: String(row.job_node_id), workAttempt: Number(row.work_attempt),
+  jobNodeId: String(row.job_node_id), policyDecisionId: optional(row.policy_decision_id), workAttempt: Number(row.work_attempt),
   status: row.status as JobNodeInvocation["status"], stateRevisionBefore: Number(row.state_revision_before),
   stateRevisionAfter: row.state_revision_after == null ? undefined : Number(row.state_revision_after),
   activeNodeRunId: optional(row.active_node_run_id), createdAt: String(row.created_at),

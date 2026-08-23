@@ -238,7 +238,7 @@ if (!parsedConfig.success) {
   for (const issue of parsedConfig.error.issues) addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`);
 } else {
   config = parsedConfig.data;
-  const automation = { version: 15, graph: config.graph };
+  const automation = { version: 16, graph: config.graph };
   for (const issue of validateProjectAutomationConfig(automation, config.executionProfiles)) addIssue(`Automation ${issue.path}: ${issue.message}`);
   const resources = await loadProjectResources(root);
   for (const issue of resources.issues) addIssue(`Resource ${issue.relativePath}: ${issue.message}`);
@@ -280,6 +280,10 @@ if (!parsedConfig.success) {
     if (/(?:high|xhigh|max|pro)/i.test(entry.reasoningEffort) || "reasoning" in entry && entry.reasoning?.mode) addIssue(`Unsupported high/pro reasoning configuration in ${entry.id}.`);
   }
   const validateComposition = (composition, location, expectedModel) => {
+    if (!composition) {
+      addIssue(`${location} is missing.`);
+      return;
+    }
     const profile = profiles.get(composition.executionProfileId);
     if (!profile) return;
     if (profile.networkAccess) addIssue(`Network-on profile used outside allowlist: ${location}.`);
@@ -289,7 +293,11 @@ if (!parsedConfig.success) {
   if (!config.graph.repairNode) addIssue("Default Graph must define a Repair Node.");
   else validateComposition(config.graph.repairNode, "graph/repair", "gpt-5.6-sol");
   for (const graphNode of config.graph.graphNodes) {
-    validateComposition(graphNode.orchestrator, `${graphNode.id}/orchestrator`, "gpt-5.6-luna");
+    if (graphNode.strategy.kind !== "agent_v1") {
+      addIssue(`Default GraphNode ${graphNode.id} must retain explicit agent_v1 strategy until its local SSP model is calibrated.`);
+    } else {
+      validateComposition(graphNode.strategy.orchestrator, `${graphNode.id}/strategy/orchestrator`, "gpt-5.6-luna");
+    }
     if (!graphNode.repairNode) addIssue(`Default GraphNode ${graphNode.id} must define a Repair Node.`);
     else validateComposition(graphNode.repairNode, `${graphNode.id}/repair`, "gpt-5.6-sol");
     for (const jobNode of graphNode.jobNodes) {
@@ -341,8 +349,10 @@ if (issues.length > 0) {
     ? (config.graph.strategy.kind === "agent_v1" ? config.graph.strategy.orchestrator.routing.continuation.length
       + config.graph.strategy.orchestrator.routing.repair.length : 0)
       + config.graph.graphNodes.reduce((total, graphNode) => total
-        + graphNode.orchestrator.routing.continuation.length
-        + graphNode.orchestrator.routing.repair.length, 0)
+        + (graphNode.strategy.kind === "agent_v1"
+          ? graphNode.strategy.orchestrator.routing.continuation.length
+            + graphNode.strategy.orchestrator.routing.repair.length
+          : 0), 0)
     : 0;
   process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} unique document IDs, ${graphNodes} GraphNodes, ${jobs} JobNodes, ${candidateRules} candidate rules.\n`);
 }

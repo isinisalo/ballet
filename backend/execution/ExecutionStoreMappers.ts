@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { nodeOutcomeJsonSchemaForRole, nodeOutcomeSchemaIds, parseNodeOutcomeForRole } from "../../shared/api/runtime-schemas.js";
 import type { CanonicalNodeOutcome, ExecutionEvent, ExecutionSpec, ExecutionTask } from "../../shared/domain/runtime.js";
-import { parseSerializedTaskEnvelopeV7 } from "../integration/TaskEnvelopeV7.js";
+import { parseSerializedTaskEnvelopeV8 } from "../integration/TaskEnvelopeV8.js";
 import { canonicalJson } from "../runtime/state/CanonicalJson.js";
 import type { ExecutionEventRow, ExecutionTaskRow } from "./ExecutionDbTypes.js";
 import { constrainRouteTargetSchema } from "./ExecutionComposition.js";
@@ -30,8 +30,8 @@ export const assertExecutionSpecEvidence = (spec: ExecutionSpec): void => {
   if (sha256(spec.evidence.prompt) !== spec.evidence.promptSha256) {
     throw new Error(`Execution task ${spec.taskId} has invalid prompt evidence.`);
   }
-  const taskEnvelope = parseSerializedTaskEnvelopeV7(promptSection(
-    spec.evidence.prompt, "TASK-ENVELOPE", "v7", spec.taskId
+  const taskEnvelope = parseSerializedTaskEnvelopeV8(promptSection(
+    spec.evidence.prompt, "TASK-ENVELOPE", "v8", spec.taskId
   ));
   const envelope = taskEnvelope.envelope;
   if (taskEnvelope.sha256 !== spec.evidence.taskEnvelopeSha256
@@ -44,11 +44,13 @@ export const assertExecutionSpecEvidence = (spec: ExecutionSpec): void => {
   }
   const routeTargets = envelope.role === "orchestrator" || envelope.role === "repair"
     ? envelope.allowedCandidates.map(({ key }) => key) : [];
-  const expected = constrainRouteTargetSchema(nodeOutcomeJsonSchemaForRole(envelope.role), routeTargets);
+  const outcomeIds = envelope.role === "validation" || envelope.role === "orchestrator"
+    ? envelope.allowedOutcomes.map(({ outcomeId }) => outcomeId) : [];
+  const expected = constrainRouteTargetSchema(nodeOutcomeJsonSchemaForRole(envelope.role), routeTargets, outcomeIds);
   const schemaJson = canonicalJson(spec.evidence.outputSchema);
   if (schemaJson !== canonicalJson(expected)
     || sha256(schemaJson) !== spec.evidence.outputSchemaSha256
-    || promptSection(spec.evidence.prompt, "OUTPUT-SCHEMA", "v7", spec.taskId) !== schemaJson
+    || promptSection(spec.evidence.prompt, "OUTPUT-SCHEMA", "v8", spec.taskId) !== schemaJson
     || spec.evidence.outputSchemaId !== nodeOutcomeSchemaIds[spec.evidence.nodeRole]) {
     throw new Error(`Execution task ${spec.taskId} has invalid output schema evidence.`);
   }
@@ -79,7 +81,7 @@ const parseEventData = (source: string, taskId: string): Record<string, unknown>
 };
 const sha256 = (value: string): string => createHash("sha256").update(value, "utf8").digest("hex");
 const promptSection = (prompt: string, kind: string, id: string, taskId: string): string => {
-  const opening = `<<< BALLET EXECUTION COMPOSITION V8 · ${kind} · ${id} >>>\n`;
+  const opening = `<<< BALLET EXECUTION COMPOSITION V9 · ${kind} · ${id} >>>\n`;
   const closing = `\n<<< END BALLET ${kind} >>>`;
   const start = prompt.indexOf(opening);
   if (start < 0 || prompt.indexOf(opening, start + opening.length) >= 0) {

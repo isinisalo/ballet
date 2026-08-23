@@ -2,50 +2,11 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EngineeringInspector, type EngineeringInspectorModel } from "../src/workspace/automation/EngineeringInspector";
-import {
-  SpaceEngineeringCanvas,
-  spaceRadialLayout,
-  type SpaceCanvasNode
-} from "../src/workspace/automation/SpaceEngineeringCanvas";
 import { JobFlowCanvas } from "../src/workspace/automation/JobFlowCanvas";
 import type { ProjectJobNode } from "@shared/api/workspace-contracts";
 import { projectInstruction } from "./projectInstructionFixture";
 
-const node = (id: string, role = "Graph Node"): SpaceCanvasNode => ({
-  id,
-  label: id,
-  role,
-  nodeStyle: "terra",
-  nodeSize: "medium"
-});
-
-describe("three-level engineering canvases", () => {
-  it("keeps the hub, repair and children in the Graph scope without result endpoints", async () => {
-    const user = userEvent.setup();
-    const openHub = vi.fn();
-    const openRepair = vi.fn();
-    const openChild = vi.fn();
-    render(<SpaceEngineeringCanvas
-      hub={node("graph-orchestrator", "Graph Orchestrator")}
-      repair={node("graph-repair", "Repair Node")}
-      children={[node("plan"), node("build"), node("verify")]}
-      onHub={openHub}
-      onRepair={openRepair}
-      onChild={openChild}
-    />);
-
-    await user.click(screen.getByRole("button", { name: "Graph Orchestrator graph-orchestrator" }));
-    await user.click(screen.getByRole("button", { name: "Repair Node graph-repair" }));
-    await user.click(screen.getByRole("button", { name: "Graph Node build" }));
-
-    expect(openHub).toHaveBeenCalledOnce();
-    expect(openRepair).toHaveBeenCalledOnce();
-    expect(openChild).toHaveBeenCalledWith("build");
-    expect(screen.queryByText("PASS")).not.toBeInTheDocument();
-    expect(screen.queryByText("FAIL")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Work Node/ })).not.toBeInTheDocument();
-  });
-
+describe("Job Node engineering canvas", () => {
   it("shows the industrial Job flow and opens only Work and Validation", async () => {
     const user = userEvent.setup();
     const openWork = vi.fn();
@@ -87,26 +48,10 @@ describe("three-level engineering canvases", () => {
     expect(screen.queryByText("Human gate")).not.toBeInTheDocument();
   });
 
-  it.each([1, 5, 17, 40, 64])("places %i nodes deterministically without button overlap", (count) => {
-    const children = Array.from({ length: count }, (_, index) => node(`node-${index + 1}`));
-    const first = spaceRadialLayout(children);
-    const second = spaceRadialLayout(children);
-
-    expect(second).toEqual(first);
-    expect(first.nodes).toHaveLength(count);
-    for (let left = 0; left < first.nodes.length; left += 1) {
-      for (let right = left + 1; right < first.nodes.length; right += 1) {
-        const a = first.nodes[left]!;
-        const b = first.nodes[right]!;
-        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(144);
-      }
-    }
-  });
 });
 
 const jobNode = (maxRetries = 2): ProjectJobNode => ({
-  id: "job", description: "Job", nodeStyle: "terra", nodeSize: "medium",
-  capabilities: { accepts: [], provides: [] }, maxRetries,
+  id: "job", description: "Job", outcomes: [], capabilities: { accepts: [], provides: [] }, maxRetries,
   workNode: {
     id: "work", description: "Work", task: "Perform work.", type: "agent", nodeStyle: "sol", nodeSize: "large",
     executionProfileId: "luna-medium", primaryInstructionId: "project:work", skillIds: []

@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "category": "software-delivery",
     "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
@@ -123,8 +123,6 @@
   "graphNode": {
     "key": "frontend-implementation",
     "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
-    "nodeStyle": "sol",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "implementation:change.requested"
@@ -136,117 +134,10 @@
     "stateContract": {
       "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "analyze-frontend-change"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "analyze-frontend-change-pass-route",
-            "sourceJobNode": "analyze-frontend-change",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "implement-frontend-change"
-                },
-                "description": "Allowed PASS continuation after analyze-frontend-change."
-              }
-            ]
-          },
-          {
-            "key": "analyze-frontend-change-fail-route",
-            "sourceJobNode": "analyze-frontend-change",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after analyze-frontend-change."
-              }
-            ]
-          },
-          {
-            "key": "implement-frontend-change-pass-route",
-            "sourceJobNode": "implement-frontend-change",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "validate-frontend-change"
-                },
-                "description": "Allowed PASS continuation after implement-frontend-change."
-              }
-            ]
-          },
-          {
-            "key": "implement-frontend-change-fail-route",
-            "sourceJobNode": "implement-frontend-change",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after implement-frontend-change."
-              }
-            ]
-          },
-          {
-            "key": "validate-frontend-change-pass-route",
-            "sourceJobNode": "validate-frontend-change",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after validate-frontend-change."
-              }
-            ]
-          },
-          {
-            "key": "validate-frontend-change-fail-route",
-            "sourceJobNode": "validate-frontend-change",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after validate-frontend-change."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -257,8 +148,6 @@
       {
         "key": "analyze-frontend-change",
         "description": "Clarify the user journey, data contract, design-system constraints, accessibility needs, and responsive acceptance evidence.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -285,13 +174,21 @@
           "skills": [],
           "task": "Validate that the analysis identifies the user journey, relevant API contract, design-system rules, accessibility behavior, viewport expectations, and executable acceptance checks. Return a precise repair request when evidence is missing.",
           "type": "agent"
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "implement-frontend-change",
         "description": "Implement the approved user interface with existing components, tokens, state, and API patterns.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -318,13 +215,21 @@
           "skills": [],
           "task": "Review the implementation against the requested user journey, API contract, repository architecture, design system, accessibility semantics, responsive behavior, and state boundaries. Do not modify the implementation while validating it.",
           "type": "agent"
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "validate-frontend-change",
         "description": "Run and evaluate accessibility, behavior, responsive layout, tests, lint, and production build evidence.",
-        "nodeStyle": "sol",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -351,8 +256,134 @@
           "skills": [],
           "task": "Independently confirm keyboard and accessibility behavior, desktop and narrow layout evidence, relevant tests, lint, and production build results. Reject completion when a required state or action is hidden, clipped, or unsupported by evidence.",
           "type": "agent"
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "analyze-frontend-change"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "analyze-frontend-change-pass-route",
+              "sourceJobNode": "analyze-frontend-change",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "implement-frontend-change"
+                  },
+                  "description": "Allowed PASS continuation after analyze-frontend-change."
+                }
+              ]
+            },
+            {
+              "key": "analyze-frontend-change-fail-route",
+              "sourceJobNode": "analyze-frontend-change",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after analyze-frontend-change."
+                }
+              ]
+            },
+            {
+              "key": "implement-frontend-change-pass-route",
+              "sourceJobNode": "implement-frontend-change",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "validate-frontend-change"
+                  },
+                  "description": "Allowed PASS continuation after implement-frontend-change."
+                }
+              ]
+            },
+            {
+              "key": "implement-frontend-change-fail-route",
+              "sourceJobNode": "implement-frontend-change",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after implement-frontend-change."
+                }
+              ]
+            },
+            {
+              "key": "validate-frontend-change-pass-route",
+              "sourceJobNode": "validate-frontend-change",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after validate-frontend-change."
+                }
+              ]
+            },
+            {
+              "key": "validate-frontend-change-fail-route",
+              "sourceJobNode": "validate-frontend-change",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after validate-frontend-change."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

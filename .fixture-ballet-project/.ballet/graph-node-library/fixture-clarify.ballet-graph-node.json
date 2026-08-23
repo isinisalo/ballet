@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "id": "fixture-clarify",
     "title": "Clarify requirements",
@@ -54,8 +54,6 @@
   "graphNode": {
     "key": "fixture-clarify",
     "description": "Clarify the fixture requirements.",
-    "nodeStyle": "terra",
-    "nodeSize": "medium",
     "capabilities": {
       "accepts": [
         "fixture:requirements.requested"
@@ -64,72 +62,79 @@
         "fixture:requirements.clarified"
       ]
     },
+    "outcomes": [
+      { "outcomeId": "success", "result": "PASS" },
+      { "outcomeId": "failure", "result": "FAIL" }
+    ],
     "stateContract": {
       "description": "Bounded fixture state."
     },
-    "orchestrator": {
-      "key": "orchestrator",
-      "description": "Select one fixture Job Node or terminal.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "slot-1",
-      "primaryInstruction": "orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "fixture-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "clarify"
-              },
-              "description": "Start the fixture Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "clarify-pass",
-            "sourceJobNode": "clarify",
-            "result": "PASS",
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "orchestrator",
+        "description": "Select one fixture Job Node or terminal.",
+        "profileSlot": "slot-1",
+        "primaryInstruction": "orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "fixture-start",
             "candidates": [
               {
                 "target": {
-                  "terminal": "PASS"
+                  "jobNode": "clarify"
                 },
-                "description": "Complete the fixture Graph Node."
+                "description": "Start the fixture Job Node."
               }
             ]
           },
-          {
-            "key": "clarify-fail",
-            "sourceJobNode": "clarify",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Fail the fixture Graph Node."
-              }
-            ]
-          }
-        ],
-        "repair": []
+          "continuation": [
+            {
+              "key": "clarify-pass",
+              "sourceJobNode": "clarify",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Complete the fixture Graph Node."
+                }
+              ]
+            },
+            {
+              "key": "clarify-fail",
+              "sourceJobNode": "clarify",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Fail the fixture Graph Node."
+                }
+              ]
+            }
+          ],
+          "repair": []
+        }
       }
     },
     "jobNodes": [
       {
         "key": "clarify",
         "description": "Clarify the fixture requirements.",
-        "nodeStyle": "terra",
-        "nodeSize": "medium",
         "capabilities": {
           "accepts": [],
           "provides": []
         },
+        "outcomes": [
+          { "outcomeId": "success", "result": "PASS" },
+          { "outcomeId": "failure", "result": "FAIL" }
+        ],
         "maxRetries": 3,
         "workNode": {
           "key": "clarify-work",

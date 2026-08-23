@@ -61,6 +61,7 @@ export function WorkspaceRouteOutlet({
       return <AutomationView
         data={data}
         level={route.engineeringLevel ?? "graph"}
+        section={route.engineeringSection}
         graphNodeId={route.graphNodeId}
         jobNodeId={route.jobNodeId}
         saveAutomation={mutations.saveAutomation}
@@ -68,7 +69,7 @@ export function WorkspaceRouteOutlet({
         setNavigationBlocker={setNavigationBlocker}
       />;
     case "canvas-theme":
-      return <EmptyState title="Canvas theme" action="The protected space-canvas theme uses DESIGN.md tokens." />;
+      return <EmptyState title="Canvas theme" action="The protected Job flow artwork uses DESIGN.md tokens." />;
     case "runtimes":
       return <RuntimeRegistryView runtime={data.runtime} onRefreshed={mutations.refresh} />;
     case "execution-profiles":

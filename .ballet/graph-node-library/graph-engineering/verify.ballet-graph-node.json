@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "id": "verify",
     "title": "VERIFY",
@@ -80,31 +80,36 @@
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:desired-state.defined",
-        "description": "PASS more_work routes verify to plan."
+        "description": "PASS more_work routes verify to plan.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:desired-state.complete",
-        "description": "PASS complete routes verify to DONE."
+        "description": "PASS complete routes verify to DONE.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:release.planned",
-        "description": "FAIL implementation_defect routes verify to build."
+        "description": "FAIL implementation_defect routes verify to build.",
+        "outcomeId": "failure"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.defined",
-        "description": "FAIL invalid_plan routes verify to plan."
+        "description": "FAIL invalid_plan routes verify to plan.",
+        "outcomeId": "failure"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.requested",
-        "description": "FAIL invalid_design routes verify to design."
+        "description": "FAIL invalid_design routes verify to design.",
+        "outcomeId": "failure"
       }
     ]
   },
@@ -179,8 +184,6 @@
   "graphNode": {
     "key": "verify",
     "description": "Verify the deployment against design, acceptance and ticket evidence.",
-    "nodeStyle": "terra",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "graph:release.deployed"
@@ -193,65 +196,10 @@
     "stateContract": {
       "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "release"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "release-pass-route",
-            "sourceJobNode": "release",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after release."
-              }
-            ]
-          },
-          {
-            "key": "release-fail-route",
-            "sourceJobNode": "release",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after release."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -262,8 +210,6 @@
       {
         "key": "release",
         "description": "Verify the deployed release.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -296,8 +242,82 @@
           "skills": [
             "conformance-review"
           ]
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "release"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "release-pass-route",
+              "sourceJobNode": "release",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after release."
+                }
+              ]
+            },
+            {
+              "key": "release-fail-route",
+              "sourceJobNode": "release",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after release."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

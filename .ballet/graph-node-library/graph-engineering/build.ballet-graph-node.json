@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "id": "build",
     "title": "BUILD",
@@ -81,31 +81,36 @@
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:release.planned",
-        "description": "PASS more_work routes build to build."
+        "description": "PASS more_work routes build to build.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "PASS",
         "capability": "graph:release.built",
-        "description": "PASS success routes build to deploy."
+        "description": "PASS success routes build to deploy.",
+        "outcomeId": "success"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:release.planned",
-        "description": "FAIL implementation_defect routes build to build."
+        "description": "FAIL implementation_defect routes build to build.",
+        "outcomeId": "failure"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.defined",
-        "description": "FAIL invalid_plan routes build to plan."
+        "description": "FAIL invalid_plan routes build to plan.",
+        "outcomeId": "failure"
       },
       {
         "direction": "outgoing",
         "result": "FAIL",
         "capability": "graph:desired-state.requested",
-        "description": "FAIL invalid_design routes build to design."
+        "description": "FAIL invalid_design routes build to design.",
+        "outcomeId": "failure"
       }
     ]
   },
@@ -172,8 +177,6 @@
   "graphNode": {
     "key": "build",
     "description": "Implement exactly one ready issue per invocation.",
-    "nodeStyle": "terra",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "graph:implementation.defect",
@@ -187,65 +190,10 @@
     "stateContract": {
       "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "one-ready-issue"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "one-ready-issue-pass-route",
-            "sourceJobNode": "one-ready-issue",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after one-ready-issue."
-              }
-            ]
-          },
-          {
-            "key": "one-ready-issue-fail-route",
-            "sourceJobNode": "one-ready-issue",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after one-ready-issue."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -256,8 +204,6 @@
       {
         "key": "one-ready-issue",
         "description": "Implement exactly one ready issue.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -288,8 +234,82 @@
           "skills": [
             "conformance-review"
           ]
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "one-ready-issue"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "one-ready-issue-pass-route",
+              "sourceJobNode": "one-ready-issue",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after one-ready-issue."
+                }
+              ]
+            },
+            {
+              "key": "one-ready-issue-fail-route",
+              "sourceJobNode": "one-ready-issue",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after one-ready-issue."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

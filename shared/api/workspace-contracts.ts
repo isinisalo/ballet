@@ -20,9 +20,9 @@ import type {
   CanvasNodeSize, CanvasNodeSizeDefinition, CanvasNodeStyle, CanvasNodeStyleDefinition, CanvasNodeStyleGroup,
   JsonValue, NodeResult, ProjectAgentValidationNode, ProjectAgentWorkNode, ProjectAutomationConfig,
   ProjectAutomationIssue, ProjectCandidateRouting, ProjectContinuationCandidateRule, ProjectExecutionComposition,
-  ProjectGraph, ProjectGraphNode, ProjectGraphNodeRouteTarget, ProjectGraphRouteTarget, ProjectHumanValidationNode,
+  ProjectGraph, ProjectGraphNode, ProjectGraphNodeDecisionStrategyV2, ProjectGraphNodeRouteTarget, ProjectGraphRouteTarget, ProjectHumanValidationNode,
   ProjectHumanWorkNode, ProjectJobNode, ProjectNodeAppearance, ProjectNodeCapabilities, ProjectOrchestrator,
-  ProjectRepairCandidateRule, ProjectRepairNode, ProjectRouteCandidate, ProjectStartCandidateRule,
+  ProjectRepairCandidateRule, ProjectRepairNode, ProjectRouteCandidate, ProjectStartCandidateRule, ProjectIntrinsicOutcome,
   ProjectStateContract, ProjectStateDefinition, ProjectValidationNode, ProjectWorkNode
 } from "../domain/automation.js";
 import type { CanvasConnectionLineStyle, CanvasConnectionPointStyle, CanvasTheme, CanvasThemeIssue } from "../domain/canvasTheme.js";
@@ -38,9 +38,9 @@ import type {
   RuntimeConfigurationIssue, RuntimePreflightIssue, RuntimeProvider, StatePatch, ValidationNodeOutcome, WorkNodeOutcome
 } from "../domain/runtime.js";
 import type {
-  OrchestratorTaskEnvelopeV7, RepairTaskEnvelopeV7, TaskEnvelopeHistoryEntry, TaskEnvelopeNodeIdentity,
+  OrchestratorTaskEnvelopeV8, RepairTaskEnvelopeV8, TaskEnvelopeHistoryEntry, TaskEnvelopeNodeIdentity,
   TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate, TaskEnvelopeRunIdentity, TaskEnvelopeState,
-  TaskEnvelopeV7, ValidationTaskEnvelopeV7, WorkTaskEnvelopeV7
+  TaskEnvelopeV8, ValidationTaskEnvelopeV8, WorkTaskEnvelopeV8, TaskEnvelopeOutcomeCandidate
 } from "../domain/taskEnvelope.js";
 import type {
   BalletMode, DashboardRunStatus, RespondToNodeRunRequest, RootRunDetail, RootRunKind, RootRunListResponse,
@@ -50,13 +50,13 @@ import type {
 } from "../domain/runs.js";
 import type {
   GraphNodeModuleExportResult, GraphNodeModuleInspection, GraphNodeModuleInstallPlan,
-  GraphNodeModuleLibraryEntry, GraphNodeModulePackageV4, InstalledGraphNodeModuleStatus
+  GraphNodeModuleLibraryEntry, GraphNodeModulePackageV5, InstalledGraphNodeModuleStatus
 } from "../domain/graphNodeModules.js";
 import type {
-  DecisionFeatureDefinitionV1, DecisionOptionModelRowV1, DecisionStateDefinitionV1,
-  ExecutionGraphOccurrenceV1, PolicyDecisionRecordV1, PolicyPreviewResultV1, PolicyPreviewV1, PolicyProjectionEdgeV1,
-  PolicyProjectionNodeV1, PolicyProjectionV1, PolicyTelemetryV1, ProjectCapabilityGraphV1,
-  ProjectSspDecisionModelV1, ProjectSspGraphStrategyV1, SspActionValueV1
+  DecisionFeatureDefinitionV2, DecisionOptionModelRowV2, DecisionStateDefinitionV2,
+  ExecutionGraphOccurrenceV2, PolicyDecisionRecordV2, PolicyPreviewResultV2, PolicyPreviewV2, PolicyProjectionEdgeV2,
+  PolicyProjectionNodeV2, PolicyProjectionV2, PolicyTelemetryV2, ProjectCapabilityModelV2,
+  ProjectGraphDecisionStrategyV2, ProjectSspDecisionModelV2, ProjectSspDecisionStrategyV2, SspActionValueV2
 } from "../domain/decisionModel.js";
 
 export type ProjectDocumentCreateRequest = { directoryPath: string; title: string };
@@ -84,6 +84,11 @@ type ServerManagedEntityField = "relativePath" | "slug" | "errors" | "projectId"
 export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
 export type ExecutionProfileSaveRequest = Omit<ExecutionProfile, "id">;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
+export type PolicyPreviewRequestV2 = {
+  config: ProjectAutomationConfig;
+  scope: "graph" | "graph_node";
+  graphNodeId?: string;
+};
 export type GraphNodeModuleInspectRequest = { package: unknown; source?: string };
 export type GraphNodeModuleInstallPlanRequest = { package: unknown; source: string; profileMappings?: Record<string, string> };
 export type GraphNodeModuleInstallCommitRequest = GraphNodeModuleInstallPlanRequest & { expectedPlanHash: string };
@@ -112,7 +117,7 @@ export {
   projectValidationNodeSchema,
   projectWorkNodeSchema
 } from "./workspace-schemas.js";
-export { graphNodeModulePackageV4Schema } from "./graph-node-module-schemas.js";
+export { graphNodeModulePackageV5Schema } from "./graph-node-module-schemas.js";
 
 export type {
   MarkdownDocument, Project, ProjectInstruction, ProjectResourceIssue, ExecutionProfile, JsonValue, NodeResult,
@@ -122,6 +127,7 @@ export type {
   ProjectHumanWorkNode, ProjectIssueTrackerConfig, ProjectJobNode, ProjectNodeAppearance, ProjectNodeCapabilities,
   ProjectOrchestrator, ProjectRepairCandidateRule, ProjectRepairNode, ProjectRouteCandidate, ProjectStartCandidateRule,
   ProjectStateContract, ProjectStateDefinition, ProjectValidationNode, ProjectWorkNode,
+  ProjectGraphNodeDecisionStrategyV2, ProjectIntrinsicOutcome,
   CanvasNodeSize, CanvasNodeSizeDefinition, CanvasNodeStyle, CanvasNodeStyleDefinition, CanvasNodeStyleGroup,
   CanvasTheme, CanvasThemeIssue, CanvasConnectionLineStyle, CanvasConnectionPointStyle,
   CanonicalNodeOutcome, ControlFlowEvent, GraphStateRevision, GraphStateRevisionMetadata, NodeRun, NodeRunRole,
@@ -135,12 +141,12 @@ export type {
   RootRunListState, RootRunSummary, RunTarget, RunTargetIssue, RunTargetsResponse, RespondToNodeRunRequest,
   StartRootRunRequest, WorkspaceInvalidationEvent, WorkspaceInvalidationInput, Skill,
   TaskEnvelopeHistoryEntry, TaskEnvelopeNodeIdentity, TaskEnvelopeResumeContext, TaskEnvelopeRouteCandidate,
-  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV7, WorkTaskEnvelopeV7, ValidationTaskEnvelopeV7,
-  OrchestratorTaskEnvelopeV7, RepairTaskEnvelopeV7,
+  TaskEnvelopeRunIdentity, TaskEnvelopeState, TaskEnvelopeV8, WorkTaskEnvelopeV8, ValidationTaskEnvelopeV8,
+  OrchestratorTaskEnvelopeV8, RepairTaskEnvelopeV8, TaskEnvelopeOutcomeCandidate,
   InstalledGraphNodeModuleStatus, GraphNodeModuleExportResult, GraphNodeModuleInspection,
-  GraphNodeModuleInstallPlan, GraphNodeModuleLibraryEntry, GraphNodeModulePackageV4
-  , DecisionFeatureDefinitionV1, DecisionOptionModelRowV1, DecisionStateDefinitionV1,
-  ExecutionGraphOccurrenceV1, PolicyDecisionRecordV1, PolicyPreviewResultV1, PolicyPreviewV1, PolicyProjectionEdgeV1,
-  PolicyProjectionNodeV1, PolicyProjectionV1, PolicyTelemetryV1, ProjectCapabilityGraphV1,
-  ProjectSspDecisionModelV1, ProjectSspGraphStrategyV1, SspActionValueV1
+  GraphNodeModuleInstallPlan, GraphNodeModuleLibraryEntry, GraphNodeModulePackageV5
+  , DecisionFeatureDefinitionV2, DecisionOptionModelRowV2, DecisionStateDefinitionV2,
+  ExecutionGraphOccurrenceV2, PolicyDecisionRecordV2, PolicyPreviewResultV2, PolicyPreviewV2, PolicyProjectionEdgeV2,
+  PolicyProjectionNodeV2, PolicyProjectionV2, PolicyTelemetryV2, ProjectCapabilityModelV2,
+  ProjectGraphDecisionStrategyV2, ProjectSspDecisionModelV2, ProjectSspDecisionStrategyV2, SspActionValueV2
 };

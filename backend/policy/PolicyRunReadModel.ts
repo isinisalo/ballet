@@ -1,43 +1,59 @@
 import type { GraphNodeInvocationDetails } from "../../shared/domain/runtime.js";
 import type {
-  ExecutionGraphOccurrenceV1,
-  PolicyDecisionRecordV1,
-  PolicyOptionObservationV1,
-  PolicyTelemetryV1,
-  ProjectSspGraphStrategyV1
+  ExecutionGraphOccurrenceV2,
+  PolicyDecisionRecordV2,
+  PolicyOptionObservationV2,
+  PolicyTelemetryV2,
+  ProjectSspDecisionStrategyV2
 } from "../../shared/domain/decisionModel.js";
 
 export const reconstructExecutionGraph = (input: {
-  strategy: ProjectSspGraphStrategyV1;
-  decisions: PolicyDecisionRecordV1[];
-  observations: PolicyOptionObservationV1[];
+  strategies: Readonly<Record<string, ProjectSspDecisionStrategyV2>>;
+  decisions: PolicyDecisionRecordV2[];
+  observations: PolicyOptionObservationV2[];
   invocations: GraphNodeInvocationDetails[];
-}): ExecutionGraphOccurrenceV1[] => {
+}): ExecutionGraphOccurrenceV2[] => {
   const observations = new Map(input.observations.map((observation) => [observation.policyDecisionId, observation]));
-  const invocations = new Map(input.invocations.flatMap((invocation) =>
+  const graphInvocations = new Map(input.invocations.flatMap((invocation) =>
     invocation.policyDecisionId ? [[invocation.policyDecisionId, invocation] as const] : []));
-  return [...input.decisions].sort((left, right) => left.epoch - right.epoch).flatMap((decision) => {
-    if (!decision.selectedGraphNodeId) return [];
+  const jobInvocations = new Map(input.invocations.flatMap(({ jobNodeInvocations }) =>
+    jobNodeInvocations.flatMap((invocation) =>
+      invocation.policyDecisionId ? [[invocation.policyDecisionId, invocation] as const] : [])));
+  return [...input.decisions].sort((left, right) => left.createdAt.localeCompare(right.createdAt)
+    || left.epoch - right.epoch).flatMap((decision) => {
+    if (!decision.selectedActionId) return [];
     const observation = observations.get(decision.policyDecisionId);
-    const invocation = invocations.get(decision.policyDecisionId);
-    const row = decision.state ? input.strategy.model.stateActions.find((candidate) =>
-      candidate.stateId === decision.state!.stateId && candidate.graphNodeId === decision.selectedGraphNodeId) : undefined;
-    const active = invocation && ["queued", "running", "waiting_for_input"].includes(invocation.status);
+    if (!observation) return [];
+    const graphInvocation = graphInvocations.get(decision.policyDecisionId);
+    const jobInvocation = jobInvocations.get(decision.policyDecisionId);
+    const strategy = input.strategies[decision.scopeKey];
+    const row = strategy && decision.state ? strategy.model.stateActions.find((candidate) =>
+      candidate.stateId === decision.state!.stateId && candidate.actionId === decision.selectedActionId) : undefined;
     return [{
-      occurrenceId: observation?.graphNodeInvocationId ?? invocation?.graphNodeInvocationId ?? decision.policyDecisionId,
+      occurrenceId: observation?.actionInvocationId
+        ?? graphInvocation?.graphNodeInvocationId ?? jobInvocation?.jobNodeInvocationId ?? decision.policyDecisionId,
+      scope: decision.scope,
+      scopeKey: decision.scopeKey,
       epoch: decision.epoch,
       policyDecisionId: decision.policyDecisionId,
-      graphNodeInvocationId: observation?.graphNodeInvocationId ?? invocation?.graphNodeInvocationId,
-      graphNodeId: decision.selectedGraphNodeId,
-      status: observation ? "observed" as const : active ? "running" as const : "selected" as const,
+      actionInvocationId: observation?.actionInvocationId
+        ?? graphInvocation?.graphNodeInvocationId ?? jobInvocation?.jobNodeInvocationId,
+      graphNodeInvocationId: observation?.graphNodeInvocationId ?? graphInvocation?.graphNodeInvocationId
+        ?? jobInvocation?.graphNodeInvocationId,
+      jobNodeInvocationId: observation?.jobNodeInvocationId ?? jobInvocation?.jobNodeInvocationId,
+      actionId: decision.selectedActionId,
+      status: "observed" as const,
       decisionStateBefore: decision.state,
       expectedRemainingCostMicros: decision.stateValueMicros,
-      selectedActionValueMicros: decision.actionValues.find(({ graphNodeId }) => graphNodeId === decision.selectedGraphNodeId)?.qMicros,
+      selectedActionValueMicros: decision.actionValues.find(({ actionId }) =>
+        actionId === decision.selectedActionId)?.qMicros,
       configuredExpectedCostMicros: observation?.configuredExpectedCostMicros ?? row?.expectedCostMicros,
-      expectedOutcomeDistribution: row?.successors ?? [],
+      expectedOutcomeDistribution: observation?.expectedOutcomeDistribution ?? row?.successors ?? [],
       actualCostMicros: observation?.actualCostMicros,
-      actualOutcome: observation?.verifiedOutcome,
-      decisionStateAfter: observation?.stateAfter,
+      observedOutcomeId: observation?.observedOutcomeId,
+      verifiedResult: observation?.verifiedResult,
+      actualState: observation?.actualState,
+      modelMatch: observation?.modelMatch,
       durationMillis: observation?.durationMillis,
       modelSha256: decision.modelSha256,
       snapshotSha256: decision.snapshotSha256,
@@ -46,24 +62,32 @@ export const reconstructExecutionGraph = (input: {
   });
 };
 
-export const summarizePolicyTelemetry = (observations: PolicyOptionObservationV1[]): PolicyTelemetryV1[] => {
-  const groups = new Map<string, PolicyOptionObservationV1[]>();
+export const summarizePolicyTelemetry = (observations: PolicyOptionObservationV2[]): PolicyTelemetryV2[] => {
+  const groups = new Map<string, PolicyOptionObservationV2[]>();
   for (const observation of observations) {
-    const key = `${observation.action}\u0000${observation.stateBefore.stateId}`;
+    const key = `${observation.scopeKey}\u0000${observation.actionId}\u0000${observation.stateBefore.stateId}`;
     groups.set(key, [...(groups.get(key) ?? []), observation]);
   }
   return [...groups.values()].map((entries) => {
     const actualCosts = entries.flatMap(({ actualCostMicros }) => actualCostMicros === undefined ? [] : [actualCostMicros]);
     return {
-      graphNodeId: entries[0]!.action,
+      scope: entries[0]!.scope,
+      scopeKey: entries[0]!.scopeKey,
+      actionId: entries[0]!.actionId,
       stateId: entries[0]!.stateBefore.stateId,
       observationCount: entries.length,
-      outcomeCounts: Object.fromEntries(["PASS", "FAIL"].map((outcome) => [outcome,
-        entries.filter(({ verifiedOutcome }) => verifiedOutcome === outcome).length]).filter(([, count]) => count)) as PolicyTelemetryV1["outcomeCounts"],
-      observedNextStateCounts: Object.fromEntries([...new Set(entries.flatMap(({ stateAfter }) => stateAfter ? [stateAfter.stateId] : []))]
-        .sort().map((stateId) => [stateId, entries.filter(({ stateAfter }) => stateAfter?.stateId === stateId).length])),
-      meanActualCostMicros: actualCosts.length ? actualCosts.reduce((sum, value) => sum + value, 0) / actualCosts.length : undefined,
+      resultCounts: counts(entries.map(({ verifiedResult }) => verifiedResult)),
+      outcomeCounts: counts(entries.map(({ observedOutcomeId }) => observedOutcomeId)),
+      observedNextStateCounts: counts(entries.flatMap(({ actualState }) => actualState ? [actualState.stateId] : [])),
+      modelMissCount: entries.filter(({ modelMatch }) => modelMatch !== "match").length,
+      meanActualCostMicros: actualCosts.length
+        ? actualCosts.reduce((sum, value) => sum + value, 0) / actualCosts.length : undefined,
       meanDurationMillis: entries.reduce((sum, { durationMillis }) => sum + durationMillis, 0) / entries.length
     };
-  }).sort((left, right) => left.graphNodeId.localeCompare(right.graphNodeId) || left.stateId.localeCompare(right.stateId));
+  }).sort((left, right) => left.scopeKey.localeCompare(right.scopeKey)
+    || left.actionId.localeCompare(right.actionId) || left.stateId.localeCompare(right.stateId));
 };
+
+const counts = <T extends string>(values: T[]): Record<T, number> => Object.fromEntries(
+  [...new Set(values)].sort().map((value) => [value, values.filter((candidate) => candidate === value).length])
+) as Record<T, number>;

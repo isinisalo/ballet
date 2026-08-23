@@ -111,7 +111,7 @@ body {
   color: var(--foreground);
 }
 
-.space-engineering-canvas {
+.job-flow-grid {
   background-color: var(--background);
   background-image:
     linear-gradient(color-mix(in srgb, var(--border) 52%, transparent) 1px, transparent 1px),
@@ -120,98 +120,12 @@ body {
   overscroll-behavior: contain;
 }
 
-.space-engineering-stage {
-  position: relative;
-  transform-origin: 0 0;
-}
-
-.space-node {
-  position: absolute;
-  display: grid;
-  justify-items: center;
-  gap: 0.35rem;
-  width: 9rem;
-  border: 0;
-  background: transparent;
-  color: var(--foreground);
-  transform: translate(-50%, -50%);
-}
-
-.space-node:focus-visible .space-node-planet {
-  outline: 2px solid var(--primary);
-  outline-offset: 4px;
-}
-
-.space-node-planet {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--space-node-size, 72px);
-  height: var(--space-node-size, 72px);
-  border: 1px solid color-mix(in srgb, var(--canvas-flow) 66%, var(--border));
-  border-radius: 9999px;
-  background:
-    radial-gradient(circle at 32% 27%, color-mix(in srgb, white 72%, transparent) 0 2%, transparent 3%),
-    radial-gradient(circle at 34% 29%, var(--space-highlight) 0, var(--space-color) 31%, var(--space-shadow) 78%, var(--ballet-space-void) 100%);
-  box-shadow:
-    inset -10px -12px 22px color-mix(in srgb, black 54%, transparent),
-    0 0 22px color-mix(in srgb, var(--space-color) 40%, transparent);
-  transition: filter 140ms ease, transform 140ms ease;
-}
-
-.space-node:hover .space-node-planet {
-  filter: brightness(1.12);
-  transform: scale(1.035);
-}
-
-.space-node[data-style="luna"], .job-flow-card[data-style="luna"] { --space-color: var(--ballet-luna-surface); --space-highlight: var(--ballet-luna-highlight); --space-shadow: var(--ballet-luna-shadow); }
-.space-node[data-style="sol"], .job-flow-card[data-style="sol"] { --space-color: var(--ballet-sol-surface); --space-highlight: var(--ballet-sol-highlight); --space-shadow: var(--ballet-sol-shadow); }
-.space-node[data-style="mars"], .job-flow-card[data-style="mars"] { --space-color: var(--ballet-mars-surface); --space-highlight: var(--ballet-mars-highlight); --space-shadow: var(--ballet-mars-shadow); }
-.space-node[data-style="terra"], .job-flow-card[data-style="terra"] { --space-color: var(--ballet-terra-surface); --space-highlight: var(--ballet-terra-highlight); --space-shadow: var(--ballet-terra-shadow); }
-.space-node[data-style="flat"], .job-flow-card[data-style="flat"] { --space-color: var(--ballet-flat-surface); --space-highlight: var(--ballet-flat-highlight); --space-shadow: var(--ballet-flat-shadow); }
-.space-node[data-style="vector-planet"], .job-flow-card[data-style="vector-planet"] { --space-color: var(--ballet-vector-planet-surface); --space-highlight: var(--ballet-vector-planet-highlight); --space-shadow: var(--ballet-vector-planet-shadow); }
-
-.space-node[data-active="true"] .space-node-planet::after {
-  position: absolute;
-  inset: -10px;
-  border: 1px solid color-mix(in srgb, var(--secondary) 62%, transparent);
-  border-radius: inherit;
-  box-shadow: 0 0 18px color-mix(in srgb, var(--secondary) 38%, transparent);
-  content: "";
-  animation: space-node-pulse 1.8s ease-in-out infinite;
-}
-
-.space-node-id {
-  max-width: 9rem;
-  overflow: hidden;
-  color: var(--tertiary);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  line-height: 1rem;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.space-node-role {
-  color: var(--muted-foreground);
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  line-height: 0.75rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.space-spoke {
-  stroke: var(--canvas-flow);
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-}
-
-.space-spoke--repair {
-  stroke: var(--tertiary);
-  stroke-dasharray: 5 7;
-}
+.job-flow-card[data-style="luna"] { --space-color: var(--ballet-luna-surface); --space-highlight: var(--ballet-luna-highlight); --space-shadow: var(--ballet-luna-shadow); }
+.job-flow-card[data-style="sol"] { --space-color: var(--ballet-sol-surface); --space-highlight: var(--ballet-sol-highlight); --space-shadow: var(--ballet-sol-shadow); }
+.job-flow-card[data-style="mars"] { --space-color: var(--ballet-mars-surface); --space-highlight: var(--ballet-mars-highlight); --space-shadow: var(--ballet-mars-shadow); }
+.job-flow-card[data-style="terra"] { --space-color: var(--ballet-terra-surface); --space-highlight: var(--ballet-terra-highlight); --space-shadow: var(--ballet-terra-shadow); }
+.job-flow-card[data-style="flat"] { --space-color: var(--ballet-flat-surface); --space-highlight: var(--ballet-flat-highlight); --space-shadow: var(--ballet-flat-shadow); }
+.job-flow-card[data-style="vector-planet"] { --space-color: var(--ballet-vector-planet-surface); --space-highlight: var(--ballet-vector-planet-highlight); --space-shadow: var(--ballet-vector-planet-shadow); }
 
 .job-flow-canvas {
   position: relative;
@@ -443,20 +357,9 @@ body {
 .job-flow-edge-label--retry { fill: var(--canvas-flow); }
 .job-flow-edge-label--fail { fill: var(--destructive); }
 
-@keyframes space-node-pulse {
-  0%, 100% { opacity: 0.35; transform: scale(0.96); }
-  50% { opacity: 0.85; transform: scale(1.06); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .space-node,
-  .space-node-planet,
   .job-flow-card--action {
     transition: none;
-  }
-  .space-node[data-active="true"] .space-node-planet::after {
-    animation: none;
-    opacity: 0.7;
   }
 }
 

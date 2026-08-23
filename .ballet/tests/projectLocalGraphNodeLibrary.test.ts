@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { graphNodeModulePackageV4Schema } from "../../shared/api/graph-node-module-schemas.js";
+import { graphNodeModulePackageV5Schema } from "../../shared/api/graph-node-module-schemas.js";
 import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
-import type { GraphNodeModulePackageV4 } from "../../shared/domain/graphNodeModules.js";
+import type { GraphNodeModulePackageV5 } from "../../shared/domain/graphNodeModules.js";
 import { GraphNodeModuleService } from "../../backend/graph-node-modules/GraphNodeModuleService.js";
 import { ProjectConfigurationSourceError } from "../../backend/project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "../../backend/services/RuntimeDatabaseProvider.js";
@@ -12,10 +12,10 @@ import type { RuntimeDatabaseProvider } from "../../backend/services/RuntimeData
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("project-local Graph Engineering v15", () => {
-  it("contains five Graph Nodes and 17 aggregate Job Nodes with Luna/Sol agents", async () => {
+describe("project-local Graph Engineering v16", () => {
+  it("contains five capability-first Graph Nodes and 17 aggregate Job Nodes", async () => {
     const config = projectConfigSchema.parse(JSON.parse(await readFile(".ballet/project.json", "utf8")));
-    expect(config.version).toBe(15);
+    expect(config.version).toBe(16);
     expect(config.graph.graphNodes.map(({ id }) => id)).toEqual(["design","plan","build","deploy","verify"]);
     expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)).toHaveLength(17);
     expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)
@@ -23,31 +23,36 @@ describe("project-local Graph Engineering v15", () => {
     expect(config.graph.strategy.kind).toBe("agent_v1");
     if (config.graph.strategy.kind !== "agent_v1") throw new Error("Expected agent strategy.");
     expect(config.graph.strategy.orchestrator).toMatchObject({
-      nodeStyle: "luna",
       executionProfileId: "codex-gpt-5-6-luna-medium-network-off",
       maxRouteAttempts: 3,
       maxTransitions: 256
     });
     expect(config.graph.repairNode).toMatchObject({
-      nodeStyle: "sol",
       executionProfileId: "codex-gpt-5-6-sol-medium-network-off",
       maxRepairAttempts: 3,
       maxRepairDepth: 3
     });
     for (const graphNode of config.graph.graphNodes) {
-      expect(graphNode.orchestrator.executionProfileId).toBe("codex-gpt-5-6-luna-medium-network-off");
+      expect(graphNode.strategy.kind).toBe("agent_v1");
+      if (graphNode.strategy.kind !== "agent_v1") throw new Error("Expected pilot agent strategy.");
+      expect(graphNode.strategy.orchestrator.executionProfileId).toBe("codex-gpt-5-6-luna-medium-network-off");
       expect(graphNode.repairNode?.executionProfileId).toBe("codex-gpt-5-6-sol-medium-network-off");
+      expect(graphNode).not.toHaveProperty("nodeStyle");
     }
   });
 
-  it("publishes 14 strict Graph Node Module v4 packages without peer targets", async () => {
+  it("publishes 14 strict Graph Node Module v5 packages without peer targets or upper artwork", async () => {
     const packages = await readPackages();
     expect(packages).toHaveLength(14);
     expect(new Set(packages.map(({ manifest }) => manifest.id)).size).toBe(14);
     for (const pkg of packages) {
-      expect(pkg).toMatchObject({ format: "ballet-graph-node-module", version: 4 });
+      expect(pkg).toMatchObject({ format: "ballet-graph-node-module", version: 5 });
       expect(pkg.graphNode.jobNodes.length).toBeGreaterThan(0);
-      expect(pkg.graphNode.orchestrator).toBeDefined();
+      expect(pkg.graphNode.strategy).toMatchObject({ kind: "agent_v1" });
+      expect(pkg.graphNode.outcomes).toEqual(expect.arrayContaining([
+        { outcomeId: "success", result: "PASS" }, { outcomeId: "failure", result: "FAIL" }
+      ]));
+      expect(pkg.graphNode).not.toHaveProperty("nodeStyle");
       expect(pkg.graphNode.repairNode).toBeDefined();
       expect(peerGraphTargetPaths(pkg)).toEqual([]);
     }
@@ -83,7 +88,7 @@ describe("project-local Graph Engineering v15", () => {
         status: "exact"
       });
       const exported = await modules.exportGraphNode({ graphNodeId: installed.graphNodeId });
-      expect(exported.package).toMatchObject({ format: "ballet-graph-node-module", version: 4 });
+      expect(exported.package).toMatchObject({ format: "ballet-graph-node-module", version: 5 });
       expect(exported.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect((await modules.statuses())[0]).toMatchObject({ graphNodeId: installed.graphNodeId, status: "exact" });
       await modules.remove(installed.graphNodeId);
@@ -92,7 +97,7 @@ describe("project-local Graph Engineering v15", () => {
   });
 });
 
-const readPackages = async (): Promise<GraphNodeModulePackageV4[]> => {
+const readPackages = async (): Promise<GraphNodeModulePackageV5[]> => {
   const library = path.resolve(".ballet/graph-node-library");
   const categories = (await readdir(library, { withFileTypes: true })).filter((entry) => entry.isDirectory());
   const files = (await Promise.all(categories.map(async (entry) =>
@@ -100,7 +105,7 @@ const readPackages = async (): Promise<GraphNodeModulePackageV4[]> => {
       .filter((name) => name.endsWith(".ballet-graph-node.json"))
       .map((name) => path.join(library, entry.name, name))))).flat().sort();
   return Promise.all(files.map(async (file) =>
-    graphNodeModulePackageV4Schema.parse(JSON.parse(await readFile(file, "utf8")))));
+    graphNodeModulePackageV5Schema.parse(JSON.parse(await readFile(file, "utf8")))));
 };
 
 const peerGraphTargetPaths = (value: unknown, current = "$"): string[] => {
@@ -112,14 +117,14 @@ const peerGraphTargetPaths = (value: unknown, current = "$"): string[] => {
 };
 
 const emptyProject = async (requiredKeys: string[]): Promise<string> => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v4-module-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v5-module-"));
   roots.push(root);
   await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
   await Promise.all(["global-orch","global-repair","local-orch","local-repair"].map((id) =>
     writeFile(path.join(root, `.ballet/instructions/${id}.md`),
       `---\nid: ${id}\ntitle: ${id}\n---\nOperate only inside the immutable candidate set.\n`)));
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 15,
+    version: 16,
     executionProfiles: [
       { id: "luna", name: "Luna", provider: "codex", model: "gpt-5.6-luna", reasoningEffort: "medium", networkAccess: false },
       { id: "sol", name: "Sol", provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "medium", networkAccess: false }
@@ -137,17 +142,19 @@ const emptyProject = async (requiredKeys: string[]): Promise<string> => {
       ], "placeholder") },
       repairNode: repair("global-repair", "global-repair"),
       graphNodes: [{
-        id: "placeholder", description: "Placeholder", nodeStyle: "vector-planet", nodeSize: "medium",
+        id: "placeholder", description: "Placeholder",
         capabilities: { accepts: ["test:input"], provides: ["test:output"] },
+        outcomes: [{ outcomeId: "success", result: "PASS" }, { outcomeId: "failure", result: "FAIL" }],
         stateContract: { description: "Test state" },
-        orchestrator: orchestrator("local", "local-orch", [
+        strategy: { kind: "agent_v1", orchestrator: orchestrator("local", "local-orch", [
           { target: { jobNodeId: "placeholder-job" }, description: "Placeholder job" },
           terminal("PASS"), terminal("FAIL")
-        ], "placeholder-job"),
+        ], "placeholder-job") },
         repairNode: repair("local-repair", "local-repair"),
         jobNodes: [{
-          id: "placeholder-job", description: "Placeholder Job", nodeStyle: "vector-planet", nodeSize: "medium",
-          capabilities: { accepts: ["test:input"], provides: ["test:output"] }, maxRetries: 1,
+          id: "placeholder-job", description: "Placeholder Job",
+          capabilities: { accepts: ["test:input"], provides: ["test:output"] },
+          outcomes: [{ outcomeId: "success", result: "PASS" }, { outcomeId: "failure", result: "FAIL" }], maxRetries: 1,
           workNode: {
             id: "placeholder-work", type: "human", description: "Work", task: "Work",
             nodeStyle: "vector-planet", nodeSize: "medium"
@@ -166,7 +173,7 @@ const emptyProject = async (requiredKeys: string[]): Promise<string> => {
 const orchestrator = (
   id: string, instruction: string, startCandidates: unknown[], childId: string
 ) => ({
-  id, description: "Route", nodeStyle: "luna", nodeSize: "medium",
+  id, description: "Route",
   executionProfileId: "luna", primaryInstructionId: `project:${instruction}`, skillIds: [],
   maxTransitions: 256, maxRouteAttempts: 3,
   routing: {
@@ -179,7 +186,7 @@ const orchestrator = (
   }
 });
 const repair = (id: string, instruction: string) => ({
-  id, description: "Repair", task: "Repair", nodeStyle: "sol", nodeSize: "medium",
+  id, description: "Repair", task: "Repair",
   executionProfileId: "sol", primaryInstructionId: `project:${instruction}`, skillIds: [],
   maxRepairDepth: 3, maxRepairAttempts: 3
 });

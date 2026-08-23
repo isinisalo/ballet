@@ -1,4 +1,4 @@
-import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
+import { projectConfigReadinessSchema } from "../../shared/api/workspace-schemas.js";
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
@@ -22,7 +22,7 @@ export const validateProjectAutomationConfig = (
   config: ProjectAutomationConfig,
   executionProfiles: readonly ExecutionProfile[] = []
 ): ProjectAutomationIssue[] => {
-  const parsed = projectConfigSchema.safeParse({
+  const parsed = projectConfigReadinessSchema.safeParse({
     ...config,
     executionProfiles: [...executionProfiles],
     issueTracker: defaultProjectConfiguration().issueTracker
@@ -74,7 +74,9 @@ const validateGraphNodeResources = (
   check: (composition: ProjectExecutionComposition, path: string, peerIds?: readonly string[]) => void,
   issues: ProjectAutomationIssue[]
 ) => {
-  check(graphNode.orchestrator, `${path}.orchestrator`);
+  if (graphNode.strategy.kind === "agent_v1") {
+    check(graphNode.strategy.orchestrator, `${path}.strategy.orchestrator`);
+  }
   const peerIds = graphNode.jobNodes.map((jobNode) => jobNode.id);
   if (graphNode.repairNode) {
     check(graphNode.repairNode, `${path}.repairNode`, peerIds);

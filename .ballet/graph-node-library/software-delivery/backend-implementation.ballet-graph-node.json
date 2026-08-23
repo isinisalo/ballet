@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 4,
+  "version": 5,
   "manifest": {
     "category": "software-delivery",
     "description": "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated.",
@@ -123,8 +123,6 @@
   "graphNode": {
     "key": "backend-implementation",
     "description": "Implement one bounded backend change. Done when requested domain, API and persistence behavior, compatibility, tests and concrete check evidence are independently validated.",
-    "nodeStyle": "terra",
-    "nodeSize": "large",
     "capabilities": {
       "accepts": [
         "implementation:change.requested"
@@ -136,117 +134,10 @@
     "stateContract": {
       "description": "Bounded software-engineering request, artifact, check and evidence references shared by capability-compatible starter Graph Nodes."
     },
-    "orchestrator": {
-      "key": "graph-node-orchestrator",
-      "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-      "nodeStyle": "luna",
-      "nodeSize": "medium",
-      "profileSlot": "orchestrator-luna",
-      "primaryInstruction": "graph-node-orchestrator",
-      "skills": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "key": "graph-node-start",
-          "candidates": [
-            {
-              "target": {
-                "jobNode": "analyze-backend-change"
-              },
-              "description": "Allowed initial Job Node."
-            }
-          ]
-        },
-        "continuation": [
-          {
-            "key": "analyze-backend-change-pass-route",
-            "sourceJobNode": "analyze-backend-change",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "implement-backend-change"
-                },
-                "description": "Allowed PASS continuation after analyze-backend-change."
-              }
-            ]
-          },
-          {
-            "key": "analyze-backend-change-fail-route",
-            "sourceJobNode": "analyze-backend-change",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after analyze-backend-change."
-              }
-            ]
-          },
-          {
-            "key": "implement-backend-change-pass-route",
-            "sourceJobNode": "implement-backend-change",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "validate-backend-change"
-                },
-                "description": "Allowed PASS continuation after implement-backend-change."
-              }
-            ]
-          },
-          {
-            "key": "implement-backend-change-fail-route",
-            "sourceJobNode": "implement-backend-change",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after implement-backend-change."
-              }
-            ]
-          },
-          {
-            "key": "validate-backend-change-pass-route",
-            "sourceJobNode": "validate-backend-change",
-            "result": "PASS",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Allowed PASS continuation after validate-backend-change."
-              }
-            ]
-          },
-          {
-            "key": "validate-backend-change-fail-route",
-            "sourceJobNode": "validate-backend-change",
-            "result": "FAIL",
-            "candidates": [
-              {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "Allowed FAIL terminal after validate-backend-change."
-              }
-            ]
-          }
-        ],
-        "repair": []
-      }
-    },
     "repairNode": {
       "key": "graph-node-repair",
       "description": "Repairs difficult local failures before Graph escalation.",
       "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "nodeStyle": "sol",
-      "nodeSize": "medium",
       "profileSlot": "repair-sol",
       "primaryInstruction": "repair-node",
       "skills": [],
@@ -257,8 +148,6 @@
       {
         "key": "analyze-backend-change",
         "description": "Clarify the requested backend behavior, affected contracts, persistence implications, and acceptance evidence.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -285,13 +174,21 @@
           "skills": [],
           "task": "Validate that the analysis identifies the bounded behavior, affected domain and API contracts, persistence or migration implications, compatibility constraints, and executable acceptance checks. Return a precise repair request when evidence is missing.",
           "type": "agent"
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "implement-backend-change",
         "description": "Implement the approved backend behavior with explicit contracts and minimal architectural scope.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -318,13 +215,21 @@
           "skills": [],
           "task": "Review the implementation against the requested behavior, repository architecture, API and persistence contracts, compatibility constraints, and security boundaries. Do not modify the implementation while validating it.",
           "type": "agent"
-        }
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
       },
       {
         "key": "validate-backend-change",
         "description": "Run and evaluate backend tests, contract checks, migrations, and compatibility evidence.",
-        "nodeStyle": "terra",
-        "nodeSize": "large",
         "capabilities": {
           "accepts": [],
           "provides": []
@@ -351,8 +256,134 @@
           "skills": [],
           "task": "Independently confirm that the named tests and contract checks passed, migrations are safe where applicable, no blocking architecture drift remains, and the evidence supports completion.",
           "type": "agent"
+        },
+        "outcomes": [
+          {
+            "outcomeId": "success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "failure",
+            "result": "FAIL"
+          }
+        ]
+      }
+    ],
+    "outcomes": [
+      {
+        "outcomeId": "success",
+        "result": "PASS"
+      },
+      {
+        "outcomeId": "failure",
+        "result": "FAIL"
+      }
+    ],
+    "strategy": {
+      "kind": "agent_v1",
+      "orchestrator": {
+        "key": "graph-node-orchestrator",
+        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
+        "profileSlot": "orchestrator-luna",
+        "primaryInstruction": "graph-node-orchestrator",
+        "skills": [],
+        "maxTransitions": 256,
+        "maxRouteAttempts": 3,
+        "routing": {
+          "start": {
+            "key": "graph-node-start",
+            "candidates": [
+              {
+                "target": {
+                  "jobNode": "analyze-backend-change"
+                },
+                "description": "Allowed initial Job Node."
+              }
+            ]
+          },
+          "continuation": [
+            {
+              "key": "analyze-backend-change-pass-route",
+              "sourceJobNode": "analyze-backend-change",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "implement-backend-change"
+                  },
+                  "description": "Allowed PASS continuation after analyze-backend-change."
+                }
+              ]
+            },
+            {
+              "key": "analyze-backend-change-fail-route",
+              "sourceJobNode": "analyze-backend-change",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after analyze-backend-change."
+                }
+              ]
+            },
+            {
+              "key": "implement-backend-change-pass-route",
+              "sourceJobNode": "implement-backend-change",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "jobNode": "validate-backend-change"
+                  },
+                  "description": "Allowed PASS continuation after implement-backend-change."
+                }
+              ]
+            },
+            {
+              "key": "implement-backend-change-fail-route",
+              "sourceJobNode": "implement-backend-change",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after implement-backend-change."
+                }
+              ]
+            },
+            {
+              "key": "validate-backend-change-pass-route",
+              "sourceJobNode": "validate-backend-change",
+              "result": "PASS",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "PASS"
+                  },
+                  "description": "Allowed PASS continuation after validate-backend-change."
+                }
+              ]
+            },
+            {
+              "key": "validate-backend-change-fail-route",
+              "sourceJobNode": "validate-backend-change",
+              "result": "FAIL",
+              "candidates": [
+                {
+                  "target": {
+                    "terminal": "FAIL"
+                  },
+                  "description": "Allowed FAIL terminal after validate-backend-change."
+                }
+              ]
+            }
+          ],
+          "repair": []
         }
       }
-    ]
+    }
   }
 }

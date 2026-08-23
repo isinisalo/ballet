@@ -19,30 +19,32 @@ const history = z.array(z.object({
   state: z.enum(["completed", "needs_input", "blocked", "failed"]),
   summary: text, stateRevision: z.number().int().nonnegative()
 }).strict()).max(8);
-const base = { version: z.literal(7), run, task: nonEmpty, state, resume: resume.optional(), relevantHistory: history };
+const base = { version: z.literal(8), run, task: nonEmpty, state, resume: resume.optional(), relevantHistory: history };
 const candidate = z.object({ key: id, description: nonEmpty }).strict();
+const outcome = z.object({ outcomeId: id, result: z.enum(["PASS", "FAIL"]) }).strict();
 
-export const workTaskEnvelopeV7Schema = z.object({
+export const workTaskEnvelopeV8Schema = z.object({
   ...base, role: z.literal("work"), graphNode: identity, jobNode: identity, workNode: identity,
   workAttempt: z.number().int().min(1).max(101),
   previousValidationFeedback: z.object({ feedback: nonEmpty, expectedCorrection: nonEmpty }).strict().optional()
 }).strict();
-export const validationTaskEnvelopeV7Schema = z.object({
+export const validationTaskEnvelopeV8Schema = z.object({
   ...base, role: z.literal("validation"), graphNode: identity, jobNode: identity, validationNode: identity,
   workAttempt: z.number().int().min(1).max(101), workOutcome: workNodeOutcomeSchema,
+  allowedOutcomes: z.array(outcome).max(64),
   repairReturn: z.object({
     repairRequestId: id, repairResultId: id, stateRevision: z.number().int().nonnegative(), summary: nonEmpty
   }).strict().optional()
 }).strict();
-export const orchestratorTaskEnvelopeV7Schema = z.object({
+export const orchestratorTaskEnvelopeV8Schema = z.object({
   ...base, role: z.literal("orchestrator"), scope: z.enum(["graph", "graph_node"]), graphNode: identity.optional(),
   request: z.object({
     id, kind: z.enum(["start", "continuation", "repair"]), sourceChildId: id.optional(),
     result: z.enum(["PASS", "FAIL"]).optional(), requestedCapability: nonEmpty.optional(), evidence: z.json()
   }).strict(),
-  allowedCandidates: z.array(candidate).max(256), repairAvailable: z.boolean()
+  allowedCandidates: z.array(candidate).max(256), allowedOutcomes: z.array(outcome).max(64), repairAvailable: z.boolean()
 }).strict();
-export const repairTaskEnvelopeV7Schema = z.object({
+export const repairTaskEnvelopeV8Schema = z.object({
   ...base, role: z.literal("repair"), scope: z.enum(["graph", "graph_node"]), graphNode: identity.optional(),
   request: z.object({
     id, reason: nonEmpty, requestedCapability: nonEmpty.optional(), evidence: z.json(),
@@ -50,6 +52,6 @@ export const repairTaskEnvelopeV7Schema = z.object({
   }).strict(),
   allowedCandidates: z.array(candidate).max(256), parentEscalationAvailable: z.boolean()
 }).strict();
-export const taskEnvelopeV7Schema = z.discriminatedUnion("role", [
-  workTaskEnvelopeV7Schema, validationTaskEnvelopeV7Schema, orchestratorTaskEnvelopeV7Schema, repairTaskEnvelopeV7Schema
+export const taskEnvelopeV8Schema = z.discriminatedUnion("role", [
+  workTaskEnvelopeV8Schema, validationTaskEnvelopeV8Schema, orchestratorTaskEnvelopeV8Schema, repairTaskEnvelopeV8Schema
 ]);

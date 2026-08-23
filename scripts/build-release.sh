@@ -151,7 +151,7 @@ if (!Array.isArray(entries)
   || entries[0]?.manifest?.title !== "Clarify requirements"
   || entries[0]?.permissions?.externalWrites !== false
   || entries[0]?.package?.format !== "ballet-graph-node-module"
-  || entries[0]?.package?.version !== 4
+  || entries[0]?.package?.version !== 5
   || entries[0]?.package?.capabilities?.accepts?.[0] !== "fixture:requirements.requested"
   || entries[0]?.package?.capabilities?.provides?.[0] !== "fixture:requirements.clarified"
   || entries[0]?.package?.graphNode?.jobNodes?.length !== 1
@@ -176,7 +176,7 @@ const workNode = jobNode?.workNode;
 const validationNode = jobNode?.validationNode;
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 15
+if (workspace.automation?.version !== 16
   || workspace.automation.graph?.graphNodes?.length !== 1
   || graphNode?.id !== "review-node"
   || graphNode?.description !== "Review the fixture project."
@@ -189,6 +189,10 @@ if (workspace.automation?.version !== 15
   || workspace.automation.graph?.strategy?.kind !== "agent_v1"
   || workspace.automation.graph?.strategy?.orchestrator?.id !== "fixture-graph-orchestrator"
   || workspace.automation.graph?.strategy?.orchestrator?.maxTransitions !== 256
+  || graphNode?.strategy?.kind !== "agent_v1"
+  || graphNode?.strategy?.orchestrator?.id !== "review-node-orchestrator"
+  || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "success" && outcome.result === "PASS")
+  || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "failure" && outcome.result === "FAIL")
   || jobNode?.description !== "Run and validate the fixture review."
   || jobNode?.capabilities?.accepts?.length !== 0
   || jobNode?.capabilities?.provides?.length !== 0
@@ -215,7 +219,7 @@ if (workspace.automation?.version !== 15
   || workspace.canvasTheme?.version !== 4
   || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.canvasThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v15 Graph/Graph Node fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v16 Graph/Graph Node fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
@@ -231,7 +235,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "11") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 11`);
+if (version !== "12") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 12`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
   git -C "$SMOKE_ROOT/project" status --short >&2
