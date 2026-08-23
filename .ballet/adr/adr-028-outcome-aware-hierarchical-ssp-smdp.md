@@ -1,7 +1,7 @@
 ---
 id: adr-028
 title: Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya
-status: review
+status: accepted
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:

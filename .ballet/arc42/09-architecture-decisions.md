@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 20
+version: 21
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-023:n domain/runtime-invariantit, ADR-025/027:n Job Node -canvaspäätökset ja ADR-026:n Graph-scope finite SSP/SMDP-policystrategia säilyvät. ADR-028/029 ovat review-tilassa ja dokumentoivat Portti A:n hierarchical policy- ja capability-first-implementationin; ADR-027 on edelleen review-tilassa.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-023:n domain/runtime-invariantit, ADR-025/027:n Job Node -canvaspäätökset ja ADR-026:n Graph-scope finite SSP/SMDP-policystrategia säilyvät. ADR-028/029 ovat review-tilassa. Draft ADR-030 ehdottaa offline calibration-, immutable registry-, shadow- ja human activation -rajaa; se ei vielä valtuuta toteutusta.
 
 ## Päätösindeksi
 
@@ -54,6 +54,7 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-023:n domain/runtime-i
 | adr-027 | review | Job Node flow labels and terminal markers | [Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä](../adr/adr-027-job-node-flow-terminal-markers.md) |
 | adr-028 | review | Outcome-aware hierarchical scoped SSP/SMDP v2 | [Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya](../adr/adr-028-outcome-aware-hierarchical-ssp-smdp.md) |
 | adr-029 | review | Capability-first Graph/GraphNode authoring | [Graph ja GraphNode authoroidaan capability-first-korttinäkymissä](../adr/adr-029-capability-first-card-authoring.md) |
+| adr-030 | draft | Governed offline policy calibration and promotion | [Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla](../adr/adr-030-governed-offline-calibration-and-promotion.md) |
 
 ## Supersession-suhteet
 
@@ -123,6 +124,10 @@ adr-026:n Graph-only P(nextState|state,GraphNode) ja local agent-only routing
 adr-023:n Graph/GraphNode planet/multi-ring-projektio ja adr-024:n vastaavat upper-level-osat
         └── superseded by ──▶ adr-029
             capability-first cards; ADR-025/027 Job industrial flow säilyy
+
+adr-028:n Portti B:lle ennakoitu v17/v10/v13-versionumeroiden varaus
+        └── hyväksynnän jälkeen osittain superseded by ──▶ adr-030
+            calibration/registry/shadow käyttää seuraavaa strict cutia; Portti B:n semantic approval gate säilyy
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -149,6 +154,7 @@ adr-023:n Graph/GraphNode planet/multi-ring-projektio ja adr-024:n vastaavat upp
 | adr-023, Graph-scope LLM-only routing | adr-026 | Graph valitsee explicit `agent_v1 | ssp_v1`; SSP käyttää bounded Decision Statea, GraphNode Optioneita, hard admissibilityä, explicit transition/cost/terminal-mallia ja proper-policy solveria. GraphNode-scope, Job-invariantit ja repair säilyvät. |
 | adr-026, Graph-only `ssp_v1` ja `{nextStateId, probabilityPpm}` | adr-028 | Portti A lisää scoped `ssp_v2`:n molemmille routing-tasoille, intrinsic semantic outcomes, `P(outcome,nextState|state,action)`:n, projector-owned actual Staten, model-miss-evidenssin ja reachable local proper-policy readinessin. Agent coexistence säilyy pilottiin; strict cut vaatii erillisen approvalin. |
 | adr-023 ja adr-024, vain Graph/GraphNode upper-level planet/multi-ring-projektion osat | adr-029 | Graph/GraphNode authorointi käyttää capability-first-kortteja ja URL-omisteisia Decision Model -osioita. ADR-025/027:n Job industrial flow, Work/Validation-artwork ja runtime-invariantit säilyvät. |
+| adr-028, vain Portti B:lle ennakoitu Config v17 / Snapshot v10 / SQLite v13 -numerovaraus | adr-030 | Hyväksyttynä calibration/registry/shadow/promotion-slice käyttää seuraavaa v17/v10/v13 strict cutia. Portti B:n calibrated-pilot- ja human approval -semantiikka säilyy, mutta sen exact version matrix päätetään myöhemmin. |
 
 ## Päätösten käyttö
 
@@ -173,6 +179,7 @@ Kaikki yllä indeksoidut ADR:t; `adr-011` määrittää indeksointi- ja source-o
 ## Avoimet kysymykset
 
 - ADR-028/029 vaativat eksplisiittisen acceptance-päätöksen. ADR-028:n Portti B vaatii lisäksi kalibroidun pilotin ja erillisen agenttirouting-poiston approvalin.
+- ADR-030 vaatii eksplisiittisen acceptance-päätöksen ennen Phase 2:n observation/calibration-sopimusleikkausta.
 
 ## Seuraava katselmointiperuste
 

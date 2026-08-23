@@ -4,7 +4,7 @@ title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 13
+version: 14
 tags:
   - arc42
   - requirements
@@ -19,7 +19,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 
 ## Tila ja väitteiden luokittelu
 
-- **Hyväksytty päätös:** `goal-001`–`goal-016` määrittävät hyväksytyn tuotteen tarkoituksen ja laajuuden. Review-tilaiset `goal-017` ja `goal-018` omistavat Portti A:n hierarchical policy- ja capability-first-tavoitteet.
+- **Hyväksytty päätös:** `goal-001`–`goal-016` määrittävät hyväksytyn tuotteen tarkoituksen ja laajuuden. Review-tilaiset `goal-017` ja `goal-018` omistavat Portti A:n hierarchical policy- ja capability-first-tavoitteet. Draft `goal-019` ehdottaa immutable offline calibration-, shadow- ja human promotion -rajaa; se ei vielä valtuuta toteutusta.
 - **Toteutettu policy-intentio:** `goal-016` / `REQ-016` tuo Graph-scopeen geneerisen finite SSP/SMDP -policystrategian explicit `agent_v1 | ssp_v1` -valintana.
 - **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v16 Graph/GraphNode/JobNode-domainin, explicit agent/SSP scoped routingin, outcome-aware policy coren, capability-first upper-level-authoringin ja säilyvän Job industrial flow'n.
 - **Hyväksytty domain:** `goal-015` / `adr-023` määrittää viiden project-local GraphNoden, 17 aggregate JobNoden sekä Luna/Sol-profiilien säilyvän baseline-intention; Portti A:n portable package on Graph Node Module v5 ja upper-level-projektio on ADR-029:n review-rajalla.
@@ -48,6 +48,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-016 | goal-016 | Valitse Graph Runin seuraava user-defined GraphNode explicit finite SSP/SMDP -päätösmallista erottaen Capability Graph, Decision Model, Policy Projection ja Execution Graph. | Bounded Decision State, GraphNode Option, hard `A(s)`, snapshotted transition/cost/terminal model, proper-policy value iteration ja per-epoch evidence; explicit `agent_v1 | ssp_v1` ilman fallbackia. | QS-021 |
 | REQ-017 | goal-017 | Käytä outcome-aware finite SSP/SMDP v2 -policya sekä GraphNode-optionin että sen JobNode-actionin valintaan ja pidä actual state canonical projectorin omistuksessa. | Scoped `P(outcome,nextState|state,action)`, intrinsic outcomes, proper global/local policy, model-miss observation, immutable provenance ja explicit `agent_v1 | ssp_v2` Portti A:ssa. | QS-022, QS-023 |
 | REQ-018 | goal-018 | Näytä mitä järjestelmä voi tehdä capability-first-korteilla ja authoroi global/local policy omissa URL-omisteisissa osioissaan säilyttäen Job flow'n. | Capability Graph / Decision Model ja Jobs / Local Decision Model & Repair -osiot, atominen CRUD, scoped Run evidence ja ADR-025/027 Job-flow. | QS-024 |
+| REQ-019 | goal-019 | Muodosta immutable observations-evidenssistä deterministisiä offline candidate modeleja ja promotoi tai rollbackaa exact model hash vain eksplisiittisellä ihmisaktivoinnilla. | Provider-neutral cost dimensions, hierarchy-safe attribution, dataset/model registry, joint calibration, evaluation, shadow provenance ja append-only promotion/activation events. | QS-025 |
 
 Täydelliset mitattavat skenaariot ja evidenssistatukset ovat [osiossa 10](10-quality-requirements.md), ja päästä päähän -ketjut ovat [TRACEABILITYssa](TRACEABILITY.md).
 
@@ -85,7 +86,7 @@ Ballet omistaa yleiset Graph-, GraphNode-, aggregate JobNode-, scoped orchestrat
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-026` sekä review-tilaiset `adr-028` ja `adr-029`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-026`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`.
 
 ## Evidenssi
 
@@ -96,6 +97,7 @@ Goal-frontmatter, project-skeema, toteutuksen lähdeankkurit ja trace-matriisi o
 - Initiative-kohtaiset sidosryhmät, hyväksymismitat ja mahdollinen `needs_input` täsmennetään aina BRIEFissä.
 - Ensimmäinen end-to-end-pilotti määrittää menetelmäterveyden lähtöarvot.
 - Ensimmäinen SSP-pilotti kalibroi domain expertin probability/cost-priorit ja dokumentoi Decision Staten tunnetut Markov-gap-kohdat.
+- `goal-019` / `adr-030` tarvitsee project ownerin hyväksynnän ennen calibration/promotion-toteutusta.
 
 ## Seuraava katselmointiperuste
 

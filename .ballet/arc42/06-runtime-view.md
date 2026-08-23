@@ -4,7 +4,7 @@ title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 14
+version: 15
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-016 kuvaavat accepted invariantit tai historialliset skenaariot. Review-tilaiset RT-017 ja RT-018 kuvaavat Portti A:n outcome-aware hierarchical decision epochin sekä capability-first draft/compile-authoringin. Current implementation cut on config v16, immutable snapshot v9 ja SQLite schema v12.
+RT-001–RT-016 kuvaavat accepted invariantit tai historialliset skenaariot. Review-tilaiset RT-017 ja RT-018 kuvaavat Portti A:n outcome-aware hierarchical decision epochin sekä capability-first draft/compile-authoringin. Draft RT-019 ehdottaa offline candidate-, shadow- ja promotion-lifecyclea ilman live-mallin automaattista mutaatiota. Current implementation cut on config v16, immutable snapshot v9 ja SQLite schema v12.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -325,7 +325,36 @@ sequenceDiagram
 
 URL omistaa aktiivisen capability/decision-model-sectionin. Preview on derived ja unsnapshotted, eikä se dispatchaa tai mutatoi runtimea. Save hyväksyy structurally validin kalibroimattoman draftin. Run käyttää readiness-rajaa ja immutable snapshotia.
 
-## Skenaarioindeksi RT-001–RT-018
+## RT-019: Offline calibration, shadow ja ihmisaktivointi
+
+```mermaid
+sequenceDiagram
+  participant Store as BB-005 immutable observations
+  participant Learning as BB-012 offline calibration
+  participant Policy as BB-011 compiler/evaluator
+  participant Registry as BB-012 immutable registry
+  actor Owner as Project owner
+  participant Planner as BB-004 snapshot planner
+  Store-->>Learning: Exact observation IDs + versioned dimensions
+  Learning->>Registry: Dataset snapshot + hash
+  Learning->>Registry: Candidate model + priors/cost lineage + hash
+  Learning->>Policy: Exact evaluation + seeded cross-check + thresholds
+  Policy-->>Registry: Immutable report and optional promotion proposal
+  alt Insufficient evidence or failed threshold
+    Registry-->>Owner: not_ready; live reference unchanged
+  else Proposal passes
+    Registry-->>Owner: Exact candidate hash and review report
+    Owner->>Registry: Explicit activation or rollback authorization
+    Registry->>Planner: Active hash for future snapshots only
+  end
+  Note over Planner: Running snapshots and historical artifacts remain unchanged
+```
+
+Shadow-variantissa Planner snapshottaa `agent_v1`-controllerin ja yhden candidate hashin. Controllerin dispatch on ainoa control effect. Candidate saa saman canonical Staten ja hard action setin, mutta shadow-decision ei dispatchaa. Vain controllerin toteutuneesta actionista syntyy outcome/next-state/cost-observation; unchosen shadow-actionista syntyy vain prediction/comparison-evidenssi.
+
+RT-019 on draft eikä kuvaa nykyistä toteutettua runtimea. Exact priors, scalarization, readiness/promotion-thresholdit, pilotin budgetit ja stop-ehdot puuttuvat tarkoituksella myöhempään ihmisporttiin.
+
+## Skenaarioindeksi RT-001–RT-019
 
 | ID | Trigger ja vuorovaikutus | Rakennusosat | Tulos ja evidenssi |
 | --- | --- | --- | --- |
@@ -347,6 +376,7 @@ URL omistaa aktiivisen capability/decision-model-sectionin. Preview on derived j
 | RT-016 | `ssp_v1` Graph Run alkaa tai GraphNode Option terminoituu; runtime projisoi Staten, ratkaisee hard `A(s)`:n ja pyytää bounded SSP-policyn. | BB-003–BB-005, BB-011 | Valid proper model → policy decision ja linkitetty dispatch; explicit terminal → terminal fact; invalid/improper/non-convergent → 0 actionia ja 0 strategy fallbackia; observation ei mutatoi modelia. |
 | RT-017 | `ssp_v2` Graph/GraphNode decision epoch alkaa tai JobNode/GraphNode Option terminoituu semantic outcome + PASS/FAIL -tulokseen. | BB-003–BB-005, BB-011 | Scoped proper policy valitsee GraphNode/JobNode-actionin; actual state tulee projectorilta; expected/actual/model-miss persistoi; unknown state → `needs_input`; prior mutation ja fallback = 0. |
 | RT-018 | Operaattori muokkaa capability/outcome/Decision Model -draftia, previewaa scoped policyn, tallentaa tai yrittää käynnistää Runin. | BB-001–BB-003, BB-011 | Structural draft tallentuu; preview ei dispatchaa; Run alkaa vain, kun global ja reachable local scopes compileutuvat immutable snapshotiin. |
+| RT-019 | Offline calibration snapshottaa observations-datasetin, tuottaa/evaluoi immutable candidaten, voi vertailla sitä shadow'na ja ehdottaa promotionia; ihminen aktivoi tai rollbackaa exact hashin. | BB-002–BB-005, BB-011, BB-012 | Deterministinen lineage/report; insufficient evidence → `not_ready`; shadow dispatch 0; ilman ihmisaktivointia live ref -muutoksia 0; running snapshot -muutoksia 0. |
 
 ## Samanaikaisuusmalli
 
@@ -378,13 +408,15 @@ ADR-023 ja runtime-lähde omistavat säilyvän Graph/GraphNode/JobNode/Repair-co
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023`, `adr-026` sekä review-tilaiset `adr-028` ja `adr-029`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023`, `adr-026`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`.
 
 ## Evidenssi
 
 Runtime-, State-, persistence-, queue-, adapter-, worktree- ja Run UI -testit kattavat säilyvät skenaariot. RT-008–RT-013:n historiallinen evidenssi säilyy `EVID-011`–`EVID-018`:ssä. RT-014/015:n strict-v14 runtime-evidenssi indeksoidaan `EVID-019`:ään. Deploy ja muu ulkoinen kirjoitus pysyvät erillisen ihmisvaltuutuksen takana.
 
 RT-017/018:n automated implementation evidence on `TEST-022`–`TEST-024` / `EVID-022`–`EVID-024`:ssä. Kalibroitu end-to-end-pilotti, empirical model-miss-jakauma, final browser/human review ja Portti B ovat avoimia.
+
+RT-019:n governance trace on `TEST-025` / `EVID-025`; toteutus-, candidate-, shadow-, pilot- ja activation-evidenssi on pending.
 
 ## Avoimet kysymykset
 

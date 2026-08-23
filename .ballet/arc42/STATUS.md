@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 28
+version: 29
 tags:
   - arc42
   - status
@@ -19,7 +19,7 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 
 ## Tila
 
-- `goal-001`–`goal-016` ovat accepted. `goal-017` ja `goal-018` ovat review-tilassa Portti A:n implementation/acceptance-rajalla.
+- `goal-001`–`goal-016` ovat accepted. `goal-017` ja `goal-018` ovat review-tilassa Portti A:n implementation/acceptance-rajalla. Draft `goal-019` / `adr-030` valmistaa Phase 2–7 calibration/promotion-governancen ilman toteutusvaltuutusta.
 - `goal-016`, `adr-026` ja `QS-021` hyväksyvät Graph-scopeen explicit `agent_v1 | ssp_v1` -strategian, proper-policy-semanticsin, fixed-point mallin ja v15/v8/v11 strict cutin.
 - `adr-023` omistaa säilyvän Graph/GraphNode/JobNode-domainin ja bounded Repair Noden. `adr-025` ja review-tilainen `adr-027` omistavat Job Node industrial flow'n. Review-tilaiset `adr-028` ja `adr-029` dokumentoivat hierarchical policy- ja capability-first-upper-level-muutokset.
 - Nykyinen Portti A implementation cut on Project Config v16, Graph Node Module v5, Root Snapshot v9, Task Envelope/Outcome v8, composition v9, ExecutionSpec v10 ja SQLite v12. Compatibility-lukijoita, reittialiaksia, dual-writeä tai runtime-migraatiota ei ole.
@@ -40,14 +40,15 @@ Tämä tiedosto ylläpitää project-tason pitkäikäisen arkkitehtuuritilanteen
 | Avoin riski | Probability/cost/outcome-kalibrointi, `ssp_v2` end-to-end-pilotti, restart/resume-pilottievidenssi, final human review ja Portti B approval puuttuvat. Ne eivät valtuuta agenttipoistoa, releasea tai external writea. Lintin non-blocking warning baseline nousi 8:sta 15:een. |
 | Policy Portti A | `outcome-aware-hierarchical-policy` lisää semantic outcomes, scoped `P(o,s'|s,a)`:n, global/local proper policyn, projector-owned actual Staten, neljä model-miss-luokkaa ja immutable provenance -ketjun ilman prior mutationia. |
 | UI Portti A | `capability-first-authoring` lisää Capability Graph / Decision Model ja Jobs / Local Decision Model & Repair -osiot sekä scoped Run current decision/projection/execution -pinnat. |
+| Phase 1 governance | `governed-policy-calibration-and-promotion` määrittää draftina provider-neutral option-costit, hierarchy-safe-attribuution, immutable dataset/candidate/report-lineagen, evaluation/shadow-provenancen ja human activation/rollback -rajan. Toteutusta, candidatea tai aktivointia ei ole. |
 
 ## Kanoniset lähteet
 
-Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY.md), State-raja [STATE-CONTRACTissa](STATE-CONTRACT.md), Job-flow-baseline [job-node-industrial-flow-canvas](initiatives/job-node-industrial-flow-canvas/BRIEF.md)-initiativessa sekä Portti A:n review-jälki [outcome-aware-hierarchical-policy](initiatives/outcome-aware-hierarchical-policy/BRIEF.md)- ja [capability-first-authoring](initiatives/capability-first-authoring/BRIEF.md)-initiativeissa.
+Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY.md), State-raja [STATE-CONTRACTissa](STATE-CONTRACT.md), Job-flow-baseline [job-node-industrial-flow-canvas](initiatives/job-node-industrial-flow-canvas/BRIEF.md)-initiativessa, Portti A:n review-jälki [outcome-aware-hierarchical-policy](initiatives/outcome-aware-hierarchical-policy/BRIEF.md)- ja [capability-first-authoring](initiatives/capability-first-authoring/BRIEF.md)-initiativeissa sekä Phase 1 -governance [governed-policy-calibration-and-promotion](initiatives/governed-policy-calibration-and-promotion/BRIEF.md)-initiativessa.
 
 ## Relevantit päätökset
 
-`goal-015`–`goal-018`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`–`adr-029`.
+`goal-015`–`goal-019`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`–`adr-030`.
 
 ## Evidenssi
 
@@ -57,6 +58,7 @@ Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY
 - `TEST-020` / `EVID-020` omistaa canonical route-, scope-, a11y-, layout-, browser- ja visual-evidenssin.
 - `npm run validate:arc42` on deterministinen repository-conformance-gate.
 - `TEST-022`–`TEST-024` / `EVID-022`–`EVID-024` omistavat Portti A:n review-ketjut; implementation/startup/capability-first browser evidence on paikallisesti passed, kalibroitu pilotti, post-fix Job-flow screenshot ja human review pending.
+- `TEST-025` / `EVID-025` omistaa draft calibration/promotion -ketjun; governance-validation passed locally, kaikki runtime-, candidate-, shadow-, pilot- ja activation-evidenssi pending.
 
 ## Avoimet kysymykset
 
@@ -64,13 +66,14 @@ Osioindeksi on [README](README.md), trace-suhteet [TRACEABILITYssa](TRACEABILITY
 - Mitkä outcome-katalogit, probabilityt, costit ja bounded featuret hyväksytään ensimmäiseen `ssp_v2`-pilottiin?
 - Pinned tracker/provider live-smoke raportoidaan erikseen eikä hermetic testi korvaa sitä.
 - Mitkä ensimmäisen pilotin featuret, priors/costit ja observed cost dimensions domain expert hyväksyy?
+- Hyväksyykö project owner `goal-019` / `adr-030`:n ennen Phase 2:n strict observation/calibration -cutia?
 
 ## Nykyinen handoff
 
-- Initiativet: `outcome-aware-hierarchical-policy` ja `capability-first-authoring`.
-- Status: `review`; Portti A implementation ja standardigatet on rakennettu ja ajettu, calibrated pilot, post-fix Job-flow screenshot, ihmisreview ja Portti B ovat erilliset rajat.
-- Muuttunut stable chain: `goal-017`/`goal-018`, `REQ-017`/`REQ-018`, `QS-022`–`QS-024`, `adr-028`/`adr-029`, `CON-005`/`CON-012`, `BB-001`/`BB-003`–`BB-005`/`BB-011`, `RT-017`/`RT-018`, `TEST-022`–`TEST-024`, `EVID-022`–`EVID-024`.
-- Seuraava yksi hyväksytty toimi: project owner kalibroi ja hyväksyy ensimmäisen `ssp_v2`-pilottimallin; narrow Job-flow’n post-fix screenshot voidaan täydentää, kun in-app browser navigoi localhostiin jälleen.
+- Initiativet: `outcome-aware-hierarchical-policy`, `capability-first-authoring` ja draft `governed-policy-calibration-and-promotion`.
+- Status: `needs_input`; Portti A implementation on olemassa, mutta Phase 2:n architecture authority puuttuu ja calibration/promotion-governance on draft.
+- Muuttunut stable chain: `goal-019`, `REQ-019`, `QS-025`, `adr-030`, `CON-002`/`CON-012`, `BB-002`–`BB-005`/`BB-011`/`BB-012`, `RT-019`, `TEST-025`, `EVID-025`.
+- Seuraava yksi toimi: project owner hyväksyy tai hylkää `goal-019` / `adr-030`:n; vasta hyväksyntä valtuuttaa Phase 2:n strict observation/calibration -toteutuksen.
 - Stop condition: deploy/release/merge/push vaatii erillisen täsmällisen valtuutuksen.
 
 ## Seuraava katselmointiperuste

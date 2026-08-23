@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 19
+version: 20
 tags:
   - arc42
   - quality
@@ -20,7 +20,7 @@ Tämä osio määrittää arkkitehtuurin suunnitteluun, hyväksymiseen ja evalua
 
 ## Tila
 
-QS-001–QS-021 säilyttävät hyväksytyn/historiallisen quality intentin ja evidenssin. Review-tilaiset QS-022–QS-024 mittaavat Portti A:n hierarchical policy -turvallisuutta, model-miss-jälkeä ja capability-first-authoringia; implementation-evidenssi erotetaan avoimesta pilotista ja ihmisreview'sta.
+QS-001–QS-021 säilyttävät hyväksytyn/historiallisen quality intentin ja evidenssin. Review-tilaiset QS-022–QS-024 mittaavat Portti A:n hierarchical policy -turvallisuutta, model-miss-jälkeä ja capability-first-authoringia. Draft QS-025 määrittää ehdotetun offline calibration/promotion -ketjun mitan ilman toteutusvaltuutusta.
 
 ## Laatupuu
 
@@ -54,6 +54,7 @@ flowchart TD
   integrity --> q22["QS-022 scoped proper policy"]
   recovery --> q23["QS-023 model miss trace"]
   usability --> q24["QS-024 capability-first authoring"]
+  integrity --> q25["QS-025 governed calibration and promotion"]
 ```
 
 Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voivat estää toiminnon, vaikka käytettävyys kärsisi. UI:n ymmärrettävyys ei oikeuta keksittyä runtime-telemetriaa.
@@ -87,6 +88,7 @@ Laatupuu ei muuta prioriteettia: safety-, integrity- ja recovery-invariantit voi
 | QS-022 | goal-016, goal-017 | Graph- tai GraphNode-scope yritetään koota tai ajaa `ssp_v2`:lla validilla, invalidilla, guardien jälkeen improperilla tai ristiriitaisen outcome-semanticsin mallilla. | Strict v16 config, Module v5, Snapshot v9 ja SQLite v12; 1/5/40 GraphNodea ja jokaisessa 1/17/64 JobNodea. | BB-003–BB-005, BB-011, RT-017, CON-002, CON-012 | Compilea scoped `P(outcome,nextState given state,action)` fail-closedisti ja salli Graph Run vain, kun global sekä jokainen reachable local policy ovat proper. | 100 % vääristä ppm-summista, unknown outcome/state/action-viitteistä, PASS/FAIL-ristiriidoista ja improper-malleista hylätään molemmissa scopeissa; guard/authorizationin jälkeen improper policy dispatchaa 0 actionia; success on ainoa goal ja `V(success)=0`; failure/blocked valitaan 0 kertaa halpana terminaalina; draft tallentuu mutta Run käynnistyy 0 kertaa, jos yksikin reachable scope ei compileudu; strategiafallbackien määrä on 0. | 1 | EVID-022 | automated implementation verified locally; calibrated pilot and restart acceptance pending |
 | QS-023 | goal-006, goal-007, goal-016, goal-017 | `ssp_v2`-action valmistuu semantic outcomella ja canonical facts projisoivat ennustetta vastaavan, eriävän tai tuntemattoman next staten. | Active Graph/GraphNode Run immutable v9 snapshotilla ja SQLite v12 observation-storella. | BB-001, BB-005, BB-011, RT-009, RT-010, RT-017, CON-002, CON-012 | Persistoi expected-versus-actual ilman, että transition määrää statea tai observation mutatoi modelia; ratkaise seuraava policy actual statesta. | Validation hyväksyy vain snapshotatun actionin intrinsic outcome-ID:n ja matching PASS/FAIL:n; `match`, `outcome_miss`, `state_miss` ja `outside_support` ovat kaikki testattuja; actual state vastaa projector-outputia 100 % tapauksista ja configured probability/cost muuttuu 0 kertaa; unknown/unprojected actual state dispatchaa 0 actionia ja johtaa `needs_input`-tilaan; restart monistaa observationin 0 kertaa. | 1 | EVID-023 | automated four-class/projector evidence verified locally; empirical pilot distribution pending |
 | QS-024 | goal-007, goal-018 | Operaattori authoroi capabilityja, intrinsic outcomeja ja global/local Decision Modelia, käyttää CRUDia tai tarkastaa scoped Runia desktop/narrow-viewportissa ja scale-fixtureillä. | Canonical URL sections, 1440×900 ja 390×844, keyboard/focus, long IDs, draft/error/readiness states, 1/5/40 GraphNodea ja 1/17/64 JobNodea. | BB-001, BB-002, RT-010, RT-018, CON-005 | Näytä responsive Capability Graph / Decision Model ja Jobs / Local Decision Model & Repair -korttinäkymät, säilytä Job industrial flow ja erota policy projection factual executionista. | URL säilyttää sectionin back/forwardissa; GraphNode/JobNode add/open/edit/rename/delete ja keyboard/focus-polut toimivat; referenced JobNode deletion nimeää ≥1 korjattavan viitteen ja kirjoittaa 0 muutosta; rename jättää stale action-ID-viitteitä 0; upper-level planet/multi-ring-nodeja ja appearance-dataa on 0; Job flow regression läpäisee; kaikissa fixtureissä card overlap, page horizontal overflow ja clipped core action ovat 0; Run näyttää exact `Current State`, `Current Decision`, `Policy Projection`, `Most Likely Rollout`, `Execution Graph` ja model miss -tekstin ilman “Expected Path” -termiä. | 1 | EVID-024 | automated implementation verified locally; desktop/narrow browser and human visual review pending |
+| QS-025 | goal-002, goal-006, goal-019 | Immutable observations-dataset kalibroidaan toistuvasti samalla expert prior-, scalarization- ja threshold-konfiguraatiolla; candidate arvioidaan, ajetaan shadow'na tai ehdotetaan promotioniin, ja activation/rollback-pyyntö tehdään hyväksytyllä tai puuttuvalla ihmisvaltuutuksella. | Strict offline pipeline, append-only registry, future Root Run snapshot boundary ja hermetic 1/5/40 × 1/17/64 fixturet; required cost dimension voi olla known-zero tai unknown. | BB-002–BB-005, BB-011, BB-012, RT-019, CON-002, CON-012 | Tuota content-addressed dataset/model/report/proposal-lineage deterministisesti, failaa insufficient evidenceen, pidä controller/shadow erillään ja muuta live model refiä vain exact human activationilla tuleville Runeille. | Sama ordered observation set + config tuottaa 100 % samat dataset/model/report-hashit; joint outcome×actual-state probability-rivit summautuvat exact scaleen; required unknown muuttuu nollaksi 0 kertaa ja estää readinessin; global/local inclusive cost summataan samaan aggregaattiin 0 kertaa; exact evaluation ja seeded simulation ovat määritellyn toleranssin sisällä; held-out/sensitivity/threshold-failure tuottaa proposalin 0 kertaa; shadow dispatchaa 0 actionia ja unchosen shadow-action tuottaa 0 observationia; ilman exact ihmisvaltuutusta activation/rollback/live-ref-muutoksia on 0; activation vaikuttaa käynnissä olevaan snapshotiin 0 kertaa; restart monistaa artifactin/eventin 0 kertaa. | 1 | EVID-025 | draft governance; implementation and human decision pending |
 <!-- quality-scenarios:end -->
 
 ## Priorisoinnin tulkinta
@@ -101,11 +103,11 @@ Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot; [
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023`, `adr-025`, `adr-026` sekä review-tilaiset `adr-028` ja `adr-029`; historialliset ADR-017–ADR-022-ketjut säilyvät.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023`, `adr-025`, `adr-026`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`; historialliset ADR-017–ADR-022-ketjut säilyvät.
 
 ## Evidenssi
 
-EVID-001–EVID-024 ratkaistaan TRACEABILITYssa. EVID-022–EVID-024 erottavat automated implementation -näytön kalibroidusta pilotista, browser-QA:sta ja ihmisreview'sta.
+EVID-001–EVID-025 ratkaistaan TRACEABILITYssa. EVID-022–EVID-024 erottavat automated implementation -näytön kalibroidusta pilotista, browser-QA:sta ja ihmisreview'sta. EVID-025 on vasta governance-evidenssiä; runtime- ja activation-näyttö puuttuu.
 
 ## Avoimet kysymykset
 

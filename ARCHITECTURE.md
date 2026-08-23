@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 19
+version: 20
 tags:
   - architecture
   - arc42
@@ -19,7 +19,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Tila
 
-- `goal-001`–`goal-016` omistavat hyväksytyn WHAT/WHY:n. `goal-017` ja `goal-018` ovat review-tilassa Portti A:n implementation- ja hyväksyntärajalla.
+- `goal-001`–`goal-016` omistavat hyväksytyn WHAT/WHY:n. `goal-017` ja `goal-018` ovat review-tilassa Portti A:n implementation- ja hyväksyntärajalla. Draft `goal-019` / `adr-030` ehdottaa offline calibration-, immutable registry-, shadow- ja human activation -hallintaa; se ei vielä valtuuta Phase 2:n toteutusta.
 - `goal-016` / `adr-026` hyväksyy finite SSP/SMDP Graph-policy -strategian. Se erottaa Capability Graphin, Decision Modelin, Policy Projectionin ja Execution Graphin sekä säilyttää explicit `agent_v1`-vaihtoehdon ilman fallbackia.
 - Virallisen [arc42-rakenteen 12 osiota](https://docs.arc42.org/home/) ovat kanonisesti `.ballet/arc42/`-hakemistossa.
 - `goal-009` ja `adr-011` hyväksyvät jatkuvan Ballet Methodin. `goal-015` / `adr-023` materialisoi repositoryn nykyisen oletusmenetelmän viideksi project-local GraphNodeksi ja 17 aggregate JobNodeksi muuttamatta platformin geneeristä 1–40 GraphNoden rajaa.
@@ -67,6 +67,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - Hyväksyykö projektin omistaja `three-level-graph-node-engineering`-initiativen `EVID-019`–`EVID-020`-ketjun, conformance-gatejen ja kolmen canvasin visual QA:n jälkeen?
 - Hyväksyykö projektin omistaja `comprehensive-arc42-documentation`-draftin lopputarkistuksen jälkeen?
 - Mitkä domain expertin kalibroimat outcome-katalogit, priors/costit ja bounded featuret valitaan ensimmäiseen `ssp_v2`-pilottiin?
+- Hyväksyykö project owner `goal-019` / `adr-030`:n governance-rajan ennen observation/calibration-sopimusten toteutusta?
 - Hyväksyykö projektin omistaja ADR-028/029:n ja milloin Portti B:n agent-routerien poisto valtuutetaan pilotin jälkeen?
 
 ## Seuraava katselmointiperuste

@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 19
+version: 20
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-010 säilyvät accepted vastuualueina. BB-011:n Portti A -implementation ratkaisee saman pure decision -portin kautta Graph- ja GraphNode-scopea. ADR-023:n domain/Repair- ja ADR-025/027:n Job-flow-invariantit säilyvät; upper-level-projektion muutos on ADR-029:n review-rajalla.
+BB-001–BB-010 säilyvät accepted vastuualueina. BB-011:n Portti A -implementation ratkaisee saman pure decision -portin kautta Graph- ja GraphNode-scopea. Draft BB-012 rajaa ehdotetun offline calibration/registry/evaluation/promotion -pinnan erilleen runtime controlista. ADR-023:n domain/Repair- ja ADR-025/027:n Job-flow-invariantit säilyvät.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -31,6 +31,8 @@ flowchart LR
   api --> modules["BB-009 Graph Node module boundary"]
   planner --> runtime["BB-005 Graph routing runtime"]
   runtime -->|"global/local ssp_v2"| policy["BB-011 Scoped policy subsystem"]
+  policy -.->|"immutable observations"| learning["BB-012 Offline policy learning + registry"]
+  learning -.->|"candidate/proposal; no activation"| catalog
   planner --> tracker["BB-010 tracker adapter + outbox"]
   runtime --> tracker
   runtime --> execution["BB-006 Provider execution"]
@@ -53,6 +55,7 @@ flowchart LR
 | BB-009 | Graph Node Module v5 inspect/plan/install/export/remove ja provenance; intrinsic outcomes mukana, upper appearance ja project-specific model pois. | Strict package/API, materialisointijono ja resource catalog. | Supply-chain-näkyvyys ja project/runtime/model-omistajuusrajan säilyminen. | `shared/domain/graphNodeModules.ts`, `shared/api/graph-node-module-schemas.ts`, `backend/graph-node-modules/` | REQ-002, REQ-010, REQ-015, REQ-017 |
 | BB-010 | Tracker adapter ja transactional outbox. | argv-only process adapter, SQLite intent/linkit ja worktree-local stores. | Fail-closed external process boundary ja idempotentti reconciliation. | `backend/tracker/`, `backend/cli/TrackerCli.ts`, SQLite v12 tracker-taulut | REQ-006, REQ-015 |
 | BB-011 | Scoped policy subsystem projisoi bounded Decision Staten, ratkaisee hard `A(s)`:n, validoi outcome-aware finite SSP/SMDP-mallin ja laskee global/local Q/V/policyn sekä bounded rolloutin. Se ei suorita actionia eikä omista canonical statea. | BB-003:n snapshotted Capability/Decision Model, BB-005:n canonical facts/guards ja pure projector/resolver/compiler/solver/projection-portit. | Project-agnostic deterministic routing, proper-policy safety, model-miss trace ja erillinen execution evidence. | `shared/domain/decisionModel*.ts`, `backend/policy/`, BB-005 SQLite v12 adapter, BB-001 read models | REQ-002, REQ-006, REQ-007, REQ-016–REQ-018 |
+| BB-012 | Ehdotettu offline policy learning ja immutable model registry snapshottaa observations-datasetin, kalibroi joint outcome/actual-state- ja cost-estimaatit, arvioi candidaten, tuottaa shadow-evidenssin sekä promotion proposalin. Se ei aktivoi mallia eikä muuta runtime snapshotia. | BB-005:n immutable observations, BB-011:n compiler/solver/evaluation-portit, BB-003:n project-local calibration/promotion policy ja append-only artifact/event store. | Deterministinen lineage, fail-closed readiness, controller/shadow-erottelu ja human activation/rollback. | Suunniteltu `shared/domain/policyLearning*.ts`, `backend/policy-calibration/`, registry/store/API/read models | REQ-019 |
 
 ## Rajapinta- ja riippuvuussäännöt
 
@@ -65,6 +68,7 @@ flowchart LR
 - BB-002–BB-007 toteuttavat vain geneerisiä primitivejä. Balletin viiden GraphNoden nimet ja arc42-/release-menettely pysyvät project-local-datassa.
 - BB-011 saa action-ID:t vain BB-003:n snapshotatusta kyseisen scopen GraphNode- tai JobNode-kokoelmasta. Se ei tunne default-nodeja, lue live project configia, kutsu provideria tai mutatoi model probabilityjä/costeja.
 - BB-005 omistaa edelleen atomisen dispatchin/terminalin. BB-011 palauttaa validin policy-päätöksen tai typed failure -tuloksen; se ei muodosta toista control-flow/store-omistajaa.
+- Draft BB-012 lukee vain immutable observations- ja project policy -snapshotteja. Se saa kirjoittaa candidate/report/proposal-artifacteja, mutta live model ref-, activation- tai rollback-muutos vaatii exact ihmisvaltuutuksen BB-002/003-mutaation kautta.
 
 ## BB-001 whitebox: kolmitasoinen operator workspace
 
@@ -116,13 +120,15 @@ Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-027` sekä review-tilaiset `adr-028` ja `adr-029`.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-027`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`.
 
 ## Evidenssi
 
 `TEST-019` kattaa domain-, snapshot-, runtime-, persistence- ja module-rajat. `TEST-020` kattaa BB-001:n reitit, scope-projektiot, a11y:n ja layoutin. Conformance-evidenssi indeksoidaan `EVID-019`/`EVID-020`:een.
 
 BB-011:n scoped v2 compiler/solver/projection/model-miss-read model ja BB-001:n capability-first UI on toteutettu Portti A:ssa ja indeksoitu `TEST-022`–`TEST-024` / `EVID-022`–`EVID-024`:ään. Calibrated pilot, browser/human review ja Portti B ovat avoimia.
+
+BB-012 on draft-ratkaisu ilman toteutusevidenssiä. Sen governance-chain on `TEST-025` / `EVID-025`; runtime evidence pysyy pending-tilassa.
 
 ## Avoimet kysymykset
 

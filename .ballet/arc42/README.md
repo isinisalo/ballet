@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 18
+version: 19
 tags:
   - arc42
   - architecture
@@ -19,7 +19,7 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 
 ## Tila
 
-12-osioinen baseline on hyväksytty. Nykyinen Portti A -implementation käyttää strict-v16 Graph/GraphNode/JobNode/strategy-sopimusta, explicit scoped `agent_v1 | ssp_v2` -strategioita ilman fallbackia, Graph Node Module v5:tä, Root Snapshot v9:ää, Task Envelope/outcome v8:aa, composition v9:ää, ExecutionSpec v10:tä ja SQLite schema v12:ta. `goal-017` / `adr-028` ja `goal-018` / `adr-029` ovat review-tilassa; agenttiroutingin poistava strict cut odottaa kalibroitua onnistunutta pilottia ja eksplisiittistä ihmishyväksyntää. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
+12-osioinen baseline on hyväksytty. Nykyinen Portti A -implementation käyttää strict-v16 Graph/GraphNode/JobNode/strategy-sopimusta, explicit scoped `agent_v1 | ssp_v2` -strategioita ilman fallbackia, Graph Node Module v5:tä, Root Snapshot v9:ää, Task Envelope/outcome v8:aa, composition v9:ää, ExecutionSpec v10:tä ja SQLite schema v12:ta. `goal-017` / `adr-028` ja `goal-018` / `adr-029` ovat review-tilassa. Draft `goal-019` / `adr-030` valmistaa calibration/promotion-governancen; Phase 2, calibrated pilot ja Portti B odottavat omia ihmisporttejaan. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
 
 ## Osiot
 
@@ -62,6 +62,7 @@ Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko 
 - [Stochastic Policy Orchestration initiative](initiatives/stochastic-policy-orchestration/BRIEF.md): accepted `goal-016` / `adr-026` finite SSP/SMDP Graph-policy; core implementation evidence on kerätty ja projection/pilot/conformance ovat review-rajalla.
 - [Outcome-aware hierarchical policy initiative](initiatives/outcome-aware-hierarchical-policy/BRIEF.md): review-tilainen `goal-017` / `adr-028` scoped outcome-aware `ssp_v2`, proper-policy-, projection-, observation- ja pilotointiketju.
 - [Capability-first authoring initiative](initiatives/capability-first-authoring/BRIEF.md): review-tilainen `goal-018` / `adr-029` upper-level card authoring ja Run-policy/evidence-projektio ADR-025/027:n Job-flow'ta muuttamatta.
+- [Governed policy calibration and promotion initiative](initiatives/governed-policy-calibration-and-promotion/BRIEF.md): draft `goal-019` / `adr-030` observation-cost-, offline candidate-, evaluation-, shadow- ja human activation/rollback -ketju ilman toteutusvaltuutusta.
 
 ## Kanoninen omistajuus
 
@@ -82,7 +83,7 @@ Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `
 
 ## Relevantit päätökset
 
-`goal-009`–`goal-018`, `adr-011`, `adr-013`–`adr-016` ja `adr-023`–`adr-029`.
+`goal-009`–`goal-019`, `adr-011`, `adr-013`–`adr-016` ja `adr-023`–`adr-030`.
 
 ## Evidenssi
 

@@ -4,7 +4,7 @@ title: Riskit ja tekninen velka
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 14
+version: 15
 tags:
   - arc42
   - risks
@@ -20,7 +20,7 @@ Tämä osio ylläpitää arkkitehtuurin kannalta merkittävät riskit, teknisen 
 
 ## Tila
 
-RISK-001–RISK-017 säilyttävät nykyiset tai historialliset riskit. RISK-018 laajenee global/local outcome-aware-malliin; RISK-019 omistaa capability-first-UI:n acceptance-vajeen. Domain calibration, end-to-end-pilotti ja final browser/human evidence puuttuvat.
+RISK-001–RISK-017 säilyttävät nykyiset tai historialliset riskit. RISK-018 laajenee global/local outcome-aware-malliin; RISK-019 omistaa capability-first-UI:n acceptance-vajeen. RISK-020 omistaa draft calibration/promotion -ketjun data-, double-counting-, shadow- ja activation-riskit. Domain calibration, end-to-end-pilotti ja final browser/human evidence puuttuvat.
 
 ## Riskirekisteri
 
@@ -45,6 +45,7 @@ RISK-001–RISK-017 säilyttävät nykyiset tai historialliset riskit. RISK-018 
 | RISK-017 | visuaalinen regressio | Graphin uusi pelkistetty kieli voi heikentää 40 Loopin luettavuutta tai vuotaa Workflow Engineeringin suojattuun avaruusteemaan. | keskisuuri / mahdollinen | Eri projektiot, deterministinen layered layout, päätös+outcome-tekstilabelit, pan/zoom ja desktop/narrow Graph + Workflow regression QA. QS-017/TEST-017. | technical/browser controlled; human visual acceptance pending |
 | RISK-018 | policy model mis-specification ja numeerinen routing failure | Global tai local Decision State voi jättää Markov-relevantin faktan ulos, outcome/next-state-priori tai cost voi olla väärin kalibroitu tai guardien jälkeinen policy improper; seurauksena inspectable mutta väärä routing tai turvallinen pysähdys. | korkea / mahdollinen | ADR-026 + review ADR-028: finite feature/outcome catalog, projector-owned actual state, four model-miss classes, hard `A(s)`, exact ppm/result/cost validation, scoped proper-policy/preflight, stable rollout/tie/hash, 0 fallbackia ja pilotin calibration review. QS-022/023, TEST-022/023, EVID-022/023. | Portti A controls implemented; calibration, empirical misses and pilot open |
 | RISK-019 | capability authoring usability ja reference drift | Suuri card/model-grid voi peittää readiness-virheen, pitkän ID:n tai stale local action -viitteen; narrow UI voi leikata core actionin. | keskisuuri / mahdollinen | Review ADR-029, URL-owned sections, atomic rename/delete guards, exact issue paths, stable responsive grid, keyboard/focus sekä 1/5/40 × 1/17/64 desktop/narrow QA. QS-024/TEST-024/EVID-024. | automated implementation controlled; browser/human acceptance pending |
+| RISK-020 | learning/promotion governance failure | Unknown cost voi muuttua nollaksi, global/local inclusive cost double-countata, biased/insufficient dataset promotoitua, shadow action tulkita counterfactualiksi tai live/running model vaihtua ilman exact approvalia. | korkea / mahdollinen | Draft ADR-030: versioned dimensions, hierarchy attribution, immutable dataset/model/report lineage, explicit priors/thresholds, held-out+sensitivity evaluation, zero-shadow-dispatch, human activation/rollback ja snapshot immutability. QS-025/TEST-025/EVID-025. | open; governance draft, implementation absent |
 
 ## Riskien arviointiperiaate
 
@@ -75,6 +76,7 @@ RISK-011 ei valtuuta sivutehtävänä tehtävää laajaa refaktorointia. Warning
 | RISK-017 | TEST-017, EVID-017 ja Graph/Workflow desktop+narrow QA | Layout, edge-semanttiikka tai Workflow-artwork muuttuu. |
 | RISK-018 | TEST-022/023 ja EVID-022/023, model calibration report, solver/proper-policy/model-miss monitor ja Decision State Markov-gap review | Feature/outcome domain, prior/cost, terminal, guard, solver bound tai action-setti muuttuu; observed transition/cost poikkeaa pilotissa olennaisesti mallista. |
 | RISK-019 | TEST-024/EVID-024, desktop/narrow focus/overflow/CRUD QA ja human usability review | Card structure, section routes, ID-reference behavior tai Job-flow regression muuttuu. |
+| RISK-020 | TEST-025/EVID-025, registry lineage, unknown/double-count monitors, shadow audit ja activation log | Observation/cost contract, calibration estimator, threshold, shadow/controller, active model ref tai rollback semantics muuttuu. |
 
 ## Kanoniset lähteet
 
@@ -82,7 +84,7 @@ Tämä osio omistaa project-level-arkkitehtuuririskit. Initiative-kohtaiset risk
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-020`, `adr-021`, `adr-022`, `adr-023` ja `adr-026`.
+`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-017`, `adr-020`, `adr-021`, `adr-022`, `adr-023`, `adr-026` ja draft `adr-030`.
 
 ## Evidenssi
 
@@ -96,6 +98,7 @@ Migration-findingit, validoinnit, Root Run -outcomet, lint-outputit ja initiativ
 - RISK-013 ja RISK-014 säilyvät historiallisina acceptance-vajeina, kunnes niiden nimetyt ihmisreviewt valmistuvat.
 - RISK-015 on teknisesti kontrolloitu final gateillä. RISK-016:n live-smoke, RISK-017:n ihmisvisual review ja kaikkien kolmen tuotantokaltainen pilotointi pysyvät avoimina.
 - RISK-018 pysyy open-tilassa domain expertin pilot calibration/Markov-gap review'hun ja empirical model-miss-evidenssiin asti. RISK-019 pysyy open-tilassa final desktop/narrow-browser- ja ihmisusability-review'hun asti.
+- RISK-020 pysyy open-tilassa, kunnes governance hyväksytään ja TEST-025 osoittaa observation→candidate→evaluation→proposal→human activation/rollback -ketjun.
 
 ## Seuraava katselmointiperuste
 

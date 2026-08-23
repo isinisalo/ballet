@@ -1,7 +1,7 @@
 ---
 id: goal-017
 title: Outcome-aware hierarchical SSP/SMDP routing
-status: review
+status: accepted
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
