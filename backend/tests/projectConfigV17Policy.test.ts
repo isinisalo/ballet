@@ -8,7 +8,7 @@ import { decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
 import { resolveAllAdmissibleActions } from "../policy/AdmissibleActionResolver.js";
 import { solvePolicy } from "../policy/SspPolicySolver.js";
 
-describe("project configuration v16 outcome-aware hierarchical SSP/SMDP", () => {
+describe("project configuration v17 outcome-aware hierarchical SSP/SMDP", () => {
   it("compiles proper global and local policies and chooses solely from configured costs", async () => {
     const config = await policyProject(["discover", "prototype", "publish"]);
     const parsed = projectConfigReadinessSchema.parse(config);
@@ -77,7 +77,7 @@ const policyProject = async (ids: string[], jobsPerNode = 1): Promise<ProjectCon
   const repository = JSON.parse(await readFile(".ballet/project.json", "utf8")) as ProjectConfiguration;
   const graphNodes = ids.map((id) => graphNode(id, jobsPerNode));
   return {
-    version: 16, executionProfiles: repository.executionProfiles, issueTracker: repository.issueTracker,
+    version: 17, executionProfiles: repository.executionProfiles, issueTracker: repository.issueTracker,
     graph: {
       id: "arbitrary-policy", name: "Arbitrary policy", state: { description: "Bounded generic state.", initial: {} },
       strategy: strategyFor(graphNodes.map(({ id, outcomes }) => ({ id, outcomes })), ids.map((id, index) => [id, id === "publish" ? 1 : index + 10])),

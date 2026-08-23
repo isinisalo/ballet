@@ -4,7 +4,7 @@ title: Governed Policy Calibration and Promotion PLAN
 status: draft
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Status and dependency order
 
-No implementation step is authorized while `goal-019` and `adr-030` are draft. After acceptance, execute strictly in order and stop whenever a prerequisite or `QS-025` gate fails.
+`goal-019` and `adr-030` are accepted. Step 001 is implemented in strict v17/v10/v13 with policy observation v3. Execute later steps strictly in order and stop whenever a prerequisite, required project-local calibration input or `QS-025` gate fails.
 
 ## Planned slices
 

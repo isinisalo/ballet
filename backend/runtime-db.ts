@@ -10,7 +10,7 @@ import type {
   CanonicalNodeOutcome, ControlFlowEvent, GraphNodeInvocation, GraphNodeInvocationDetails,
   GraphStateRevisionMetadata, JobNodeInvocation, NodeRun, OrchestrationScope, RepairFrame,
   RepairNodeOutcome, RepairRequest, RepairResult, RootExecutionSnapshot, RoutingDecision,
-  RoutingRequest, ValidationNodeOutcome, PolicyDecisionRecordV2, PolicyOptionObservationV2
+  RoutingRequest, ValidationNodeOutcome, PolicyDecisionRecordV2, PolicyOptionObservationV3
 } from "../shared/domain/runtime.js";
 import type {
   RootRunOrchestrationProjection, RootRunRepairProjection, RootRunStateProjection
@@ -25,6 +25,7 @@ import { jsonSha256, parseJsonValue } from "./runtime/state/CanonicalJson.js";
 import { evaluatePolicyDecision } from "./policy/PolicyRuntime.js";
 import { projectDecisionState } from "./policy/DecisionStateProjector.js";
 import { PolicyEvidenceStore } from "./policy/PolicyEvidenceStore.js";
+import { OptionCostEvidence } from "./policy/OptionCostEvidence.js";
 
 export { isPatchedSqliteVersion };
 
@@ -33,9 +34,11 @@ type DbRow = Record<string, unknown>;
 export class RuntimeDatabase {
   private readonly manager: RuntimeDbConnection;
   private readonly policyEvidence: PolicyEvidenceStore;
+  private readonly optionCosts: OptionCostEvidence;
   constructor(dbPath: string) {
     this.manager = new RuntimeDbConnection(dbPath);
     this.policyEvidence = new PolicyEvidenceStore(() => this.connection());
+    this.optionCosts = new OptionCostEvidence(() => this.connection());
   }
   close(): void { this.manager.close(); }
   connection(): Database.Database { return this.manager.connection(); }
@@ -1023,18 +1026,25 @@ export class RuntimeDatabase {
     const actionInvocationId = scope === "graph"
       ? graphInvocation.graphNodeInvocationId : jobInvocation!.jobNodeInvocationId;
     const createdAt = scope === "graph" ? graphInvocation.createdAt : jobInvocation!.createdAt;
-    const observation: PolicyOptionObservationV2 = {
-      policyObservationId: randomUUID(), rootRunId, policyDecisionId: decision.policyDecisionId,
+    const observedAt = now();
+    const observation: PolicyOptionObservationV3 = {
+      version: 3, policyObservationId: randomUUID(), rootRunId, policyDecisionId: decision.policyDecisionId,
       scope, scopeKey: decision.scopeKey, actionInvocationId,
       graphNodeInvocationId: graphInvocation.graphNodeInvocationId,
       jobNodeInvocationId: jobInvocation?.jobNodeInvocationId,
       stateBefore: decision.state, actionId, configuredExpectedCostMicros: configured.expectedCostMicros,
-      expectedOutcomeDistribution: structuredClone(configured.successors), observedOutcomeId: outcomeId,
+      expectedOutcomeDistribution: structuredClone(configured.successors),
+      observedCost: this.optionCosts.observe({
+        scope,
+        graphNodeInvocationId: graphInvocation.graphNodeInvocationId,
+        jobNodeInvocationId: jobInvocation?.jobNodeInvocationId,
+        durationMillis: Math.max(0, Date.parse(observedAt) - Date.parse(createdAt))
+      }),
+      observedOutcomeId: outcomeId,
       verifiedResult: result, actualState, modelMatch,
-      durationMillis: Math.max(0, Date.parse(now()) - Date.parse(createdAt)),
       modelSha256: decisionSnapshot.modelSha256,
       snapshotSha256: snapshot.project.snapshotHash,
-      createdAt: now()
+      createdAt: observedAt
     };
     this.policyEvidence.insertObservation(observation);
     this.event(rootRunId, "policy_observed", {
@@ -1183,7 +1193,9 @@ export class RuntimeDatabase {
   private snapshot(rootRunId: string): RootExecutionSnapshot {
     const source = String(this.rootRow(rootRunId).execution_snapshot_json);
     const value = JSON.parse(source) as RootExecutionSnapshot;
-    if (value.version !== 9) throw new Error("Persisted Root snapshot is not v9.");
+    if (value.version !== 10 || value.policyObservationContractVersion !== 3) {
+      throw new Error("Persisted Root snapshot is not v10 with policy observation contract v3.");
+    }
     return value;
   }
   private rootRow(rootRunId: string): DbRow {

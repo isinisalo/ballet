@@ -1,4 +1,4 @@
-export const projectConfigurationVersion = 16 as const;
+export const projectConfigurationVersion = 17 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxJobRetriesLimit = 100;
 export const maxProjectGraphNodes = 40;

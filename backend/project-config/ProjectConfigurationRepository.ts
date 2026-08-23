@@ -75,14 +75,14 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version !== 16) return {
+    if (isRecord(value) && value.version !== 17) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 16 is required; version ${String(value.version)} is not supported.`
+        `Strict project config version 17 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -97,7 +97,7 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config,
-      version: 16,
+      version: 17,
       graph: automation.graph,
     });
     this.write(root, config);
@@ -112,7 +112,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 16,
+      version: 17,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -127,7 +127,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 16,
+      version: 17,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -141,7 +141,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 16,
+      version: 17,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -175,7 +175,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 16,
+  version: 17,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,

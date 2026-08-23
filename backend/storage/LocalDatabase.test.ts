@@ -9,7 +9,7 @@ import { localDatabaseTableNames } from "./RuntimeSchema.js";
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("LocalDatabase schema v12", () => {
+describe("LocalDatabase schema v13", () => {
   it("creates only the GraphNode runtime inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -20,7 +20,7 @@ describe("LocalDatabase schema v12", () => {
     expect(tables).not.toEqual(expect.arrayContaining([
       "loop_invocations", "job_runs", "loop_schedule_state", "orchestration_requests", "orchestrator_routes"
     ]));
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("12");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("13");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
     database.close();
   });
@@ -50,8 +50,8 @@ describe("LocalDatabase schema v12", () => {
     expect(columns(connection, "policy_option_observations")).toEqual(expect.arrayContaining([
       "policy_observation_id", "policy_decision_id", "scope", "scope_key", "action_invocation_id",
       "graph_node_invocation_id", "job_node_invocation_id", "state_before_json", "action_id",
-      "configured_expected_cost_micros", "expected_outcome_distribution_json", "actual_cost_micros",
-      "observed_outcome_id", "verified_result", "actual_state_json", "model_match", "duration_millis",
+      "configured_expected_cost_micros", "expected_outcome_distribution_json", "observation_version",
+      "observed_cost_json", "observed_outcome_id", "verified_result", "actual_state_json", "model_match",
       "model_sha256", "snapshot_sha256"
     ]));
     database.close();
@@ -90,7 +90,7 @@ describe("LocalDatabase schema v12", () => {
     `);
     previous.close();
     expect(() => new LocalDatabase(filename).connection()).toThrow(
-      "Unsupported Ballet state schema 11; expected 12."
+      "Unsupported Ballet state schema 11; expected 13."
     );
     const untouched = new Database(filename, { readonly: true });
     expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("11");

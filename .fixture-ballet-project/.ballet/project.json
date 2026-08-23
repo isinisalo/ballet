@@ -1,5 +1,5 @@
 {
-  "version": 16,
+  "version": 17,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",

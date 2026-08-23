@@ -4,7 +4,7 @@ title: Governed Policy Calibration and Promotion BRIEF
 status: draft
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,13 +16,13 @@ tags:
 
 ## Purpose and authority
 
-Prepare the governed path from Portti A observations to immutable offline candidates, evaluation, shadow evidence and human activation under draft `goal-019` / `REQ-019` and `adr-030`. This initiative is not authorized for implementation until those drafts are explicitly accepted.
+Deliver the governed path from Portti A observations to immutable offline candidates, evaluation, shadow evidence and human activation under accepted `goal-019` / `REQ-019` and `adr-030`. Project owner accepted the Goal/ADR chain in commit `26698dda09c9e9fda5284d4bfa578d6084581dc5`.
 
 ## Fact, decision and finding
 
-- **Fact GPCP-F-001:** current v16/v9/v12 shape/store supports scoped outcome/state evidence, `durationMillis` and optional `actualCostMicros`, but the runtime observation producer does not populate actual cost. Provider token usage is not aggregated consistently into option observations, and no complete provider-neutral cost dimensions, dataset snapshot, candidate registry, shadow provenance or promotion event exists.
-- **Decision GPCP-D-001 (proposed):** observations never update a live model; offline candidate/proposal generation is automatic only after explicit readiness/evaluation gates, while activation and rollback require a human-selected exact model hash.
-- **Finding GPCP-FIND-001:** ADR-026 rejects automatic learning and ADR-028 excludes calibration, so Phase 2 has no accepted architecture authority.
+- **Fact GPCP-F-001:** Phase 2 implements strict v17/v10/v13 and policy observation v3 with measured-or-explicitly-unknown provider-neutral dimensions, inclusive scope attribution, execution provenance and parent/child observation links. Dataset snapshot, candidate registry, shadow provenance and promotion events do not yet exist.
+- **Decision GPCP-D-001 (accepted):** observations never update a live model; offline candidate/proposal generation is automatic only after explicit readiness/evaluation gates, while activation and rollback require a human-selected exact model hash.
+- **Finding GPCP-FIND-001:** resolved by project-owner acceptance of `goal-019` / `adr-030`; Phase 2 is implemented, while Phase 3 still lacks project-local expert priors and readiness values.
 - **Assumption GPCP-A-001:** project owners can provide explicit priors, scalarization and readiness/promotion thresholds; not yet verified.
 - **Hypothesis GPCP-H-001:** immutable joint calibration plus shadow evidence can improve cost-to-go routing without weakening snapshot or authorization boundaries; pilot pending.
 
@@ -44,9 +44,9 @@ Priority-1 `QS-025` requires immutable datasets/models, deterministic reruns, fa
 
 ## Open questions
 
-- **GPCP-OQ-001:** does the project owner accept `goal-019` and `adr-030` as the authority for Phases 2–7?
-- Calibration values are deliberately not requested until the strict contracts and authoring surface exist; they remain a later pilot gate.
+- **GPCP-OQ-001:** resolved: project owner accepted `goal-019` and `adr-030` in commit `26698dda09c9e9fda5284d4bfa578d6084581dc5`.
+- Phase 3 requires exact project-local joint pseudo-count priors, sample/coverage/readiness limits and scalarization rules; no values have been invented.
 
 ## Next review basis
 
-Ready for implementation planning only after explicit acceptance of `goal-019`, `adr-030` and `QS-025` intent.
+Review Phase 2 at `GPCP-EVID-002`; begin Phase 3 only after the missing project-local calibration inputs are approved.

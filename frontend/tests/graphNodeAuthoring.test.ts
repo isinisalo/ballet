@@ -42,7 +42,7 @@ describe("generic GraphNode Configure authoring", () => {
 });
 
 const baseConfig = (): ProjectAutomationConfig => ({
-  version: 16,
+  version: 17,
   graph: {
     id: "unrelated", name: "Unrelated", state: { description: "Bounded.", initial: { phase: "open" } },
     strategy: {

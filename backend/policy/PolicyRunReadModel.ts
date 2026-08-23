@@ -1,18 +1,18 @@
 import type { GraphNodeInvocationDetails } from "../../shared/domain/runtime.js";
 import type {
-  ExecutionGraphOccurrenceV2,
+  ExecutionGraphOccurrenceV3,
   PolicyDecisionRecordV2,
-  PolicyOptionObservationV2,
-  PolicyTelemetryV2,
+  PolicyOptionObservationV3,
+  PolicyTelemetryV3,
   ProjectSspDecisionStrategyV2
 } from "../../shared/domain/decisionModel.js";
 
 export const reconstructExecutionGraph = (input: {
   strategies: Readonly<Record<string, ProjectSspDecisionStrategyV2>>;
   decisions: PolicyDecisionRecordV2[];
-  observations: PolicyOptionObservationV2[];
+  observations: PolicyOptionObservationV3[];
   invocations: GraphNodeInvocationDetails[];
-}): ExecutionGraphOccurrenceV2[] => {
+}): ExecutionGraphOccurrenceV3[] => {
   const observations = new Map(input.observations.map((observation) => [observation.policyDecisionId, observation]));
   const graphInvocations = new Map(input.invocations.flatMap((invocation) =>
     invocation.policyDecisionId ? [[invocation.policyDecisionId, invocation] as const] : []));
@@ -49,12 +49,11 @@ export const reconstructExecutionGraph = (input: {
         actionId === decision.selectedActionId)?.qMicros,
       configuredExpectedCostMicros: observation?.configuredExpectedCostMicros ?? row?.expectedCostMicros,
       expectedOutcomeDistribution: observation?.expectedOutcomeDistribution ?? row?.successors ?? [],
-      actualCostMicros: observation?.actualCostMicros,
+      observedCost: observation?.observedCost,
       observedOutcomeId: observation?.observedOutcomeId,
       verifiedResult: observation?.verifiedResult,
       actualState: observation?.actualState,
       modelMatch: observation?.modelMatch,
-      durationMillis: observation?.durationMillis,
       modelSha256: decision.modelSha256,
       snapshotSha256: decision.snapshotSha256,
       createdAt: decision.createdAt
@@ -62,14 +61,13 @@ export const reconstructExecutionGraph = (input: {
   });
 };
 
-export const summarizePolicyTelemetry = (observations: PolicyOptionObservationV2[]): PolicyTelemetryV2[] => {
-  const groups = new Map<string, PolicyOptionObservationV2[]>();
+export const summarizePolicyTelemetry = (observations: PolicyOptionObservationV3[]): PolicyTelemetryV3[] => {
+  const groups = new Map<string, PolicyOptionObservationV3[]>();
   for (const observation of observations) {
     const key = `${observation.scopeKey}\u0000${observation.actionId}\u0000${observation.stateBefore.stateId}`;
     groups.set(key, [...(groups.get(key) ?? []), observation]);
   }
   return [...groups.values()].map((entries) => {
-    const actualCosts = entries.flatMap(({ actualCostMicros }) => actualCostMicros === undefined ? [] : [actualCostMicros]);
     return {
       scope: entries[0]!.scope,
       scopeKey: entries[0]!.scopeKey,
@@ -80,9 +78,11 @@ export const summarizePolicyTelemetry = (observations: PolicyOptionObservationV2
       outcomeCounts: counts(entries.map(({ observedOutcomeId }) => observedOutcomeId)),
       observedNextStateCounts: counts(entries.flatMap(({ actualState }) => actualState ? [actualState.stateId] : [])),
       modelMissCount: entries.filter(({ modelMatch }) => modelMatch !== "match").length,
-      meanActualCostMicros: actualCosts.length
-        ? actualCosts.reduce((sum, value) => sum + value, 0) / actualCosts.length : undefined,
-      meanDurationMillis: entries.reduce((sum, { durationMillis }) => sum + durationMillis, 0) / entries.length
+      meanKnownDurationMillis: entries.reduce((sum, { observedCost }) => {
+        const duration = observedCost.dimensions.durationMillis;
+        if (duration.status !== "known") throw new Error("Option duration must always be measured.");
+        return sum + duration.value;
+      }, 0) / entries.length
     };
   }).sort((left, right) => left.scopeKey.localeCompare(right.scopeKey)
     || left.actionId.localeCompare(right.actionId) || left.stateId.localeCompare(right.stateId));

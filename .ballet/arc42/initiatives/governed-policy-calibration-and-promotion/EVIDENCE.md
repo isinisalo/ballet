@@ -4,7 +4,7 @@ title: Governed Policy Calibration and Promotion EVIDENCE
 status: draft
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -18,8 +18,8 @@ tags:
 
 | Evidence ID | QS/requirement | Check or observation | Artifact paths/stable IDs | Result | Timestamp/source | Limitations |
 | --- | --- | --- | --- | --- | --- | --- |
-| GPCP-EVID-001 | REQ-019 / QS-025 | Governance baseline, decision-chain validation, package build and installed startup | `goal-019`, `adr-030`, `REQ-019`, `QS-025`, `BB-012`, `RT-019`, `TEST-025`, `EVID-025`; `npm run validate:arc42`; `git diff --check`; `make latest` | passed locally | 2026-08-23; 12 sections / 80 document IDs; installed health OK at port 53321 | Proves document/package/startup consistency only; no calibration runtime behavior, pilot, activation or approval. |
-| GPCP-EVID-002 | QS-023 / QS-025 | Complete option-cost observation and hierarchy-safe attribution | strict contract/persistence/provider/runtime tests | pending | future implementation | No observation schema change is currently authorized. |
+| GPCP-EVID-001 | REQ-019 / QS-025 | Governance baseline, decision-chain validation, package build and installed startup | `goal-019`, `adr-030`, `REQ-019`, `QS-025`, `BB-012`, `RT-019`, `TEST-025`, `EVID-025`; `npm run validate:arc42`; `git diff --check`; `make latest` | passed locally | 2026-08-23; 12 sections / 80 document IDs; archive SHA-256 `acd7e6be89753a2177af0b2e816d4785178e8a07b43cbe1d359e28e89eb4cf87`; installed health OK at port 53321 with SQLite v13 | Proves document/package/startup consistency only; no calibration runtime behavior, pilot, activation or approval. |
+| GPCP-EVID-002 | QS-023 / QS-025 | Complete option-cost observation and hierarchy-safe attribution | `OptionCostEvidence.test.ts`, `PolicyRuntimeIntegration.test.ts`, `LocalDatabase.test.ts`, `runPolicyViews.test.tsx`, strict v17/v10/v13 build | verified locally | 2026-08-23; focused 4 files / 11 tests; full 50 files / 191 tests; production and packaged builds passed; lint 0 errors / 15 baseline warnings; DESIGN lint 0 errors / 0 warnings | Provider monetary/utility values remain explicitly unknown when their adapters or project policy do not report/configure them. |
 | GPCP-EVID-003 | QS-025 | Deterministic dataset snapshot, joint calibration, candidate registry and lineage | calibration/registry tests and candidate review report | pending | future implementation | Expert priors and thresholds are absent. |
 | GPCP-EVID-004 | QS-022 / QS-025 | Exact/simulated/held-out/sensitivity evaluation and fail-closed thresholds | evaluation tests and immutable report | pending | future implementation | No candidate exists. |
 | GPCP-EVID-005 | QS-023 / QS-025 | Controller/shadow separation and zero counterfactual observations | shadow runtime/persistence/read-model tests | pending | future implementation | Shadow mode does not exist. |
@@ -28,11 +28,11 @@ tags:
 
 ## Current finding
 
-The repository is at Portti A. `PolicyOptionObservationV2`, `PolicyEvidenceStore`, SQLite v12 and runtime read models prove outcome/state/duration provenance. The observation producer leaves actual cost unset; token usage remains execution-event data rather than a complete option observation. Phases 2–7 are not implemented, and draft governance is not implementation evidence.
+Phase 2 is implemented as `PolicyOptionObservationV3` on Project Config v17, Root Snapshot v10 and SQLite v13. Each duration, token-usage, retry, repair, monetary and utility dimension is measured or explicitly unknown with source references. Local JobNode and global GraphNode observations are both inclusive, and global observations link local child observation IDs instead of summing the two scope totals. Phases 3–7 are not implemented.
 
 ## Open questions
 
-Project owner acceptance of `goal-019` and `adr-030` is required before GPCP-EVID-002 can begin.
+Phase 3 requires approved project-local expert priors, scalarization, sample-readiness and coverage thresholds before a candidate can be generated.
 
 ## Next review basis
 

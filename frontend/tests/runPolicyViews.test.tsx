@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
-  ExecutionGraphOccurrenceV2, PolicyDecisionRecordV2, PolicyProjectionV2, RootRunDetail
+  ExecutionGraphOccurrenceV3, PolicyDecisionRecordV2, PolicyProjectionV2, RootRunDetail
 } from "@shared/api/workspace-contracts";
 import { RunPolicyViews } from "../src/workspace/runs/RunPolicyViews";
 
@@ -30,7 +30,7 @@ const detail = (): RootRunDetail => ({
   rootRunId: "run", kind: "graph", targetId: "unrelated", source: "manual", status: "running", stateRevision: 2,
   createdAt: "2026-08-22T00:00:00.000Z", updatedAt: "2026-08-22T00:01:00.000Z",
   executionSnapshot: {
-    version: 9, rootKind: "graph",
+    version: 10, policyObservationContractVersion: 3, rootKind: "graph",
     project: { checkoutRoot: "/tmp", headSha: "head", configHash: "config", snapshotHash: "snapshot-hash" },
     issueTracker: {} as RootRunDetail["executionSnapshot"]["issueTracker"],
     graph: {} as RootRunDetail["executionSnapshot"]["graph"],
@@ -75,14 +75,27 @@ const projection = (): PolicyProjectionV2 => ({
     probabilityPpm: 1_000_000, cumulativeProbabilityPpm: 1_000_000, configuredPrior: true }]
 });
 
-const occurrence = (occurrenceId: string, epoch: number): ExecutionGraphOccurrenceV2 => ({
+const occurrence = (occurrenceId: string, epoch: number): ExecutionGraphOccurrenceV3 => ({
   occurrenceId, scope: "graph", scopeKey: "graph", epoch, policyDecisionId: `decision-${epoch}`,
   actionInvocationId: `invocation-${epoch}`, graphNodeInvocationId: `invocation-${epoch}`, actionId: "intake",
   status: "observed", decisionStateBefore: state(epoch - 1), expectedRemainingCostMicros: 5,
   selectedActionValueMicros: 5, configuredExpectedCostMicros: 2,
   expectedOutcomeDistribution: [{ outcomeId: "intake-pass", expectedNextStateId: "open", probabilityPpm: 1_000_000 }],
   observedOutcomeId: "intake-pass", verifiedResult: "PASS", actualState: state(epoch), modelMatch: "match",
-  durationMillis: 2_000, modelSha256: "model-hash", snapshotSha256: "snapshot-hash",
+  observedCost: {
+    version: 1,
+    attribution: {
+      mode: "inclusive_v1", scope: "graph", nodeRunIds: [`node-${epoch}`],
+      executionTaskIds: [`task-${epoch}`], childPolicyObservationIds: [`local-observation-${epoch}`]
+    },
+    dimensions: {
+      durationMillis: known(2_000), inputTokens: known(100), outputTokens: known(20), cachedInputTokens: known(40),
+      workRetryCount: known(1), repairAttemptCount: known(0),
+      monetaryMicros: { status: "unknown", reason: "provider_not_reported", sourceRefs: [] },
+      utilityMicros: { status: "unknown", reason: "project_not_configured", sourceRefs: [] }
+    }
+  },
+  modelSha256: "model-hash", snapshotSha256: "snapshot-hash",
   createdAt: `2026-08-22T00:0${epoch}:00.000Z`
 });
 
@@ -90,3 +103,4 @@ const state = (revision: number) => ({
   stateId: "open", features: { phase: "open" }, featureVectorSha256: `feature-${revision}`,
   sourceStateRevision: revision, evidenceRefs: [`graph-state:${revision}`]
 });
+const known = (value: number) => ({ status: "known" as const, value, sourceRefs: [] });

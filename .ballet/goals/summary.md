@@ -4,7 +4,7 @@ title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-23'
-version: 16
+version: 17
 tags:
   - yhteenveto
   - tavoitteet
@@ -43,24 +43,24 @@ Tuotteen tärkein lupaus on hallittu agenttisuoritus: jokainen Root Run sidotaan
 
 ## Nykytila tämän repositoryn perusteella
 
-- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja Portti A:n projektikonfiguraatio käyttää strict **v16** -skeemaa.
-- Projektissa on **16 hyväksyttyä, 2 review-tilassa olevaa ja 1 draft Goalia** sekä 30 ADR-recordia. ADR-028/029 ovat review-tilassa; draft ADR-030 ehdottaa offline calibration-, immutable registry-, shadow- ja human activation -rajaa.
+- Tuote on merkitty **alphaksi**, pakettiversio on **0.1.0** ja projektikonfiguraatio käyttää strict **v17** -skeemaa.
+- Projektissa on **19 hyväksyttyä Goalia** sekä 30 ADR-recordia. `adr-027`–`adr-030` ovat accepted; ADR-030 omistaa offline calibration-, immutable registry-, shadow- ja human activation -rajan.
 - `agent_v1 | ssp_v2` ovat eksplisiittisiä strategioita Graph- ja GraphNode-scopeissa ilman fallbackia. Repositoryn default pysyy `agent_v1`:ssä, kunnes project owner hyväksyy probabilityt/costit ja pilotin.
 - Paikallinen Graph Node Library sisältää **14 V5-pakettia**. Paketti sisältää intrinsic outcomet ja local agent -strategian mutta ei probabilityja, costeja, project-specific transitioneita tai upper-level appearancea.
 - Graph Engineering näyttää Capability Graph -kortit ja Decision Model -osion. Graph Node näyttää Jobs-kortit ja Local Decision Model & Repair -osion. Job Node säilyttää deterministic Work/Validation industrial flow'n.
 - `ssp_v2` laskee global/local Q/V-evidenssin hard-admissible actioneille. Validation palauttaa semantic outcome + PASS/FAIL:n, actual state tulee canonical projectorilta ja model miss näkyy Execution Graphissa; bounded Repair käsittelee poikkeuksen muuttamatta policya.
 - Balletin oletusgraafissa on **5 GraphNodea** ja **17 aggregate JobNodea**, joilla on erilliset Work/Validation-lapset. DESIGN toteuttaa kaikki 12 arc42-osiota omissa JobNodeissaan.
-- Current Portti A cut on Snapshot V9, envelope/outcome V8, composition V9, ExecutionSpec V10, runtime DB V12 ja Graph Node Module Package V5.
+- Current cut on Snapshot V10, policy observation V3, envelope/outcome V8, composition V9, ExecutionSpec V10, runtime DB V13 ja Graph Node Module Package V5.
 - Koodissa ovat sekä Codex- että Copilot-adapterit, provider-kohtaiset FIFO-jonot, SQLite-palautuminen, Git-worktree-eristys ja macOS-jakelutyökalut. Schedule-domainia tai standalone JobNode Runia ei ole.
-- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja strict-v16 GraphNode/strategy-graafin.
+- Arkkitehtuurin yhteinen entrypoint on `ARCHITECTURE.md`, ja `npm run validate:arc42` tarkistaa dokumentit, traceabilityn, resurssit ja strict-v17 GraphNode/strategy-graafin.
 
 ## Mitä puuttuu tai ei vielä näy käytössä?
 
 **Todentamatta end-to-end:**
 
-- Portti A:n implementation-, release-, startup- ja capability-first desktop/narrow/40/64-browser-evidenssi on paikallisesti koossa; projektin omistajan ADR-028/029-review ja final narrow Job-flow post-fix -kuva puuttuvat.
+- Portti A:n implementation-, release-, startup- ja capability-first desktop/narrow/40/64-browser-evidenssi on paikallisesti koossa; final narrow Job-flow post-fix -kuva puuttuu.
 - Ensimmäistä viiden GraphNoden Graph Runia ei ole vielä ajettu tuotantokaltaisena end-to-end-pilottina.
-- Observation-cost-, dataset/candidate registry-, evaluation-, shadow- ja promotion/rollback-toteutusta ei ole; draft `goal-019` / `adr-030` odottaa ihmisarviota.
+- Phase 2 observation-cost on toteutettu; dataset/candidate registry-, evaluation-, shadow- ja promotion/rollback-toteutusta ei vielä ole.
 - Method-healthin runtime-, transition-, repair- ja tracker-baselinet puuttuvat ensimmäiseen pilottiin asti.
 - Pinnatun `tk`-revision live-smoke riippuu paikallisesta prerequisite-asennuksesta; hermetic fake-CLI-testit eivät korvaa sitä.
 - Konfiguraatiossa ei ole Copilot-ExecutionProfilea tai Copilot-Nodea, vaikka platform-adapteri on toteutettu.

@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 17
+version: 18
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-012:n accepted finite policy boundary laajenee Portti A:n implementationissa outcome-aware global/local-scopeen; CON-011:n Work/Validation/Repair-invariantit säilyvät strict-v16-rajassa.
+CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-012:n accepted finite policy boundary laajenee Portti A:n implementationissa outcome-aware global/local-scopeen; CON-011:n Work/Validation/Repair-invariantit säilyvät strict-v17-rajassa.
 
 ## Konseptikartta
 
@@ -36,7 +36,7 @@ CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CO
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
 | CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää Work/Validation-, retry- ja terminaalimerkit; Graph Node Orchestrator omistaa routingin ilman Job-canvasin parent-junctionia. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, ADR-027, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
-| CON-012 | Finite policy boundary: Capability Model omistaa outcomes/actions/hard guards; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa `P(outcome,nextState|state,action)`/cost/terminalit; sama solver tuottaa global/local Q/V/actionin; actual state tulee aina projectorilta. Policy Projection on derived evidence ja Execution Graph factual observations. Hard controls poistavat actionin `A(s)`:stä, probabilityt/costit eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011 | QS-002, QS-012, QS-013, QS-021–QS-023 | ADR-026, review ADR-028, config v16/snapshot v9/SQLite v12, RT-016/RT-017 |
+| CON-012 | Finite policy boundary: Capability Model omistaa outcomes/actions/hard guards; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa `P(outcome,nextState|state,action)`/cost/terminalit; sama solver tuottaa global/local Q/V/actionin; actual state tulee aina projectorilta. Policy Projection on derived evidence ja Execution Graph factual observations. Hard controls poistavat actionin `A(s)`:stä, probabilityt/costit eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011, BB-012 | QS-002, QS-012, QS-013, QS-021–QS-025 | ADR-026, ADR-028, ADR-030, config v17/snapshot v10/observation v3/SQLite v13, RT-016/RT-019 |
 
 ## Turvallisuus ja auktorisointi
 
@@ -117,10 +117,10 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää strict-v16-skeemaa: graph omistaa yhteisen Staten, explicit `agent_v1 | ssp_v2` -strategian ja 1–40 GraphNodea; GraphNode omistaa oman strategian/repairin, intrinsic outcomet ja aggregate JobNodet.
+- `.ballet/project.json` käyttää strict-v17-skeemaa: graph omistaa yhteisen Staten, explicit `agent_v1 | ssp_v2` -strategian ja 1–40 GraphNodea; GraphNode omistaa oman strategian/repairin, intrinsic outcomet ja aggregate JobNodet.
 - V16-toteutus ei säilytä v15-readeria, `ssp_v1`:tä, Loop/Workflow/schedule/Edge/start-ID-readereita, reittialiaksia, dual-writeä tai silent defaultia.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
-- SQLite schema v12 käyttää GraphNode-/JobNode-invocationeja, scoped orchestrator/repair request/decision/frame -evidenssiä sekä append-only scoped policy decision/outcome-aware observation/model-miss -evidenssiä. V11-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
+- SQLite schema v13 käyttää GraphNode-/JobNode-invocationeja, scoped orchestrator/repair request/decision/frame -evidenssiä sekä append-only scoped policy decision/outcome-aware observation/model-miss -evidenssiä. V11-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
 
@@ -130,7 +130,7 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-029`.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-030`.
 
 ## Evidenssi
 

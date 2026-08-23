@@ -16,7 +16,7 @@ export const executionEventRowSchema = z.object({
   source: z.enum(["ballet", "codex", "copilot"]),
   kind: z.enum(["system", "think", "agent", "command", "output", "file", "tool", "info", "warn", "error"]),
   level: z.enum(["info", "warn", "error"]), phase: z.enum(["started", "delta", "completed"]),
-  item_id: z.string().nullable(), message: z.string(), data_json: z.string().nullable(),
+  item_id: z.string().nullable(), metric_kind: z.enum(["usage_v1"]).nullable(), message: z.string(), data_json: z.string().nullable(),
   content_bytes: z.number().int(), terminal: z.union([z.literal(0), z.literal(1)]), created_at: z.string()
 }).strict();
 

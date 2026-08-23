@@ -161,7 +161,7 @@ The visual system combines Modern Minimalism with Technical Industrialism. Dark 
 
 ## Implementation Status Boundary
 
-The Port A implementation baseline is strict project config v16, Graph Node Module v5, Root Snapshot v9, Task Envelope and role outcome v8, composition v9, ExecutionSpec v10 and SQLite v12. Graph and GraphNode scopes each use an explicit `agent_v1` or outcome-aware `ssp_v2` strategy without fallback. The repository default remains `agent_v1` until calibrated policy inputs and the pilot are approved. There are no legacy readers, route aliases, dual writes, schedule UI or standalone JobNode Run.
+The active implementation baseline is strict project config v17, Graph Node Module v5, Root Snapshot v10, policy observation v3, Task Envelope and role outcome v8, composition v9, ExecutionSpec v10 and SQLite v13. Graph and GraphNode scopes each use an explicit `agent_v1` or outcome-aware `ssp_v2` strategy without fallback. The execution inspector presents measured or explicitly unknown provider-neutral option-cost dimensions and inclusive scope attribution without inventing scalar actual cost. The repository default remains `agent_v1` until calibrated policy inputs and the pilot are approved. There are no legacy readers, route aliases, dual writes, schedule UI or standalone JobNode Run.
 
 Authoring has exactly three canonical URL-owned levels:
 

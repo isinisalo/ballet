@@ -4,7 +4,7 @@ title: Balletin arc42-menetelmän terveys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 5
+version: 6
 tags:
   - arc42
   - method-health
@@ -19,7 +19,7 @@ Tämä tiedosto seuraa evidenssiä siitä, miten kehitysmenetelmä toimii, ja sa
 
 ## Tila
 
-Mittauskontrakti on accepted. Operatiiviset arvot ovat `not measured`, kunnes ensimmäinen viiden GraphNoden Root Run tuottaa runtime-evidenssin. MHC-004 kirjaa Portti A:n review-tilaisen outcome-aware policy -hypoteesin; teknisten testien läpäisy ei muodosta kalibrointi- tai end-to-end-method-baselinea.
+Mittauskontrakti on accepted. Operatiiviset arvot ovat `not measured`, kunnes ensimmäinen viiden GraphNoden Root Run tuottaa runtime-evidenssin. MHC-004 kirjaa accepted outcome-aware policy -hypoteesin ja Phase 2 observation-evidenssin; teknisten testien läpäisy ei muodosta kalibrointi- tai end-to-end-method-baselinea.
 
 ## Terveysmittarit
 
@@ -35,9 +35,9 @@ Mittauskontrakti on accepted. Operatiiviset arvot ovat `not measured`, kunnes en
 | MH-MANUAL | Manual interventionit ja syyt | not measured | `needs_input` ja Human Node outcomes | sama vältettävä syy kahdessa Runissa |
 | MH-TRANSITION | Named transitionien määrä, outcome-jakauma ja transition limit -osumat | not measured | `GraphOrchestrationStateV1` ja Root Run controls | odottamaton outcome, puuttuva route tai yli 128 transitionin Run |
 | MH-TRACKER | Tracker reconcile -yritykset, pending-intentit ja duplicate-estot | hermetic fault matrix passed 2026-08-21; live baseline not measured | SQLite v9 tracker outbox/linkit | sama reconcile-syy kahdessa Runissa tai duplicate external-ref |
-| MH-POLICY | Scoped policy decisionit, Q/V-selected actionit ja completion | not measured | SQLite v12 policy decisions + Root Run terminal | no proper policy, non-convergence tai Run ei saavuta successia |
-| MH-MODEL-MISS | `outcome_miss`, `state_miss` ja `outside_support` action/state-scopeittain | not measured | SQLite v12 policy observations | mikä tahansa outside_support tai sama miss kahdessa Runissa |
-| MH-COST | Configured expected cost vs observed cost/latency | not measured | policy observations/telemetry | calibration review'n määrittämä poikkeama ylittyy |
+| MH-POLICY | Scoped policy decisionit, Q/V-selected actionit ja completion | not measured | SQLite v13 policy decisions + Root Run terminal | no proper policy, non-convergence tai Run ei saavuta successia |
+| MH-MODEL-MISS | `outcome_miss`, `state_miss` ja `outside_support` action/state-scopeittain | not measured | SQLite v13 policy observations | mikä tahansa outside_support tai sama miss kahdessa Runissa |
+| MH-COST | Configured expected cost vs measured/unknown duration, usage, retry, repair, monetary ja utility dimensions | observation contract verified; operational values not measured | policy observation v3 / telemetry | required dimension unknown tai calibration review'n määrittämä poikkeama ylittyy |
 
 ## Parannusloki
 
@@ -46,7 +46,7 @@ Mittauskontrakti on accepted. Operatiiviset arvot ovat `not measured`, kunnes en
 | MHC-001 | 4 delivery Loopia, 0 valittua project skilliä, legacy `migrated-*`-instructionit, ei jaettua architecture tracea | 6+1 capability Loops ja vakaat arc42-artefaktit vähentävät driftiä ja ambiguous handoffeja | Ota `adr-011` ja strict-v10 arc42 -graafi käyttöön | `validate:arc42` = 0 issuea; ensimmäinen pilotti sisältää täydellisen Goal→evidence-tracen eikä fallback routea | eksplisiittisesti valtuutettu 2026-08-16 | pending pilot | ensimmäisen REVIEW’n jälkeen |
 | MHC-002 | Aktiiviset arkkitehtuurilähteet olivat lyhyitä ja osa Goal/support-sanastosta ristiriidassa strict-v10:n sekä nykyisen Run UI:n kanssa | Kattava suomenkielinen, trace- ja lähdeankkuroitu arc42-korpus vähentää ihmis- ja agenttitulkinnan driftiä | Toteuta `comprehensive-arc42-documentation` muuttamatta runtimea tai ADR-semanttiikkaa | 0 arc42-validointivirhettä, 8/8 Mermaid-renderöintiä, 11/11 Goal/REQ-paria tracettuna ja rajatusta legacy-hausta 0 aktiivista ristiriitaa | käyttäjän hyväksymä suunnitelma 2026-08-17 | paikalliset rakenteelliset mittarit täyttyivät; ihmis- ja pilottivaikutus pending | initiative REVIEW ja ensimmäinen pilotti |
 | MHC-003 | Oletuksessa oli 11 capability Loopia, agentin flow-target-valinta, 62 flow/repair-yhteyttä ja 10 arc42-moduulia; release-taskit eivät olleet idempotentisti sovitetussa trackerissa | Viiden named RunBook -Loopin exact routing ja kaksistoreinen `tk`-sovitus tekevät toimitusjärjestyksestä ennustettavan ja toteutustyöstä restart-turvallisen | Toteuta `goal-014` / `adr-022`: DESIGN→PLAN→BUILD→DEPLOY→VERIFY, 18 transitionia, V13/V3/DB9 ja tracker outbox | TEST-016–TEST-018 läpäisevät; pilotissa 0 providerin flow-target-valintaa, 0 duplicate external-refiä ja jokainen Loop invocation jäljitettävissä | käyttäjän hyväksymä suunnitelma 2026-08-20 | local schema/runtime/hermetic/browser/final gates passed 2026-08-21; live `tk`, human visual verdict and pilot impact pending | `graph-engineering-runbook` REVIEW ja ensimmäinen VERIFY |
-| MHC-004 | Accepted Graph-only `ssp_v1`, local LLM routing, PASS/FAIL-only observations ja upper-level planet canvas; calibrated priors/costs sekä oikea pilotti puuttuivat | Outcome-aware global/local `ssp_v2` ja capability-first authoring tekevät routingista täsmällisemmin tarkastettavan ja model missit kalibroitaviksi | Toteuta `goal-017`/`goal-018`, review ADR-028/029, strict v16/v5/v9/v12 ja kerää MH-POLICY/MH-MODEL-MISS/MH-COST pilotissa | Automated TEST-022–024 läpäisevät; pilotissa kaikki viisi local policya proper, yksi success Graph Run, 0 provider-routingia `ssp_v2`:ssa ja jokainen miss luokiteltu | käyttäjän valtuuttama Portti A 2026-08-23; calibrated pilot/Portti B pending | automated implementation local passed; browser/final gate ja operational impact pending | ADR-028/029 review ja ensimmäinen calibrated `ssp_v2` pilot |
+| MHC-004 | Accepted Graph-only `ssp_v1`, local LLM routing, PASS/FAIL-only observations ja upper-level planet canvas; calibrated priors/costs sekä oikea pilotti puuttuivat | Outcome-aware global/local `ssp_v2`, capability-first authoring ja explicit option-cost dimensions tekevät routingista tarkastettavan ja model missit kalibroitaviksi | Toteuta `goal-017`–`goal-019`, ADR-028–030, strict v17/v5/v10/v13 ja kerää MH-POLICY/MH-MODEL-MISS/MH-COST pilotissa | TEST-022–025 läpäisevät; pilotissa kaikki viisi local policya proper, yksi success Graph Run, 0 provider-routingia `ssp_v2`:ssa ja jokainen miss/cost dimension luokiteltu | project owner acceptance commit `26698dda`; calibrated pilot/Portti B pending | Phase 2 observation implementation verified locally; operational impact pending | Phase 3 calibration inputs ja ensimmäinen calibrated `ssp_v2` pilot |
 
 ## Muutospolitiikka
 
@@ -60,7 +60,7 @@ Runtime-lukumäärät tulevat Root Run -evidenssistä. Persistent findingit ja p
 
 ## Relevantit päätökset
 
-`goal-009`, `goal-014`, `goal-016`–`goal-018`, `adr-011`, `adr-015`, `adr-022`, `adr-026` sekä review-tilaiset `adr-028` ja `adr-029`.
+`goal-009`, `goal-014`, `goal-016`–`goal-019`, `adr-011`, `adr-015`, `adr-022`, `adr-026`, `adr-028`–`adr-030`.
 
 ## Evidenssi
 

@@ -4,7 +4,7 @@ title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 14
+version: 15
 tags:
   - arc42
   - requirements
@@ -19,9 +19,9 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 
 ## Tila ja väitteiden luokittelu
 
-- **Hyväksytty päätös:** `goal-001`–`goal-016` määrittävät hyväksytyn tuotteen tarkoituksen ja laajuuden. Review-tilaiset `goal-017` ja `goal-018` omistavat Portti A:n hierarchical policy- ja capability-first-tavoitteet. Draft `goal-019` ehdottaa immutable offline calibration-, shadow- ja human promotion -rajaa; se ei vielä valtuuta toteutusta.
+- **Hyväksytty päätös:** `goal-001`–`goal-019` määrittävät hyväksytyn tuotteen tarkoituksen ja laajuuden. `goal-017`–`goal-019` omistavat hierarchical policy-, capability-first- sekä immutable offline calibration/shadow/human promotion -tavoitteet.
 - **Toteutettu policy-intentio:** `goal-016` / `REQ-016` tuo Graph-scopeen geneerisen finite SSP/SMDP -policystrategian explicit `agent_v1 | ssp_v1` -valintana.
-- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v16 Graph/GraphNode/JobNode-domainin, explicit agent/SSP scoped routingin, outcome-aware policy coren, capability-first upper-level-authoringin ja säilyvän Job industrial flow'n.
+- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v17 Graph/GraphNode/JobNode-domainin, Snapshot v10 / observation v3 / SQLite v13 -option-cost-evidenssin, explicit agent/SSP scoped routingin, outcome-aware policy coren, capability-first upper-level-authoringin ja säilyvän Job industrial flow'n.
 - **Hyväksytty domain:** `goal-015` / `adr-023` määrittää viiden project-local GraphNoden, 17 aggregate JobNoden sekä Luna/Sol-profiilien säilyvän baseline-intention; Portti A:n portable package on Graph Node Module v5 ja upper-level-projektio on ADR-029:n review-rajalla.
 - **Paikallinen evidenssi:** toteutuksen ajantasaisuus osoitetaan testeillä, buildilla ja `validate:arc42`-tarkistuksella; yksittäisen initiative-työn tulokset kirjataan sen EVIDENCE-tiedostoon.
 - **Avoin riski:** ensimmäisen tuotantokaltaisen pilotin mitatut menetelmä- ja palautumisarvot puuttuvat vielä; katso [osio 11](11-risks-and-technical-debt.md).
@@ -86,7 +86,7 @@ Ballet omistaa yleiset Graph-, GraphNode-, aggregate JobNode-, scoped orchestrat
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-026`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-026` ja accepted `adr-028`–`adr-030`.
 
 ## Evidenssi
 
@@ -97,7 +97,7 @@ Goal-frontmatter, project-skeema, toteutuksen lähdeankkurit ja trace-matriisi o
 - Initiative-kohtaiset sidosryhmät, hyväksymismitat ja mahdollinen `needs_input` täsmennetään aina BRIEFissä.
 - Ensimmäinen end-to-end-pilotti määrittää menetelmäterveyden lähtöarvot.
 - Ensimmäinen SSP-pilotti kalibroi domain expertin probability/cost-priorit ja dokumentoi Decision Staten tunnetut Markov-gap-kohdat.
-- `goal-019` / `adr-030` tarvitsee project ownerin hyväksynnän ennen calibration/promotion-toteutusta.
+- Phase 3 tarvitsee project ownerin hyväksymät exact joint priors-, scalarization-, sample-, coverage- ja readiness-inputit.
 
 ## Seuraava katselmointiperuste
 

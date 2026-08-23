@@ -4,7 +4,7 @@ title: Governed Policy Calibration and Promotion REVIEW
 status: draft
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,13 +16,13 @@ tags:
 
 ## Current verdict
 
-Phase 1 governance is prepared for review. No Phase 2–7 runtime implementation, calibration, candidate, shadow decision, pilot, activation or rollback has occurred.
+Phase 1 governance is accepted and Phase 2 option-cost evidence is implemented. No Phase 3–7 dataset snapshot, calibration candidate, evaluation, shadow decision, pilot, activation or rollback has occurred.
 
 ## Findings
 
-- **Fact GPCP-R-F-001:** accepted ADR-026 and review ADR-028 do not authorize automatic calibration or promotion.
-- **Finding GPCP-R-FIND-001:** the current observation contract is insufficient for provider-neutral complete cost calibration and hierarchy-safe aggregation.
-- **Decision GPCP-R-D-001:** pending project owner acceptance of `goal-019` and `adr-030`.
+- **Fact GPCP-R-F-001:** accepted ADR-026 and ADR-028 still forbid observation-driven live-model mutation; accepted ADR-030 authorizes governed offline phases.
+- **Finding GPCP-R-FIND-001:** resolved for Phase 2 by observation v3, explicit unknown semantics and hierarchy-safe inclusive attribution.
+- **Decision GPCP-R-D-001:** `goal-019` and `adr-030` accepted in commit `26698dda09c9e9fda5284d4bfa578d6084581dc5`.
 - **Assumption GPCP-A-001:** unresolved; exact expert priors, scalarization and thresholds are not yet authored.
 - **Hypothesis GPCP-H-001:** untested; no pilot or shadow evidence exists.
 
@@ -30,23 +30,23 @@ Phase 1 governance is prepared for review. No Phase 2–7 runtime implementation
 
 | QS | Criterion | Evidence | Status |
 | --- | --- | --- | --- |
-| QS-025 | Immutable deterministic calibration/promotion chain and human activation | GPCP-EVID-001 | governance chain passed locally; runtime evidence absent |
+| QS-025 | Immutable deterministic calibration/promotion chain and human activation | GPCP-EVID-001/002 | governance and Phase 2 observation evidence passed locally; Phases 3–7 absent |
 
 ## Conformance review
 
-The bounded diff is an intended draft architecture update. It preserves accepted ADR-026's no-history-default/no-online-update decision, review ADR-028's projector/proper-policy/no-fallback invariants, immutable Root Run snapshots, Work→Validation→bounded retry, Repair and human external-write gates. No production runtime, schema, API, provider, UI, project config or accepted decision text changed.
+The bounded implementation preserves ADR-026/028's no-history-default, projector, proper-policy and no-fallback invariants, immutable Root Run snapshots, Work→Validation→bounded retry, Repair and human external-write gates. It changes the strict project, snapshot, policy-observation, SQLite, API and read-model contracts together without compatibility readers or dual writes.
 
-The only supersession proposal is explicit: if ADR-030 is accepted, it reassigns ADR-028's anticipated Portti B v17/v10/v13 number reservation to the earlier calibration/registry/shadow cut while preserving Portti B's separate semantic approval gate. This is not active while ADR-030 remains draft.
+Accepted ADR-030 explicitly reassigns ADR-028's anticipated Portti B v17/v10/v13 number reservation to the earlier Phase 2 observation cut while preserving Portti B's separate semantic approval gate. The reservation change is active; Portti B model activation is not.
 
-Remaining limitation: `GPCP-EVID-001` proves document/package/startup conformance only. `GPCP-EVID-002`–`GPCP-EVID-007` remain pending and block implementation acceptance, pilot claims and activation.
+Remaining limitation: `GPCP-EVID-003`–`GPCP-EVID-007` remain pending and block candidate, evaluation, pilot and activation claims.
 
 ## Handoff
 
-- Current status: `draft`, human decision required.
-- Next Loop: implementation planning only after decision acceptance.
-- Requested decision: accept or reject `goal-019` and `adr-030` as the authority for Phases 2–7.
-- Stop: no implementation, pilot, activation, Portti B or external write under this draft.
+- Current status: Phase 2 implemented; Phase 3 `needs_input`.
+- Next Loop: offline dataset/calibration only after exact project-local prior, scalarization and readiness inputs are approved.
+- Requested decision: provide the missing Phase 3 calibration inputs; no candidate is generated before them.
+- Stop: no Phase 3 implementation, pilot, activation, Portti B or external write under the current Phase 2 authority.
 
 ## Next review basis
 
-Project owner decision on `goal-019` and `adr-030`.
+Approved Phase 3 calibration inputs or new Phase 2 evidence.

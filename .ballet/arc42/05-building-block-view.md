@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 20
+version: 21
 tags:
   - arc42
   - building-blocks
@@ -15,11 +15,11 @@ arc42Section: 5
 
 ## Tarkoitus
 
-Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vastuut, rajapinnat, laatuvaikutukset ja lähdekoodiankkurit. Portti A:n strict-v16 implementation käyttää yhtä sisäkkäistä Graph/GraphNode/JobNode-domainia, explicit scoped strategioita, outcome-aware policy/repair-runtimea ja Graph Node Module v5 -rajaa.
+Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vastuut, rajapinnat, laatuvaikutukset ja lähdekoodiankkurit. Portti A:n strict-v17 implementation käyttää yhtä sisäkkäistä Graph/GraphNode/JobNode-domainia, explicit scoped strategioita, outcome-aware policy/repair-runtimea ja Graph Node Module v5 -rajaa.
 
 ## Tila
 
-BB-001–BB-010 säilyvät accepted vastuualueina. BB-011:n Portti A -implementation ratkaisee saman pure decision -portin kautta Graph- ja GraphNode-scopea. Draft BB-012 rajaa ehdotetun offline calibration/registry/evaluation/promotion -pinnan erilleen runtime controlista. ADR-023:n domain/Repair- ja ADR-025/027:n Job-flow-invariantit säilyvät.
+BB-001–BB-012 ovat accepted vastuualueita. BB-011 ratkaisee saman pure decision -portin kautta Graph- ja GraphNode-scopea. BB-012 rajaa offline calibration/registry/evaluation/promotion -pinnan erilleen runtime controlista; sen Phase 2 observation feeder on toteutettu, muu learning-pinta ei. ADR-023:n domain/Repair- ja ADR-025/027:n Job-flow-invariantit säilyvät.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -46,16 +46,16 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | BB-001 | Frontend operator workspace: capability-first Graph/GraphNode cards, scoped Decision Model -authoring, protected Job flow, inspector/Sheet ja scoped Run-evidenssi. | Loopback HTTP JSON, shared DTO:t ja URL route/section state. | Ymmärrettävä, saavutettava ja projection/truth-rajan säilyttävä operointi. | `frontend/src/workspace/automation/`, `frontend/src/workspace/policy/`, `frontend/src/workspace/routing.ts`, `frontend/src/workspace/runs/` | REQ-001, REQ-007, REQ-015, REQ-017, REQ-018 |
 | BB-002 | Local HTTP/application services validoivat pyynnöt ja orkestroivat käyttötapaukset. | Express router, service-portit ja shared schemas. | Fail-closed local boundary ja yksi mutaation omistaja. | `backend/http/`, `backend/services/`, `shared/api/` | REQ-001, REQ-006, REQ-015 |
-| BB-003 | Project catalog lukee strict-v16 Graph/strategy/GraphNode/JobNode/intrinsic-outcome/Decision Model -konfiguraation ja resource closuren. | Repositoryt, structural draft/readiness schemas, resource catalog ja workspace DTO:t. | Siirrettävä, katselmoitava project truth; draft tallentuu mutta invalidi Run estyy. | `shared/domain/automation.ts`, `shared/domain/decisionModel*.ts`, `shared/api/workspace-schemas.ts`, `backend/project-config/` | REQ-002, REQ-003, REQ-015–REQ-017 |
+| BB-003 | Project catalog lukee strict-v17 Graph/strategy/GraphNode/JobNode/intrinsic-outcome/Decision Model -konfiguraation ja resource closuren. | Repositoryt, structural draft/readiness schemas, resource catalog ja workspace DTO:t. | Siirrettävä, katselmoitava project truth; draft tallentuu mutta invalidi Run estyy. | `shared/domain/automation.ts`, `shared/domain/decisionModel*.ts`, `shared/api/workspace-schemas.ts`, `backend/project-config/` | REQ-002, REQ-003, REQ-015–REQ-017 |
 | BB-004 | Graph Run planner luo Graph- tai GraphNode-snapshotin, worktreen ja ensimmäisen scoped dispatchin. | Run service, GraphExecutionPlanner, RootRunStore ja BB-005/006. | Immutable execution, eristys ja turvallinen lifecycle ilman standalone JobRunia. | `backend/runs/GraphExecutionPlanner.ts`, `backend/runs/LocalRunService.ts`, `backend/runs/RootRunStore.ts` | REQ-004–REQ-006, REQ-015 |
-| BB-005 | Graph routing runtime validoi semantic outcome + PASS/FAIL:n, projisoi actual Staten, ajaa scoped agent/policy-päätökset, retryt, repair-framet ja terminaalit. | SQLite v12, strict role outcome v8 ja provider-task-portti. | Atominen, rajattu, model-miss-jäljitettävä ja restartissa selitettävä control flow. | `backend/runtime-db.ts`, `backend/runtime/GraphRoutingEngine.ts`, `backend/storage/RuntimeSchema.ts` | REQ-004, REQ-006, REQ-015–REQ-017 |
+| BB-005 | Graph routing runtime validoi semantic outcome + PASS/FAIL:n, projisoi actual Staten, ajaa scoped agent/policy-päätökset, retryt, repair-framet ja terminaalit. | SQLite v13, strict role outcome v8 ja provider-task-portti. | Atominen, rajattu, model-miss-jäljitettävä ja restartissa selitettävä control flow. | `backend/runtime-db.ts`, `backend/runtime/GraphRoutingEngine.ts`, `backend/storage/RuntimeSchema.ts` | REQ-004, REQ-006, REQ-015–REQ-017 |
 | BB-006 | Provider execution ratkaisee exact compositionin, policyt, FIFO-kaistat ja adapterit. | ExecutionProfile, ExecutionSpec v10, Task Envelope v8 ja strict output schema. | Provider-neutralisuus, tavustabiili composition ja no-fallback. | `backend/execution/`, `backend/integration/` | REQ-003, REQ-005, REQ-006, REQ-015, REQ-017 |
 | BB-007 | Checkout lifecycle, Git branch/worktree ja macOS-jakelu. | CLI, Git, launchd ja release-artefaktit. | Active checkout -eristys ja ulkoisen kirjoituksen ihmisraja. | `backend/cli/`, `backend/execution/git/`, `scripts/`, `packaging/` | REQ-005, REQ-008 |
 | BB-008 | Project-local arc42 Method resources ja validointi. | Markdown/JSON-polut, stable ID:t ja npm-validointi. | Jaettu intentio, traceability ja evidenssipohjainen muutos. | `.ballet/arc42/`, `.ballet/goals/`, `.ballet/adr/`, `.agents/skills/arc42/` | REQ-002, REQ-009, REQ-015 |
 | BB-009 | Graph Node Module v5 inspect/plan/install/export/remove ja provenance; intrinsic outcomes mukana, upper appearance ja project-specific model pois. | Strict package/API, materialisointijono ja resource catalog. | Supply-chain-näkyvyys ja project/runtime/model-omistajuusrajan säilyminen. | `shared/domain/graphNodeModules.ts`, `shared/api/graph-node-module-schemas.ts`, `backend/graph-node-modules/` | REQ-002, REQ-010, REQ-015, REQ-017 |
-| BB-010 | Tracker adapter ja transactional outbox. | argv-only process adapter, SQLite intent/linkit ja worktree-local stores. | Fail-closed external process boundary ja idempotentti reconciliation. | `backend/tracker/`, `backend/cli/TrackerCli.ts`, SQLite v12 tracker-taulut | REQ-006, REQ-015 |
-| BB-011 | Scoped policy subsystem projisoi bounded Decision Staten, ratkaisee hard `A(s)`:n, validoi outcome-aware finite SSP/SMDP-mallin ja laskee global/local Q/V/policyn sekä bounded rolloutin. Se ei suorita actionia eikä omista canonical statea. | BB-003:n snapshotted Capability/Decision Model, BB-005:n canonical facts/guards ja pure projector/resolver/compiler/solver/projection-portit. | Project-agnostic deterministic routing, proper-policy safety, model-miss trace ja erillinen execution evidence. | `shared/domain/decisionModel*.ts`, `backend/policy/`, BB-005 SQLite v12 adapter, BB-001 read models | REQ-002, REQ-006, REQ-007, REQ-016–REQ-018 |
-| BB-012 | Ehdotettu offline policy learning ja immutable model registry snapshottaa observations-datasetin, kalibroi joint outcome/actual-state- ja cost-estimaatit, arvioi candidaten, tuottaa shadow-evidenssin sekä promotion proposalin. Se ei aktivoi mallia eikä muuta runtime snapshotia. | BB-005:n immutable observations, BB-011:n compiler/solver/evaluation-portit, BB-003:n project-local calibration/promotion policy ja append-only artifact/event store. | Deterministinen lineage, fail-closed readiness, controller/shadow-erottelu ja human activation/rollback. | Suunniteltu `shared/domain/policyLearning*.ts`, `backend/policy-calibration/`, registry/store/API/read models | REQ-019 |
+| BB-010 | Tracker adapter ja transactional outbox. | argv-only process adapter, SQLite intent/linkit ja worktree-local stores. | Fail-closed external process boundary ja idempotentti reconciliation. | `backend/tracker/`, `backend/cli/TrackerCli.ts`, SQLite v13 tracker-taulut | REQ-006, REQ-015 |
+| BB-011 | Scoped policy subsystem projisoi bounded Decision Staten, ratkaisee hard `A(s)`:n, validoi outcome-aware finite SSP/SMDP-mallin ja laskee global/local Q/V/policyn sekä bounded rolloutin. Se ei suorita actionia eikä omista canonical statea. | BB-003:n snapshotted Capability/Decision Model, BB-005:n canonical facts/guards ja pure projector/resolver/compiler/solver/projection-portit. | Project-agnostic deterministic routing, proper-policy safety, model-miss trace ja erillinen execution evidence. | `shared/domain/decisionModel*.ts`, `backend/policy/`, BB-005 SQLite v13 adapter, BB-001 read models | REQ-002, REQ-006, REQ-007, REQ-016–REQ-018 |
+| BB-012 | Offline policy learning ja immutable model registry snapshottaa observations-datasetin, kalibroi joint outcome/actual-state- ja cost-estimaatit, arvioi candidaten, tuottaa shadow-evidenssin sekä promotion proposalin. Se ei aktivoi mallia eikä muuta runtime snapshotia. | BB-005:n immutable observations, BB-011:n compiler/solver/evaluation-portit, BB-003:n project-local calibration/promotion policy ja append-only artifact/event store. | Deterministinen lineage, fail-closed readiness, controller/shadow-erottelu ja human activation/rollback. | Phase 2: `backend/policy/OptionCostEvidence.ts`, observation v3/read models; myöhemmät `policy-calibration`/registry-portit puuttuvat | REQ-019 |
 
 ## Rajapinta- ja riippuvuussäännöt
 
@@ -68,7 +68,7 @@ flowchart LR
 - BB-002–BB-007 toteuttavat vain geneerisiä primitivejä. Balletin viiden GraphNoden nimet ja arc42-/release-menettely pysyvät project-local-datassa.
 - BB-011 saa action-ID:t vain BB-003:n snapshotatusta kyseisen scopen GraphNode- tai JobNode-kokoelmasta. Se ei tunne default-nodeja, lue live project configia, kutsu provideria tai mutatoi model probabilityjä/costeja.
 - BB-005 omistaa edelleen atomisen dispatchin/terminalin. BB-011 palauttaa validin policy-päätöksen tai typed failure -tuloksen; se ei muodosta toista control-flow/store-omistajaa.
-- Draft BB-012 lukee vain immutable observations- ja project policy -snapshotteja. Se saa kirjoittaa candidate/report/proposal-artifacteja, mutta live model ref-, activation- tai rollback-muutos vaatii exact ihmisvaltuutuksen BB-002/003-mutaation kautta.
+- BB-012 lukee vain immutable observations- ja project policy -snapshotteja. Se saa kirjoittaa candidate/report/proposal-artifacteja, mutta live model ref-, activation- tai rollback-muutos vaatii exact ihmisvaltuutuksen BB-002/003-mutaation kautta.
 
 ## BB-001 whitebox: kolmitasoinen operator workspace
 
@@ -84,14 +84,14 @@ Graph/Graph Node käyttävät responsive stable-order card gridia 1/5/40 GraphNo
 
 ## BB-004/005 whitebox: snapshot ja runtime
 
-1. Planner hyväksyy vain Graph- tai GraphNode-targetin, validoi strict-v16-scopen sekä global/reachable-local readinessin ja ratkaisee exact resource closuren.
-2. Root Snapshot v9 jäädyttää project headin, Staten, molempien scopejen strategy/model/capability-hashit, module provenance, compositions, rightsit, resurssit ja limitit.
+1. Planner hyväksyy vain Graph- tai GraphNode-targetin, validoi strict-v17-scopen sekä global/reachable-local readinessin ja ratkaisee exact resource closuren.
+2. Root Snapshot v10 jäädyttää project headin, Staten, molempien scopejen strategy/model/capability-hashit, module provenance, compositions, rightsit, resurssit ja limitit.
 3. `agent_v1` kutsuu scoped Orchestratoria. `ssp_v2` projisoi Graph- tai GraphNode-Decision Staten, ratkaisee hard `A(s)`:n ja SSP-policyn; provider ei valitse actionia.
 4. Work `completed` siirtyy aina paired Validationiin. Validation `FAIL` palaa Workiin retryrajan sisällä; rajan jälkeen orchestrator valitsee strict repair/escalation-candidateista.
 5. Invalidi orchestrator-target voidaan uusia enintään kolme kertaa. Saman tason Repair Node voi patchata validoitua Statea tai Run-worktreen artefakteja, dispatchata sallittuun repair-candidateen tai eskaloida.
 6. Durable frame palauttaa repairista samaan Validationiin uusimmalla Statella, Work rerun = 0 ja retry reset = 0. Depth/attempt ovat enintään 3 ja transition count enintään 256.
 7. GraphNode Runin normaali flow päättyy paikalliseen terminaliin. Ylempi Graph Orchestrator on käytettävissä vain repair-eskalaatioon.
-8. SQLite v12 committoi scoped agent request/decision-, policy decision/observation/model-miss-, frame/outcome/State- ja control-flow-faktat transaktiorajojen mukaisesti. V11-kanta failaa suljetusti eikä sitä muuteta.
+8. SQLite v13 committoi scoped agent request/decision-, policy decision/observation/model-miss-, frame/outcome/State- ja control-flow-faktat transaktiorajojen mukaisesti. V11-kanta failaa suljetusti eikä sitä muuteta.
 
 ## BB-006 whitebox: composition ja provider
 
@@ -120,7 +120,7 @@ Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-027`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-030`.
 
 ## Evidenssi
 
@@ -128,7 +128,7 @@ Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-
 
 BB-011:n scoped v2 compiler/solver/projection/model-miss-read model ja BB-001:n capability-first UI on toteutettu Portti A:ssa ja indeksoitu `TEST-022`–`TEST-024` / `EVID-022`–`EVID-024`:ään. Calibrated pilot, browser/human review ja Portti B ovat avoimia.
 
-BB-012 on draft-ratkaisu ilman toteutusevidenssiä. Sen governance-chain on `TEST-025` / `EVID-025`; runtime evidence pysyy pending-tilassa.
+BB-012:n governance ja Phase 2 observation-evidenssi ovat `TEST-025` / `EVID-025`:ssä; calibration/registry/evaluation/shadow/activation-evidenssi pysyy pending-tilassa.
 
 ## Avoimet kysymykset
 

@@ -9,7 +9,7 @@ tags:
   - policy
   - calibration
   - governance
-version: 1
+version: 2
 ---
 
 # Hallittu policy-kalibrointi ja mallipromootio
@@ -41,4 +41,4 @@ Project-local outcome-katalogit, priorit, scalarization-parametrit, readiness-th
 
 ## Ihmispäätös
 
-Tämä Goal on draft. Project ownerin on hyväksyttävä `goal-019` ja `adr-030` ennen runtime-, schema-, persistence-, API- tai UI-toteutusta. Hyväksyntä ei vielä aktivoi mallia, käynnistä pilottia tai valtuuta Portti B:tä.
+Project owner hyväksyi `goal-019`:n ja `adr-030`:n commitissa `26698dda09c9e9fda5284d4bfa578d6084581dc5`. Hyväksyntä valtuuttaa vaiheittaisen Phase 2–7 -toteutuksen hyväksyttyjen stop-ehtojen mukaisesti, mutta se ei aktivoi mallia, käynnistä pilottia tai valtuuta Portti B:tä.

@@ -22,7 +22,7 @@ export const toExecutionEvent = (event: RuntimeEvent, sequence: number, provider
     case "permission.denied":
       return { ...base, source: event.request.provider, kind: "warn", level: "warn", phase: "completed", message: `Runtime policy denied ${event.request.operation}.`, data: data(event.request) };
     case "usage":
-      return { ...base, source: provider, kind: "info", level: "info", phase: "completed", message: "Token usage updated.", data: data(event.usage) };
+      return { ...base, source: provider, kind: "info", level: "info", phase: "completed", metricKind: "usage_v1", message: "Usage updated.", data: data(event.usage) };
     case "diagnostic":
       return { ...base, source: provider, kind: event.level === "warning" ? "warn" : event.level === "error" ? "error" : "info", level: event.level === "warning" ? "warn" : event.level, phase: "completed", message: event.message, data: data(event.data) };
     case "execution.completed":

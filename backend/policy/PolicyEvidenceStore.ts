@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
-import type { PolicyDecisionRecordV2, PolicyOptionObservationV2 } from "../../shared/domain/decisionModel.js";
+import type { PolicyDecisionRecordV2, PolicyOptionObservationV3 } from "../../shared/domain/decisionModel.js";
+import { policyOptionObservationSchema } from "../../shared/api/runtime-schemas.js";
 
 type Row = Record<string, unknown>;
 
@@ -12,7 +13,7 @@ export class PolicyEvidenceStore {
     ).all(rootRunId) as Row[]).map(mapPolicyDecision);
   }
 
-  listObservations(rootRunId: string): PolicyOptionObservationV2[] {
+  listObservations(rootRunId: string): PolicyOptionObservationV3[] {
     return (this.connection().prepare(
       "SELECT * FROM policy_option_observations WHERE root_run_id = ? ORDER BY created_at, rowid"
     ).all(rootRunId) as Row[]).map(mapPolicyObservation);
@@ -47,13 +48,13 @@ export class PolicyEvidenceStore {
     );
   }
 
-  insertObservation(observation: PolicyOptionObservationV2): void {
+  insertObservation(observation: PolicyOptionObservationV3): void {
     this.connection().prepare(`
       INSERT INTO policy_option_observations (
         policy_observation_id, root_run_id, policy_decision_id, scope, scope_key, action_invocation_id,
         graph_node_invocation_id, job_node_invocation_id, state_before_json, action_id,
-        configured_expected_cost_micros, expected_outcome_distribution_json, actual_cost_micros,
-        observed_outcome_id, verified_result, actual_state_json, model_match, duration_millis,
+        configured_expected_cost_micros, expected_outcome_distribution_json, observation_version,
+        observed_cost_json, observed_outcome_id, verified_result, actual_state_json, model_match,
         model_sha256, snapshot_sha256, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
@@ -61,10 +62,10 @@ export class PolicyEvidenceStore {
       observation.scope, observation.scopeKey, observation.actionInvocationId,
       observation.graphNodeInvocationId ?? null, observation.jobNodeInvocationId ?? null,
       JSON.stringify(observation.stateBefore), observation.actionId, observation.configuredExpectedCostMicros,
-      JSON.stringify(observation.expectedOutcomeDistribution), observation.actualCostMicros ?? null,
-      observation.observedOutcomeId, observation.verifiedResult,
+      JSON.stringify(observation.expectedOutcomeDistribution), observation.version,
+      JSON.stringify(observation.observedCost), observation.observedOutcomeId, observation.verifiedResult,
       observation.actualState ? JSON.stringify(observation.actualState) : null, observation.modelMatch,
-      observation.durationMillis, observation.modelSha256, observation.snapshotSha256, observation.createdAt
+      observation.modelSha256, observation.snapshotSha256, observation.createdAt
     );
   }
 }
@@ -89,18 +90,18 @@ const mapPolicyDecision = (row: Row): PolicyDecisionRecordV2 => ({
   message: optional(row.message), createdAt: String(row.created_at)
 });
 
-const mapPolicyObservation = (row: Row): PolicyOptionObservationV2 => ({
-  policyObservationId: String(row.policy_observation_id), rootRunId: String(row.root_run_id),
-  policyDecisionId: String(row.policy_decision_id), scope: row.scope as PolicyOptionObservationV2["scope"],
+const mapPolicyObservation = (row: Row): PolicyOptionObservationV3 => policyOptionObservationSchema.parse({
+  version: Number(row.observation_version), policyObservationId: String(row.policy_observation_id), rootRunId: String(row.root_run_id),
+  policyDecisionId: String(row.policy_decision_id), scope: row.scope as PolicyOptionObservationV3["scope"],
   scopeKey: String(row.scope_key), actionInvocationId: String(row.action_invocation_id),
   graphNodeInvocationId: optional(row.graph_node_invocation_id), jobNodeInvocationId: optional(row.job_node_invocation_id),
-  stateBefore: JSON.parse(String(row.state_before_json)) as PolicyOptionObservationV2["stateBefore"],
+  stateBefore: JSON.parse(String(row.state_before_json)) as PolicyOptionObservationV3["stateBefore"],
   actionId: String(row.action_id), configuredExpectedCostMicros: Number(row.configured_expected_cost_micros),
-  expectedOutcomeDistribution: JSON.parse(String(row.expected_outcome_distribution_json)) as PolicyOptionObservationV2["expectedOutcomeDistribution"],
-  actualCostMicros: row.actual_cost_micros == null ? undefined : Number(row.actual_cost_micros),
-  observedOutcomeId: String(row.observed_outcome_id), verifiedResult: row.verified_result as PolicyOptionObservationV2["verifiedResult"],
-  actualState: row.actual_state_json ? JSON.parse(String(row.actual_state_json)) as PolicyOptionObservationV2["actualState"] : undefined,
-  modelMatch: row.model_match as PolicyOptionObservationV2["modelMatch"], durationMillis: Number(row.duration_millis),
+  expectedOutcomeDistribution: JSON.parse(String(row.expected_outcome_distribution_json)) as PolicyOptionObservationV3["expectedOutcomeDistribution"],
+  observedCost: JSON.parse(String(row.observed_cost_json)) as PolicyOptionObservationV3["observedCost"],
+  observedOutcomeId: String(row.observed_outcome_id), verifiedResult: row.verified_result as PolicyOptionObservationV3["verifiedResult"],
+  actualState: row.actual_state_json ? JSON.parse(String(row.actual_state_json)) as PolicyOptionObservationV3["actualState"] : undefined,
+  modelMatch: row.model_match as PolicyOptionObservationV3["modelMatch"],
   modelSha256: String(row.model_sha256), snapshotSha256: String(row.snapshot_sha256), createdAt: String(row.created_at)
 });
 

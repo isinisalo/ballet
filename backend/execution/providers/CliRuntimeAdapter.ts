@@ -68,6 +68,8 @@ export interface RuntimeUsage {
   inputTokens?: number;
   outputTokens?: number;
   cachedInputTokens?: number;
+  monetaryMicros?: number;
+  utilityMicros?: number;
 }
 
 export type RuntimeEvent =

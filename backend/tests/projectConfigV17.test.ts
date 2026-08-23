@@ -2,11 +2,11 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { projectConfigReadinessSchema, projectConfigSchema } from "../../shared/api/workspace-schemas.js";
 
-describe("project configuration v16 Port A contract", () => {
+describe("project configuration v17 governed observation contract", () => {
   it("accepts the repository agent_v1 pilot baseline as structurally and operationally valid", async () => {
     const source = JSON.parse(await readFile(".ballet/project.json", "utf8"));
     const parsed = projectConfigSchema.parse(source);
-    expect(parsed.version).toBe(16);
+    expect(parsed.version).toBe(17);
     expect(parsed.graph.graphNodes).toHaveLength(5);
     expect(parsed.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)).toHaveLength(17);
     expect(projectConfigReadinessSchema.safeParse(source).success).toBe(true);

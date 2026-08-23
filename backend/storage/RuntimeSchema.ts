@@ -1,4 +1,4 @@
-export const localDatabaseSchemaVersion = 12;
+export const localDatabaseSchemaVersion = 13;
 
 export const localDatabaseTableNames = [
   "control_flow_events", "execution_events", "execution_tasks", "graph_node_invocations",
@@ -117,10 +117,10 @@ export const runtimeSchema = `
     graph_node_invocation_id TEXT REFERENCES graph_node_invocations(graph_node_invocation_id),
     job_node_invocation_id TEXT REFERENCES job_node_invocations(job_node_invocation_id),
     state_before_json TEXT NOT NULL, action_id TEXT NOT NULL, configured_expected_cost_micros INTEGER NOT NULL,
-    expected_outcome_distribution_json TEXT NOT NULL, actual_cost_micros INTEGER, observed_outcome_id TEXT NOT NULL,
+    expected_outcome_distribution_json TEXT NOT NULL, observation_version INTEGER NOT NULL CHECK (observation_version = 3),
+    observed_cost_json TEXT NOT NULL, observed_outcome_id TEXT NOT NULL,
     verified_result TEXT NOT NULL CHECK (verified_result IN ('PASS','FAIL')), actual_state_json TEXT,
     model_match TEXT NOT NULL CHECK (model_match IN ('match','outcome_miss','state_miss','outside_support')),
-    duration_millis INTEGER NOT NULL CHECK (duration_millis >= 0),
     model_sha256 TEXT NOT NULL, snapshot_sha256 TEXT NOT NULL, created_at TEXT NOT NULL,
     UNIQUE (scope, action_invocation_id)
   );
@@ -177,7 +177,8 @@ export const runtimeSchema = `
     id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL REFERENCES execution_tasks(task_id) ON DELETE CASCADE,
     sequence INTEGER NOT NULL, source TEXT NOT NULL CHECK (source IN ('ballet','codex','copilot')), kind TEXT NOT NULL,
     level TEXT NOT NULL CHECK (level IN ('info','warn','error')), phase TEXT NOT NULL CHECK (phase IN ('started','delta','completed')),
-    item_id TEXT, message TEXT NOT NULL, data_json TEXT, content_bytes INTEGER NOT NULL, terminal INTEGER NOT NULL CHECK (terminal IN (0,1)),
+    item_id TEXT, metric_kind TEXT CHECK (metric_kind IN ('usage_v1')), message TEXT NOT NULL, data_json TEXT,
+    content_bytes INTEGER NOT NULL, terminal INTEGER NOT NULL CHECK (terminal IN (0,1)),
     created_at TEXT NOT NULL, UNIQUE (task_id, sequence)
   );
 

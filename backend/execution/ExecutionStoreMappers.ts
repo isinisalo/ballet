@@ -63,7 +63,8 @@ export const assertExecutionSpecEvidence = (spec: ExecutionSpec): void => {
 
 export const toExecutionEvent = (row: ExecutionEventRow): ExecutionEvent => ({
   id: row.id, taskId: row.task_id, sequence: row.sequence, source: row.source, kind: row.kind,
-  level: row.level, phase: row.phase, itemId: row.item_id ?? undefined, message: row.message,
+  level: row.level, phase: row.phase, itemId: row.item_id ?? undefined,
+  metricKind: row.metric_kind ?? undefined, message: row.message,
   data: row.data_json ? parseEventData(row.data_json, row.task_id) : undefined,
   contentBytes: row.content_bytes, terminal: Boolean(row.terminal), createdAt: row.created_at
 });

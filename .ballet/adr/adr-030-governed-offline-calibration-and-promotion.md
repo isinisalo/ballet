@@ -9,16 +9,16 @@ tags:
   - policy
   - calibration
   - promotion
-version: 1
+version: 2
 ---
 
 # Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla
 
 ## Konteksti
 
-Accepted ADR-026 kieltää probabilityjen history-derived-defaultit ja automaattisen RL/päivityksen. Review ADR-028 toteuttaa immutable `P(outcome,expectedNextState|state,action)` -mallin, projector-owned actual Staten ja havaintojäljen mutta rajaa probabilityjen ja costien automaattisen kalibroinnin ulos.
+Accepted ADR-026 kieltää probabilityjen history-derived-defaultit ja automaattisen RL/päivityksen. Accepted ADR-028 toteuttaa immutable `P(outcome,expectedNextState|state,action)` -mallin, projector-owned actual Staten ja havaintojäljen mutta rajaa probabilityjen ja costien automaattisen kalibroinnin ulos.
 
-Nykyinen `PolicyOptionObservationV2` ja SQLite v12 voivat tallentaa keston, valinnaisen `actualCostMicros`-arvon, toteutuneen outcomen/next staten sekä provenance-viitteet, mutta nykyinen runtime producer ei aseta `actualCostMicros`-arvoa. Provider-event-raja tuntee osan token usage -dimensioista, mutta niitä ei aggregoida option observationiin yhdenmukaisesti. Sopimus ei määritä täydellisiä provider-neutral usage-, retry-, monetary- tai utility-dimensioita, hierarchy-safe-attribuutiota, dataset-snapshotteja, candidate registryä, held-out-evaluationia, shadow-provenancea tai aktivointi-/rollback-politiikkaa.
+Ennen Phase 2 -leikkausta `PolicyOptionObservationV2` ja SQLite v12 pystyivät tallentamaan keston, valinnaisen `actualCostMicros`-arvon, toteutuneen outcomen/next staten sekä provenance-viitteet, mutta runtime producer ei asettanut `actualCostMicros`-arvoa. Provider-event-raja tunsi osan token usage -dimensioista, mutta niitä ei aggregoitu option observationiin yhdenmukaisesti. Sopimus ei määrittänyt täydellisiä provider-neutral usage-, retry-, monetary- tai utility-dimensioita, hierarchy-safe-attribuutiota, dataset-snapshotteja, candidate registryä, held-out-evaluationia, shadow-provenancea tai aktivointi-/rollback-politiikkaa.
 
 ## Päätösajurit
 
@@ -29,7 +29,7 @@ Nykyinen `PolicyOptionObservationV2` ja SQLite v12 voivat tallentaa keston, vali
 - Provider-neutral, project-local ja deterministisesti katselmoitava scalarization.
 - Fail-closed readiness/evaluation sekä ihmisen säilyvä activation-, rollback- ja external-write-valta.
 
-## Ehdotettu päätös
+## Päätös
 
 ### Option-cost-evidenssi ja hierarkia
 
@@ -79,7 +79,7 @@ Pilotin target, outcome-katalogit, priors, scalarization, thresholds, model hash
 
 ### Strict contract cut ja Portti B
 
-Governance-draft ei muuta nykyisiä v16/v5/v9/v12-sopimuksia. Hyväksynnän jälkeinen implementation tekee yhden koordinoidun hard cutin ilman compatibility-readeria, dual-writeä tai runtime-migraatiota. Project Config v17, Root Snapshot v10 ja SQLite v13 varataan calibration/registry/shadow/promotion-slicelle; Graph Node Module säilyy v5:nä, ellei package-raja tosiasiassa muutu. Jokainen muu kosketettu strict producer/consumer bumpataan samassa cutissa.
+Phase 2 tekee yhden koordinoidun hard cutin ilman compatibility-readeria, dual-writeä tai runtime-migraatiota: Project Config v17, Root Snapshot v10, policy observation v3 ja SQLite v13. Graph Node Module säilyy v5:nä, koska package-raja ei muutu. Seuraavat calibration/registry/shadow/promotion-slicet jatkavat näistä versioista ja bumpaavat vain tosiasiassa muuttuvat strict producerit ja consumerit.
 
 ADR-028:n review-tekstissä Portti B:lle ennakoidut v17/v10/v13-numerot siirtyvät tämän ehdotuksen hyväksynnän jälkeen vähintään seuraaviin vapaisiin versioihin. Portti B:n exact version matrix päätetään vasta sen erillisessä hyväksyntärajassa; tämä ADR ei valtuuta agent-routerien poistoa.
 
@@ -104,6 +104,6 @@ ADR-028:n review-tekstissä Portti B:lle ennakoidut v17/v10/v13-numerot siirtyv�
 
 ## Evidenssi ja review trigger
 
-Trace-ehdotus on `goal-019` / `REQ-019`, `QS-025`, `adr-030` / `CON-012`, `BB-005`, `BB-011`, ehdotettu `BB-012`, `RT-019`, `TEST-025`, `EVID-025` ja initiative `governed-policy-calibration-and-promotion`.
+Trace on `goal-019` / `REQ-019`, `QS-025`, `adr-030` / `CON-012`, `BB-005`, `BB-011`, `BB-012`, `RT-019`, `TEST-025`, `EVID-025` ja initiative `governed-policy-calibration-and-promotion`.
 
-ADR tarvitsee eksplisiittisen hyväksynnän ennen Phase 2 -toteutusta. Uusi ADR vaaditaan online learningille, automaattiselle activationille, profile-aware Optioneille, permission/network-rajan policy-laajennukselle tai Portti B:n agent-routerien poistolle.
+Project owner hyväksyi ADR:n commitissa `26698dda09c9e9fda5284d4bfa578d6084581dc5`. Uusi ADR vaaditaan online learningille, automaattiselle activationille, profile-aware Optioneille, permission/network-rajan policy-laajennukselle tai Portti B:n agent-routerien poistolle.

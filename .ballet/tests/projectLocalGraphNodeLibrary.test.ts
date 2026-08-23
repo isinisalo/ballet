@@ -12,10 +12,10 @@ import type { RuntimeDatabaseProvider } from "../../backend/services/RuntimeData
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("project-local Graph Engineering v16", () => {
+describe("project-local Graph Engineering v17", () => {
   it("contains five capability-first Graph Nodes and 17 aggregate Job Nodes", async () => {
     const config = projectConfigSchema.parse(JSON.parse(await readFile(".ballet/project.json", "utf8")));
-    expect(config.version).toBe(16);
+    expect(config.version).toBe(17);
     expect(config.graph.graphNodes.map(({ id }) => id)).toEqual(["design","plan","build","deploy","verify"]);
     expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)).toHaveLength(17);
     expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)
@@ -124,7 +124,7 @@ const emptyProject = async (requiredKeys: string[]): Promise<string> => {
     writeFile(path.join(root, `.ballet/instructions/${id}.md`),
       `---\nid: ${id}\ntitle: ${id}\n---\nOperate only inside the immutable candidate set.\n`)));
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 16,
+    version: 17,
     executionProfiles: [
       { id: "luna", name: "Luna", provider: "codex", model: "gpt-5.6-luna", reasoningEffort: "medium", networkAccess: false },
       { id: "sol", name: "Sol", provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "medium", networkAccess: false }

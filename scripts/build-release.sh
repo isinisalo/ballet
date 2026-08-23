@@ -176,7 +176,7 @@ const workNode = jobNode?.workNode;
 const validationNode = jobNode?.validationNode;
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 16
+if (workspace.automation?.version !== 17
   || workspace.automation.graph?.graphNodes?.length !== 1
   || graphNode?.id !== "review-node"
   || graphNode?.description !== "Review the fixture project."
@@ -219,7 +219,7 @@ if (workspace.automation?.version !== 16
   || workspace.canvasTheme?.version !== 4
   || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.canvasThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v16 Graph/Graph Node fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v17 Graph/Graph Node fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
@@ -235,7 +235,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "12") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 12`);
+if (version !== "13") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 13`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
   git -C "$SMOKE_ROOT/project" status --short >&2

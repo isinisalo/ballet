@@ -171,11 +171,11 @@ export class ExecutionStore {
       const sequence = Math.max(event.sequence, this.lastSequence(taskId) + 1);
       const inserted = this.connection().prepare(`
         INSERT INTO execution_events (
-          task_id, sequence, source, kind, level, phase, item_id, message, data_json,
+          task_id, sequence, source, kind, level, phase, item_id, metric_kind, message, data_json,
           content_bytes, terminal, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(taskId, sequence, event.source, event.kind, event.level, event.phase,
-        event.itemId ?? null, message, dataJson,
+        event.itemId ?? null, event.metricKind ?? null, message, dataJson,
         bytes, event.terminal ? 1 : 0, event.createdAt);
       this.connection().prepare(`
         UPDATE execution_tasks SET retained_content_bytes = retained_content_bytes + ?, last_sequence = ?, updated_at = ?
@@ -185,7 +185,8 @@ export class ExecutionStore {
       return {
         id: Number(inserted.lastInsertRowid), task_id: taskId, sequence, source: event.source,
         kind: event.kind, level: event.level, phase: event.phase, item_id: event.itemId ?? null,
-        message, data_json: dataJson, content_bytes: bytes, terminal: event.terminal ? 1 : 0,
+        metric_kind: event.metricKind ?? null, message, data_json: dataJson, content_bytes: bytes,
+        terminal: event.terminal ? 1 : 0,
         created_at: event.createdAt
       } satisfies ExecutionEventRow;
     });

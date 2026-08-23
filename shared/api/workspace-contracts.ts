@@ -54,8 +54,8 @@ import type {
 } from "../domain/graphNodeModules.js";
 import type {
   DecisionFeatureDefinitionV2, DecisionOptionModelRowV2, DecisionStateDefinitionV2,
-  ExecutionGraphOccurrenceV2, PolicyDecisionRecordV2, PolicyPreviewResultV2, PolicyPreviewV2, PolicyProjectionEdgeV2,
-  PolicyProjectionNodeV2, PolicyProjectionV2, PolicyTelemetryV2, ProjectCapabilityModelV2,
+  ExecutionGraphOccurrenceV3, PolicyCostMeasureV1, PolicyDecisionRecordV2, PolicyPreviewResultV2, PolicyPreviewV2,
+  PolicyProjectionEdgeV2, PolicyProjectionNodeV2, PolicyProjectionV2, PolicyTelemetryV3, ProjectCapabilityModelV2,
   ProjectGraphDecisionStrategyV2, ProjectSspDecisionModelV2, ProjectSspDecisionStrategyV2, SspActionValueV2
 } from "../domain/decisionModel.js";
 
@@ -146,7 +146,7 @@ export type {
   InstalledGraphNodeModuleStatus, GraphNodeModuleExportResult, GraphNodeModuleInspection,
   GraphNodeModuleInstallPlan, GraphNodeModuleLibraryEntry, GraphNodeModulePackageV5
   , DecisionFeatureDefinitionV2, DecisionOptionModelRowV2, DecisionStateDefinitionV2,
-  ExecutionGraphOccurrenceV2, PolicyDecisionRecordV2, PolicyPreviewResultV2, PolicyPreviewV2, PolicyProjectionEdgeV2,
-  PolicyProjectionNodeV2, PolicyProjectionV2, PolicyTelemetryV2, ProjectCapabilityModelV2,
+  ExecutionGraphOccurrenceV3, PolicyCostMeasureV1, PolicyDecisionRecordV2, PolicyPreviewResultV2, PolicyPreviewV2,
+  PolicyProjectionEdgeV2, PolicyProjectionNodeV2, PolicyProjectionV2, PolicyTelemetryV3, ProjectCapabilityModelV2,
   ProjectGraphDecisionStrategyV2, ProjectSspDecisionModelV2, ProjectSspDecisionStrategyV2, SspActionValueV2
 };

@@ -96,7 +96,7 @@ const runtimeFixture = async (policy: ProjectSspDecisionStrategyV2, ids = ["disc
 };
 
 const executionSnapshot = (policy: ProjectSspDecisionStrategyV2, ids: string[]): RootExecutionSnapshot => ({
-  version: 9, rootKind: "graph",
+  version: 10, policyObservationContractVersion: 3, rootKind: "graph",
   project: { checkoutRoot: "/tmp/policy", headSha: "a".repeat(40), configHash: "config", snapshotHash: "snapshot-hash" },
   issueTracker: { kind: "tk", testedRevision: "b".repeat(40), orchestrationDirectory: ".tickets/orchestration", workDirectory: ".tickets/work" },
   graph: { id: "generic-policy-graph", name: "Generic policy graph", state: { description: "Bounded authorization facts.", initial: { permitPrototype: "no" } }, strategy: structuredClone(policy), graphNodes: ids.map(graphNode) },

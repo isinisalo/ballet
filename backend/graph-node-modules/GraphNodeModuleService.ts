@@ -115,7 +115,7 @@ export class GraphNodeModuleService {
         written.push(filename);
       }
       const next = installGraphNode(loaded.config, plan.graphNode);
-      this.projects.putAutomation(this.root(), { version: 16, graph: next.graph });
+      this.projects.putAutomation(this.root(), { version: 17, graph: next.graph });
       const persistedGraphNode = this.projects.load(this.root()).config?.graph.graphNodes.find(
         ({ id }) => id === plan.graphNode.id
       );
@@ -194,7 +194,7 @@ export class GraphNodeModuleService {
         }
       } }
     };
-    this.projects.putAutomation(this.root(), { version: 16, graph: nextGraph });
+    this.projects.putAutomation(this.root(), { version: 17, graph: nextGraph });
     for (const resource of record.ownedResources) await unlink(path.join(this.root(), resource.relativePath)).catch(() => undefined);
     installed.installed = installed.installed.filter((candidate) => candidate.graphNodeId !== graphNodeId);
     await this.writeInstalled(installed);

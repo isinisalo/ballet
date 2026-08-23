@@ -4,7 +4,7 @@ title: Ajonäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 15
+version: 16
 tags:
   - arc42
   - runtime
@@ -19,7 +19,7 @@ Tämä osio kuvaa vain sellaiset runtime-skenaariot, joiden järjestys, samanaik
 
 ## Tila
 
-RT-001–RT-016 kuvaavat accepted invariantit tai historialliset skenaariot. Review-tilaiset RT-017 ja RT-018 kuvaavat Portti A:n outcome-aware hierarchical decision epochin sekä capability-first draft/compile-authoringin. Draft RT-019 ehdottaa offline candidate-, shadow- ja promotion-lifecyclea ilman live-mallin automaattista mutaatiota. Current implementation cut on config v16, immutable snapshot v9 ja SQLite schema v12.
+RT-001–RT-019 kuvaavat accepted invariantit tai historialliset skenaariot. RT-017 ja RT-018 kuvaavat outcome-aware hierarchical decision epochin sekä capability-first draft/compile-authoringin. RT-019 omistaa offline candidate-, shadow- ja promotion-lifecyclen ilman live-mallin automaattista mutaatiota; sen Phase 2 observation-input on toteutettu. Current implementation cut on config v17, immutable snapshot v10, policy observation v3 ja SQLite schema v13.
 
 ## RT-001: normaali sekventiaalinen Root Run
 
@@ -180,13 +180,13 @@ sequenceDiagram
 
 Root Runin orchestration epic ja Loop invocationin chore käyttävät pysyviä external-refeja. Osittainen ulkoinen kirjoitus ei luo seuraavalla yrityksellä duplikaattia, koska reconciliation kysyy external-refin ja sovittaa linkin ennen uutta createa. Work-store CLI käyttää samaa strict adapteria mutta ei voi muokata orchestration-storea. BUILD claim valitsee enintään yhden ready-issuen yhtä invocationia kohti.
 
-RT-013 säilyttää strict-v13 tracker-evidenssin. Current strict-v16 käyttää samoja fail-closed-idempotenssi-invariantteja GraphNode-invocationeihin ja SQLite v12:n generalisoituun agent/policy/request/decision/frame/evidence-miss-dataan.
+RT-013 säilyttää strict-v13 tracker-evidenssin. Current strict-v17 käyttää samoja fail-closed-idempotenssi-invariantteja GraphNode-invocationeihin ja SQLite v13:n generalisoituun agent/policy/request/decision/frame/evidence-miss-dataan.
 
 ## RT-014: scoped Graph ja GraphNode orchestrator dispatch
 
 ```mermaid
 flowchart TD
-  start["Graph tai GraphNode Root Run"] --> snapshot["Snapshot v9: strategy/model provenance, State, candidates, compositions, rights"]
+  start["Graph tai GraphNode Root Run"] --> snapshot["Snapshot v10: strategy/model provenance, State, candidates, compositions, rights"]
   snapshot --> scope{"Root scope"}
   scope -->|"Graph"| graphOrch["Graph Orchestrator: Luna profile"]
   scope -->|"GraphNode"| nodeOrch["Graph Node Orchestrator: Luna profile"]
@@ -211,7 +211,7 @@ GraphNode Run käyttää paikallista orchestratoria normaalissa flow'ssa ja pä�
 sequenceDiagram
   participant V as Validation
   participant O as Scoped Orchestrator
-  participant DB as SQLite v12 State + frames
+  participant DB as SQLite v13 State + frames
   participant R as Scoped Repair Node
   participant GO as Graph Orchestrator/Repair
   V-->>O: FAIL + evidence + target-ID-free repair request
@@ -277,7 +277,7 @@ sequenceDiagram
   participant Local as GraphNode local policy
   participant Job as JobNode Work→Validation
   participant Projector as Canonical state projector
-  participant Store as SQLite v12 evidence
+  participant Store as SQLite v13 evidence
   Runtime->>Policy: Graph DecisionState + hard guards
   Policy-->>Runtime: πG(S) → GraphNode + Q/V/projection
   Runtime->>Option: Dispatch GraphNode Option
@@ -309,15 +309,15 @@ sequenceDiagram
   participant Catalog as BB-003 project catalog
   participant Compiler as BB-011 scoped compiler
   Operator->>UI: Edit capability/outcome/model row
-  UI->>API: Preview structural v16 draft for scope
+  UI->>API: Preview structural v17 draft for scope
   API->>Compiler: Compile current scope without persistence
   Compiler-->>UI: issues or Q/V + Policy Projection
   Operator->>API: Save draft
-  API->>Catalog: Persist structurally valid config v16
+  API->>Catalog: Persist structurally valid config v17
   Operator->>API: Start Graph Run
   API->>Compiler: Compile global + every reachable local model
   alt every scope ready
-    API-->>Operator: Snapshot v9 and start
+    API-->>Operator: Snapshot v10 and start
   else any issue
     API-->>Operator: exact scoped readiness issues, Run 0
   end
@@ -352,7 +352,7 @@ sequenceDiagram
 
 Shadow-variantissa Planner snapshottaa `agent_v1`-controllerin ja yhden candidate hashin. Controllerin dispatch on ainoa control effect. Candidate saa saman canonical Staten ja hard action setin, mutta shadow-decision ei dispatchaa. Vain controllerin toteutuneesta actionista syntyy outcome/next-state/cost-observation; unchosen shadow-actionista syntyy vain prediction/comparison-evidenssi.
 
-RT-019 on draft eikä kuvaa nykyistä toteutettua runtimea. Exact priors, scalarization, readiness/promotion-thresholdit, pilotin budgetit ja stop-ehdot puuttuvat tarkoituksella myöhempään ihmisporttiin.
+RT-019:n Phase 2 producer muodostaa measured/unknown cost-dimensiot, inclusive scope-attribuution ja child-observation-linkit. Dataset/calibration/registry/shadow/promotion-osat eivät vielä ole toteutettua runtimea. Exact priors, scalarization, readiness/promotion-thresholdit, pilotin budgetit ja stop-ehdot puuttuvat ihmisportista.
 
 ## Skenaarioindeksi RT-001–RT-019
 
@@ -404,11 +404,11 @@ RT-019 on draft eikä kuvaa nykyistä toteutettua runtimea. Exact priors, scalar
 
 ## Kanoniset lähteet
 
-ADR-023 ja runtime-lähde omistavat säilyvän Graph/GraphNode/JobNode/Repair-control-semanticsin. ADR-026 omistaa RT-016:n hyväksytyn Graph-policy-rajan; review ADR-028/029 omistavat RT-017/018:n Portti A -muutoksen. `.ballet/project.json` omistaa capability- ja decision-model-draftin; actual execution truth tulee snapshotista ja SQLite-faktoista.
+ADR-023 ja runtime-lähde omistavat säilyvän Graph/GraphNode/JobNode/Repair-control-semanticsin. ADR-026 omistaa RT-016:n Graph-policy-rajan; accepted ADR-028/029 omistavat RT-017/018:n muutoksen ja ADR-030 RT-019:n governance-rajan. `.ballet/project.json` omistaa capability- ja decision-model-draftin; actual execution truth tulee snapshotista ja SQLite-faktoista.
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023`, `adr-026`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`.
+`adr-005`, `adr-006`, `adr-007`, `adr-008`, `adr-011`, `adr-012`, `adr-013`, `adr-015`, `adr-016`, `adr-023`, `adr-026`, `adr-028`, `adr-029` ja `adr-030`.
 
 ## Evidenssi
 
@@ -416,7 +416,7 @@ Runtime-, State-, persistence-, queue-, adapter-, worktree- ja Run UI -testit ka
 
 RT-017/018:n automated implementation evidence on `TEST-022`–`TEST-024` / `EVID-022`–`EVID-024`:ssä. Kalibroitu end-to-end-pilotti, empirical model-miss-jakauma, final browser/human review ja Portti B ovat avoimia.
 
-RT-019:n governance trace on `TEST-025` / `EVID-025`; toteutus-, candidate-, shadow-, pilot- ja activation-evidenssi on pending.
+RT-019:n governance ja Phase 2 observation trace ovat `TEST-025` / `EVID-025`; candidate-, shadow-, pilot- ja activation-evidenssi on pending.
 
 ## Avoimet kysymykset
 

@@ -238,7 +238,7 @@ if (!parsedConfig.success) {
   for (const issue of parsedConfig.error.issues) addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`);
 } else {
   config = parsedConfig.data;
-  const automation = { version: 16, graph: config.graph };
+  const automation = { version: 17, graph: config.graph };
   for (const issue of validateProjectAutomationConfig(automation, config.executionProfiles)) addIssue(`Automation ${issue.path}: ${issue.message}`);
   const resources = await loadProjectResources(root);
   for (const issue of resources.issues) addIssue(`Resource ${issue.relativePath}: ${issue.message}`);

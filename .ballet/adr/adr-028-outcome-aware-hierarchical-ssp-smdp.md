@@ -9,7 +9,7 @@ tags:
   - policy
   - ssp
   - smdp
-version: 1
+version: 2
 ---
 
 # Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya
@@ -106,5 +106,4 @@ Portti B:n mandatory-policy cut, Project Config v17, Module v6, Snapshot v10 ja 
 
 Trace on `goal-017` / `REQ-017`, `QS-022`–`QS-023`, `CON-012`, `BB-003`–`BB-005`, `BB-011`, `RT-017`, `TEST-022`, `EVID-022` ja initiative `outcome-aware-hierarchical-policy`.
 
-ADR tarvitsee eksplisiittisen hyväksynnän. Portti B tarvitsee tämän lisäksi suunnitelmassa nimetyn pilotin ja erillisen ihmisapprovalin. Uusi ADR vaaditaan online learningille, multi-objective-costille, POMDP:lle tai Repairin muuttamiselle policy-actioniksi.
-
+Project owner hyväksyi ADR:n commitissa `26698dda09c9e9fda5284d4bfa578d6084581dc5`. Portti B tarvitsee tämän lisäksi suunnitelmassa nimetyn pilotin ja erillisen ihmisapprovalin. Uusi ADR vaaditaan online learningille, multi-objective-costille, POMDP:lle tai Repairin muuttamiselle policy-actioniksi.

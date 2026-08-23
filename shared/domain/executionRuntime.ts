@@ -40,7 +40,8 @@ export interface ExecutionResourceSnapshot {
 export interface ExecutionRuntimeBinding { executionProfileId: string; runtime: ExecutionRuntimeSnapshot; }
 
 export interface RootExecutionSnapshot {
-  version: 9;
+  version: 10;
+  policyObservationContractVersion: 3;
   rootKind: "graph" | "graph_node";
   rootGraphNodeId?: string;
   project: ExecutionProjectSnapshot;
@@ -133,6 +134,7 @@ export interface ExecutionEvent {
   level: "info" | "warn" | "error";
   phase: ExecutionEventPhase;
   itemId?: string;
+  metricKind?: "usage_v1";
   message: string;
   data?: Record<string, unknown>;
   contentBytes: number;

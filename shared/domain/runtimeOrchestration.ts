@@ -2,7 +2,7 @@ import type { JsonValue, NodeResult } from "./automation.js";
 import type { CanonicalNodeOutcome, OrchestrationScope } from "./runtime.js";
 export type {
   PolicyDecisionRecordV2,
-  PolicyOptionObservationV2
+  PolicyOptionObservationV3
 } from "./decisionModel.js";
 
 export type RoutingRequestKind = "start" | "continuation" | "repair";

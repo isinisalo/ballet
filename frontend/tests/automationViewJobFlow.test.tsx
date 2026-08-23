@@ -91,7 +91,7 @@ const appData = (): AppData => ({
 });
 
 const automation = (): ProjectAutomationConfig => ({
-  version: 16,
+  version: 17,
   graph: {
     id: "graph", name: "Graph", state: { description: "Shared state.", initial: {} },
     strategy: { kind: "agent_v1", orchestrator: {

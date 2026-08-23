@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 24
+version: 25
 tags:
   - arc42
   - traceability
@@ -19,7 +19,7 @@ Tämä tiedosto yhdistää hyväksytyn, review- tai draft-tilaisen intentin mita
 
 ## Tila
 
-Matriisi sisältää 25 laatuketjua. QS-001–QS-021 säilyttävät accepted/historical-ketjut. QS-022–QS-024 ovat review-tilaisen Portti A:n implementation-ketjuja. QS-025 on draft calibration/promotion -governanceketju; kaikki runtime- ja ihmisactivation-evidenssi pysyy pending-tilassa.
+Matriisi sisältää 25 laatuketjua. QS-001–QS-025 ovat accepted/historical-ketjuja. QS-025:n governance ja Phase 2 option-cost-observation ovat toteutettuja; calibration-, evaluation-, shadow-, pilot- ja ihmisactivation-evidenssi pysyy pending-tilassa.
 
 ## Trace-matriisi
 
@@ -50,7 +50,7 @@ Matriisi sisältää 25 laatuketjua. QS-001–QS-021 säilyttävät accepted/his
 | goal-016 / REQ-016; goal-017 / REQ-017 | QS-022 | adr-028 / CON-012 | BB-003–BB-005 / BB-011 | RT-017 / DEP-001 / DEP-002 | TEST-022 | EVID-022 | automated scoped compiler/runtime passed locally; calibrated pilot and acceptance pending |
 | goal-006 / REQ-006; goal-007 / REQ-007; goal-017 / REQ-017 | QS-023 | adr-028 / CON-002 / CON-012 | BB-001 / BB-005 / BB-011 | RT-009 / RT-010 / RT-017 / DEP-001 | TEST-023 | EVID-023 | automated projector/model-miss evidence passed locally; empirical pilot pending |
 | goal-007 / REQ-007; goal-018 / REQ-018 | QS-024 | adr-029 / CON-005 | BB-001 / BB-002 | RT-010 / RT-018 / DEP-001 | TEST-024 | EVID-024 | automated card/route/CRUD evidence passed locally; browser and human visual review pending |
-| goal-002 / REQ-002; goal-006 / REQ-006; goal-019 / REQ-019 | QS-025 | adr-030 / CON-002 / CON-012 | BB-002–BB-005 / BB-011 / BB-012 | RT-009 / RT-019 / DEP-001 / DEP-002 | TEST-025 | EVID-025 | draft governance validated; implementation, pilot and human activation pending |
+| goal-002 / REQ-002; goal-006 / REQ-006; goal-019 / REQ-019 | QS-025 | adr-030 / CON-002 / CON-012 | BB-002–BB-005 / BB-011 / BB-012 | RT-009 / RT-019 / DEP-001 / DEP-002 | TEST-025 | EVID-025 | governance and Phase 2 observation verified; Phases 3–7 and human activation pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -78,8 +78,8 @@ Matriisi sisältää 25 laatuketjua. QS-001–QS-021 säilyttävät accepted/his
 | TEST-019 | Strict-v14/v4/v7/v8/v9/v10 schema-, snapshot-, composition-, runtime-, persistence- ja Graph Node Module -matriisi: scoped start/continuation/repair-enumit, Graph/GraphNode dispatch, Work→Validation, bounded retry, Luna orchestrator invalid-target retry, local Sol Repair, Graph-eskalaatio, same-Validation LIFO-return, State patch, depth/attempt/transition-rajat, restart/cancel/no-duplicate, v9 fail-closed, kaikkien 14 paketin roundtrip/provenance/mapping ja active legacy/platform-boundary -haut. | `three-level-graph-node-engineering` backend/shared/module suites + final gates |
 | TEST-020 | Kolmen canonical authoring-routen ja kahden Run-routen projection/UI/browser-matriisi: Graph/Graph Node planet/multi-ring -regressio, Job industrial flow'n pure layout/ghost/retry/interaction-semantics, inspector/Sheet, active Run -lukot, keyboard/a11y, reduced motion sekä 1440×900/390×844 overflow/visual QA. | frontend suites + browser QA + human visual review |
 | TEST-021 | Strict-v15/v8/v11 SSP/SMDP-matriisi: decision feature/state/schema, arbitrary GraphNode metamorphic fixtures, hard admissibility/authorization, exact ppm/microcost validation, proper-policy analysis, Bellman convergence/tie/numeric/time/size bounds, snapshot/hash, atomic decision/dispatch/observation, restart/no-duplicate, explicit agent/ssp no-fallback, structured Configure editor/preview, bounded Run projection, repeated factual execution occurrence, 1/5/40 schema/layout ja platform-name coupling audit. Cancel-race stress ja max-bound/cross-host benchmark raportoidaan erikseen. | `stochastic-policy-orchestration` shared/backend/frontend/browser/conformance suites |
-| TEST-022 | Strict-v16/v5/v9/v12 hierarchical SSP v2 -matriisi: global/local schema, exact outcome/PPM/result-semantics, guardien jälkeinen proper policy, reachable local readiness, no fallback, scoped dispatch ja immutable provenance sekä 1/5/40 × 1/17/64 scale. | `outcome-aware-hierarchical-policy` shared/backend/module/runtime suites |
-| TEST-023 | Observation-matriisi: intrinsic outcome enum, PASS/FAIL consistency, projector-owned actual state, `match | outcome_miss | state_miss | outside_support`, unknown-state `needs_input`, no prior mutation ja restart/no-duplicate. | `outcome-aware-hierarchical-policy` projector/runtime/persistence suites |
+| TEST-022 | Strict-v17/v5/v10/v13 hierarchical SSP v2 -matriisi: global/local schema, exact outcome/PPM/result-semantics, guardien jälkeinen proper policy, reachable local readiness, no fallback, scoped dispatch ja immutable provenance sekä 1/5/40 × 1/17/64 scale. | `outcome-aware-hierarchical-policy` shared/backend/module/runtime suites |
+| TEST-023 | Observation-matriisi: intrinsic outcome enum, PASS/FAIL consistency, projector-owned actual state, `match | outcome_miss | state_miss | outside_support`, measured/unknown provider-neutral cost dimensions, inclusive scope attribution, child links, unknown-state `needs_input`, no prior mutation ja restart/no-duplicate. | `outcome-aware-hierarchical-policy` projector/runtime/persistence suites |
 | TEST-024 | Capability-first UI -matriisi: canonical section URLs, GraphNode/JobNode CRUD ja atomic refs, compile readiness, scoped Run views, upper-canvas absence, Job-flow regression, keyboard/focus, long IDs, error states, desktop/narrow sekä scale fixtures. | `capability-first-authoring` frontend/browser suites |
 | TEST-025 | Governed calibration/promotion -matriisi: versioned provider-neutral option dimensions ja unknown-semantics, hierarchy-safe attribution, immutable dataset/model/report hashes ja lineage, explicit priors/sample/coverage gates, joint outcome×actual-state ja cost estimation, exact/seeded/held-out/sensitivity evaluation, shadow/controller separation, zero counterfactual evidence, proposal thresholds, human activation/rollback, future-run-only snapshot effect ja restart/no-duplicate. | `governed-policy-calibration-and-promotion` contract/persistence/calibration/evaluation/runtime suites + human activation audit |
 
@@ -111,7 +111,7 @@ Matriisi sisältää 25 laatuketjua. QS-001–QS-021 säilyttävät accepted/his
 | EVID-022 | Outcome-aware global/local compiler-, solver-, snapshot-, module- ja runtime-evidenssi; calibrated pilot pysyy erillisenä pending-raja-arvona. | `.ballet/arc42/initiatives/outcome-aware-hierarchical-policy/EVIDENCE.md`; OHP-EVID-001/003–006 |
 | EVID-023 | Projector-owned actual state, neljän model-miss-luokan ja no-prior-mutationin evidenssi. | `.ballet/arc42/initiatives/outcome-aware-hierarchical-policy/EVIDENCE.md`; OHP-EVID-002/004/006 |
 | EVID-024 | Capability-first route/card/CRUD/readiness/Run/Job-regression sekä desktop/narrow-evidenssi. | `.ballet/arc42/initiatives/capability-first-authoring/EVIDENCE.md`; CFA-EVID-001–005 |
-| EVID-025 | Offline calibration-, immutable registry-, evaluation-, shadow-, proposal-, human activation- ja rollback-ketju. | `.ballet/arc42/initiatives/governed-policy-calibration-and-promotion/EVIDENCE.md`; GPCP-EVID-001–007, vain governance pending validation, muu pending |
+| EVID-025 | Provider-neutral option-cost-, offline calibration-, immutable registry-, evaluation-, shadow-, proposal-, human activation- ja rollback-ketju. | `.ballet/arc42/initiatives/governed-policy-calibration-and-promotion/EVIDENCE.md`; GPCP-EVID-001/002 verified locally, GPCP-EVID-003–007 pending |
 
 ## Ketjun tulkinta
 
@@ -123,7 +123,7 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`, `adr-026`, `adr-027`, review-tilaiset `adr-028` ja `adr-029` sekä draft `adr-030`; historiallisten ketjujen ADR-017/020/021/022 säilyvät.
+`adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-025`–`adr-030`; historiallisten ketjujen ADR-017/020/021/022 säilyvät.
 
 ## Evidenssi
 

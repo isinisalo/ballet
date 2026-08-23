@@ -24,10 +24,10 @@ export class GraphExecutionPlanner {
   ): Promise<RootExecutionSnapshot> {
     const loaded = new ProjectConfigurationRepository().load(workspace.path);
     if (!loaded.config || loaded.issues.length > 0) {
-      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v16 is unavailable.");
+      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v17 is unavailable.");
     }
     const readinessIssues = validateProjectAutomationConfig(
-      { version: 16, graph: loaded.config.graph }, loaded.config.executionProfiles
+      { version: 17, graph: loaded.config.graph }, loaded.config.executionProfiles
     );
     if (readinessIssues.length) throw new GraphRunStateError(readinessIssues[0]!.message);
     const selected = kind === "graph"
@@ -61,7 +61,8 @@ export class GraphExecutionPlanner {
     const theme = await new CanvasThemeRepository().load(workspace.path);
     if (theme.issues.length > 0) throw new GraphRunStateError(theme.issues[0]!.message);
     return {
-      version: 9,
+      version: 10,
+      policyObservationContractVersion: 3,
       rootKind: kind,
       ...(kind === "graph_node" ? { rootGraphNodeId: targetId } : {}),
       project: {

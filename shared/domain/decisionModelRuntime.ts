@@ -29,12 +29,37 @@ export interface PolicyDecisionRecordV2 {
   message?: string; createdAt: string;
 }
 export type PolicyModelMatchV2 = "match" | "outcome_miss" | "state_miss" | "outside_support";
-export interface PolicyOptionObservationV2 {
+export type PolicyCostUnknownReasonV1 = "provider_not_reported" | "project_not_configured";
+export type PolicyCostMeasureV1 =
+  | { status: "known"; value: number; sourceRefs: string[] }
+  | { status: "unknown"; reason: PolicyCostUnknownReasonV1; sourceRefs: string[] };
+export interface PolicyOptionCostObservationV1 {
+  version: 1;
+  attribution: {
+    mode: "inclusive_v1";
+    scope: DecisionPolicyScope;
+    nodeRunIds: string[];
+    executionTaskIds: string[];
+    childPolicyObservationIds: string[];
+  };
+  dimensions: {
+    durationMillis: PolicyCostMeasureV1;
+    inputTokens: PolicyCostMeasureV1;
+    outputTokens: PolicyCostMeasureV1;
+    cachedInputTokens: PolicyCostMeasureV1;
+    workRetryCount: PolicyCostMeasureV1;
+    repairAttemptCount: PolicyCostMeasureV1;
+    monetaryMicros: PolicyCostMeasureV1;
+    utilityMicros: PolicyCostMeasureV1;
+  };
+}
+export interface PolicyOptionObservationV3 {
+  version: 3;
   policyObservationId: string; rootRunId: string; policyDecisionId: string; scope: DecisionPolicyScope; scopeKey: string;
   actionInvocationId: string; graphNodeInvocationId?: string; jobNodeInvocationId?: string; stateBefore: DecisionStateV2;
   actionId: string; configuredExpectedCostMicros: number; expectedOutcomeDistribution: DecisionTransitionV2[];
-  actualCostMicros?: number; observedOutcomeId: string; verifiedResult: NodeResult; actualState?: DecisionStateV2;
-  modelMatch: PolicyModelMatchV2; durationMillis: number; modelSha256: string; snapshotSha256: string; createdAt: string;
+  observedCost: PolicyOptionCostObservationV1; observedOutcomeId: string; verifiedResult: NodeResult; actualState?: DecisionStateV2;
+  modelMatch: PolicyModelMatchV2; modelSha256: string; snapshotSha256: string; createdAt: string;
 }
 export type PolicyProjectionCutoffV2 = "cycle" | "epoch_limit" | "node_limit" | "solver_error";
 export interface PolicyProjectionNodeV2 {
@@ -59,18 +84,18 @@ export interface PolicyPreviewV2 {
   modelVersion: 2; modelSha256: string; projection?: PolicyProjectionV2; message?: string;
 }
 export interface PolicyPreviewResultV2 { issues: Array<{ path: string; message: string }>; preview?: PolicyPreviewV2; }
-export interface ExecutionGraphOccurrenceV2 {
+export interface ExecutionGraphOccurrenceV3 {
   occurrenceId: string; scope: DecisionPolicyScope; scopeKey: string; epoch: number; policyDecisionId: string;
   actionInvocationId?: string; graphNodeInvocationId?: string; jobNodeInvocationId?: string; actionId: string;
   status: "selected" | "running" | "observed"; decisionStateBefore?: DecisionStateV2;
   expectedRemainingCostMicros?: number; selectedActionValueMicros?: number; configuredExpectedCostMicros?: number;
-  expectedOutcomeDistribution: DecisionTransitionV2[]; actualCostMicros?: number; observedOutcomeId?: string;
-  verifiedResult?: NodeResult; actualState?: DecisionStateV2; modelMatch?: PolicyModelMatchV2; durationMillis?: number;
+  expectedOutcomeDistribution: DecisionTransitionV2[]; observedCost?: PolicyOptionCostObservationV1; observedOutcomeId?: string;
+  verifiedResult?: NodeResult; actualState?: DecisionStateV2; modelMatch?: PolicyModelMatchV2;
   modelSha256: string; snapshotSha256: string; createdAt: string;
 }
-export interface PolicyTelemetryV2 {
+export interface PolicyTelemetryV3 {
   scope: DecisionPolicyScope; scopeKey: string; actionId: string; stateId: string; observationCount: number;
   resultCounts: Partial<Record<NodeResult, number>>; outcomeCounts: Record<string, number>;
   observedNextStateCounts: Record<string, number>; modelMissCount: number;
-  meanActualCostMicros?: number; meanDurationMillis: number;
+  meanKnownDurationMillis: number;
 }

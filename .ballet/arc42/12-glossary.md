@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 15
+version: 16
 tags:
   - arc42
   - glossary
@@ -19,9 +19,9 @@ Tämä osio määrittää project-, authoring-, runtime-, tracker-, provider-, p
 
 ## Tila
 
-Active Portti A implementation on strict-v16 `Graph → GraphNode → JobNode → Work/Validation`, explicit scoped `agent_v1 | ssp_v2`, Graph Node Module v5, Root Snapshot v9 ja SQLite v12. Review ADR-028/029 odottavat acceptancea; strict-v13/Loop/Workflow/RunBook-termit säilyvät historiallisena audit trailina.
+Active implementation on strict-v17 `Graph → GraphNode → JobNode → Work/Validation`, explicit scoped `agent_v1 | ssp_v2`, Graph Node Module v5, Root Snapshot v10, policy observation v3 ja SQLite v13. ADR-028–ADR-030 ovat accepted; strict-v13/Loop/Workflow/RunBook-termit säilyvät historiallisena audit trailina.
 
-## Active strict-v16 ja policy-termit
+## Active strict-v17 ja policy-termit
 
 | Termi | Status | Määritelmä |
 | --- | --- | --- |
@@ -104,7 +104,8 @@ Active Portti A implementation on strict-v16 `Graph → GraphNode → JobNode �
 | Preflight | Tilapäisessä hakemistossa tehtävä capability-, JSONL/Markdown-, parent-, dependency-, cycle- ja external-ref-validointi ennen Runia. |
 | Canonical persistence | SQLiteen atomisesti commitoitu runtime-, State-, outcome-, control- ja tracker-intent-totuus. Ticket-store ei korvaa runtime-ohjausta. |
 | Machine-local runtime state | `.git/ballet`-hakemiston SQLite-, worktree- ja lifecycle-data, jota ei versionhallita project truthina. |
-| Runtime DB v12 | Nykyinen strict runtime schema. V11-kanta jätetään koskemattomaksi ja käynnistys antaa archive/remediation-ohjeen. |
+| Runtime DB v13 | Nykyinen strict runtime schema. V12- ja vanhemmat kannat jätetään koskemattomiksi ja käynnistys antaa archive/remediation-ohjeen. |
+| Policy option observation v3 | Immutable scoped havainto, joka yhdistää outcome/actual-state/model-match-evidenssin versionoituihin measured/unknown cost-dimensioihin ja inclusive attribution -viitteisiin. |
 
 ## Provider ja versionoidut sopimukset
 
@@ -145,11 +146,11 @@ Hyväksytyt Goalit/ADR:t, shared domain -sopimukset, `.ballet/project.json`, STA
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021`, `adr-022`, `adr-023`, `adr-025`–`adr-029`.
+`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021`, `adr-022`, `adr-023`, `adr-025`–`adr-030`.
 
 ## Evidenssi
 
-Accepted active termit esiintyvät strict-v16 project configissa, shared contracts -rajapinnoissa ja runtime/persistencessä. V2-policy- ja capability-first-termit traceutuvat review-tilaisiin ADR-028/029:ään, QS-022–024:ään, RT-017/018:aan sekä EVID-022–024:ään; hyväksytty v1-baseline säilyy ADR-026/QS-021/RT-016/EVID-021-ketjussa.
+Accepted active termit esiintyvät strict-v17 project configissa, shared contracts -rajapinnoissa ja runtime/persistencessä. V2-policy-, capability-first- ja observation v3 -termit traceutuvat ADR-028–030:een, QS-022–025:een, RT-017–019:ään sekä EVID-022–025:een; hyväksytty v1-baseline säilyy ADR-026/QS-021/RT-016/EVID-021-ketjussa.
 
 ## Avoimet kysymykset
 

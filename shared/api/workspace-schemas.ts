@@ -257,7 +257,7 @@ export const projectIssueTrackerSchema = z.object({
 }).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
 
 export const automationConfigSchema = z.object({
-  version: z.literal(16),
+  version: z.literal(17),
   graph: graphSchema
 }).strict() as z.ZodType<ProjectAutomationConfig>;
 
@@ -272,14 +272,14 @@ export const policyPreviewRequestSchema = z.object({
 });
 
 export const projectConfigSchema = z.object({
-  version: z.literal(16),
+  version: z.literal(17),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
   graph: graphSchema
 }).strict() as z.ZodType<ProjectConfiguration>;
 
 export const projectConfigReadinessSchema = z.object({
-  version: z.literal(16),
+  version: z.literal(17),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
   graph: graphSchema
