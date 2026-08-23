@@ -209,7 +209,10 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 ### Graph Engineering
 
 - `Capability Graph` shows responsive GraphNode cards with exact ID, description, accepts/provides, intrinsic outcome contracts, readiness and adjacent open/edit/rename/delete actions.
-- `Decision Model` shows state features/catalog, action guards, `P(outcome,nextState | state,action)`, costs, terminals, solver, scoped Repair and compile issues in inline cards/panels.
+- `Decision Model` is a scoped decision dashboard: current projected state and read-only Q/V evidence first, then a state/action matrix of configured immediate costs, a focused rule inspector and factual Model Health. The same component derives Graph actions from configured GraphNodes and GraphNode actions from that node's configured JobNodes without a frontend action catalog.
+- Matrix state headers and action headers remain visible where practical; 1–20 action columns preserve configured order and scroll only inside the matrix. A selected cell opens the rule inspector alongside the matrix on desktop and in a Sheet on narrow viewports.
+- The focused rule inspector edits human-readable cost units and percentage branches while preserving exact `expectedCostMicros` and `probabilityPpm` integers. Q(s,a) and V(s) remain read-only solver evidence, never immediate-cost inputs.
+- State features/catalog, action guards, solver/projection settings, scoped Repair and exact schema detail remain fully available under the collapsed `Advanced Model` area instead of dominating the primary workflow.
 - Adding a transition requires explicit outcome, next state, probability and cost data. The UI never invents defaults for priors or costs.
 - A draft may be saved; Run readiness is a separate visible state.
 
@@ -243,7 +246,7 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 
 ## Inspectors & Authoring
 
-- Graph and GraphNode strategy authoring is inline in the Decision Model sections. `agent_v1` exposes explicit composition/candidate rules; `ssp_v2` exposes Capability/Decision Model and readiness without a modal editor.
+- Graph and GraphNode strategy authoring is inline in the Decision Model sections. `agent_v1` exposes explicit composition/candidate rules; `ssp_v2` uses the current-decision preview, scoped matrix, focused rule inspector, Model Health and collapsed Advanced Model without a modal editor.
 - Repair inspector exposes explicit ExecutionProfile, instruction, skills, attempt/depth limits and bounded outcomes. It never presents expanded permission or active-snapshot mutation controls.
 - Work inspector exposes agent/human type, task, appearance, explicit profile/instruction/skills and capability/State contract.
 - Validation inspector exposes criteria, appearance, explicit composition and PASS/FAIL contract. FAIL repair input contains no target ID.

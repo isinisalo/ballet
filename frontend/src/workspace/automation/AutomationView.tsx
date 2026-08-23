@@ -57,18 +57,18 @@ export function AutomationView({ data, level, section, graphNodeId, jobNodeId, s
   const actions = <><Button type="button" size="sm" variant="outline" disabled={!isDirty || saving || !parse.success || locked} onClick={() => void saveDraft()}><Save /> {saving ? "Saving…" : "Save draft"}</Button>{level === "job_node" ? <Button type="button" size="sm" variant="outline" onClick={() => setSelection("settings")}><Settings2 /> Settings</Button> : null}</>;
   return <EngineeringShell level={level} section={section} graphNodeId={graphNode?.id} graphNodeTitle={graphNode?.description} jobNodeId={jobNode?.id} jobNodeTitle={jobNode?.description} actions={actions} navigate={navigate}>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <Notices error={error} parse={parse} automationIssues={data.automationIssues} />
+      <Notices error={error} parse={parse} automationIssues={visibleAutomationIssues(section, data.automationIssues)} />
       {level !== "job_node" ? <SectionTabs level={level} section={section} graphNodeId={graphNodeId} navigate={navigate} /> : null}
       {level === "graph" ? section === "decision-model" ? <DecisionModelWorkspace
         scopeKey={draft.graph.id} strategy={draft.graph.strategy}
-        actionContracts={draft.graph.graphNodes.map(({ id, outcomes }) => ({ id, outcomes }))}
+        actionContracts={draft.graph.graphNodes.map(({ id, description, outcomes }) => ({ id, description, outcomes }))}
         repair={draft.graph.repairNode} issues={policyResult?.issues ?? []} preview={policyResult} loading={policyLoading} locked={locked}
         onStrategyChange={(strategy) => setDraft((config) => ({ ...config, graph: { ...config.graph, strategy: strategy as ProjectGraphDecisionStrategyV2 } }))}
         onRepairChange={(repairNode) => setDraft((config) => ({ ...config, graph: { ...config.graph, repairNode } }))}
       /> : <CapabilityCards nodes={draft.graph.graphNodes} kind="Graph Node" locked={locked} onAdd={() => setDialog({ kind: "create" })} onOpen={(id) => navigate(automationGraphNodePath(id))} onEdit={(id) => setDialog({ kind: "edit", id })} onRename={(id) => setDialog({ kind: "rename", id })} onDelete={(id) => setDialog({ kind: "delete", id })} />
         : level === "graph_node" && graphNode ? section === "local-decision-model" ? <DecisionModelWorkspace
           scopeKey={graphNode.id} strategy={graphNode.strategy}
-          actionContracts={graphNode.jobNodes.map(({ id, outcomes }) => ({ id, outcomes }))}
+          actionContracts={graphNode.jobNodes.map(({ id, description, outcomes }) => ({ id, description, outcomes }))}
           repair={graphNode.repairNode} issues={policyResult?.issues ?? []} preview={policyResult} loading={policyLoading} locked={locked}
           onStrategyChange={(strategy) => updateCurrentGraphNode(setDraft, graphNode.id, (node) => ({ ...node, strategy: strategy as ProjectGraphNodeDecisionStrategyV2 }))}
           onRepairChange={(repairNode) => updateCurrentGraphNode(setDraft, graphNode.id, (node) => ({ ...node, repairNode }))}
@@ -87,6 +87,7 @@ function SectionTabs({ level, section, graphNodeId, navigate }: { level: Enginee
 
 function Notices({ error, parse, automationIssues }: { error?: string; parse: ReturnType<typeof automationConfigSchema.safeParse>; automationIssues: Array<{ message: string }> }) { return <>{error ? <Alert variant="destructive" className="m-3 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}{!parse.success ? <Alert variant="destructive" className="m-3 mb-0"><AlertDescription>{parse.error.issues[0]?.message ?? "Graph configuration is structurally invalid."}</AlertDescription></Alert> : null}{automationIssues.length ? <Alert className="m-3 mb-0"><AlertDescription>Saved configuration: {automationIssues[0]?.message}</AlertDescription></Alert> : null}</>; }
 const active = (status: string) => ["queued", "running", "waiting_for_input", "finalizing"].includes(status);
+const visibleAutomationIssues = (section: EngineeringSection | undefined, issues: Array<{ message: string }>) => section === "decision-model" || section === "local-decision-model" ? [] : issues;
 const updateCurrentGraphNode = (setDraft: React.Dispatch<React.SetStateAction<ProjectAutomationConfig>>, id: string, update: (node: ProjectAutomationConfig["graph"]["graphNodes"][number]) => ProjectAutomationConfig["graph"]["graphNodes"][number]) => setDraft((config) => ({ ...config, graph: { ...config.graph, graphNodes: config.graph.graphNodes.map((node) => node.id === id ? update(node) : node) } }));
 
 function CrudDialogs({ dialog, setDialog, data, draft, setDraft, graphNode, level, navigate }: { dialog?: { kind: "create" | "rename" | "edit" | "delete"; id?: string }; setDialog: (value: { kind: "create" | "rename" | "edit" | "delete"; id?: string } | undefined) => void; data: AppData; draft: ProjectAutomationConfig; setDraft: React.Dispatch<React.SetStateAction<ProjectAutomationConfig>>; graphNode?: ProjectAutomationConfig["graph"]["graphNodes"][number]; level: EngineeringLevel; navigate: WorkspaceNavigation["navigate"] }) {
