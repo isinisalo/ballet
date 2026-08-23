@@ -7,8 +7,8 @@ import type {
 import { DecisionModelWorkspace } from "../src/workspace/automation/DecisionModelWorkspace";
 
 describe("Reward-MDP Decision Model workspace", () => {
-  it("shows reward, factual acceptance, exact priors and compiled Q/V evidence", () => {
-    render(<DecisionModelWorkspace
+  it("shows a visual policy pulse, transition impact and inspectable Q/V evidence", () => {
+    const rendered = render(<DecisionModelWorkspace
       strategy={strategy()}
       issues={[]}
       preview={preview()}
@@ -17,13 +17,41 @@ describe("Reward-MDP Decision Model workspace", () => {
       onStrategyChange={vi.fn()}
     />);
     expect(screen.getByText(/Reward-MDP v3/)).toBeInTheDocument();
-    expect(screen.getByText("Acceptance ledger contract")).toBeInTheDocument();
-    expect(screen.getAllByText("default_prior")).toHaveLength(2);
-    expect(screen.getByText("Compiled Q / V policy")).toBeInTheDocument();
-    expect(screen.getByText("design=42000000")).toBeInTheDocument();
+    expect(screen.getByText("Decision pulse")).toBeInTheDocument();
+    expect(screen.getByText("Policy horizon")).toBeInTheDocument();
+    expect(screen.getByText("Transition impact")).toBeInTheDocument();
+    expect(screen.getByText(/Policy landscape/)).toBeInTheDocument();
+    expect(screen.getByText("Reward tuning")).toBeInTheDocument();
+    expect(screen.getAllByText("50%")).toHaveLength(2);
+    expect(screen.getAllByText(/default prior/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("42,000,000 micros").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText(/design-valid, 50%, \+124 reward units/)).toHaveClass("text-secondary");
+    expect(screen.getByLabelText(/design-invalid, 50%, −25 reward units/)).toHaveClass("text-destructive");
+    expect(rendered.container.querySelector("table")).not.toBeInTheDocument();
+    expect(screen.queryByText("25000000")).not.toBeInTheDocument();
   });
 
-  it("edits integer reward micros and locks an immutable Run snapshot", async () => {
+  it("keeps added GraphNodes visible until their transition model exists", () => {
+    const model = strategy();
+    model.capabilityModel.actions.push({ actionId: "review", guards: [] });
+    render(<DecisionModelWorkspace
+      strategy={model}
+      actionOrder={["review", "design"]}
+      issues={[]}
+      preview={preview()}
+      loading={false}
+      locked={false}
+      onStrategyChange={vi.fn()}
+    />);
+
+    const options = screen.getAllByRole("article").filter((article) =>
+      article.textContent?.includes("transition model") || article.textContent?.includes("Q +42"));
+    expect(options[0]).toHaveTextContent("review");
+    expect(options[0]).toHaveTextContent("needs transition model");
+    expect(options[1]).toHaveTextContent("design");
+  });
+
+  it("tunes human reward units and locks an immutable Run snapshot", async () => {
     const onStrategyChange = vi.fn();
     const rendered = render(<DecisionModelWorkspace
       strategy={strategy()}
@@ -33,8 +61,7 @@ describe("Reward-MDP Decision Model workspace", () => {
       locked={false}
       onStrategyChange={onStrategyChange}
     />);
-    const cost = screen.getByLabelText("Action cost");
-    fireEvent.change(cost, { target: { value: "2000000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Increase action cost by 1 reward unit" }));
     expect(onStrategyChange.mock.calls.at(-1)?.[0].model.reward.actionCostMicros).toBe(2_000_000);
 
     rendered.rerender(<DecisionModelWorkspace
@@ -46,7 +73,8 @@ describe("Reward-MDP Decision Model workspace", () => {
       onStrategyChange={onStrategyChange}
     />);
     expect(screen.getByText("The immutable Run snapshot locks this model.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Action cost")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Increase action cost by 1 reward unit" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Decrease action cost by 1 reward unit" })).toBeDisabled();
   });
 });
 

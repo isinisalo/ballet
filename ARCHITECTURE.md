@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 22
+version: 23
 tags:
   - architecture
   - arc42
@@ -28,12 +28,12 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - Authorization tulee erillisestä immutable snapshotista. Unauthorized action ei kuulu `A(s)`:ään eikä project State voi antaa sille lupaa.
 - Aktiivinen strict cut on Project Config v18, Decision Model v3, Graph Node Module v6, Root Snapshot v11, Task Envelope/Outcome v9, composition v10, ExecutionSpec v11, policy observation v4 ja SQLite v14. Legacy-readeria, migraatiota, aliasia tai dual-writeä ei ole.
 - Repositoryn project-local default sisältää DESIGN/PLAN/BUILD/DEPLOY/VERIFY-GraphNodet, 17 ordered Action Nodea ja DONE-terminalin. Platform tuntee vain geneeriset primitivit.
-- UI säilyttää capability-first Graph/GraphNode-kortit ja ADR-025/027:n protected Action Node industrial flow'n. Graph Decision Model näyttää factual reward-, PPM-, prior-, acceptance- ja Q/V-tiedon; local Decision Model/Repair UI:ta ei ole.
+- UI säilyttää capability-first Graph/GraphNode-kortit ja ADR-025/027:n protected Action Node industrial flow'n. ADR-032:n Graph Decision Model näyttää projected state-, acceptance-, option-, transition-impact-, prior- ja Q/V-evidenssin visuaalisena dashboardina ihmisyksiköissä; exact micros/ppm säilyvät accessible detailissä ja sopimuksissa. Local Decision Model/Repair UI:ta ei ole.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen.
 
 ## Supersession
 
-`goal-020` supersedoi goalit 016, 017 ja 019. `adr-031` supersedoi ADR:t 026, 028 ja 030 kokonaan, ADR-023:n scoped routing/orchestrator/Repair-osat sekä ADR-029:n local-policy/Repair-osat. Vanhat tiedostot säilyvät historiallisena audit trailina, eivät aktiivisena nykytilana. ADR-025/027:n Action Node -flow ja ADR-029:n capability-first-osat säilyvät.
+`goal-020` supersedoi goalit 016, 017 ja 019. `adr-031` supersedoi ADR:t 026, 028 ja 030 kokonaan, ADR-023:n scoped routing/orchestrator/Repair-osat sekä ADR-029:n local-policy/Repair-osat. `adr-032` supersedoi ADR-029:n Graph Decision Model -osion form/matrix/table-projektion muuttamatta capability-first-kortteja tai ADR-031:n runtime-semanttiikkaa. Vanhat tiedostot säilyvät historiallisena audit trailina, eivät aktiivisena nykytilana. ADR-025/027:n Action Node -flow ja ADR-029:n muut capability-first-osat säilyvät.
 
 ## Kanoniset lähteet
 

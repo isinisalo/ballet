@@ -215,9 +215,13 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 ### Graph Engineering
 
 - `Capability Graph` shows responsive GraphNode cards with exact ID, description, accepts/provides, intrinsic outcome contracts, readiness and adjacent open/edit/rename/delete actions.
-- `Decision Model` is the Graph-level Reward-MDP dashboard: current projected state, factual acceptance progress and read-only Q/V evidence first, then reward constants, γ, exact PPM transition branches and prior provenance. It derives actions from configured GraphNodes without a frontend action catalog.
-- Matrix state headers and action headers remain visible where practical; 1–20 action columns preserve configured order and scroll only inside the matrix. A selected cell opens the rule inspector alongside the matrix on desktop and in a Sheet on narrow viewports.
-- Reward values use human-readable units while preserving exact integer micros; probabilities preserve exact `probabilityPpm`. Q(s,a) and V(s) remain read-only compiler evidence.
+- `Decision Model` is the Graph-level Reward-MDP visual impact dashboard. Lead with `Decision pulse`: draft-projected state, factual acceptance classification, selected GraphNode option, human-scale `V(s)` and visible prior provenance. Explicitly label the projection as authoring preview rather than live Run state.
+- `Policy horizon` preserves project-config GraphNode order for 1–20 options, highlights the compiled selection and distinguishes state-admissible, elsewhere-modeled and `needs transition model` options. It may scroll only inside its panel and must state that option order is not persisted runtime flow.
+- `Transition impact` projects the selected `(state, action)` branches without a traditional table. Probability controls a bounded bar/width cue; positive immediate reward uses Secondary plus `+`/`reward`, negative impact uses Error plus `−`/`cost`, and zero uses Tertiary plus `neutral`. Outcome, next-state and provenance text remain exact. Color is never the only signal.
+- `Policy landscape` renders the bounded compiled state catalog as a selectable relative-`V(s)` heatmap. Tile selection is ephemeral inspection only and reveals exact acceptance status plus Q-values without mutating topology, draft or runtime. Distinguish selected inspection state from the current projected state.
+- Primary reward values use `micros / 1,000,000` reward units and probabilities use `ppm / 10,000` percentages. Preserve exact integer micros/ppm in accessible title/detail, API, project config and immutable snapshot. Relative heatmap color must be labeled relative; it does not assert positive absolute reward.
+- Reward authoring uses compact ±1 reward-unit steppers and a neutral→amber→error penalty spectrum instead of raw-number fields. Active Run locking remains visible and disables every mutation.
+- Do not place traditional form layouts, transition tables or Q/V tables on the primary Decision Model surface. Bounded action, state and Q collections scroll inside their own panels; the page itself never overflows horizontally.
 - State/catalog, action guards, absorption status and deterministic solver bounds remain inspectable without becoming runtime control state.
 - `default_prior` branches are visibly distinguished from `authored_evidence`; the UI never presents the default as calibrated evidence.
 - A draft may be saved; Run readiness is a separate visible state.
@@ -284,8 +288,10 @@ Human Work returns a Work outcome. Human Validation returns `PASS | FAIL`; FAIL 
 - Do prefer dense, scannable, work-focused surfaces.
 - Do use exact entity IDs, scope, status, target enum and timestamps.
 - Do distinguish readiness, prior provenance, retry/escalate and outcome semantics with exact text/status plus existing tokens, not a new palette.
+- Do pair Decision Model reward/cost color with an explicit sign and `reward | cost | neutral` text.
 - Don't introduce one-off colors, ornamental backgrounds, decorative gradients or shape language beyond standard cards and the protected Action Node industrial-flow contract.
 - Don't use signal colors as passive decoration.
 - Don't hide operational state behind vague labels.
+- Don't expose raw micros or ppm as the primary Decision Model value, and don't restore dense form/table inventory as its main interaction.
 - Don't combine Graph, GraphNode and Action Node authoring scopes in one section.
 - Don't present configured transition predictions as factual execution or actual state.

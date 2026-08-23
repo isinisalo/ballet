@@ -40,7 +40,8 @@ export function AutomationLevelContent({
 }) {
   if (level === "graph") {
     if (section === "decision-model") return <DecisionModelWorkspace
-      strategy={draft.graph.strategy} issues={policyResult?.issues ?? []} preview={policyResult}
+      strategy={draft.graph.strategy} actionOrder={draft.graph.graphNodes.map(({ id }) => id)}
+      issues={policyResult?.issues ?? []} preview={policyResult}
       loading={policyLoading} locked={locked}
       onStrategyChange={(strategy) => setDraft((config) => ({ ...config, graph: { ...config.graph, strategy } }))}
     />;

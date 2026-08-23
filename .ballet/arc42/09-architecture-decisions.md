@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 23
+version: 24
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-031 omistaa aktiivisen yhden Graph Reward-MDP:n. ADR-026/028/030 ovat superseded; ADR-023:n routing/orchestrator/Repair- ja ADR-029:n local-policy/Repair-osat ovat superseded. ADR-025/027:n protected Action Node flow sekä ADR-029:n capability-first-osat säilyvät.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-031 omistaa aktiivisen yhden Graph Reward-MDP:n ja ADR-032 sen visuaalisen authoring-projektion. ADR-026/028/030 ovat superseded; ADR-023:n routing/orchestrator/Repair-, ADR-029:n local-policy/Repair- ja Graph Decision Model form/matrix/table -osat ovat superseded. ADR-025/027:n protected Action Node flow sekä ADR-029:n muut capability-first-osat säilyvät.
 
 ## Päätösindeksi
 
@@ -53,9 +53,10 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-031 omistaa aktiivisen
 | adr-026 | superseded by adr-031 | Historical Graph-scope SSP/SMDP policy | [Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa](../adr/adr-026-stochastic-ssp-smdp-policy-orchestration.md) |
 | adr-027 | accepted | Job Node flow labels and terminal markers | [Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä](../adr/adr-027-job-node-flow-terminal-markers.md) |
 | adr-028 | superseded by adr-031 | Historical outcome-aware hierarchical scoped SSP/SMDP v2 | [Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya](../adr/adr-028-outcome-aware-hierarchical-ssp-smdp.md) |
-| adr-029 | accepted; local-policy/Repair superseded by adr-031 | Capability-first Graph/GraphNode authoring and protected Action flow | [Graph ja GraphNode authoroidaan capability-first-korttinäkymissä](../adr/adr-029-capability-first-card-authoring.md) |
+| adr-029 | accepted; local-policy/Repair superseded by adr-031; Decision Model projection superseded by adr-032 | Capability-first Graph/GraphNode authoring and protected Action flow | [Graph ja GraphNode authoroidaan capability-first-korttinäkymissä](../adr/adr-029-capability-first-card-authoring.md) |
 | adr-030 | superseded by adr-031 | Historical offline policy calibration and promotion | [Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla](../adr/adr-030-governed-offline-calibration-and-promotion.md) |
 | adr-031 | accepted | Single Graph Reward-MDP, immutable acceptance/authorization and strict cut | [Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä](../adr/adr-031-single-graph-reward-mdp.md) |
+| adr-032 | accepted | Visual Reward-MDP impact dashboard and human-scale authoring projection | [Graph Decision Model käyttää visuaalista reward-impact-dashboardia](../adr/adr-032-visual-reward-impact-dashboard.md) |
 
 ## Supersession-suhteet
 
@@ -129,6 +130,10 @@ adr-023:n Graph/GraphNode planet/multi-ring-projektio ja adr-024:n vastaavat upp
 adr-028:n Portti B:lle ennakoitu v17/v10/v13-versionumeroiden varaus
         └── osittain superseded by ──▶ adr-030
             calibration/registry/shadow käyttää seuraavaa strict cutia; Portti B:n semantic approval gate säilyy
+
+adr-029:n Graph Decision Model form/matrix/table -projektio
+        └── osittain superseded by ──▶ adr-032
+            visual impact dashboard; capability-first-kortit, URL-omistajuus ja protected Action flow säilyvät
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -156,6 +161,7 @@ adr-028:n Portti B:lle ennakoitu v17/v10/v13-versionumeroiden varaus
 | adr-026, Graph-only `ssp_v1` ja `{nextStateId, probabilityPpm}` | adr-028 | Portti A lisää scoped `ssp_v2`:n molemmille routing-tasoille, intrinsic semantic outcomes, `P(outcome,nextState|state,action)`:n, projector-owned actual Staten, model-miss-evidenssin ja reachable local proper-policy readinessin. Agent coexistence säilyy pilottiin; strict cut vaatii erillisen approvalin. |
 | adr-023 ja adr-024, vain Graph/GraphNode upper-level planet/multi-ring-projektion osat | adr-029 | Graph/GraphNode authorointi käyttää capability-first-kortteja ja URL-omisteisia Decision Model -osioita. ADR-025/027:n Job industrial flow, Work/Validation-artwork ja runtime-invariantit säilyvät. |
 | adr-028, vain Portti B:lle ennakoitu Config v17 / Snapshot v10 / SQLite v13 -numerovaraus | adr-030 | Phase 2 käyttää v17/v10/v13 strict cutia option-cost-evidenssiin. Portti B:n calibrated-pilot- ja human approval -semantiikka säilyy, mutta sen exact version matrix päätetään myöhemmin. |
+| adr-029, vain Graph Decision Model form/matrix/table -projektio | adr-032 | Ensisijainen Decision Model käyttää projected-state-pulssia, policy-horisonttia, transition-impactia, state-heatmapia ja ihmisyksiköitä. Capability-first Graph/GraphNode-kortit, URL-omistajuus, exact sopimukset ja ADR-025/027:n Action flow säilyvät. |
 
 ## Päätösten käyttö
 
@@ -179,7 +185,7 @@ Kaikki yllä indeksoidut ADR:t; `adr-011` määrittää indeksointi- ja source-o
 
 ## Avoimet kysymykset
 
-- ADR-031 on accepted ja supersession on toteutettu strict hard cutina. Tuotantokaltainen Reward-MDP-pilotti sekä final human visual review puuttuvat edelleen, eikä niitä päätellä teknisestä hyväksynnästä.
+- ADR-031 ja ADR-032 ovat accepted. Tuotantokaltainen Reward-MDP-pilotti sekä toteutetun visual impact -dashboardin final human visual review puuttuvat edelleen, eikä niitä päätellä teknisestä hyväksynnästä.
 
 ## Seuraava katselmointiperuste
 
