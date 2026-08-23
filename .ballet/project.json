@@ -87,224 +87,64 @@
       }
     },
     "strategy": {
-      "kind": "agent_v1",
-      "orchestrator": {
-        "id": "graph-orchestrator",
-        "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-        "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-        "primaryInstructionId": "project:graph-orchestrator",
-        "skillIds": [],
-        "maxTransitions": 256,
-        "maxRouteAttempts": 3,
-        "routing": {
-          "start": {
-            "id": "graph-start",
-            "candidates": [
-              {
-                "target": {
-                  "graphNodeId": "design"
-                },
-                "description": "Begin from the approved desired-state Graph Node."
-              }
-            ]
+      "kind": "ssp_v2",
+      "id": "graph-engineering-policy",
+      "description": "Outcome-aware finite SSP policy for graph-engineering.",
+      "capabilityModel": {
+        "version": 2,
+        "outcomes": [
+          {
+            "id": "outcome-1",
+            "description": "Describe this semantic outcome."
+          }
+        ],
+        "actions": [
+          {
+            "actionId": "build",
+            "guards": []
           },
-          "continuation": [
-            {
-              "id": "design-pass-routes",
-              "sourceId": "design",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "plan"
-                  },
-                  "description": "success: PASS success routes design to plan."
-                }
-              ]
-            },
-            {
-              "id": "design-fail-routes",
-              "sourceId": "design",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "design"
-                  },
-                  "description": "failure: FAIL failure routes design to design."
-                }
-              ]
-            },
-            {
-              "id": "plan-pass-routes",
-              "sourceId": "plan",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "build"
-                  },
-                  "description": "success: PASS success routes plan to build."
-                }
-              ]
-            },
-            {
-              "id": "plan-fail-routes",
-              "sourceId": "plan",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "design"
-                  },
-                  "description": "failure: FAIL failure routes plan to design."
-                }
-              ]
-            },
-            {
-              "id": "build-pass-routes",
-              "sourceId": "build",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "build"
-                  },
-                  "description": "more_work: PASS more_work routes build to build."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "deploy"
-                  },
-                  "description": "success: PASS success routes build to deploy."
-                }
-              ]
-            },
-            {
-              "id": "build-fail-routes",
-              "sourceId": "build",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "build"
-                  },
-                  "description": "implementation_defect: FAIL implementation_defect routes build to build."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "plan"
-                  },
-                  "description": "invalid_plan: FAIL invalid_plan routes build to plan."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "design"
-                  },
-                  "description": "invalid_design: FAIL invalid_design routes build to design."
-                }
-              ]
-            },
-            {
-              "id": "deploy-pass-routes",
-              "sourceId": "deploy",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "verify"
-                  },
-                  "description": "success: PASS success routes deploy to verify."
-                }
-              ]
-            },
-            {
-              "id": "deploy-fail-routes",
-              "sourceId": "deploy",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "deploy"
-                  },
-                  "description": "transient_deployment_error: FAIL transient_deployment_error routes deploy to deploy."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "build"
-                  },
-                  "description": "implementation_defect: FAIL implementation_defect routes deploy to build."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "plan"
-                  },
-                  "description": "invalid_plan: FAIL invalid_plan routes deploy to plan."
-                }
-              ]
-            },
-            {
-              "id": "verify-pass-routes",
-              "sourceId": "verify",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "plan"
-                  },
-                  "description": "more_work: PASS more_work routes verify to plan."
-                },
-                {
-                  "target": {
-                    "terminal": "PASS"
-                  },
-                  "description": "complete: PASS complete routes verify to DONE."
-                }
-              ]
-            },
-            {
-              "id": "verify-fail-routes",
-              "sourceId": "verify",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "graphNodeId": "build"
-                  },
-                  "description": "implementation_defect: FAIL implementation_defect routes verify to build."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "plan"
-                  },
-                  "description": "invalid_plan: FAIL invalid_plan routes verify to plan."
-                },
-                {
-                  "target": {
-                    "graphNodeId": "design"
-                  },
-                  "description": "invalid_design: FAIL invalid_design routes verify to design."
-                },
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "End the Graph Run when repair and rerouting cannot produce a valid result."
-                }
-              ]
-            }
-          ],
-          "repair": []
+          {
+            "actionId": "deploy",
+            "guards": []
+          },
+          {
+            "actionId": "design",
+            "guards": []
+          },
+          {
+            "actionId": "plan",
+            "guards": []
+          },
+          {
+            "actionId": "verify",
+            "guards": []
+          }
+        ]
+      },
+      "model": {
+        "version": 2,
+        "features": [],
+        "states": [],
+        "stateActions": [],
+        "solver": {
+          "algorithm": "ssp_value_iteration_v2",
+          "epsilon": 0.000001,
+          "maxIterations": 1000,
+          "maxSolveMillis": 250
+        },
+        "projection": {
+          "maxDecisionEpochs": 8,
+          "maxProjectionNodes": 64
         }
       }
     },
     "repairNode": {
-      "id": "graph-repair",
-      "description": "Repairs difficult Graph state or worktree failures before human escalation.",
-      "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
       "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
       "primaryInstructionId": "project:repair-node",
       "skillIds": [],
+      "id": "graph-repair",
+      "description": "Repairs difficult Graph state or worktree failures before human escalation.",
+      "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
       "maxRepairDepth": 3,
       "maxRepairAttempts": 3
     },
@@ -320,473 +160,18 @@
             "graph:desired-state.defined"
           ]
         },
+        "outcomes": [],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "repairNode": {
-          "id": "design-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
-          {
-            "id": "design-01-introduction-and-goals",
-            "description": "Maintain arc42 01 Introduction and Goals.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-01-introduction-and-goals-work",
-              "description": "Maintain arc42 01 Introduction and Goals.",
-              "task": "Update only `.ballet/arc42/01-introduction-and-goals.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-requirements-agent",
-              "skillIds": [
-                "project:arc42/document-maintenance",
-                "project:arc42/quality-scenarios"
-              ]
-            },
-            "validationNode": {
-              "id": "design-01-introduction-and-goals-validation",
-              "description": "Validate arc42 01 Introduction and Goals.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-02-constraints",
-            "description": "Maintain arc42 02 Constraints.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-02-constraints-work",
-              "description": "Maintain arc42 02 Constraints.",
-              "task": "Update only `.ballet/arc42/02-constraints.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-requirements-agent",
-              "skillIds": [
-                "project:arc42/document-maintenance"
-              ]
-            },
-            "validationNode": {
-              "id": "design-02-constraints-validation",
-              "description": "Validate arc42 02 Constraints.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-03-context-and-scope",
-            "description": "Maintain arc42 03 Context and Scope.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-03-context-and-scope-work",
-              "description": "Maintain arc42 03 Context and Scope.",
-              "task": "Update only `.ballet/arc42/03-context-and-scope.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-requirements-agent",
-              "skillIds": [
-                "project:arc42/architecture-views",
-                "project:arc42/document-maintenance"
-              ]
-            },
-            "validationNode": {
-              "id": "design-03-context-and-scope-validation",
-              "description": "Validate arc42 03 Context and Scope.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-04-solution-strategy",
-            "description": "Maintain arc42 04 Solution Strategy.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-04-solution-strategy-work",
-              "description": "Maintain arc42 04 Solution Strategy.",
-              "task": "Update only `.ballet/arc42/04-solution-strategy.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-solution-strategy-agent",
-              "skillIds": [
-                "project:arc42/architecture-views",
-                "project:arc42/decision-records"
-              ]
-            },
-            "validationNode": {
-              "id": "design-04-solution-strategy-validation",
-              "description": "Validate arc42 04 Solution Strategy.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-05-building-block-view",
-            "description": "Maintain arc42 05 Building Block View.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-05-building-block-view-work",
-              "description": "Maintain arc42 05 Building Block View.",
-              "task": "Update only `.ballet/arc42/05-building-block-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-building-block-agent",
-              "skillIds": [
-                "project:arc42/architecture-views",
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "design-05-building-block-view-validation",
-              "description": "Validate arc42 05 Building Block View.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-06-runtime-view",
-            "description": "Maintain arc42 06 Runtime View.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-06-runtime-view-work",
-              "description": "Maintain arc42 06 Runtime View.",
-              "task": "Update only `.ballet/arc42/06-runtime-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-runtime-deployment-agent",
-              "skillIds": [
-                "project:arc42/architecture-views",
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "design-06-runtime-view-validation",
-              "description": "Validate arc42 06 Runtime View.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-07-deployment-view",
-            "description": "Maintain arc42 07 Deployment View.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-07-deployment-view-work",
-              "description": "Maintain arc42 07 Deployment View.",
-              "task": "Update only `.ballet/arc42/07-deployment-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-runtime-deployment-agent",
-              "skillIds": [
-                "project:arc42/architecture-views",
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "design-07-deployment-view-validation",
-              "description": "Validate arc42 07 Deployment View.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-08-crosscutting-concepts",
-            "description": "Maintain arc42 08 Crosscutting Concepts.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-08-crosscutting-concepts-work",
-              "description": "Maintain arc42 08 Crosscutting Concepts.",
-              "task": "Update only `.ballet/arc42/08-crosscutting-concepts.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-crosscutting-concepts-agent",
-              "skillIds": [
-                "project:arc42/document-maintenance",
-                "project:arc42/decision-records"
-              ]
-            },
-            "validationNode": {
-              "id": "design-08-crosscutting-concepts-validation",
-              "description": "Validate arc42 08 Crosscutting Concepts.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-09-architecture-decisions",
-            "description": "Maintain arc42 09 Architecture Decisions.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-09-architecture-decisions-work",
-              "description": "Maintain arc42 09 Architecture Decisions.",
-              "task": "Update only `.ballet/arc42/09-architecture-decisions.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-decision-agent",
-              "skillIds": [
-                "project:arc42/decision-records",
-                "project:arc42/document-maintenance"
-              ]
-            },
-            "validationNode": {
-              "id": "design-09-architecture-decisions-validation",
-              "description": "Validate arc42 09 Architecture Decisions.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-10-quality-requirements",
-            "description": "Maintain arc42 10 Quality Requirements.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-10-quality-requirements-work",
-              "description": "Maintain arc42 10 Quality Requirements.",
-              "task": "Update only `.ballet/arc42/10-quality-requirements.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-requirements-agent",
-              "skillIds": [
-                "project:arc42/quality-scenarios",
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "design-10-quality-requirements-validation",
-              "description": "Validate arc42 10 Quality Requirements.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-11-risks-and-technical-debt",
-            "description": "Maintain arc42 11 Risks and Technical Debt.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-11-risks-and-technical-debt-work",
-              "description": "Maintain arc42 11 Risks and Technical Debt.",
-              "task": "Update only `.ballet/arc42/11-risks-and-technical-debt.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-evaluation-agent",
-              "skillIds": [
-                "project:arc42/evaluation",
-                "project:arc42/document-maintenance"
-              ]
-            },
-            "validationNode": {
-              "id": "design-11-risks-and-technical-debt-validation",
-              "description": "Validate arc42 11 Risks and Technical Debt.",
-              "type": "agent",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "design-12-glossary",
-            "description": "Maintain arc42 12 Glossary.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "design-12-glossary-work",
-              "description": "Maintain arc42 12 Glossary.",
-              "task": "Update only `.ballet/arc42/12-glossary.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "type": "agent",
-              "nodeStyle": "sol",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:arc42-documentation-agent",
-              "skillIds": [
-                "project:arc42/document-maintenance",
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "design-12-glossary-validation",
-              "description": "Validate arc42 12 Glossary.",
-              "type": "agent",
-              "task": "Validate only this canonical section. On PASS select success; on exhausted terminal FAIL select failure. Do not edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          }
-        ],
-        "outcomes": [],
         "strategy": {
           "kind": "agent_v1",
           "orchestrator": {
-            "id": "design-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:graph-node-orchestrator",
             "skillIds": [],
+            "id": "design-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "maxTransitions": 256,
             "maxRouteAttempts": 3,
             "routing": {
@@ -1118,7 +503,462 @@
               "repair": []
             }
           }
-        }
+        },
+        "repairNode": {
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:repair-node",
+          "skillIds": [],
+          "id": "design-repair",
+          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
+          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
+          "maxRepairDepth": 3,
+          "maxRepairAttempts": 3
+        },
+        "jobNodes": [
+          {
+            "id": "design-01-introduction-and-goals",
+            "description": "Maintain arc42 01 Introduction and Goals.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-01-introduction-and-goals-work",
+              "description": "Maintain arc42 01 Introduction and Goals.",
+              "task": "Update only `.ballet/arc42/01-introduction-and-goals.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-requirements-agent",
+              "skillIds": [
+                "project:arc42/document-maintenance",
+                "project:arc42/quality-scenarios"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-01-introduction-and-goals-validation",
+              "description": "Validate arc42 01 Introduction and Goals.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-02-constraints",
+            "description": "Maintain arc42 02 Constraints.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-02-constraints-work",
+              "description": "Maintain arc42 02 Constraints.",
+              "task": "Update only `.ballet/arc42/02-constraints.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-requirements-agent",
+              "skillIds": [
+                "project:arc42/document-maintenance"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-02-constraints-validation",
+              "description": "Validate arc42 02 Constraints.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-03-context-and-scope",
+            "description": "Maintain arc42 03 Context and Scope.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-03-context-and-scope-work",
+              "description": "Maintain arc42 03 Context and Scope.",
+              "task": "Update only `.ballet/arc42/03-context-and-scope.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-requirements-agent",
+              "skillIds": [
+                "project:arc42/architecture-views",
+                "project:arc42/document-maintenance"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-03-context-and-scope-validation",
+              "description": "Validate arc42 03 Context and Scope.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-04-solution-strategy",
+            "description": "Maintain arc42 04 Solution Strategy.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-04-solution-strategy-work",
+              "description": "Maintain arc42 04 Solution Strategy.",
+              "task": "Update only `.ballet/arc42/04-solution-strategy.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-solution-strategy-agent",
+              "skillIds": [
+                "project:arc42/architecture-views",
+                "project:arc42/decision-records"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-04-solution-strategy-validation",
+              "description": "Validate arc42 04 Solution Strategy.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-05-building-block-view",
+            "description": "Maintain arc42 05 Building Block View.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-05-building-block-view-work",
+              "description": "Maintain arc42 05 Building Block View.",
+              "task": "Update only `.ballet/arc42/05-building-block-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-building-block-agent",
+              "skillIds": [
+                "project:arc42/architecture-views",
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-05-building-block-view-validation",
+              "description": "Validate arc42 05 Building Block View.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-06-runtime-view",
+            "description": "Maintain arc42 06 Runtime View.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-06-runtime-view-work",
+              "description": "Maintain arc42 06 Runtime View.",
+              "task": "Update only `.ballet/arc42/06-runtime-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-runtime-deployment-agent",
+              "skillIds": [
+                "project:arc42/architecture-views",
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-06-runtime-view-validation",
+              "description": "Validate arc42 06 Runtime View.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-07-deployment-view",
+            "description": "Maintain arc42 07 Deployment View.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-07-deployment-view-work",
+              "description": "Maintain arc42 07 Deployment View.",
+              "task": "Update only `.ballet/arc42/07-deployment-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-runtime-deployment-agent",
+              "skillIds": [
+                "project:arc42/architecture-views",
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-07-deployment-view-validation",
+              "description": "Validate arc42 07 Deployment View.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-08-crosscutting-concepts",
+            "description": "Maintain arc42 08 Crosscutting Concepts.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-08-crosscutting-concepts-work",
+              "description": "Maintain arc42 08 Crosscutting Concepts.",
+              "task": "Update only `.ballet/arc42/08-crosscutting-concepts.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-crosscutting-concepts-agent",
+              "skillIds": [
+                "project:arc42/decision-records",
+                "project:arc42/document-maintenance"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-08-crosscutting-concepts-validation",
+              "description": "Validate arc42 08 Crosscutting Concepts.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-09-architecture-decisions",
+            "description": "Maintain arc42 09 Architecture Decisions.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-09-architecture-decisions-work",
+              "description": "Maintain arc42 09 Architecture Decisions.",
+              "task": "Update only `.ballet/arc42/09-architecture-decisions.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-decision-agent",
+              "skillIds": [
+                "project:arc42/decision-records",
+                "project:arc42/document-maintenance"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-09-architecture-decisions-validation",
+              "description": "Validate arc42 09 Architecture Decisions.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-10-quality-requirements",
+            "description": "Maintain arc42 10 Quality Requirements.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-10-quality-requirements-work",
+              "description": "Maintain arc42 10 Quality Requirements.",
+              "task": "Update only `.ballet/arc42/10-quality-requirements.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-requirements-agent",
+              "skillIds": [
+                "project:arc42/quality-scenarios",
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-10-quality-requirements-validation",
+              "description": "Validate arc42 10 Quality Requirements.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-11-risks-and-technical-debt",
+            "description": "Maintain arc42 11 Risks and Technical Debt.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-11-risks-and-technical-debt-work",
+              "description": "Maintain arc42 11 Risks and Technical Debt.",
+              "task": "Update only `.ballet/arc42/11-risks-and-technical-debt.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-evaluation-agent",
+              "skillIds": [
+                "project:arc42/document-maintenance",
+                "project:arc42/evaluation"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-11-risks-and-technical-debt-validation",
+              "description": "Validate arc42 11 Risks and Technical Debt.",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "design-12-glossary",
+            "description": "Maintain arc42 12 Glossary.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "sol",
+              "nodeSize": "large",
+              "id": "design-12-glossary-work",
+              "description": "Maintain arc42 12 Glossary.",
+              "task": "Update only `.ballet/arc42/12-glossary.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:arc42-documentation-agent",
+              "skillIds": [
+                "project:arc42/document-maintenance",
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "design-12-glossary-validation",
+              "description": "Validate arc42 12 Glossary.",
+              "task": "Validate only this canonical section. On PASS select success; on exhausted terminal FAIL select failure. Do not edit artifacts.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          }
+        ]
       },
       {
         "id": "plan",
@@ -1132,102 +972,18 @@
             "graph:release.planned"
           ]
         },
+        "outcomes": [],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "repairNode": {
-          "id": "plan-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
-          {
-            "id": "plan-select-release",
-            "description": "Select the first eligible planned release.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "plan-select-release-work",
-              "description": "Select the first eligible planned release.",
-              "task": "Read the ordered Story/Release Map, select its first eligible planned release, validate design, acceptance and environment references, and patch only bounded State references. Return needs_input for ambiguous priority.",
-              "type": "agent",
-              "nodeStyle": "terra",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:graph-plan-agent",
-              "skillIds": [
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "plan-select-release-validation",
-              "description": "Validate selected release.",
-              "type": "agent",
-              "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          },
-          {
-            "id": "plan-materialize-work",
-            "description": "Materialize the selected release work idempotently.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "plan-materialize-work-work",
-              "description": "Materialize the selected release work idempotently.",
-              "task": "Use only ballet tracker. Upsert one ballet-release:<stable-id> epic and its implementation issues with stable external refs, acceptance references, parent and dependencies. Do not duplicate tasks in the Story/Release Map.",
-              "type": "agent",
-              "nodeStyle": "terra",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:graph-plan-agent",
-              "skillIds": [
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "plan-materialize-work-validation",
-              "description": "Validate materialized release work.",
-              "type": "agent",
-              "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          }
-        ],
-        "outcomes": [],
         "strategy": {
           "kind": "agent_v1",
           "orchestrator": {
-            "id": "plan-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:graph-node-orchestrator",
             "skillIds": [],
+            "id": "plan-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "maxTransitions": 256,
             "maxRouteAttempts": 3,
             "routing": {
@@ -1299,81 +1055,117 @@
               "repair": []
             }
           }
-        }
+        },
+        "repairNode": {
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:repair-node",
+          "skillIds": [],
+          "id": "plan-repair",
+          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
+          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
+          "maxRepairDepth": 3,
+          "maxRepairAttempts": 3
+        },
+        "jobNodes": [
+          {
+            "id": "plan-select-release",
+            "description": "Select the first eligible planned release.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "terra",
+              "nodeSize": "large",
+              "id": "plan-select-release-work",
+              "description": "Select the first eligible planned release.",
+              "task": "Read the ordered Story/Release Map, select its first eligible planned release, validate design, acceptance and environment references, and patch only bounded State references. Return needs_input for ambiguous priority.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:graph-plan-agent",
+              "skillIds": [
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "plan-select-release-validation",
+              "description": "Validate selected release.",
+              "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          },
+          {
+            "id": "plan-materialize-work",
+            "description": "Materialize the selected release work idempotently.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "terra",
+              "nodeSize": "large",
+              "id": "plan-materialize-work-work",
+              "description": "Materialize the selected release work idempotently.",
+              "task": "Use only ballet tracker. Upsert one ballet-release:<stable-id> epic and its implementation issues with stable external refs, acceptance references, parent and dependencies. Do not duplicate tasks in the Story/Release Map.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:graph-plan-agent",
+              "skillIds": [
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "plan-materialize-work-validation",
+              "description": "Validate materialized release work.",
+              "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          }
+        ]
       },
       {
         "id": "build",
         "description": "Implement exactly one ready issue per invocation.",
         "capabilities": {
           "accepts": [
-            "graph:release.planned",
-            "graph:implementation.defect"
+            "graph:implementation.defect",
+            "graph:release.planned"
           ],
           "provides": [
             "graph:release.built",
             "graph:release.work-remaining"
           ]
         },
+        "outcomes": [],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "repairNode": {
-          "id": "build-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
-          {
-            "id": "build-one-ready-issue",
-            "description": "Implement exactly one ready issue.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "build-one-ready-issue-work",
-              "description": "Implement exactly one ready issue.",
-              "task": "Call ballet tracker claim exactly once for the selected release. Prefer its in_progress issue, then ready issues by priority, created and ID. Implement only it, run checks and note evidence; never claim another issue.",
-              "type": "agent",
-              "nodeStyle": "terra",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:graph-build-agent",
-              "skillIds": [
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "build-one-ready-issue-validation",
-              "description": "Validate one issue implementation.",
-              "type": "agent",
-              "task": "Close only accepted work. PASS more_work while child issues remain, otherwise success. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          }
-        ],
-        "outcomes": [],
         "strategy": {
           "kind": "agent_v1",
           "orchestrator": {
-            "id": "build-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:graph-node-orchestrator",
             "skillIds": [],
+            "id": "build-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "maxTransitions": 256,
             "maxRouteAttempts": 3,
             "routing": {
@@ -1419,7 +1211,55 @@
               "repair": []
             }
           }
-        }
+        },
+        "repairNode": {
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:repair-node",
+          "skillIds": [],
+          "id": "build-repair",
+          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
+          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
+          "maxRepairDepth": 3,
+          "maxRepairAttempts": 3
+        },
+        "jobNodes": [
+          {
+            "id": "build-one-ready-issue",
+            "description": "Implement exactly one ready issue.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "terra",
+              "nodeSize": "large",
+              "id": "build-one-ready-issue-work",
+              "description": "Implement exactly one ready issue.",
+              "task": "Call ballet tracker claim exactly once for the selected release. Prefer its in_progress issue, then ready issues by priority, created and ID. Implement only it, run checks and note evidence; never claim another issue.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:graph-build-agent",
+              "skillIds": [
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "build-one-ready-issue-validation",
+              "description": "Validate one issue implementation.",
+              "task": "Close only accepted work. PASS more_work while child issues remain, otherwise success. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          }
+        ]
       },
       {
         "id": "deploy",
@@ -1432,66 +1272,18 @@
             "graph:release.deployed"
           ]
         },
+        "outcomes": [],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "repairNode": {
-          "id": "deploy-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
-          {
-            "id": "deploy-release",
-            "description": "Deploy one explicitly authorized release.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "deploy-release-work",
-              "description": "Deploy one explicitly authorized release.",
-              "task": "Prepare exact environment, version, actions and rollback plan; return needs_input before any external write. Continue only with explicit authorization for those exact actions and record evidence refs.",
-              "type": "agent",
-              "nodeStyle": "terra",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:graph-deploy-agent",
-              "skillIds": [
-                "project:arc42/architecture-views"
-              ]
-            },
-            "validationNode": {
-              "id": "deploy-release-validation",
-              "description": "Validate authorization and deployment evidence.",
-              "type": "agent",
-              "task": "PASS success. Terminal FAIL transient_deployment_error, implementation_defect, or invalid_plan. Do not deploy.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          }
-        ],
-        "outcomes": [],
         "strategy": {
           "kind": "agent_v1",
           "orchestrator": {
-            "id": "deploy-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:graph-node-orchestrator",
             "skillIds": [],
+            "id": "deploy-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "maxTransitions": 256,
             "maxRouteAttempts": 3,
             "routing": {
@@ -1537,7 +1329,55 @@
               "repair": []
             }
           }
-        }
+        },
+        "repairNode": {
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:repair-node",
+          "skillIds": [],
+          "id": "deploy-repair",
+          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
+          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
+          "maxRepairDepth": 3,
+          "maxRepairAttempts": 3
+        },
+        "jobNodes": [
+          {
+            "id": "deploy-release",
+            "description": "Deploy one explicitly authorized release.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "terra",
+              "nodeSize": "large",
+              "id": "deploy-release-work",
+              "description": "Deploy one explicitly authorized release.",
+              "task": "Prepare exact environment, version, actions and rollback plan; return needs_input before any external write. Continue only with explicit authorization for those exact actions and record evidence refs.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:graph-deploy-agent",
+              "skillIds": [
+                "project:arc42/architecture-views"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "deploy-release-validation",
+              "description": "Validate authorization and deployment evidence.",
+              "task": "PASS success. Terminal FAIL transient_deployment_error, implementation_defect, or invalid_plan. Do not deploy.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          }
+        ]
       },
       {
         "id": "verify",
@@ -1547,72 +1387,22 @@
             "graph:release.deployed"
           ],
           "provides": [
-            "graph:release.verified",
-            "graph:desired-state.complete"
+            "graph:desired-state.complete",
+            "graph:release.verified"
           ]
         },
+        "outcomes": [],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "repairNode": {
-          "id": "verify-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
-          {
-            "id": "verify-release",
-            "description": "Verify the deployed release.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
-            "maxRetries": 2,
-            "workNode": {
-              "id": "verify-release-work",
-              "description": "Verify the deployed release.",
-              "task": "Check all 12 arc42 sections, release acceptance, deployment and ticket evidence. Create or reopen a bug before classifying an implementation defect; close the release only after acceptance.",
-              "type": "agent",
-              "nodeStyle": "terra",
-              "nodeSize": "large",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-              "primaryInstructionId": "project:graph-verify-agent",
-              "skillIds": [
-                "project:arc42/conformance-review",
-                "project:arc42/evaluation",
-                "project:arc42/traceability"
-              ]
-            },
-            "validationNode": {
-              "id": "verify-release-validation",
-              "description": "Validate release verification.",
-              "type": "agent",
-              "task": "PASS more_work when releases remain; complete only with no release, acceptance or design gap. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-              "primaryInstructionId": "project:graph-engineering-reviewer",
-              "skillIds": [
-                "project:arc42/conformance-review"
-              ],
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            },
-            "outcomes": []
-          }
-        ],
-        "outcomes": [],
         "strategy": {
           "kind": "agent_v1",
           "orchestrator": {
-            "id": "verify-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
             "primaryInstructionId": "project:graph-node-orchestrator",
             "skillIds": [],
+            "id": "verify-orchestrator",
+            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
             "maxTransitions": 256,
             "maxRouteAttempts": 3,
             "routing": {
@@ -1658,7 +1448,57 @@
               "repair": []
             }
           }
-        }
+        },
+        "repairNode": {
+          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+          "primaryInstructionId": "project:repair-node",
+          "skillIds": [],
+          "id": "verify-repair",
+          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
+          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
+          "maxRepairDepth": 3,
+          "maxRepairAttempts": 3
+        },
+        "jobNodes": [
+          {
+            "id": "verify-release",
+            "description": "Verify the deployed release.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [],
+            "maxRetries": 2,
+            "workNode": {
+              "nodeStyle": "terra",
+              "nodeSize": "large",
+              "id": "verify-release-work",
+              "description": "Verify the deployed release.",
+              "task": "Check all 12 arc42 sections, release acceptance, deployment and ticket evidence. Create or reopen a bug before classifying an implementation defect; close the release only after acceptance.",
+              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "primaryInstructionId": "project:graph-verify-agent",
+              "skillIds": [
+                "project:arc42/conformance-review",
+                "project:arc42/evaluation",
+                "project:arc42/traceability"
+              ],
+              "type": "agent"
+            },
+            "validationNode": {
+              "nodeStyle": "luna",
+              "nodeSize": "small",
+              "id": "verify-release-validation",
+              "description": "Validate release verification.",
+              "task": "PASS more_work when releases remain; complete only with no release, acceptance or design gap. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
+              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "primaryInstructionId": "project:graph-engineering-reviewer",
+              "skillIds": [
+                "project:arc42/conformance-review"
+              ],
+              "type": "agent"
+            }
+          }
+        ]
       }
     ]
   }
