@@ -32,4 +32,4 @@ Patch evaluation/architecture/handoff reference fields only, including evidence/
 
 ## Stop rules
 
-Return `completed` for an evidence-backed evaluation, `needs_input` when a human decision or ambiguous repair target remains, `blocked` for unavailable essential evidence and `failed` for execution failure. As a Validation role, never modify the subject under review. Never return hidden chain-of-thought.
+Return `completed` for an evidence-backed evaluation, `needs_input` when a human decision or ambiguous correction targets remains, `blocked` for unavailable essential evidence and `failed` for execution failure. As a Validation role, never modify the subject under review. Never return hidden chain-of-thought.

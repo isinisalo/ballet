@@ -1,17 +1,17 @@
 import type { JsonValue, NodeResult } from "./automation.js";
-import type { OrchestrationScope, WorkNodeOutcome } from "./runtime.js";
+import type { AcceptanceLedgerSnapshotV1 } from "./decisionModel.js";
+import type { WorkNodeOutcome } from "./runtime.js";
 
-export const taskEnvelopeVersion = 8 as const;
+export const taskEnvelopeVersion = 9 as const;
 export const maxTaskEnvelopeBytes = 384 * 1024;
 export const maxRelevantHistoryEntries = 8;
 export const maxRelevantHistoryBytes = 64 * 1024;
-export const maxRoutingRequestEnvelopeBytes = 64 * 1024;
 export const maxResumeContextBytes = 32 * 1024;
 
 export interface TaskEnvelopeRunIdentity {
   rootRunId: string;
-  graphNodeInvocationId?: string;
-  jobNodeInvocationId?: string;
+  graphNodeInvocationId: string;
+  actionNodeInvocationId: string;
   nodeRunId: string;
 }
 export interface TaskEnvelopeNodeIdentity { id: string; description: string; }
@@ -20,80 +20,42 @@ export interface TaskEnvelopeResumeContext { question: string; context: string; 
 export interface TaskEnvelopeHistoryEntry {
   sequence: number;
   nodeRunId: string;
-  role: "work" | "validation" | "orchestrator" | "repair";
+  role: "work" | "validation";
   state: "completed" | "needs_input" | "blocked" | "failed";
   summary: string;
   stateRevision: number;
 }
-export interface TaskEnvelopeRouteCandidate { key: string; description: string; }
 export interface TaskEnvelopeOutcomeCandidate { outcomeId: string; result: NodeResult; }
 
-interface TaskEnvelopeBase {
+interface TaskEnvelopeBaseV9 {
   version: typeof taskEnvelopeVersion;
   run: TaskEnvelopeRunIdentity;
-  role: "work" | "validation" | "orchestrator" | "repair";
+  role: "work" | "validation";
   task: string;
   state: TaskEnvelopeState;
+  acceptanceLedger: AcceptanceLedgerSnapshotV1;
   resume?: TaskEnvelopeResumeContext;
   relevantHistory: TaskEnvelopeHistoryEntry[];
 }
 
-export interface WorkTaskEnvelopeV8 extends TaskEnvelopeBase {
+export interface WorkTaskEnvelopeV9 extends TaskEnvelopeBaseV9 {
   role: "work";
   graphNode: TaskEnvelopeNodeIdentity;
-  jobNode: TaskEnvelopeNodeIdentity;
+  actionNode: TaskEnvelopeNodeIdentity;
   workNode: TaskEnvelopeNodeIdentity;
   workAttempt: number;
   previousValidationFeedback?: { feedback: string; expectedCorrection: string };
 }
 
-export interface ValidationTaskEnvelopeV8 extends TaskEnvelopeBase {
+export interface ValidationTaskEnvelopeV9 extends TaskEnvelopeBaseV9 {
   role: "validation";
   graphNode: TaskEnvelopeNodeIdentity;
-  jobNode: TaskEnvelopeNodeIdentity;
+  actionNode: TaskEnvelopeNodeIdentity;
   validationNode: TaskEnvelopeNodeIdentity;
   workAttempt: number;
   workOutcome: WorkNodeOutcome;
   allowedOutcomes: TaskEnvelopeOutcomeCandidate[];
-  repairReturn?: { repairRequestId: string; repairResultId: string; stateRevision: number; summary: string };
+  retriesRemaining: number;
 }
 
-export interface OrchestratorTaskEnvelopeV8 extends TaskEnvelopeBase {
-  role: "orchestrator";
-  scope: OrchestrationScope;
-  graphNode?: TaskEnvelopeNodeIdentity;
-  request: {
-    id: string;
-    kind: "start" | "continuation" | "repair";
-    sourceChildId?: string;
-    result?: NodeResult;
-    requestedCapability?: string;
-    evidence: JsonValue;
-  };
-  allowedCandidates: TaskEnvelopeRouteCandidate[];
-  allowedOutcomes: TaskEnvelopeOutcomeCandidate[];
-  repairAvailable: boolean;
-}
-
-export interface RepairTaskEnvelopeV8 extends TaskEnvelopeBase {
-  role: "repair";
-  scope: OrchestrationScope;
-  graphNode?: TaskEnvelopeNodeIdentity;
-  request: {
-    id: string;
-    reason: string;
-    requestedCapability?: string;
-    evidence: JsonValue;
-    returnValidationNodeId: string;
-    attempt: number;
-    depth: number;
-  };
-  allowedCandidates: TaskEnvelopeRouteCandidate[];
-  parentEscalationAvailable: boolean;
-}
-
-export type TaskEnvelopeV8 =
-  | WorkTaskEnvelopeV8
-  | ValidationTaskEnvelopeV8
-  | OrchestratorTaskEnvelopeV8
-  | RepairTaskEnvelopeV8;
+export type TaskEnvelopeV9 = WorkTaskEnvelopeV9 | ValidationTaskEnvelopeV9;

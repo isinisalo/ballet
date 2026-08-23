@@ -1,7 +1,7 @@
 ---
 id: goal-017
 title: Outcome-aware hierarchical SSP/SMDP routing
-status: accepted
+status: superseded
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
@@ -9,10 +9,12 @@ tags:
   - policy
   - ssp
   - smdp
-version: 1
+version: 2
 ---
 
 # Outcome-aware hierarchical SSP/SMDP routing
+
+> Superseded by `goal-020`. Scoped local policy säilyy vain historiallisena päätöskontekstina.
 
 ## Tavoite
 
@@ -52,4 +54,3 @@ Käyttäjä valtuutti 2026-08-23 Portti A:n toteutuksen. Project ownerilta tarvi
 1. probabilityjen, costien ja outcome-katalogien hyväksyntä ennen pilottia;
 2. pilotin hyväksyntä; ja
 3. eksplisiittinen Portti B:n agenttirouting-poisto.
-

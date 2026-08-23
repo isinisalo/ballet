@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 17
+version: 19
 tags:
   - arc42
   - glossary
@@ -15,149 +15,83 @@ arc42Section: 12
 
 ## Tarkoitus
 
-Tämä osio määrittää project-, authoring-, runtime-, tracker-, provider-, persistence-, module- ja UI-termit, joiden yhteinen täsmällinen merkitys vaikuttaa arkkitehtuuriin, toteutukseen tai handoffiin. Lähdekoodin nimet säilyvät englanniksi, vaikka selitys on suomeksi.
+Tämä osio määrittää aktiivisen Graph Reward-MDP-, authoring-, runtime-, persistence-, module- ja evidenssisanaston. Historialliset Loop/Workflow/agent/SSP/Repair/calibration-termit ratkaistaan niiden superseded Goal/ADR-tiedostoista eikä niitä kopioida aktiiviseksi rinnakkaissanastoksi.
 
-## Tila
+## Aktiivinen strict cut
 
-Active implementation on strict-v17 `Graph → GraphNode → JobNode → Work/Validation`, explicit scoped `agent_v1 | ssp_v2`, Graph Node Module v5, Root Snapshot v10, policy observation v3 ja SQLite v13. ADR-028–ADR-030 ovat accepted; strict-v13/Loop/Workflow/RunBook-termit säilyvät historiallisena audit trailina.
+Project Config v18, Decision Model v3, Graph Node Module v6, Root Snapshot v11, Task Envelope/Outcome v9, composition v10, ExecutionSpec v11, policy observation v4 ja SQLite v14.
 
-## Active strict-v17 ja policy-termit
-
-| Termi | Status | Määritelmä |
-| --- | --- | --- |
-| Graph | accepted | Project-global user-authored automation boundary, joka omistaa yhteisen Staten, Graph Orchestratorin/Repair Noden ja 1–40 GraphNodea. |
-| GraphNode | accepted | User-defined, stable-ID:llä viitattu capability ja runtime invocation boundary. Default-projektin nodejen nimet eivät ole platform primitivejä. SMDP-mallissa yksi GraphNode on yksi Option/action. |
-| JobNode | accepted | GraphNoden aggregate child, joka omistaa täsmälleen yhden WorkNoden, yhden ValidationNoden ja bounded retryn. Tämä on nykyinen vakaa schema-, API- ja runtime-tunniste. |
-| Action | accepted | MDP:n valinta `a ∈ A(s)`, jonka orchestrator voi tehdä kyseisessä Decision Statessa. `actionId` on policy- ja evidenssisopimuksen tunniste. |
-| Action Node | accepted | Käyttöliittymän termi nykyiselle `ProjectJobNode`-aggregaatille. Se on valitun MDP-actionin authoring- ja execution-projektio; se omistaa Work/Validation-parin ja bounded retryn. |
-| Capability Model / Capability Graph | review implementation | Intrinsic outcome -katalogi, scoped actions ja hard guardit yhdessä repository-backed Graph/GraphNode/JobNode-rakenteen kanssa: mitä järjestelmä voi tehdä ja mitkä actionit voidaan aloittaa. Ei probability-, cost- tai execution history -lähde. |
-| Decision Model | accepted | Snapshotattava finite state/action/transition/cost/terminal/solver-konfiguraatio, josta SSP-policy ratkaistaan. Project truth, ei runtime observationista automaattisesti muuttuva malli. |
-| Decision State | accepted | Decision epochissa canonical factseista johdettu bounded finite feature vector + state ID/hash. Ei sama asia kuin arbitrary project State eikä itsenäisesti patchattava workflow state. |
-| Decision epoch | review implementation | Graph-scope ennen GraphNode-optionia ja GraphNode-scope ennen JobNode-actionia sekä aina actionin canonical terminaalin jälkeen; runtime projisoi Staten ja valitsee/terminoi policyn perusteella. |
-| Admissible action set `A(s)` | accepted | Snapshot-, candidate-, model-, permission-, human authorization- ja lifecycle-rajojen leikkaus. Poissuljettu action ei saa Q-arvoa. |
-| Option | accepted/refined | GraphNode temporaalisesti laajennettuna actionina: initiation set tulee hard admissibilitystä, internal policy local `ssp_v2`- tai pilotin ajan agent-strategiasta ja termination intrinsic semantic outcome + PASS/FAIL -rajasta. |
-| SSP goal | accepted | Explicit absorbing `success` Decision State, jonka arvo on 0. `failure` ja `blocked` ovat explicit non-goal terminaleja, eivät halpoja actioneita. |
-| Proper policy | accepted | Policy, joka saavuttaa success-terminalin probabilityllä 1 jokaisesta sallitusta nonterminal lähtötilasta. Failure/blocked tai suljettu non-goal recurrent class tekee policysta improperin. |
-| Policy Projection | implemented | Current Decision Statesta ja configured/snapshotted mallista johdettu branch/cumulative probability rollout, jonka rajat ovat enintään 20 decision epochia ja 100 projection-nodea. `Most Likely Rollout` valitsee täydellisen bounded terminal/cutoff-trajectoryn suurimmalla cumulative probabilityllä, ei greedy-haaralla. Ei Current Plan tai dispatch authority. |
-| Execution Graph | accepted/refined | Persistoidut vain toteutuneet scoped observationit `(state_before, action, expected distribution, outcome, PASS/FAIL, actual projected state, model match)` model/snapshot refs -viitteineen. Ei muuta Decision Modelia automaattisesti. |
-| Model miss | review implementation | Observationin `outcome_miss`, `state_miss` tai `outside_support`; `match` tarkoittaa outcome- ja state-ennusteen osumaa. Luokka ei muuta prioreita, vaan seuraava policy ratkaistaan actual statesta. |
-| `agent_v1` / `ssp_v2` | review implementation | Eksplisiittiset Graph- ja GraphNode-strategiat. Ensimmäinen käyttää scoped LLM candidate routingia, toinen Bellman SSP-policya; niiden välillä ei ole fallbackia. |
-| Capability-first authoring | review implementation | Graphin Capability Graph / Decision Model ja GraphNoden Actions / Local Decision Model & Repair -korttiosiot. Upper-level appearance/canvas ei ole domain dataa; Action Node industrial flow säilyy. |
-
-## Historiallinen strict-v13 project ja authoring
+## Domain ja authoring
 
 | Termi | Määritelmä |
 | --- | --- |
-| Project truth | Versionhallittu, ihmis- ja agenttikatselmoitava tieto checkoutissa: Goalit, ADR:t, arc42, `.ballet/project.json`, instructions, skills, release map, source ja design. Eri asia kuin machine-local runtime state ja ticket-store. |
-| Strict-v13 | Nykyinen project config hard cut: 1–40 `ProjectLoop`ia ja `ProjectGraphV13`, jossa tavalliset named transitionit ja repair-edget ovat eri kokoelmissa. V12-lukijaa tai automaattista muunnosta ei ole. |
-| Project Loop | `.ballet/project.json`:ssa materialisoitu Loop, joka sisältää identityn, capabilityt, bounded Staten ja yhden `ProjectWorkflow`-rakenteen. |
-| Loop | Nimetty authoring- ja runtime-raja. Oletusprojektissa Loopit ovat DESIGN, PLAN, BUILD, DEPLOY ja VERIFY; platform ei tunne näitä nimiä. |
-| ProjectWorkflow | Valitun Loopin sisäinen rakenne: start Job, erilliset Job/Validation-kokoelmat sekä persisted Pass/Fail Edget. |
-| JobNode | Rooli, joka tuottaa rajatun työn, omistaa täsmälleen yhden ValidationNoden ja siirtyy valmistuttuaan kiinteästi siihen. |
-| ValidationNode | Rooli, joka arvioi paired Jobin tuloksen ja palauttaa PASS/FAIL-päätöksen, terminalissa sallitun `transitionOutcome`-arvon tai rajatun repair-pyynnön. |
-| Terminal Validation | Workflow'n viimeinen Validation, joka voi valita Graph Runissa yhden snapshotin sallitun named outcomen. Väli-Validation ei voi antaa graph outcomea. |
-| PassEdge | ValidationNoden onnistumisyhteys seuraavaan JobNodeen tai Workflow PASS -endpointiin. |
-| FailEdge | ValidationNoden eskalointiyhteys Workflow FAIL -endpointiin; retryrajan sisäinen paluu ei ole Edge. |
-| Fixed Workflow transition | Job → paired Validation ja paikallinen Validation FAIL → paired Job retryrajan sisällä; ei authoroitava Edge-laji. |
-| ProjectGraphTransition | Tavallinen RunBook-reitti, jonka avain on yksilöllinen `(source, decision, outcome)` ja target on Loop tai DONE. |
-| ProjectRepairEdge | Tavallisista transitioneista erillinen capability-allowlist Validation → repair Loop -kutsulle. |
-| Named outcome | Snake_case-arvo, jonka terminal Validation valitsee snapshotatusta enumista; enintään 64 merkkiä. |
-| DONE | Graph Runin eksplisiittinen terminal-tulos. Se ei ole Loop tai canvasin authoroitava kortti. |
-| Story/Release Map | `.ballet/releases/STORY-RELEASE-MAP.md`:n kevyt docs-as-code-järjestys stable release/story ID:ille, statuksille, design/acceptance-viitteille ja target environmentille. Toteutustaskit eivät asu kartassa. |
-| ExecutionProfile | Project-local provider/model/reasoning/permission-kokoonpano, joka on erotettu Node-roolin primary instruction- ja skill-valinnoista. |
-| Resource closure | Kaikki target Loopin/Node-roolin deterministisesti tarvitsemat profiili-, instruction-, skill- ja schema-resurssit. |
+| Graph | Project-global automation boundary, joka omistaa bounded project Staten, yhden Reward Decision Modelin ja 1–40 GraphNodea. |
+| GraphNode | Käyttäjän authoroima capability ja Reward-MDP:n ajallisesti laajennettu action-optio. Omistaa intrinsic semantic outcomet ja ordered Action Nodet. |
+| Action Node | Strict-v18 aggregate `ProjectActionNode`. Omistaa yhden Workin, yhden Validationin, intrinsic outcomet ja `maxRetries`:n. |
+| Work | Action Noden työn tuottava rooli. Ei valitse GraphNodea tai seuraavaa Action Nodea. |
+| Validation | Action Noden evidenssiä tarkistava rooli. Palauttaa PASS/FAIL:n, semantic outcome-ID:n, acceptance-muutoksen ja FAILissa `retry | escalate` -dispositionin. |
+| Ordered execution | GraphNode suorittaa Action Nodet konfiguraation `actionNodes`-array-järjestyksessä. Local policya ei ole. |
+| Capability Graph | GraphNode-korttien authoring-projektio. Ei runtime graph eikä policy. |
+| Reward Decision Model | Graph-tason `(S,A,P,R,γ)`-authoring ja factual compile preview. GraphNodella ei ole local Decision Modelia. |
+| Protected Action flow | ADR-025/027:n Start→Work→Validation→Pass?/Retry?→Continue/Escalate -authoring-projektio. Vain Work ja Validation ovat interaktiivisia. |
 
-## Historiallinen strict-v13 runtime ja control flow
+## Reward-MDP
 
 | Termi | Määritelmä |
 | --- | --- |
-| RunBook | Immutable Root Snapshotista ajettava deterministinen state machine. Validation valitsee decision/outcomen, runtime ratkaisee exact transitionin ilman kohteen LLM-päättelyä. |
-| Loop Orchestrator | Geneerinen runtime-komponentti, jonka `runbook`-mode soveltaa named transitioneja ja joka käyttää valinnaista agenttipohjaista routeria vain repair-edgeille. |
-| Root Run | Yksi eristetty suoritus ja State-omistaja. Kind on `graph` tai `loop`. |
-| Graph Root Run | Käyttää `graph.id`:tä, aloittaa `startLoopId`:stä, seuraa named transitioneja ja päättyy vain DONEen tai pysäytykseen. |
-| Loop Root Run | Ajaa yhden eksplisiittisesti valitun Loopin. Manuaalinen ja scheduled JobNode -ajo eivät jatka Graph-transitioneihin. |
-| Loop invocation | Yhden Loopin suoritus Root Runissa; orchestration-storeen sovitetaan siitä child `chore`. |
-| Immutable Root Snapshot | Runin alussa jäädytetty graph, reachable Loopit, resource closure ja versionoidut sopimukset. Checkoutin myöhempi muutos ei muuta käynnissä olevan Runin reititystä. |
-| GraphOrchestrationStateV1 | Runtime-tyyppi graph/start/current Loop -viitteille, viimeiselle transitionille, transition countille, DONElle ja ulkoisen seurannan viitteille. |
-| GraphEngineeringStateV1 | Project-local bounded State release/map-, active issue-, target environment-, deploy authorization/evidence- ja verification-viitteille. Ei sama asia kuin GraphOrchestrationState tai `tk`-issue. |
-| State patch | Schema-validi bounded State -muutosehdotus. Validation FAIL ei patchaa Statea. |
-| Outcome | Roolikohtaisen strict output -skeeman läpäissyt tulos; providerin vapaa teksti ei ole outcome. |
-| `transitionOutcome` | Terminal ValidationCompletedOutcomeV6:n named outcome, jonka on kuuluttava snapshotin sallittuun enumiin. |
-| Local retry | Runtime-invariantti, joka palauttaa Validation FAILin paired Jobiin retryrajan sisällä. |
-| Repair Request | Immutable Validation-finding ja capability. Terminal FAIL sisältää joko transitionOutcomen tai repair-pyynnön, ei molempia. |
-| Repair frame | Persistoitu call-frame, joka säilyttää caller Loopin ja Validationin LIFO-paluuta varten. |
-| Transition limit | Graph Runin enintään 256 toteutunutta named transitionia; seuraava yritys estetään fail-closedisti. |
-| `needs_input` | Pysähtymistila, jossa puuttuva WHAT/WHY, prioriteetti, merkittävä päätös, deploy-valtuutus tai yksikäsitteinen repair-target vaatii ihmistä. |
-| Reconciliation | Startup/resume-prosessi, joka sovittaa runtime- ja tracker-intentit ilman replayta tai duplikaattivaikutusta. |
-| Finalization | Root Runin terminal-tilan, canonical control-faktan ja worktree-evidenssin commitointi; ei automaattinen merge, push tai deploy. |
+| Reward-MDP | Discounted Markov Decision Process `(S,A,P,R,γ)`, jossa `A` on GraphNode-optiojoukko ja `γ=0.99`. |
+| State `s` | Exact Decision Model v3 -state, joka yhdistää bounded feature-arvot sekä verified/invalidated acceptance-obligaatiot. |
+| `A(s)` | Hard admissible GraphNode-actionit. Snapshot membership, guardit ja erillinen authorization poistavat forbidden actionit ennen optimointia. |
+| `P(outcome,s′ given s,a)` | Outcome-aware transition-haara integer-ppm:nä. Branchit summautuvat täsmälleen arvoon 1 000 000. |
+| `default_prior` | Symmetric Dirichlet(1):stä deterministisesti muodostettu exact-ppm-priori, kun authored evidenssiä ei ole. Se ei ole kalibroitu väite. |
+| `authored_evidence` | Ihmisen/evidenssin authoroima transition-provenienssi. Runtime observation ei vaihda provenienssia tai arvoa. |
+| Reward | `completionBonus − actionCost − outcomePenalty + γΦ(s′) − Φ(s)` integer-mikroyksikköinä. |
+| Potential `Φ` | `100 × (verifiedProgress − 1)` reward-yksikköinä. Potential-based shaping palkitsee acceptance-ledgerin deltaa, ei workflow-noden vaihtoa. |
+| Q/V | Compilerin read-only action/state-arvot. Ne ovat policy-evidenssiä, eivät UI-inputteja tai toteutunutta progressia. |
+| Absorbing policy | Valittu policy saavuttaa terminalin todennäköisyydellä 1 eikä sisällä nonterminal recurrent classia. |
+| Compiled policy | Deterministic value iterationin, stable tie-breakin ja absorption-checkin tuottama immutable state→action/Q/V-taulukko Root Snapshotissa. |
 
-## `tk` ja persistence
+## Acceptance ja authorization
 
 | Termi | Määritelmä |
 | --- | --- |
-| `tk` | Koneelle asennettava issue tracker -prerequisite. Ballet tukee pinnatun revision käyttäytymistä eikä vendoroi tai automaattisesti asenna komentoa. |
-| Orchestration store | Worktreen `.tickets/orchestration`: runtime-only-store, jossa Root Run on `epic` ja Loop invocation child `chore`. |
-| Work store | Worktreen `.tickets/work`: release `epic` ja `task|feature|bug|chore`-toteutusissuet, joita PLAN/BUILD/VERIFY käsittelevät rajatulla CLI:llä. |
-| External ref | Idempotenssiavain kuten `ballet-root:<id>`, `ballet-loop-run:<id>` tai `ballet-release:<id>`. Yhdellä storella arvo on yksilöllinen. |
-| Tracker outbox | SQLite v9:n intent-taulu. Runtime kirjoittaa intentin ensin ja sallii etenemisen vasta onnistuneen `tk`-sovituksen ja linkityksen jälkeen. |
-| Tracker link | SQLite-taulun runtime-entiteetin, store-roolin, external-refin ja sovitetun ticket ID:n suhde. |
-| Tracker adapter | Rajattu argv-pohjainen prosessiportti, joka toimii vain konfiguroidussa worktreessä timeout- ja output-rajoilla ilman shelliä. |
-| `ballet tracker` | Agenttien sisäinen work-store-CLI: upsert, query, ready/claim, start, note, close ja reopen. Orchestration-store ei ole agenttien muokattava. |
-| Preflight | Tilapäisessä hakemistossa tehtävä capability-, JSONL/Markdown-, parent-, dependency-, cycle- ja external-ref-validointi ennen Runia. |
-| Canonical persistence | SQLiteen atomisesti commitoitu runtime-, State-, outcome-, control- ja tracker-intent-totuus. Ticket-store ei korvaa runtime-ohjausta. |
-| Machine-local runtime state | `.git/ballet`-hakemiston SQLite-, worktree- ja lifecycle-data, jota ei versionhallita project truthina. |
-| Runtime DB v13 | Nykyinen strict runtime schema. V12- ja vanhemmat kannat jätetään koskemattomiksi ja käynnistys antaa archive/remediation-ohjeen. |
-| Policy option observation v3 | Immutable scoped havainto, joka yhdistää outcome/actual-state/model-match-evidenssin versionoituihin measured/unknown cost-dimensioihin ja inclusive attribution -viitteisiin. |
+| Acceptance obligation | Vakaa ID, kuvaus ja positiivinen integer-paino, joka snapshotataan ennen Runia. |
+| Acceptance ledger | Immutable-ID/paino snapshot ja runtime-status `pending | verified | invalidated`. Vain Validation saa muuttaa statusta evidenssiviitteillä. |
+| Verified progress | Verified-obligaatiopainon osuus kokonaispainosta. Duplicate verification ei muuta osuutta; invalidointi voi laskea sitä. |
+| Authorization snapshot | Project Statesta erillinen immutable lupatotuus ja hash. Project State ei voi antaa actionille lupaa. |
+| Hard authorization | Unauthorized action puuttuu `A(s)`:stä, saa decision-evidenssissä Q-arvon 0 ja dispatchaantuu nolla kertaa. Se ei ole reward penalty. |
 
-## Provider ja versionoidut sopimukset
+## Runtime ja evidenssi
 
 | Termi | Määritelmä |
 | --- | --- |
-| Execution composition | Tavutasoinen järjestys System → primary instruction → vakaasti järjestetyt skillit → Task Envelope → role/output schema. |
-| Strict output schema | Roolikohtainen koneellisesti validoitava tulosmuoto, jonka läpäisy tarvitaan ennen canonical outcomea. |
-| Current runtime cut | Project Config V16, Root Snapshot V9, Task Envelope/outcome V8, prompt composition V9, ExecutionSpec V10, Graph Node Module V5 ja runtime DB V12. |
-| Provider adapter | Portti, joka mapittaa canonical execution taskin provider-protokollaan ja normalisoi tapahtumat muuttamatta runtime-semanticsia. |
-| No fallback | Puuttuva tai invalidi model/profile/provider/resource/tracker pysäyttää tehtävän eikä vaihdu hiljaisesti vaihtoehtoon. |
+| Root Run | Graph- tai GraphNode-targetin immutable-snapshotattu suoritus erillisessä Git-worktreessä. Standalone Action Node Runia ei ole. |
+| Root Snapshot v11 | Project/head/config/resource/composition/theme/runtime-tiedot sekä authorization, acceptance-ledger ja compiled policy. |
+| Policy decision v3 | Projected state, hard admissible/excluded actionit, Q/V, selected action ja model/policy/snapshot hashit. |
+| Policy observation v4 | Toteutunut GraphNode-outcome, actual state, acceptance-ledger, reward, expected distribution ja provenance. Ei online-learning-komento. |
+| State | Bounded `GraphEngineeringStateV1`-project/runtime-viitteet. Ei authorizationia, acceptance-ledgeriä, policyä, dokumentteja tai lokeja. |
+| `retry` | Validation FAIL ajaa saman Action Noden Workin uudelleen vain `maxRetries`-rajan sisällä. |
+| `escalate` | Validation FAIL tai loppunut retry päättää GraphNode-optionin typed semantic outcomella Graph Reward-MDP:lle. Erillistä Repair-roolia ei ole. |
+| Factual execution | Canonical SQLite/root snapshot -projektio toteutuneista invokaatioista, outcomesta, rewardista ja tilasta. Provider-proosa ei ole control truth. |
 
-## Module ja käyttöliittymä
-
-| Termi | Määritelmä |
-| --- | --- |
-| Graph Node Module V5 | Nykyinen portable package-sopimus. Moduuli exporttaa GraphNoden ja Action Nodejen (`ProjectJobNode`) intrinsic outcome -sopimukset, Work/Validation/Repair-resurssit, explicit local `agent_v1` -strategian ja provenance-datan, mutta ei probabilityja, costeja, project-specific transitioneita tai upper-level appearancea. V4-lukijaa ei ole. |
-| `externalWrites` | Module V5 permission metadata; arvo `requires-human-authorization` ilmaisee ulkoisen kirjoituksen portin. |
-| Graph Engineering | Project-global capability-first authoring: URL-omisteiset `Capability Graph`- ja `Decision Model` -korttiosiot. Se ei ole runtime-ohjain eikä upper-level planet canvas. |
-| Graph Node Engineering | Yhden GraphNoden capability-first authoring: URL-omisteiset `Actions`- ja `Local Decision Model & Repair` -korttiosiot. |
-| Action Node industrial flow | ADR-025/027:n suojattu Work → Validation → bounded retry -authoring-projektio. Work/Validation-artwork säilyy tällä tasolla, mutta näkymä ei valitse seuraavaa Action Nodea. |
-| Compile readiness | Scopekohtainen tieto siitä, että Decision Model läpäisee schema-, viite-, probability-, semantic outcome- ja proper-policy-validoinnin. Draftin voi tallentaa, mutta sitä ei saa käyttää Runissa. |
-| Loop Module Package V3 | Historiallinen strict-v13 portable package-sopimus, jonka Graph Node Module V4 ja V5 ovat korvanneet. |
-| Workflow Engineering | Historiallinen yhden Loopin editori ennen GraphNode/JobNode- ja capability-first-rajoja. |
-
-## Arkkitehtuuri ja governance
+## Module ja platform/project-raja
 
 | Termi | Määritelmä |
 | --- | --- |
-| Initiative | Rajattu muutos, jolla on BRIEF-, PLAN-, EVIDENCE- ja REVIEW-artefaktit. |
-| Stable ID | Sisältöpäivityksissä säilyvä Goal/REQ/QS/ADR/CON/BB/RT/DEP/TEST/EVID-tunniste. |
-| Trace chain | Goal/REQ → QS → ADR/CON → BB/RT/DEP → TEST/monitor → EVID -suhdeketju. |
-| External write | Push, merge, release, deploy, rollback, viesti tai muu mutaatio hyväksytyn Root Run -worktreen ulkopuolelle. |
-| Human authorization | Täsmällinen käyttäjän lupa tiettyyn ulkoiseen kirjoitukseen; yleinen toteutuspyyntö ei valtuuta deployta, mergeä tai pushia. |
+| Graph Node Module v6 | Yhden GraphNoden, ordered Action Nodejen, intrinsic outcomejen ja resource closuren portable package. Ei local policya, Repairia, Graph-transitioneita tai rewardia. |
+| Materialisointi | Inspect→plan→commit-kopio project-local-resursseiksi config-last-periaatteella. Package ei ole live runtime dependency. |
+| Platform primitive | Geneerinen Graph/GraphNode/ActionNode/Work/Validation/Reward-MDP/ledger/auth/snapshot/runtime/provider/store-ominaisuus. |
+| Project-local data | Default-nodejen nimet, arc42/release/deploy-menettely, instructions, skills, outcomes ja Reward-MDP-rivit repositoryssä. |
+| Strict cut | Producerit ja consumerit vaihtuvat yhdessä; vanhaa readeria, migraatiota, aliasia tai dual-writeä ei jää. |
+
+## Historiallinen sanasto
+
+`JobNode`, `jobNodes`, `agent_v1`, `ssp_v1`, `ssp_v2`, scoped orchestrator, local Decision Model, Repair Node, RepairRequest/frame/result sekä shadow/promotion ovat superseded audit trail -termejä. Niitä ei käytetä active configissa, runtime-contractissa, persistence-skeemassa, module v6:ssa tai UI:ssa.
 
 ## Kanoniset lähteet
 
-Hyväksytyt Goalit/ADR:t, shared domain -sopimukset, `.ballet/project.json`, STATE-CONTRACT ja tracker-sopimus menevät tämän yhteenvedon edelle ristiriidassa. Ristiriita korjataan sanastoon eikä jätetä rinnakkaiseksi tulkinnaksi.
+`goal-020`, `adr-031`, shared strict contracts, [STATE-CONTRACT](STATE-CONTRACT.md), [DESIGN](../../DESIGN.md) ja [Graph Reward-MDP initiative](initiatives/graph-reward-mdp/BRIEF.md).
 
-## Relevantit päätökset
+## Review-trigger
 
-`adr-002`, `adr-005`, `adr-007`, `adr-011`, `adr-013`, `adr-015`, `adr-016`, `adr-020`, `adr-021`, `adr-022`, `adr-023`, `adr-025`–`adr-030`.
-
-## Evidenssi
-
-Accepted active termit esiintyvät strict-v17 project configissa, shared contracts -rajapinnoissa ja runtime/persistencessä. V2-policy-, capability-first- ja observation v3 -termit traceutuvat ADR-028–030:een, QS-022–025:een, RT-017–019:ään sekä EVID-022–025:een; hyväksytty v1-baseline säilyy ADR-026/QS-021/RT-016/EVID-021-ketjussa.
-
-## Avoimet kysymykset
-
-- Termi lisätään vain, jos epäyhtenäinen tulkinta vaikuttaa arkkitehtuuriin, runtimeen, käyttöliittymään tai handoffiin.
-
-## Seuraava katselmointiperuste
-
-Katselmoi osio, kun uusi vakaa domain-termi hyväksytään tai evaluation löytää käytännössä haitallisen ambiguiteetin.
+Päivitä sanasto, kun public contract, authoring-termi, strict version matrix tai aktiivinen supersession muuttuu. Historiallista termiä ei nosteta aktiiviseksi ilman uutta Goalia ja ADR:ää.

@@ -2,8 +2,7 @@ import { projectConfigReadinessSchema } from "../../shared/api/workspace-schemas
 import type {
   ProjectAutomationConfig,
   ProjectAutomationIssue,
-  ProjectExecutionComposition,
-  ProjectGraphNode
+  ProjectExecutionComposition
 } from "../../shared/domain/automation.js";
 import { defaultProjectConfiguration, type ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import type { ProjectInstruction, ProjectResourceIssue, Skill } from "../../shared/domain/documents.js";
@@ -18,10 +17,10 @@ export class AutomationConflictError extends Error {
   constructor(message: string) { super(message); this.name = "AutomationConflictError"; }
 }
 
-export const validateProjectAutomationConfig = (
+export function validateProjectAutomationConfig(
   config: ProjectAutomationConfig,
   executionProfiles: readonly ExecutionProfile[] = []
-): ProjectAutomationIssue[] => {
+): ProjectAutomationIssue[] {
   const parsed = projectConfigReadinessSchema.safeParse({
     ...config,
     executionProfiles: [...executionProfiles],
@@ -31,78 +30,35 @@ export const validateProjectAutomationConfig = (
     path: issue.path.map(String).join("."),
     message: issue.message
   }));
-};
+}
 
-export const validateProjectExecutionResources = (
+export function validateProjectExecutionResources(
   config: ProjectAutomationConfig,
-  resources: {
-    instructions: ProjectInstruction[];
-    skills: Skill[];
-    issues: ProjectResourceIssue[];
-  }
-): ProjectAutomationIssue[] => {
-  const issues: ProjectAutomationIssue[] = resources.issues.map((issue) => ({ path: issue.relativePath, message: issue.message }));
+  resources: { instructions: ProjectInstruction[]; skills: Skill[]; issues: ProjectResourceIssue[] }
+): ProjectAutomationIssue[] {
+  const issues = resources.issues.map((issue) => ({ path: issue.relativePath, message: issue.message }));
   const instructions = new Map(resources.instructions.flatMap((instruction) =>
     instruction.id ? [[instruction.id, instruction] as const] : []));
   const skills = new Set(resources.skills.map((skill) => skill.id));
-  const check = (composition: ProjectExecutionComposition, path: string, peerIds: readonly string[] = []) => {
+  const check = (composition: ProjectExecutionComposition, path: string) => {
     const instruction = instructions.get(composition.primaryInstructionId);
-    if (!instruction?.valid) issues.push({ path: `${path}.primaryInstructionId`, message: `Missing or invalid instruction ${composition.primaryInstructionId}.` });
+    if (!instruction?.valid) issues.push({
+      path: `${path}.primaryInstructionId`,
+      message: `Missing or invalid instruction ${composition.primaryInstructionId}.`
+    });
     composition.skillIds.forEach((skillId, index) => {
-      if (!skills.has(skillId)) issues.push({ path: `${path}.skillIds.${index}`, message: `Missing or invalid skill ${skillId}.` });
+      if (!skills.has(skillId)) issues.push({
+        path: `${path}.skillIds.${index}`,
+        message: `Missing or invalid skill ${skillId}.`
+      });
     });
-    if (instruction) for (const peerId of peerIds) if (containsIdentifier(instruction.body, peerId)) {
-      issues.push({ path: `${path}.primaryInstructionId`, message: `Instruction must not name peer node ${peerId}; routing belongs to the Orchestrator.` });
-    }
   };
-  if (config.graph.strategy.kind === "agent_v1") {
-    check(config.graph.strategy.orchestrator, "graph.strategy.orchestrator");
-  }
-  if (config.graph.repairNode) check(config.graph.repairNode, "graph.repairNode", config.graph.graphNodes.map((node) => node.id));
-  config.graph.graphNodes.forEach((graphNode, graphNodeIndex) => validateGraphNodeResources(
-    graphNode,
-    `graph.graphNodes.${graphNodeIndex}`,
-    check,
-    issues
-  ));
-  return issues;
-};
-
-const validateGraphNodeResources = (
-  graphNode: ProjectGraphNode,
-  path: string,
-  check: (composition: ProjectExecutionComposition, path: string, peerIds?: readonly string[]) => void,
-  issues: ProjectAutomationIssue[]
-) => {
-  if (graphNode.strategy.kind === "agent_v1") {
-    check(graphNode.strategy.orchestrator, `${path}.strategy.orchestrator`);
-  }
-  const peerIds = graphNode.jobNodes.map((jobNode) => jobNode.id);
-  if (graphNode.repairNode) {
-    check(graphNode.repairNode, `${path}.repairNode`, peerIds);
-    peerIds.forEach((peerId) => {
-      if (containsIdentifier(graphNode.repairNode!.task, peerId)) issues.push({
-        path: `${path}.repairNode.task`,
-        message: `Repair task must not name peer node ${peerId}; routing belongs to the Orchestrator.`
-      });
+  config.graph.graphNodes.forEach((graphNode, graphNodeIndex) => {
+    graphNode.actionNodes.forEach((actionNode, jobIndex) => {
+      const path = `graph.graphNodes.${graphNodeIndex}.actionNodes.${jobIndex}`;
+      if (actionNode.workNode.type === "agent") check(actionNode.workNode, `${path}.workNode`);
+      if (actionNode.validationNode.type === "agent") check(actionNode.validationNode, `${path}.validationNode`);
     });
-  }
-  graphNode.jobNodes.forEach((jobNode, jobIndex) => {
-    const nodePath = `${path}.jobNodes.${jobIndex}`;
-    const otherPeers = peerIds.filter((id) => id !== jobNode.id);
-    if (jobNode.workNode.type === "agent") check(jobNode.workNode, `${nodePath}.workNode`, otherPeers);
-    if (jobNode.validationNode.type === "agent") check(jobNode.validationNode, `${nodePath}.validationNode`, otherPeers);
-    for (const [role, task] of [["workNode", jobNode.workNode.task], ["validationNode", jobNode.validationNode.task]] as const) {
-      otherPeers.forEach((peerId) => {
-        if (containsIdentifier(task, peerId)) issues.push({
-          path: `${nodePath}.${role}.task`,
-          message: `${role} task must not name peer node ${peerId}; routing belongs to the Orchestrator.`
-        });
-      });
-    }
   });
-};
-
-const containsIdentifier = (source: string, id: string): boolean =>
-  new RegExp(`(^|[^a-z0-9-])${escapeRegExp(id)}([^a-z0-9-]|$)`, "i").test(source);
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return issues;
+}

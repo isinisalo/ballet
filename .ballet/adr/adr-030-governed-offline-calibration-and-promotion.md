@@ -1,7 +1,7 @@
 ---
 id: adr-030
 title: Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla
-status: accepted
+status: superseded
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
@@ -9,10 +9,12 @@ tags:
   - policy
   - calibration
   - promotion
-version: 2
+version: 3
 ---
 
 # Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla
+
+> Superseded by `adr-031`; calibration/shadow/promotion-arkkitehtuuri ei ole aktiivinen.
 
 ## Konteksti
 

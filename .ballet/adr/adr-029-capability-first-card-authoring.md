@@ -8,10 +8,12 @@ tags:
   - arkkitehtuuripaatos
   - ui
   - authoring
-version: 1
+version: 2
 ---
 
 # Graph ja GraphNode authoroidaan capability-first-korttinäkymissä
+
+> `adr-031` supersedoi local Decision Model & Repair -osion. Capability-first-kortit, Graph-tason Decision Model ja protected Action Node flow säilyvät.
 
 ## Konteksti
 
@@ -80,4 +82,3 @@ ADR-025 ja ADR-027 jäävät Job-flow'n osalta voimaan. ADR-029 ei väitä ADR-0
 Trace on `goal-018` / `REQ-018`, `QS-024`, `CON-005`, `BB-001`–`BB-002`, `RT-018`, `TEST-024`, `EVID-024` ja initiative `capability-first-authoring`.
 
 ADR tarvitsee eksplisiittisen hyväksynnän sekä desktop/narrow-browser-QA:n. Uusi ADR vaaditaan, jos Job industrial flow, design tokenit tai UI:n control-truth-raja muuttuu.
-

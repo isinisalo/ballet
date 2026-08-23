@@ -2,16 +2,12 @@ import { z } from "zod";
 import {
   canvasNodeSizes,
   canvasNodeStyles,
-  maxGraphNodeJobNodes,
-  maxJobRetriesLimit,
+  maxGraphNodeActionNodes,
+  maxActionRetriesLimit,
   maxNodeCapabilities,
   maxNodeCapabilityLength,
-  maxOrchestratorTransitions,
   maxProjectGraphNodes,
   maxProjectStateBytes,
-  maxRepairAttemptsLimit,
-  maxRepairDepthLimit,
-  maxRouteAttemptsLimit,
   nodeCapabilityPattern,
   type JsonValue,
   type ProjectAutomationConfig
@@ -24,7 +20,7 @@ import {
 import type { ExecutionProfile, ProjectConfiguration, ProjectIssueTrackerConfig } from "../domain/projectConfig.js";
 import type { WorkspaceSaveRequestByCollection } from "./workspace-contracts.js";
 import { validateProjectConfigSchema } from "./project-config-schema-validation.js";
-import { sspDecisionStrategySchema } from "./decision-model-schemas.js";
+import { rewardDecisionStrategySchema } from "./decision-model-schemas.js";
 
 const stringRecordSchema = z.record(z.string(), z.string());
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -113,7 +109,6 @@ const taskSchema = z.string().trim().min(1).max(20_000);
 const entityIdSchema = z.string().min(1).max(160)
   .regex(kebabCaseIdPattern, "Node id must be lowercase kebab-case.")
   .refine((value) => value !== "pass" && value !== "fail", "Node id is reserved for a terminal result.");
-const ruleIdSchema = z.string().min(1).max(200).regex(kebabCaseIdPattern, "Rule id must be lowercase kebab-case.");
 export const nodeCapabilitySchema = z.string().trim().min(1).max(maxNodeCapabilityLength)
   .regex(nodeCapabilityPattern, "Capability must use a namespaced lowercase id such as namespace:capability.name.");
 const capabilityListSchema = z.array(nodeCapabilitySchema).max(maxNodeCapabilities)
@@ -127,7 +122,7 @@ export const canvasThemeSchema = z.object({
     color: themeColorSchema,
     labelColor: themeColorSchema,
     style: z.enum(canvasConnectionLineStyles),
-    repairStyle: z.enum(canvasConnectionLineStyles),
+    retryStyle: z.enum(canvasConnectionLineStyles),
     crossScopeStyle: z.enum(canvasConnectionLineStyles)
   }).strict(),
   connectionPoint: z.object({ style: z.enum(canvasConnectionPointStyles), color: themeColorSchema }).strict()
@@ -157,66 +152,14 @@ const intrinsicOutcomesSchema = z.array(z.object({
   (outcomes) => new Set(outcomes.map(({ outcomeId }) => outcomeId)).size === outcomes.length,
   "Intrinsic outcome ids must be unique."
 );
-const jobNodeSchema = z.object({
+const actionNodeSchema = z.object({
   id: entityIdSchema,
   description: descriptionSchema,
   capabilities: capabilitiesSchema,
   outcomes: intrinsicOutcomesSchema,
-  maxRetries: z.number().int().min(0).max(maxJobRetriesLimit),
+  maxRetries: z.number().int().min(0).max(maxActionRetriesLimit),
   workNode: projectWorkNodeSchema,
   validationNode: projectValidationNodeSchema
-}).strict();
-
-const terminalTargetSchema = z.object({ terminal: z.enum(["PASS", "FAIL"]) }).strict();
-const graphTargetSchema = z.union([
-  z.object({ graphNodeId: entityIdSchema }).strict(),
-  terminalTargetSchema
-]);
-const graphNodeTargetSchema = z.union([
-  z.object({ jobNodeId: entityIdSchema }).strict(),
-  terminalTargetSchema
-]);
-const candidateSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
-  target,
-  description: descriptionSchema
-}).strict();
-const routingSchema = <T extends z.ZodTypeAny>(target: T) => {
-  const candidate = candidateSchema(target);
-  return z.object({
-    start: z.object({ id: ruleIdSchema, candidates: z.array(candidate).min(1) }).strict(),
-    continuation: z.array(z.object({
-      id: ruleIdSchema,
-      sourceId: entityIdSchema,
-      result: z.enum(["PASS", "FAIL"]),
-      candidates: z.array(candidate).min(1)
-    }).strict()).max(maxOrchestratorTransitions),
-    repair: z.array(z.object({
-      id: ruleIdSchema,
-      sourceId: entityIdSchema,
-      capability: nodeCapabilitySchema,
-      candidates: z.array(candidate).min(1)
-    }).strict()).max(maxOrchestratorTransitions)
-  }).strict();
-};
-const orchestratorSchema = <T extends z.ZodTypeAny>(target: T) => z.object({
-  ...compositionFields,
-  id: entityIdSchema,
-  description: descriptionSchema,
-  maxTransitions: z.number().int().min(1).max(maxOrchestratorTransitions),
-  maxRouteAttempts: z.number().int().min(1).max(maxRouteAttemptsLimit),
-  routing: routingSchema(target)
-}).strict();
-const graphStrategySchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("agent_v1"), orchestrator: orchestratorSchema(graphTargetSchema) }).strict(),
-  sspDecisionStrategySchema
-]);
-const repairNodeSchema = z.object({
-  ...compositionFields,
-  id: entityIdSchema,
-  description: descriptionSchema,
-  task: taskSchema,
-  maxRepairDepth: z.number().int().min(0).max(maxRepairDepthLimit),
-  maxRepairAttempts: z.number().int().min(1).max(maxRepairAttemptsLimit)
 }).strict();
 
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() => z.union([
@@ -231,19 +174,13 @@ const graphNodeSchema = z.object({
   capabilities: capabilitiesSchema,
   outcomes: intrinsicOutcomesSchema,
   stateContract: z.object({ description: descriptionSchema }).strict(),
-  strategy: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("agent_v1"), orchestrator: orchestratorSchema(graphNodeTargetSchema) }).strict(),
-    sspDecisionStrategySchema
-  ]),
-  repairNode: repairNodeSchema.optional(),
-  jobNodes: z.array(jobNodeSchema).min(1).max(maxGraphNodeJobNodes)
+  actionNodes: z.array(actionNodeSchema).min(1).max(maxGraphNodeActionNodes)
 }).strict();
 const graphSchema = z.object({
   id: entityIdSchema,
   name: z.string().trim().min(1).max(200),
   state: z.object({ description: descriptionSchema, initial: initialStateSchema }).strict(),
-  strategy: graphStrategySchema,
-  repairNode: repairNodeSchema.optional(),
+  strategy: rewardDecisionStrategySchema,
   graphNodes: z.array(graphNodeSchema).min(1).max(maxProjectGraphNodes)
 }).strict();
 
@@ -257,30 +194,20 @@ export const projectIssueTrackerSchema = z.object({
 }).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
 
 export const automationConfigSchema = z.object({
-  version: z.literal(17),
+  version: z.literal(18),
   graph: graphSchema
 }).strict() as z.ZodType<ProjectAutomationConfig>;
 
 export const policyPreviewRequestSchema = z.object({
   config: automationConfigSchema,
-  scope: z.enum(["graph", "graph_node"]),
-  graphNodeId: entityIdSchema.optional()
-}).strict().superRefine((value, context) => {
-  if (value.scope === "graph_node" && !value.graphNodeId) context.addIssue({
-    code: "custom", path: ["graphNodeId"], message: "Graph Node policy preview requires graphNodeId."
-  });
-});
+}).strict();
 
-export const projectConfigSchema = z.object({
-  version: z.literal(17),
+const projectConfigBaseSchema = z.object({
+  version: z.literal(18),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
   graph: graphSchema
-}).strict() as z.ZodType<ProjectConfiguration>;
+}).strict();
 
-export const projectConfigReadinessSchema = z.object({
-  version: z.literal(17),
-  executionProfiles: z.array(executionProfileSchema),
-  issueTracker: projectIssueTrackerSchema,
-  graph: graphSchema
-}).strict().superRefine(validateProjectConfigSchema);
+export const projectConfigSchema = projectConfigBaseSchema as z.ZodType<ProjectConfiguration>;
+export const projectConfigReadinessSchema = projectConfigBaseSchema.superRefine(validateProjectConfigSchema);

@@ -233,7 +233,8 @@ const readUtf8ProjectFile = async (
   }
 };
 
-const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)[0]?.trim() ?? "";
+const bodyPreview = (body: string): string => body.replace(/^#+\s+/gm, "").split(/\n{2,}/)
+  .map((part) => part.trim()).find(Boolean) ?? "Undocumented project skill.";
 const sha256 = (source: string | Uint8Array): string => createHash("sha256").update(source).digest("hex");
 const posix = (value: string): string => value.split(path.sep).join("/");
 const compareText = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0;

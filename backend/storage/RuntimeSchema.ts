@@ -1,10 +1,9 @@
-export const localDatabaseSchemaVersion = 13;
+export const localDatabaseSchemaVersion = 14;
 
 export const localDatabaseTableNames = [
-  "control_flow_events", "execution_events", "execution_tasks", "graph_node_invocations",
-  "graph_state_revisions", "job_node_invocations", "metadata", "node_runs",
-  "policy_decisions", "policy_option_observations", "repair_frames", "repair_requests", "repair_results", "root_runs",
-  "routing_decisions", "routing_requests", "tracker_links", "tracker_outbox"
+  "acceptance_ledger_entries", "control_flow_events", "execution_events", "execution_tasks",
+  "graph_node_invocations", "graph_state_revisions", "action_node_invocations", "metadata", "node_runs",
+  "policy_decisions", "policy_observations", "root_runs", "tracker_links", "tracker_outbox"
 ] as const;
 
 export const runtimeSchema = `
@@ -40,20 +39,22 @@ export const runtimeSchema = `
   );
 
   CREATE TABLE graph_node_invocations (
-    graph_node_invocation_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    graph_node_id TEXT NOT NULL, parent_graph_node_invocation_id TEXT REFERENCES graph_node_invocations(graph_node_invocation_id),
+    graph_node_invocation_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    graph_node_id TEXT NOT NULL,
     policy_decision_id TEXT,
-    source TEXT NOT NULL CHECK (source IN ('orchestrator','policy','repair','root')),
+    source TEXT NOT NULL CHECK (source IN ('policy','root')),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
-    input_json TEXT, snapshot_json TEXT NOT NULL, entry_state_revision INTEGER NOT NULL, completion_state_revision INTEGER,
-    nesting_depth INTEGER NOT NULL CHECK (nesting_depth BETWEEN 0 AND 3),
+    input_json TEXT, snapshot_json TEXT NOT NULL,
+    entry_state_revision INTEGER NOT NULL, completion_state_revision INTEGER,
     created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
   );
 
-  CREATE TABLE job_node_invocations (
-    job_node_invocation_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+  CREATE TABLE action_node_invocations (
+    action_node_invocation_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     graph_node_invocation_id TEXT NOT NULL REFERENCES graph_node_invocations(graph_node_invocation_id) ON DELETE CASCADE,
-    graph_node_id TEXT NOT NULL, job_node_id TEXT NOT NULL, policy_decision_id TEXT,
+    graph_node_id TEXT NOT NULL, action_node_id TEXT NOT NULL,
     work_attempt INTEGER NOT NULL DEFAULT 0 CHECK (work_attempt >= 0),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
     state_revision_before INTEGER NOT NULL, state_revision_after INTEGER, active_node_run_id TEXT,
@@ -61,112 +62,67 @@ export const runtimeSchema = `
   );
 
   CREATE TABLE node_runs (
-    node_run_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    graph_node_invocation_id TEXT REFERENCES graph_node_invocations(graph_node_invocation_id) ON DELETE CASCADE,
-    job_node_invocation_id TEXT REFERENCES job_node_invocations(job_node_invocation_id) ON DELETE CASCADE,
-    scope TEXT CHECK (scope IN ('graph','graph_node')),
-    role TEXT NOT NULL CHECK (role IN ('work','validation','orchestrator','repair')),
-    graph_node_id TEXT, job_node_id TEXT, node_definition_id TEXT NOT NULL, execution_task_id TEXT UNIQUE,
-    input_json TEXT, context_json TEXT, outcome_json TEXT,
+    node_run_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    graph_node_invocation_id TEXT NOT NULL REFERENCES graph_node_invocations(graph_node_invocation_id) ON DELETE CASCADE,
+    action_node_invocation_id TEXT NOT NULL REFERENCES action_node_invocations(action_node_invocation_id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('work','validation')),
+    graph_node_id TEXT NOT NULL, action_node_id TEXT NOT NULL, node_definition_id TEXT NOT NULL,
+    execution_task_id TEXT UNIQUE, input_json TEXT, context_json TEXT, outcome_json TEXT,
     status TEXT NOT NULL CHECK (status IN (
       'queued','running','waiting_for_input','completed','blocked','failed','cancelled','interrupted'
     )),
     attempt INTEGER NOT NULL CHECK (attempt >= 1), state_revision_before INTEGER NOT NULL, state_revision_after INTEGER,
     patch_json TEXT, patch_hash TEXT, error_code TEXT, error_message TEXT,
-    created_at TEXT NOT NULL, started_at TEXT, updated_at TEXT NOT NULL, completed_at TEXT,
-    CHECK ((role IN ('work','validation') AND job_node_invocation_id IS NOT NULL AND graph_node_invocation_id IS NOT NULL)
-      OR (role IN ('orchestrator','repair') AND scope IS NOT NULL))
+    created_at TEXT NOT NULL, started_at TEXT, updated_at TEXT NOT NULL, completed_at TEXT
   );
 
-  CREATE TABLE routing_requests (
-    routing_request_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    scope TEXT NOT NULL CHECK (scope IN ('graph','graph_node')), kind TEXT NOT NULL CHECK (kind IN ('start','continuation','repair')),
-    graph_node_id TEXT, source_child_id TEXT, source_node_run_id TEXT, result TEXT CHECK (result IN ('PASS','FAIL')),
-    requested_capability TEXT, state_revision INTEGER NOT NULL, evidence_json TEXT NOT NULL, candidate_keys_json TEXT NOT NULL,
-    attempt INTEGER NOT NULL CHECK (attempt BETWEEN 1 AND 3),
-    status TEXT NOT NULL CHECK (status IN ('pending','waiting_for_input','decided','dispatched','failed','cancelled')),
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
-  );
-
-  CREATE TABLE routing_decisions (
-    routing_decision_id TEXT PRIMARY KEY, routing_request_id TEXT NOT NULL REFERENCES routing_requests(routing_request_id) ON DELETE CASCADE,
-    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE, orchestrator_node_run_id TEXT NOT NULL,
-    action TEXT NOT NULL CHECK (action IN ('dispatch','complete','delegate_repair','needs_input')),
-    selected_target TEXT, result TEXT CHECK (result IN ('PASS','FAIL')), reason TEXT NOT NULL,
-    valid INTEGER NOT NULL CHECK (valid IN (0,1)), created_at TEXT NOT NULL
+  CREATE TABLE acceptance_ledger_entries (
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    obligation_id TEXT NOT NULL, weight INTEGER NOT NULL CHECK (weight > 0),
+    status TEXT NOT NULL CHECK (status IN ('pending','verified','invalidated')),
+    evidence_refs_json TEXT NOT NULL, updated_by_validation_node_run_id TEXT,
+    PRIMARY KEY (root_run_id, obligation_id)
   );
 
   CREATE TABLE policy_decisions (
-    policy_decision_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    scope TEXT NOT NULL CHECK (scope IN ('graph','graph_node')), scope_key TEXT NOT NULL, graph_node_invocation_id TEXT,
-    epoch INTEGER NOT NULL CHECK (epoch >= 1), epoch_kind TEXT NOT NULL CHECK (epoch_kind IN ('start','continuation')),
-    previous_action_invocation_id TEXT, state_json TEXT, admissible_action_ids_json TEXT NOT NULL,
-    excluded_actions_json TEXT NOT NULL, selected_action_id TEXT, action_values_json TEXT NOT NULL,
-    state_value_micros REAL, tied_action_ids_json TEXT NOT NULL, solver_status TEXT NOT NULL,
-    solver_algorithm TEXT NOT NULL CHECK (solver_algorithm = 'ssp_value_iteration_v2'), iterations INTEGER NOT NULL,
-    residual REAL NOT NULL, epsilon REAL NOT NULL, model_version INTEGER NOT NULL CHECK (model_version = 2),
-    model_sha256 TEXT NOT NULL, policy_sha256 TEXT,
-    snapshot_sha256 TEXT NOT NULL, message TEXT, created_at TEXT NOT NULL,
-    UNIQUE (root_run_id, scope_key, epoch)
+    policy_decision_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    epoch INTEGER NOT NULL CHECK (epoch >= 1),
+    record_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (root_run_id, epoch)
   );
 
-  CREATE TABLE policy_option_observations (
-    policy_observation_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+  CREATE TABLE policy_observations (
+    policy_observation_id TEXT PRIMARY KEY,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     policy_decision_id TEXT NOT NULL REFERENCES policy_decisions(policy_decision_id),
-    scope TEXT NOT NULL CHECK (scope IN ('graph','graph_node')), scope_key TEXT NOT NULL, action_invocation_id TEXT NOT NULL,
-    graph_node_invocation_id TEXT REFERENCES graph_node_invocations(graph_node_invocation_id),
-    job_node_invocation_id TEXT REFERENCES job_node_invocations(job_node_invocation_id),
-    state_before_json TEXT NOT NULL, action_id TEXT NOT NULL, configured_expected_cost_micros INTEGER NOT NULL,
-    expected_outcome_distribution_json TEXT NOT NULL, observation_version INTEGER NOT NULL CHECK (observation_version = 3),
-    observed_cost_json TEXT NOT NULL, observed_outcome_id TEXT NOT NULL,
-    verified_result TEXT NOT NULL CHECK (verified_result IN ('PASS','FAIL')), actual_state_json TEXT,
-    model_match TEXT NOT NULL CHECK (model_match IN ('match','outcome_miss','state_miss','outside_support')),
-    model_sha256 TEXT NOT NULL, snapshot_sha256 TEXT NOT NULL, created_at TEXT NOT NULL,
-    UNIQUE (scope, action_invocation_id)
-  );
-
-  CREATE TABLE repair_requests (
-    repair_request_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    scope TEXT NOT NULL CHECK (scope IN ('graph','graph_node')), graph_node_id TEXT, requester_node_run_id TEXT NOT NULL,
-    requester_job_node_invocation_id TEXT, return_validation_node_id TEXT NOT NULL, attempt INTEGER NOT NULL CHECK (attempt BETWEEN 1 AND 3),
-    depth INTEGER NOT NULL CHECK (depth BETWEEN 1 AND 3), reason TEXT NOT NULL, requested_capability TEXT,
-    evidence_json TEXT NOT NULL, state_revision INTEGER NOT NULL, candidate_keys_json TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending','running','repaired','escalated','needs_input','failed','cancelled')),
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
-  );
-
-  CREATE TABLE repair_frames (
-    repair_frame_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    repair_request_id TEXT NOT NULL REFERENCES repair_requests(repair_request_id) ON DELETE CASCADE,
-    parent_frame_id TEXT REFERENCES repair_frames(repair_frame_id), return_graph_node_invocation_id TEXT NOT NULL,
-    return_job_node_invocation_id TEXT NOT NULL, return_validation_node_id TEXT NOT NULL,
-    state_revision_at_call INTEGER NOT NULL, depth INTEGER NOT NULL CHECK (depth BETWEEN 1 AND 3),
-    status TEXT NOT NULL CHECK (status IN ('open','returned','escalated','failed','cancelled')),
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
-  );
-
-  CREATE TABLE repair_results (
-    repair_result_id TEXT PRIMARY KEY, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    repair_request_id TEXT NOT NULL REFERENCES repair_requests(repair_request_id),
-    repair_frame_id TEXT NOT NULL REFERENCES repair_frames(repair_frame_id), state_revision INTEGER NOT NULL,
-    outcome_json TEXT NOT NULL, summary TEXT NOT NULL, created_at TEXT NOT NULL
+    action_invocation_id TEXT NOT NULL UNIQUE,
+    record_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
   );
 
   CREATE TABLE control_flow_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
-    sequence INTEGER NOT NULL, kind TEXT NOT NULL CHECK (kind IN (
-      'orchestrator_requested','orchestrator_decided','orchestrator_invalid','policy_decided','policy_invalid','policy_observed',
-      'graph_node_dispatched','job_node_dispatched',
-      'work_completed','validation_pass','validation_fail_retry','validation_fail_repair','repair_dispatched',
-      'repair_return','repair_escalated','root_needs_input','root_cancelled','root_terminal','execution_interrupted'
-    )), state_revision INTEGER NOT NULL, graph_node_invocation_id TEXT, job_node_invocation_id TEXT,
-    source_node_run_id TEXT, target_node_run_id TEXT, routing_request_id TEXT, repair_request_id TEXT, repair_frame_id TEXT,
-    created_at TEXT NOT NULL, UNIQUE (root_run_id, sequence)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    sequence INTEGER NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN (
+      'policy_decided','policy_invalid','policy_observed','graph_node_dispatched','action_node_dispatched',
+      'work_completed','validation_pass','validation_fail_retry','validation_fail_escalate',
+      'root_needs_input','root_cancelled','root_terminal','execution_interrupted'
+    )),
+    state_revision INTEGER NOT NULL, graph_node_invocation_id TEXT, action_node_invocation_id TEXT,
+    source_node_run_id TEXT, target_node_run_id TEXT, policy_decision_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (root_run_id, sequence)
   );
 
   CREATE TABLE execution_tasks (
-    task_id TEXT PRIMARY KEY, provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')), kind TEXT NOT NULL CHECK (kind = 'node_execution'),
-    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE, node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
+    task_id TEXT PRIMARY KEY, provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
+    kind TEXT NOT NULL CHECK (kind = 'node_execution'),
+    root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
+    node_run_id TEXT NOT NULL REFERENCES node_runs(node_run_id),
     status TEXT NOT NULL CHECK (status IN ('queued','running','succeeded','failed','cancelled')),
     spec_json TEXT NOT NULL, spec_hash TEXT NOT NULL, started_at TEXT, completed_at TEXT, cancel_requested_at TEXT,
     error_code TEXT, error_message TEXT, outcome_json TEXT, retained_content_bytes INTEGER NOT NULL DEFAULT 0,
@@ -199,11 +155,9 @@ export const runtimeSchema = `
 
   CREATE INDEX root_runs_status_idx ON root_runs(status, updated_at);
   CREATE INDEX graph_node_invocations_root_idx ON graph_node_invocations(root_run_id, created_at);
-  CREATE INDEX job_node_invocations_root_idx ON job_node_invocations(root_run_id, created_at);
+  CREATE INDEX action_node_invocations_root_idx ON action_node_invocations(root_run_id, created_at);
   CREATE INDEX node_runs_root_idx ON node_runs(root_run_id, created_at);
   CREATE INDEX execution_tasks_status_idx ON execution_tasks(status, provider, created_at);
-  CREATE INDEX routing_requests_root_idx ON routing_requests(root_run_id, created_at);
-  CREATE INDEX policy_decisions_root_idx ON policy_decisions(root_run_id, scope_key, epoch);
-  CREATE INDEX policy_observations_root_idx ON policy_option_observations(root_run_id, created_at);
-  CREATE INDEX repair_frames_root_idx ON repair_frames(root_run_id, created_at);
+  CREATE INDEX policy_decisions_root_idx ON policy_decisions(root_run_id, epoch);
+  CREATE INDEX policy_observations_root_idx ON policy_observations(root_run_id, created_at);
 `;

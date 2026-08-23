@@ -40,7 +40,7 @@ export function EngineeringShell({
             <Orbit className="size-4 shrink-0 text-secondary" aria-hidden="true" />
             <h1 id="engineering-title" className="truncate font-heading text-base font-medium sm:text-lg">{labels[level]}</h1>
             <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-              {level === "graph" ? "Graph Nodes and global action space" : level === "graph_node" ? "Action Nodes and local action space" : "Action, verification and outcomes"}
+              {level === "graph" ? "Graph Nodes and global Reward-MDP action space" : level === "graph_node" ? "Ordered Action Nodes" : "Action, verification and outcomes"}
             </span>
           </div>
           {actions ? <div className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto">{actions}</div> : null}
@@ -51,7 +51,7 @@ export function EngineeringShell({
           </Button>
           {graphNodeId ? <>
             <ChevronRight className="size-3 shrink-0" />
-            <Button type="button" variant="ghost" size="xs" className="h-6 max-w-52 px-1.5" onClick={() => navigate(automationGraphNodePath(graphNodeId, level === "graph_node" && section === "local-decision-model" ? section : undefined))}>
+            <Button type="button" variant="ghost" size="xs" className="h-6 max-w-52 px-1.5" onClick={() => navigate(automationGraphNodePath(graphNodeId))}>
               <span className="truncate">{graphNodeTitle ?? graphNodeId}</span>
             </Button>
           </> : null}

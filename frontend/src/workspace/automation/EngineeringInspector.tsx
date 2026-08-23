@@ -19,8 +19,6 @@ export interface EngineeringInspectorModel {
   primaryInstructionId?: string;
   maxTransitions?: number;
   maxRouteAttempts?: number;
-  maxRepairDepth?: number;
-  maxRepairAttempts?: number;
   maxRetries?: number;
   accepts?: string[];
   provides?: string[];
@@ -115,8 +113,6 @@ function InspectorContent({ model, profiles, instructions, onChange }: {
 const numberFields = [
   { key: "maxTransitions", label: "Transitions" },
   { key: "maxRouteAttempts", label: "Route attempts" },
-  { key: "maxRepairDepth", label: "Repair depth" },
-  { key: "maxRepairAttempts", label: "Repair attempts" },
   { key: "maxRetries", label: "Retries" }
 ] as const;
 

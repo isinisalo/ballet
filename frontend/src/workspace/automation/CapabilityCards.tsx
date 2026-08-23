@@ -1,10 +1,10 @@
 import { BriefcaseBusiness, GitBranch, Pencil, ShieldCheck, Trash2 } from "lucide-react";
-import type { ProjectGraphNode, ProjectJobNode } from "@shared/api/workspace-contracts";
+import type { ProjectGraphNode, ProjectActionNode } from "@shared/api/workspace-contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CollectionAddCard, OperationalStatus } from "@/components/shared/workspace-ui";
 
-type CapabilityNode = ProjectGraphNode | ProjectJobNode;
+type CapabilityNode = ProjectGraphNode | ProjectActionNode;
 
 export function CapabilityCards({ nodes, kind, locked, onAdd, onOpen, onEdit, onRename, onDelete, deleteIssues }: {
   nodes: CapabilityNode[]; kind: "Graph Node" | "Action Node"; locked: boolean; onAdd: () => void;
@@ -14,10 +14,9 @@ export function CapabilityCards({ nodes, kind, locked, onAdd, onOpen, onEdit, on
   return <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={`${kind} capabilities`}>
     <CollectionAddCard label={`Add ${kind}`} onAdd={onAdd} />
     {nodes.map((node) => {
-      const graphNode = "strategy" in node ? node : undefined;
-      const strategy = graphNode?.strategy.kind;
+      const graphNode = "actionNodes" in node ? node : undefined;
       const refs = deleteIssues?.(node.id) ?? [];
-      const ready = node.outcomes.length > 0 && (graphNode?.strategy.kind !== "ssp_v2" || graphNode.strategy.model.stateActions.length > 0);
+      const ready = node.outcomes.length > 0 && (graphNode ? graphNode.actionNodes.length > 0 : true);
       return <article key={node.id} className="grid min-h-52 min-w-0 grid-rows-[1fr_auto] overflow-hidden rounded-lg border border-divider-strong bg-card">
         <div className="grid content-start gap-3 p-4">
           <header className="flex min-w-0 items-start gap-2">
@@ -29,7 +28,7 @@ export function CapabilityCards({ nodes, kind, locked, onAdd, onOpen, onEdit, on
           <ContractLine label="Accepts" values={node.capabilities.accepts} />
           <ContractLine label="Provides" values={node.capabilities.provides} />
           <div className="flex flex-wrap gap-1">{node.outcomes.length ? node.outcomes.map((outcome) => <Badge key={outcome.outcomeId} variant={outcome.result === "PASS" ? "secondary" : "destructive"}>{outcome.outcomeId} · {outcome.result}</Badge>) : <span className="font-mono text-[0.65rem] text-muted-foreground">No intrinsic outcomes</span>}</div>
-          <div className="font-mono text-[0.65rem] text-muted-foreground">{strategy ? `local routing: ${strategy}` : `retry limit: ${(node as ProjectJobNode).maxRetries}`}</div>
+          <div className="font-mono text-[0.65rem] text-muted-foreground">{graphNode ? `${graphNode.actionNodes.length} ordered Action Node${graphNode.actionNodes.length === 1 ? "" : "s"}` : `retry limit: ${(node as ProjectActionNode).maxRetries}`}</div>
           {refs.length ? <p className="text-[0.7rem] text-destructive" title={refs.join("\n")}>Delete blocked: {refs.length} policy reference{refs.length === 1 ? "" : "s"}</p> : null}
         </div>
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-1 border-t border-divider-strong p-2">

@@ -1,42 +1,44 @@
 import type {
-  AdmissibleActionSetV2,
-  ProjectSspDecisionStrategyV2
+  AdmissibleActionSetV3,
+  DecisionStateV3,
+  ProjectRewardDecisionStrategyV3
 } from "../../shared/domain/decisionModel.js";
 
-export const resolveAdmissibleActions = (
-  strategy: ProjectSspDecisionStrategyV2,
-  stateId: string,
+export function resolveAdmissibleActions(
+  strategy: ProjectRewardDecisionStrategyV3,
+  state: DecisionStateV3,
   snapshotGraphNodeIds: readonly string[]
-): AdmissibleActionSetV2 => {
+): AdmissibleActionSetV3 {
   const snapshot = new Set(snapshotGraphNodeIds);
-  const state = strategy.model.states.find((candidate) => candidate.id === stateId);
   const modeled = new Set(strategy.model.stateActions
-    .filter((row) => row.stateId === stateId).map((row) => row.actionId));
+    .filter((row) => row.stateId === state.stateId).map((row) => row.actionId));
   const capability = new Map(strategy.capabilityModel.actions.map((action) => [action.actionId, action]));
-  const all = [...new Set([
-    ...snapshotGraphNodeIds,
-    ...strategy.capabilityModel.actions.map((action) => action.actionId),
-    ...modeled
-  ])].sort();
+  const features = new Map(strategy.model.features.map((feature) => [feature.id, feature]));
+  const all = [...new Set([...snapshotGraphNodeIds, ...capability.keys(), ...modeled])].sort();
   const actionIds: string[] = [];
-  const excludedActions: AdmissibleActionSetV2["excludedActions"] = [];
+  const excludedActions: AdmissibleActionSetV3["excludedActions"] = [];
   for (const actionId of all) {
     const action = capability.get(actionId);
+    const failedGuard = action?.guards.find((guard) => !guard.allowedValues.includes(state.features[guard.featureId]!));
     const reasonCode = !snapshot.has(actionId) ? "outside_snapshot" as const
       : !action ? "outside_capability_model" as const
         : !modeled.has(actionId) ? "outside_state_model" as const
-          : action.guards.some((guard) => !state || !guard.allowedValues.includes(state.values[guard.featureId]!))
-            ? "guard_denied" as const : undefined;
+          : failedGuard && features.get(failedGuard.featureId)?.source.kind === "authorization"
+            ? "authorization_denied" as const
+            : failedGuard ? "guard_denied" as const : undefined;
     if (reasonCode) excludedActions.push({ actionId, reasonCode });
     else actionIds.push(actionId);
   }
   return { actionIds, excludedActions };
-};
+}
 
-export const resolveAllAdmissibleActions = (
-  strategy: ProjectSspDecisionStrategyV2,
+export function resolveAllAdmissibleActions(
+  strategy: ProjectRewardDecisionStrategyV3,
+  projectedStates: ReadonlyMap<string, DecisionStateV3>,
   snapshotGraphNodeIds: readonly string[]
-): Record<string, string[]> => Object.fromEntries(strategy.model.states.map((state) => [
-  state.id,
-  state.terminal ? [] : resolveAdmissibleActions(strategy, state.id, snapshotGraphNodeIds).actionIds
-]));
+): Record<string, string[]> {
+  return Object.fromEntries(strategy.model.states.map((state) => [
+    state.id,
+    state.terminal ? [] : resolveAdmissibleActions(strategy, projectedStates.get(state.id)!, snapshotGraphNodeIds).actionIds
+  ]));
+}

@@ -111,7 +111,7 @@ body {
   color: var(--foreground);
 }
 
-.job-flow-grid {
+.action-flow-grid {
   background-color: var(--background);
   background-image:
     linear-gradient(color-mix(in srgb, var(--border) 52%, transparent) 1px, transparent 1px),
@@ -120,20 +120,20 @@ body {
   overscroll-behavior: contain;
 }
 
-.job-flow-card[data-style="luna"] { --space-color: var(--ballet-luna-surface); --space-highlight: var(--ballet-luna-highlight); --space-shadow: var(--ballet-luna-shadow); }
-.job-flow-card[data-style="sol"] { --space-color: var(--ballet-sol-surface); --space-highlight: var(--ballet-sol-highlight); --space-shadow: var(--ballet-sol-shadow); }
-.job-flow-card[data-style="mars"] { --space-color: var(--ballet-mars-surface); --space-highlight: var(--ballet-mars-highlight); --space-shadow: var(--ballet-mars-shadow); }
-.job-flow-card[data-style="terra"] { --space-color: var(--ballet-terra-surface); --space-highlight: var(--ballet-terra-highlight); --space-shadow: var(--ballet-terra-shadow); }
-.job-flow-card[data-style="flat"] { --space-color: var(--ballet-flat-surface); --space-highlight: var(--ballet-flat-highlight); --space-shadow: var(--ballet-flat-shadow); }
-.job-flow-card[data-style="vector-planet"] { --space-color: var(--ballet-vector-planet-surface); --space-highlight: var(--ballet-vector-planet-highlight); --space-shadow: var(--ballet-vector-planet-shadow); }
+.action-flow-card[data-style="luna"] { --space-color: var(--ballet-luna-surface); --space-highlight: var(--ballet-luna-highlight); --space-shadow: var(--ballet-luna-shadow); }
+.action-flow-card[data-style="sol"] { --space-color: var(--ballet-sol-surface); --space-highlight: var(--ballet-sol-highlight); --space-shadow: var(--ballet-sol-shadow); }
+.action-flow-card[data-style="mars"] { --space-color: var(--ballet-mars-surface); --space-highlight: var(--ballet-mars-highlight); --space-shadow: var(--ballet-mars-shadow); }
+.action-flow-card[data-style="terra"] { --space-color: var(--ballet-terra-surface); --space-highlight: var(--ballet-terra-highlight); --space-shadow: var(--ballet-terra-shadow); }
+.action-flow-card[data-style="flat"] { --space-color: var(--ballet-flat-surface); --space-highlight: var(--ballet-flat-highlight); --space-shadow: var(--ballet-flat-shadow); }
+.action-flow-card[data-style="vector-planet"] { --space-color: var(--ballet-vector-planet-surface); --space-highlight: var(--ballet-vector-planet-highlight); --space-shadow: var(--ballet-vector-planet-shadow); }
 
-.job-flow-canvas {
+.action-flow-canvas {
   position: relative;
   padding-top: 2.25rem;
   overscroll-behavior: contain;
 }
 
-.job-flow-legend {
+.action-flow-legend {
   position: absolute;
   top: 0.75rem;
   left: 1rem;
@@ -145,26 +145,26 @@ body {
   letter-spacing: 0.05em;
 }
 
-.job-flow-legend span {
+.action-flow-legend span {
   color: var(--muted-foreground);
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
 }
 
-.job-flow-stage {
+.action-flow-stage {
   position: relative;
   margin: 0 auto;
 }
 
-.job-flow-card,
-.job-flow-decision {
+.action-flow-card,
+.action-flow-decision {
   position: absolute;
   z-index: 1;
   transform: translate(-50%, -50%);
 }
 
-.job-flow-card {
+.action-flow-card {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,7 +178,7 @@ body {
   box-shadow: 0 8px 20px color-mix(in srgb, var(--ballet-space-void) 54%, transparent);
 }
 
-.job-flow-card--action {
+.action-flow-card--action {
   min-height: 4rem;
   justify-content: flex-start;
   gap: 0.625rem;
@@ -187,33 +187,33 @@ body {
   transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.job-flow-card--action:hover {
+.action-flow-card--action:hover {
   border-color: color-mix(in srgb, var(--space-color) 72%, var(--divider-strong));
   background: var(--ballet-surface-container-high);
 }
 
-.job-flow-card--action:focus-visible {
+.action-flow-card--action:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 
-.job-flow-card--action[data-selected="true"] {
+.action-flow-card--action[data-selected="true"] {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 42%, transparent), 0 0 18px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
-.job-flow-card--action[data-defined="false"] {
+.action-flow-card--action[data-defined="false"] {
   border-style: dashed;
   background: var(--ballet-surface-lowest);
   color: var(--muted-foreground);
 }
 
-.job-flow-card[data-size="tiny"] { width: 8.25rem; }
-.job-flow-card[data-size="small"] { width: 9.25rem; }
-.job-flow-card[data-size="medium"] { width: 10.25rem; }
-.job-flow-card[data-size="large"] { width: 11.75rem; }
+.action-flow-card[data-size="tiny"] { width: 8.25rem; }
+.action-flow-card[data-size="small"] { width: 9.25rem; }
+.action-flow-card[data-size="medium"] { width: 10.25rem; }
+.action-flow-card[data-size="large"] { width: 11.75rem; }
 
-.job-flow-emblem {
+.action-flow-emblem {
   width: 1.125rem;
   height: 1.125rem;
   flex: none;
@@ -223,22 +223,22 @@ body {
   box-shadow: inset -4px -4px 8px var(--space-shadow), 0 0 10px color-mix(in srgb, var(--space-color) 32%, transparent);
 }
 
-.job-flow-card[data-size="tiny"] .job-flow-emblem { width: 0.75rem; height: 0.75rem; }
-.job-flow-card[data-size="small"] .job-flow-emblem { width: 0.9375rem; height: 0.9375rem; }
-.job-flow-card[data-size="large"] .job-flow-emblem { width: 1.375rem; height: 1.375rem; }
+.action-flow-card[data-size="tiny"] .action-flow-emblem { width: 0.75rem; height: 0.75rem; }
+.action-flow-card[data-size="small"] .action-flow-emblem { width: 0.9375rem; height: 0.9375rem; }
+.action-flow-card[data-size="large"] .action-flow-emblem { width: 1.375rem; height: 1.375rem; }
 
-.job-flow-copy {
+.action-flow-copy {
   display: grid;
   min-width: 0;
   gap: 0.125rem;
   text-align: center;
 }
 
-.job-flow-card--action .job-flow-copy {
+.action-flow-card--action .action-flow-copy {
   text-align: left;
 }
 
-.job-flow-copy strong {
+.action-flow-copy strong {
   overflow: hidden;
   font-family: var(--font-sans);
   font-size: 0.75rem;
@@ -248,7 +248,7 @@ body {
   white-space: nowrap;
 }
 
-.job-flow-card--action .job-flow-copy strong {
+.action-flow-card--action .action-flow-copy strong {
   font-family: var(--font-mono);
   font-size: 0.625rem;
   line-height: 0.875rem;
@@ -257,7 +257,7 @@ body {
   white-space: normal;
 }
 
-.job-flow-copy small {
+.action-flow-copy small {
   overflow: hidden;
   color: var(--muted-foreground);
   font-family: var(--font-mono);
@@ -267,9 +267,9 @@ body {
   white-space: nowrap;
 }
 
-.job-flow-card--start,
-.job-flow-card--escalate,
-.job-flow-card--continue {
+.action-flow-card--start,
+.action-flow-card--escalate,
+.action-flow-card--continue {
   width: 4rem;
   height: 4rem;
   min-height: 4rem;
@@ -277,22 +277,22 @@ body {
   border-radius: 9999px;
 }
 
-.job-flow-card--start {
+.action-flow-card--start {
   border-color: color-mix(in srgb, var(--primary) 58%, var(--divider-strong));
   background: color-mix(in srgb, var(--primary) 20%, var(--card));
 }
 
-.job-flow-card--escalate {
+.action-flow-card--escalate {
   border-color: color-mix(in srgb, var(--destructive) 68%, var(--divider-strong));
   background: color-mix(in srgb, var(--destructive) 18%, var(--card));
 }
 
-.job-flow-card--continue {
+.action-flow-card--continue {
   border-color: color-mix(in srgb, var(--secondary) 68%, var(--divider-strong));
   background: color-mix(in srgb, var(--secondary) 18%, var(--card));
 }
 
-.job-flow-card--retry-count {
+.action-flow-card--retry-count {
   width: 8rem;
   border-style: dashed;
   border-color: var(--outline);
@@ -301,14 +301,14 @@ body {
   box-shadow: none;
 }
 
-.job-flow-decision {
+.action-flow-decision {
   display: grid;
   width: 6.5rem;
   height: 4.5rem;
   place-items: center;
 }
 
-.job-flow-decision-shape {
+.action-flow-decision-shape {
   position: absolute;
   width: 3.25rem;
   height: 3.25rem;
@@ -317,48 +317,48 @@ body {
   transform: rotate(45deg);
 }
 
-.job-flow-decision .job-flow-copy {
+.action-flow-decision .action-flow-copy {
   position: relative;
   z-index: 1;
 }
 
-.job-flow-decision[data-muted="true"] {
+.action-flow-decision[data-muted="true"] {
   color: var(--muted-foreground);
 }
 
-.job-flow-decision[data-muted="true"] .job-flow-decision-shape {
+.action-flow-decision[data-muted="true"] .action-flow-decision-shape {
   border-style: dashed;
   background: var(--ballet-surface-lowest);
 }
 
-.job-flow-edge {
+.action-flow-edge {
   fill: none;
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
 
-.job-flow-edge[data-dashed="true"] { stroke-dasharray: 7 6; }
-.job-flow-edge--flow { stroke: var(--canvas-flow); }
-.job-flow-edge--retry { stroke: var(--canvas-flow); }
-.job-flow-edge--fail { stroke: var(--destructive); }
-.job-flow-edge--neutral { stroke: var(--outline); }
-.job-flow-marker--flow { fill: var(--canvas-flow); }
-.job-flow-marker--retry { fill: var(--canvas-flow); }
-.job-flow-marker--fail { fill: var(--destructive); }
+.action-flow-edge[data-dashed="true"] { stroke-dasharray: 7 6; }
+.action-flow-edge--flow { stroke: var(--canvas-flow); }
+.action-flow-edge--retry { stroke: var(--canvas-flow); }
+.action-flow-edge--fail { stroke: var(--destructive); }
+.action-flow-edge--neutral { stroke: var(--outline); }
+.action-flow-marker--flow { fill: var(--canvas-flow); }
+.action-flow-marker--retry { fill: var(--canvas-flow); }
+.action-flow-marker--fail { fill: var(--destructive); }
 
-.job-flow-edge-label {
+.action-flow-edge-label {
   font-family: var(--font-mono);
   font-size: 0.5625rem;
   font-weight: 600;
   letter-spacing: 0.05em;
 }
 
-.job-flow-edge-label--flow { fill: var(--secondary); }
-.job-flow-edge-label--retry { fill: var(--canvas-flow); }
-.job-flow-edge-label--fail { fill: var(--destructive); }
+.action-flow-edge-label--flow { fill: var(--secondary); }
+.action-flow-edge-label--retry { fill: var(--canvas-flow); }
+.action-flow-edge-label--fail { fill: var(--destructive); }
 
 @media (prefers-reduced-motion: reduce) {
-  .job-flow-card--action {
+  .action-flow-card--action {
     transition: none;
   }
 }

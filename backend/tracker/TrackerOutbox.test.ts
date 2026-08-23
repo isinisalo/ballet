@@ -66,10 +66,10 @@ const fixtureDatabase = (status: "running" | "completed"): Database.Database => 
   connection.prepare(`
     INSERT INTO graph_node_invocations (
       graph_node_invocation_id, root_run_id, graph_node_id, source, status,
-      snapshot_json, entry_state_revision, completion_state_revision, nesting_depth,
+      snapshot_json, entry_state_revision, completion_state_revision,
       created_at, updated_at, completed_at
-    ) VALUES ('graph-node-invocation-1', 'root-1', 'design', 'orchestrator', 'completed',
-      '{}', 0, 0, 0, 'now', 'now', 'now')
+    ) VALUES ('graph-node-invocation-1', 'root-1', 'design', 'policy', 'completed',
+      '{}', 0, 0, 'now', 'now', 'now')
   `).run();
   return connection;
 };

@@ -1,7 +1,7 @@
 ---
 id: adr-028
 title: Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya
-status: accepted
+status: superseded
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
@@ -9,10 +9,12 @@ tags:
   - policy
   - ssp
   - smdp
-version: 2
+version: 3
 ---
 
 # Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya
+
+> Superseded by `adr-031`; scoped local-policy -malli ei ole aktiivinen arkkitehtuuri.
 
 ## Konteksti
 

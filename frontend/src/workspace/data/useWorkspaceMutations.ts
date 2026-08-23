@@ -17,6 +17,7 @@ import type { ProjectDocumentCreateKind, SaveCollection } from "../types";
 import type { WorkspaceNavigation } from "../useWorkspaceNavigation";
 
 type Notify = (input: { type: "info" | "error"; message: string }) => string;
+type MutationRunner = <T>(action: () => Promise<T>, successMessage: string, fallbackError: string) => Promise<T>;
 
 export function useWorkspaceMutations({
   notify,
@@ -117,35 +118,7 @@ export function useWorkspaceMutations({
     );
   }, [runMutation]);
 
-  const installGraphNodeModule = useCallback(async (input: GraphNodeModuleInstallCommitRequest) => runMutation(
-    () => api.installGraphNodeModule(input),
-    "Graph Node module installed.",
-    "Unable to install Graph Node module."
-  ), [runMutation]);
-
-  const removeInstalledGraphNodeModule = useCallback(async (graphNodeId: string) => {
-    await runMutation(
-      () => api.removeInstalledGraphNodeModule(graphNodeId),
-      "Installed Graph Node removed.",
-      "Unable to remove installed Graph Node."
-    );
-  }, [runMutation]);
-
-  const exportGraphNodeModule = useCallback(async (input: GraphNodeModuleExportRequest) => runMutation(
-    () => api.exportGraphNodeModule(input),
-    "Graph Node module exported.",
-    "Unable to export Graph Node module."
-  ), [runMutation]);
-
-  const graphNodeModules = useMemo(() => ({
-    listLibrary: api.listGraphNodeModuleLibrary,
-    inspect: api.inspectGraphNodeModule,
-    plan: (input: GraphNodeModuleInstallPlanRequest) => api.planGraphNodeModuleInstall(input),
-    install: installGraphNodeModule,
-    statuses: api.graphNodeModuleStatuses,
-    exportGraphNode: exportGraphNodeModule,
-    remove: removeInstalledGraphNodeModule
-  }), [exportGraphNodeModule, installGraphNodeModule, removeInstalledGraphNodeModule]);
+  const graphNodeModules = useGraphNodeModuleMutations(runMutation);
 
   return {
     save,
@@ -160,4 +133,33 @@ export function useWorkspaceMutations({
     graphNodeModules,
     refresh
   };
+}
+
+function useGraphNodeModuleMutations(runMutation: MutationRunner) {
+  const install = useCallback(async (input: GraphNodeModuleInstallCommitRequest) => runMutation(
+    () => api.installGraphNodeModule(input),
+    "Graph Node module installed.",
+    "Unable to install Graph Node module."
+  ), [runMutation]);
+  const remove = useCallback(async (graphNodeId: string) => {
+    await runMutation(
+      () => api.removeInstalledGraphNodeModule(graphNodeId),
+      "Installed Graph Node removed.",
+      "Unable to remove installed Graph Node."
+    );
+  }, [runMutation]);
+  const exportGraphNode = useCallback(async (input: GraphNodeModuleExportRequest) => runMutation(
+    () => api.exportGraphNodeModule(input),
+    "Graph Node module exported.",
+    "Unable to export Graph Node module."
+  ), [runMutation]);
+  return useMemo(() => ({
+    listLibrary: api.listGraphNodeModuleLibrary,
+    inspect: api.inspectGraphNodeModule,
+    plan: (input: GraphNodeModuleInstallPlanRequest) => api.planGraphNodeModuleInstall(input),
+    install,
+    statuses: api.graphNodeModuleStatuses,
+    exportGraphNode,
+    remove
+  }), [exportGraphNode, install, remove]);
 }

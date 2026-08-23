@@ -3,16 +3,18 @@ id: adr-025
 title: Job Node authoring käyttää industrial flow -projektiota
 status: accepted
 createdAt: '2026-08-22T00:00:00.000Z'
-updatedAt: '2026-08-22T00:00:00.000Z'
+updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
   - arkkitehtuuripaatos
   - job-node
   - canvas
   - authoring
-version: 1
+version: 2
 ---
 
 # Job Node authoring käyttää industrial flow -projektiota
+
+> **Supersession notice (2026-08-23):** `adr-031` säilyttää tämän visuaalisen flow-sopimuksen Action Node -tasolla. Historiallinen `Job Node` -nimi, parent orchestrator -vastuu ja Repair-viitteet eivät ole strict-v18-domainia.
 
 ## Konteksti
 

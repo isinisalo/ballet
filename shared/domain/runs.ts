@@ -6,23 +6,17 @@ import type {
   GraphNodeInvocationDetails,
   GraphStateRevisionMetadata,
   NodeRunRole,
-  RepairFrame,
-  RepairRequest,
-  RepairResult,
   RootExecutionSnapshot,
   RootFinalizationReport,
-  RoutingDecision,
-  RoutingRequest,
   RuntimePreflightIssue,
   ValidationNodeOutcome,
   WorkNodeOutcome
 } from "./runtime.js";
 import type {
-  ExecutionGraphOccurrenceV3,
-  PolicyDecisionRecordV2,
-  PolicyOptionObservationV3,
-  PolicyProjectionV2,
-  PolicyTelemetryV3
+  AcceptanceLedgerSnapshotV1,
+  CompiledRewardPolicyV3,
+  PolicyDecisionRecordV3,
+  PolicyOptionObservationV4
 } from "./decisionModel.js";
 
 export type BalletMode = "configure" | "run";
@@ -33,18 +27,16 @@ export type RootRunListState = "active" | "recent";
 export interface RootRunCurrentPosition {
   graphNodeInvocationId?: string;
   graphNodeId?: string;
-  jobNodeInvocationId?: string;
-  jobNodeId?: string;
+  actionNodeInvocationId?: string;
+  actionNodeId?: string;
   nodeRunId?: string;
   nodeRole?: NodeRunRole;
   taskId?: string;
   executionProfileId?: string;
   taskStatus?: ExecutionTask["status"];
   workAttempt?: number;
-  repairDepth?: number;
   lastWorkOutcome?: WorkNodeOutcome;
   lastValidationOutcome?: ValidationNodeOutcome;
-  repairRequestId?: string;
 }
 export interface RootRunStateProjection {
   currentRevision: number;
@@ -54,23 +46,11 @@ export interface RootRunStateProjection {
   totalRevisionCount: number;
   historyTruncated: boolean;
 }
-export interface RootRunRepairProjection {
-  requests: RepairRequest[];
-  frames: RepairFrame[];
-  results: RepairResult[];
-  activeFrames: RepairFrame[];
-  pendingRepair?: RepairRequest;
-}
 export interface RootRunOrchestrationProjection {
-  requests: RoutingRequest[];
-  decisions: RoutingDecision[];
-  pendingRequest?: RoutingRequest;
-  selectedDecision?: RoutingDecision;
-  policyDecisions: PolicyDecisionRecordV2[];
-  policyObservations: PolicyOptionObservationV3[];
-  policyProjections: Record<string, PolicyProjectionV2>;
-  executionGraph: ExecutionGraphOccurrenceV3[];
-  policyTelemetry: PolicyTelemetryV3[];
+  policyDecisions: PolicyDecisionRecordV3[];
+  policyObservations: PolicyOptionObservationV4[];
+  compiledPolicy: CompiledRewardPolicyV3;
+  acceptanceLedger: AcceptanceLedgerSnapshotV1;
 }
 export interface RootRunFinalization {
   status: "finalizing" | "completed" | "failed";
@@ -102,7 +82,6 @@ export interface RootRunDetail extends RootRunSummary {
   tasks: ExecutionTask[];
   state: RootRunStateProjection;
   orchestration: RootRunOrchestrationProjection;
-  repair: RootRunRepairProjection;
   controlFlowEvents: ControlFlowEvent[];
 }
 export interface RootRunListQuery { state?: RootRunListState; cursor?: string; limit?: number; }

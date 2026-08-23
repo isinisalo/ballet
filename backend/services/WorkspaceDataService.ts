@@ -8,7 +8,7 @@ import { ProjectConfigurationRepository } from "../project-config/ProjectConfigu
 
 export class WorkspaceDataService {
   private enrich?: (data: WorkspaceContentData & Pick<AppData,
-    "graphNodeInvocations" | "activeRootRuns" | "routingDecisions">) => Promise<AppData>;
+    "graphNodeInvocations" | "activeRootRuns">) => Promise<AppData>;
   private readonly projectConfigurations = new ProjectConfigurationRepository();
 
   constructor(
@@ -18,7 +18,7 @@ export class WorkspaceDataService {
   ) {}
 
   setEnricher(enrich: (data: WorkspaceContentData & Pick<AppData,
-    "graphNodeInvocations" | "activeRootRuns" | "routingDecisions">) => Promise<AppData>): void {
+    "graphNodeInvocations" | "activeRootRuns">) => Promise<AppData>): void {
     this.enrich = enrich;
   }
 
@@ -44,8 +44,7 @@ export class WorkspaceDataService {
     const content = {
       ...data,
       graphNodeInvocations: this.runtimeDatabaseProvider.runtimeDatabase().listGraphNodeInvocations(),
-      activeRootRuns: [],
-      routingDecisions: []
+      activeRootRuns: []
     };
     if (!this.enrich) throw new Error("Workspace runtime enrichment is not configured.");
     return this.enrich(content);

@@ -8,10 +8,12 @@ tags:
   - tavoite
   - ui
   - authoring
-version: 1
+version: 2
 ---
 
 # Capability-first card authoring
+
+> **Supersession notice (2026-08-23):** `goal-020` / `adr-031` säilyttää capability-first Graph/GraphNode-kortit ja protected Action Node flow'n. Local Decision Model & Repair -osio sekä `JobNode`-nimi on poistettu strict-v18-sopimuksesta; alla oleva teksti säilyy alkuperäisen päätöksen audit trailina.
 
 ## Tavoite
 
@@ -37,4 +39,3 @@ Muutos poistaa vain Graph- ja GraphNode-tason appearance-, artwork- ja multi-rin
 ## Ihmispäätös
 
 Käyttäjä valtuutti 2026-08-23 capability-first-authoringin toteutuksen. `ADR-029` dokumentoi tarkat supersession-suhteet ilman ADR-025:n virheellistä korvaamista.
-

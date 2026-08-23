@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig, ProjectExecutionComposition } from "../../shared/domain/automation.js";
-import type { PolicyPreviewRequestV2 } from "../../shared/api/workspace-contracts.js";
+import type { PolicyPreviewRequestV3 } from "../../shared/api/workspace-contracts.js";
 import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import {
   AutomationConflictError,
@@ -12,10 +12,12 @@ import {
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
-import type { PolicyPreviewResultV2 } from "../../shared/domain/decisionModel.js";
+import type { DecisionStateV3, PolicyPreviewResultV3 } from "../../shared/domain/decisionModel.js";
 import { decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
-import { evaluatePolicyDecision } from "../policy/PolicyRuntime.js";
-import { derivePolicyProjection } from "../policy/PolicyProjection.js";
+import { compileRewardPolicy } from "../policy/RewardMdpCompiler.js";
+import { projectDecisionState } from "../policy/DecisionStateProjector.js";
+import { resolveAdmissibleActions } from "../policy/AdmissibleActionResolver.js";
+import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 
 export class AutomationService {
   private readonly projectConfigurations = new ProjectConfigurationRepository();
@@ -39,63 +41,66 @@ export class AutomationService {
     return saveProjectAutomationConfig(this.root(), config);
   }
 
-  previewPolicy(input: PolicyPreviewRequestV2): PolicyPreviewResultV2 {
+  previewPolicy(input: PolicyPreviewRequestV3): PolicyPreviewResultV3 {
     const { config } = input;
     const loaded = this.projectConfigurations.load(this.root());
     const allIssues = validateProjectAutomationConfig(config, loaded.config?.executionProfiles ?? []);
-    const graphNodeIndex = input.graphNodeId
-      ? config.graph.graphNodes.findIndex(({ id }) => id === input.graphNodeId) : -1;
-    const issuePrefix = input.scope === "graph" ? "graph.strategy" : `graph.graphNodes.${graphNodeIndex}.strategy`;
-    const issues = allIssues.filter(({ path }) => path.startsWith(issuePrefix));
+    const issues = allIssues.filter(({ path }) => path.startsWith("graph.strategy"));
     if (issues.length) return { issues };
-    const graphNode = input.scope === "graph_node" ? config.graph.graphNodes[graphNodeIndex] : undefined;
-    if (input.scope === "graph_node" && !graphNode) return {
-      issues: [{ path: "graphNodeId", message: `Graph Node ${String(input.graphNodeId)} was not found.` }]
-    };
-    const strategy = graphNode?.strategy ?? config.graph.strategy;
-    if (strategy.kind !== "ssp_v2") return {
-      issues: [{ path: issuePrefix, message: "Policy Preview requires the explicit ssp_v2 strategy." }]
-    };
-    const actionIds = graphNode ? graphNode.jobNodes.map(({ id }) => id) : config.graph.graphNodes.map(({ id }) => id);
+    const strategy = config.graph.strategy;
+    const actionIds = config.graph.graphNodes.map(({ id }) => id);
     const modelSha256 = decisionModelSha256(strategy.model);
-    const evaluation = evaluatePolicyDecision({
-      strategy,
-      context: {
+    const entries = strategy.model.acceptance.obligations.map(({ obligationId, weight }) => ({
+      obligationId, weight, status: "pending" as const, evidenceRefs: []
+    })).sort((left, right) => left.obligationId.localeCompare(right.obligationId));
+    const acceptanceLedger = { version: 1 as const, entries, sha256: jsonSha256(entries) };
+    const authorizationFacts = { localExecutionAuthorized: true, externalWritesAuthorized: false };
+    const authorization = { version: 1 as const, facts: authorizationFacts, sha256: jsonSha256(authorizationFacts) };
+    let state;
+    try {
+      state = projectDecisionState(strategy.model, {
         epochKind: "start",
         actionInvocationCount: 0,
         stateRevision: 0,
         projectState: config.graph.state.initial,
-        authorizationFacts: config.graph.state.initial,
+        authorization,
+        acceptanceLedger,
         evidenceRefs: ["configure:draft-unsnapshotted"]
-      },
-      snapshotGraphNodeIds: actionIds,
-      modelSha256
+      });
+    } catch (error) {
+      return { issues: [{ path: "graph.strategy.model.states", message: error instanceof Error ? error.message : String(error) }] };
+    }
+    const projected = new Map(strategy.model.states.map((definition) => [definition.id, {
+      ...state,
+      stateId: definition.id,
+      features: { ...definition.values }
+    } satisfies DecisionStateV3]));
+    const admissibleActionsByState = Object.fromEntries(strategy.model.states.map((definition) => [
+      definition.id,
+      definition.terminal ? [] : resolveAdmissibleActions(strategy, projected.get(definition.id)!, actionIds).actionIds
+    ]));
+    const compiled = compileRewardPolicy({
+      model: strategy.model, capabilityModel: strategy.capabilityModel, admissibleActionsByState, modelSha256
     });
+    const admissible = resolveAdmissibleActions(strategy, state, actionIds);
+    const current = compiled.states.find(({ stateId }) => stateId === state.stateId);
     return {
       issues: [],
       preview: {
         derived: true,
         persisted: false,
-        scope: input.scope,
-        scopeKey: graphNode?.id ?? "graph",
-        state: evaluation.state,
-        admissibleActionIds: evaluation.admissible.actionIds,
-        excludedActions: evaluation.admissible.excludedActions,
-        selectedActionId: evaluation.solution?.selectedActionId,
-        actionValues: evaluation.solution?.actionValues ?? [],
-        expectedRemainingCostMicros: evaluation.solution?.stateValueMicros,
-        solverStatus: evaluation.status,
-        modelVersion: 2,
+        state,
+        admissibleActionIds: admissible.actionIds,
+        excludedActions: admissible.excludedActions,
+        selectedActionId: current?.selectedActionId,
+        actionValues: current?.actionValues ?? [],
+        expectedReturnMicros: current?.valueMicros,
+        solverStatus: compiled.status,
+        modelVersion: 3,
         modelSha256,
-        projection: evaluation.state && evaluation.status === "converged" ? derivePolicyProjection({
-          strategy,
-          scope: input.scope,
-          currentStateId: evaluation.state.stateId,
-          snapshotActionIds: actionIds,
-          modelSha256,
-          source: "configure_draft"
-        }) : undefined,
-        message: evaluation.message
+        policySha256: compiled.policySha256,
+        compiledPolicy: compiled,
+        message: compiled.message
       }
     };
   }
@@ -133,16 +138,10 @@ export class AutomationService {
 }
 
 const compositions = (graph: ProjectAutomationConfig["graph"]): Array<{ path: string; composition: ProjectExecutionComposition }> => [
-  ...(graph.strategy.kind === "agent_v1"
-    ? [{ path: "graph.strategy.orchestrator", composition: graph.strategy.orchestrator }] : []),
-  ...(graph.repairNode ? [{ path: "graph.repairNode", composition: graph.repairNode }] : []),
   ...graph.graphNodes.flatMap((graphNode) => [
-    ...(graphNode.strategy.kind === "agent_v1"
-      ? [{ path: `${graphNode.id}.strategy.orchestrator`, composition: graphNode.strategy.orchestrator }] : []),
-    ...(graphNode.repairNode ? [{ path: `${graphNode.id}.repairNode`, composition: graphNode.repairNode }] : []),
-    ...graphNode.jobNodes.flatMap((jobNode) => [
-      ...(jobNode.workNode.type === "agent" ? [{ path: `${graphNode.id}.${jobNode.id}.work`, composition: jobNode.workNode }] : []),
-      ...(jobNode.validationNode.type === "agent" ? [{ path: `${graphNode.id}.${jobNode.id}.validation`, composition: jobNode.validationNode }] : [])
+    ...graphNode.actionNodes.flatMap((actionNode) => [
+      ...(actionNode.workNode.type === "agent" ? [{ path: `${graphNode.id}.${actionNode.id}.work`, composition: actionNode.workNode }] : []),
+      ...(actionNode.validationNode.type === "agent" ? [{ path: `${graphNode.id}.${actionNode.id}.validation`, composition: actionNode.validationNode }] : [])
     ])
   ])
 ];

@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { ProjectGraphNode, ProjectIntrinsicOutcome, ProjectJobNode } from "@shared/api/workspace-contracts";
+import type { ProjectGraphNode, ProjectIntrinsicOutcome, ProjectActionNode } from "@shared/api/workspace-contracts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
-type CapabilityNode = ProjectGraphNode | ProjectJobNode;
+type CapabilityNode = ProjectGraphNode | ProjectActionNode;
 
 export function CapabilityContractDialog({ node, open, locked, onOpenChange, onSave }: {
   node?: CapabilityNode; open: boolean; locked: boolean; onOpenChange: (open: boolean) => void;

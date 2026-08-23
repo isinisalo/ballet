@@ -261,11 +261,11 @@ export class ExecutionStore {
         UPDATE node_runs SET status = 'interrupted', error_code = 'interrupted', error_message = ?,
           state_revision_after = ?, completed_at = ?, updated_at = ? WHERE node_run_id = ?
       `).run(message, value.state_revision_before, timestamp, timestamp, value.node_run_id);
-      if (value.job_node_invocation_id) this.connection().prepare(`
-        UPDATE job_node_invocations SET status = 'failed', active_node_run_id = NULL,
+      if (value.action_node_invocation_id) this.connection().prepare(`
+        UPDATE action_node_invocations SET status = 'failed', active_node_run_id = NULL,
           state_revision_after = ?, completed_at = ?, updated_at = ?
-        WHERE job_node_invocation_id = ? AND status IN ('queued','running','waiting_for_input')
-      `).run(value.state_revision_before, timestamp, timestamp, value.job_node_invocation_id);
+        WHERE action_node_invocation_id = ? AND status IN ('queued','running','waiting_for_input')
+      `).run(value.state_revision_before, timestamp, timestamp, value.action_node_invocation_id);
       if (value.graph_node_invocation_id) this.connection().prepare(`
         UPDATE graph_node_invocations SET status = 'failed', completion_state_revision = ?,
           completed_at = ?, updated_at = ?
@@ -285,10 +285,10 @@ export class ExecutionStore {
       this.connection().prepare(`
         INSERT INTO control_flow_events (
           root_run_id, sequence, kind, state_revision, graph_node_invocation_id,
-          job_node_invocation_id, source_node_run_id, created_at
+          action_node_invocation_id, source_node_run_id, created_at
         ) VALUES (?, ?, 'execution_interrupted', ?, ?, ?, ?, ?)
       `).run(value.root_run_id, sequence, stateRevision, value.graph_node_invocation_id,
-        value.job_node_invocation_id, value.node_run_id, timestamp);
+        value.action_node_invocation_id, value.node_run_id, timestamp);
     })();
     return this.require(taskId);
   }
@@ -296,7 +296,7 @@ export class ExecutionStore {
 
 const isNodeRuntimeRow = (value: unknown): value is {
   node_run_id: string; root_run_id: string; graph_node_invocation_id: string | null;
-  job_node_invocation_id: string | null; state_revision_before: number; status: string;
+  action_node_invocation_id: string | null; state_revision_before: number; status: string;
 } => typeof value === "object" && value !== null
   && typeof Reflect.get(value, "node_run_id") === "string"
   && typeof Reflect.get(value, "root_run_id") === "string"

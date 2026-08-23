@@ -79,7 +79,6 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     return {
       ...content,
       activeRootRuns,
-      routingDecisions: database.listRoutingDecisions(),
       runtime: await runtime.snapshot(),
       runtimeConfigurationIssues: [
         ...configurationResolution.globalIssues,

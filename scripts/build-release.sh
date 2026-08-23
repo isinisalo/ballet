@@ -151,11 +151,11 @@ if (!Array.isArray(entries)
   || entries[0]?.manifest?.title !== "Clarify requirements"
   || entries[0]?.permissions?.externalWrites !== false
   || entries[0]?.package?.format !== "ballet-graph-node-module"
-  || entries[0]?.package?.version !== 5
+  || entries[0]?.package?.version !== 6
   || entries[0]?.package?.capabilities?.accepts?.[0] !== "fixture:requirements.requested"
   || entries[0]?.package?.capabilities?.provides?.[0] !== "fixture:requirements.clarified"
-  || entries[0]?.package?.graphNode?.jobNodes?.length !== 1
-  || entries[0]?.package?.graphNode?.jobNodes?.[0]?.key !== "clarify") {
+  || entries[0]?.package?.graphNode?.actionNodes?.length !== 1
+  || entries[0]?.package?.graphNode?.actionNodes?.[0]?.key !== "clarify") {
   throw new Error("packaged Ballet server did not list the fixture Graph Node Module package");
 }
 ' "$SMOKE_ROOT/graph-node-library.json"
@@ -170,14 +170,14 @@ const expectedProfile = {
   reasoningEffort: "medium",
   networkAccess: false
 };
-const graphNode = workspace.automation?.graph?.graphNodes?.[0];
-const jobNode = graphNode?.jobNodes?.find((node) => node.id === "review-job");
-const workNode = jobNode?.workNode;
-const validationNode = jobNode?.validationNode;
+const graphNode = workspace.automation?.graph?.graphNodes?.find((node) => node.id === "review-node");
+const actionNode = graphNode?.actionNodes?.find((node) => node.id === "review-action");
+const workNode = actionNode?.workNode;
+const validationNode = actionNode?.validationNode;
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 17
-  || workspace.automation.graph?.graphNodes?.length !== 1
+if (workspace.automation?.version !== 18
+  || workspace.automation.graph?.graphNodes?.length !== 2
   || graphNode?.id !== "review-node"
   || graphNode?.description !== "Review the fixture project."
   || graphNode?.capabilities?.accepts?.[0] !== "fixture:review.requested"
@@ -186,17 +186,18 @@ if (workspace.automation?.version !== 17
   || workspace.automation.graph?.state?.description !== "Provider-neutral context shared by the fixture Graph."
   || JSON.stringify(workspace.automation.graph?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || workspace.automation.graph?.strategy?.kind !== "agent_v1"
-  || workspace.automation.graph?.strategy?.orchestrator?.id !== "fixture-graph-orchestrator"
-  || workspace.automation.graph?.strategy?.orchestrator?.maxTransitions !== 256
-  || graphNode?.strategy?.kind !== "agent_v1"
-  || graphNode?.strategy?.orchestrator?.id !== "review-node-orchestrator"
+  || workspace.automation.graph?.strategy?.kind !== "reward_mdp_v3"
+  || workspace.automation.graph?.strategy?.id !== "fixture-reward-mdp"
+  || workspace.automation.graph?.strategy?.model?.discountPpm !== 990000
+  || workspace.automation.graph?.strategy?.model?.stateActions?.[0]?.successors
+    ?.reduce((sum, successor) => sum + successor.probabilityPpm, 0) !== 1000000
+  || Object.hasOwn(graphNode ?? {}, "strategy")
   || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "success" && outcome.result === "PASS")
   || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "failure" && outcome.result === "FAIL")
-  || jobNode?.description !== "Run and validate the fixture review."
-  || jobNode?.capabilities?.accepts?.length !== 0
-  || jobNode?.capabilities?.provides?.length !== 0
-  || jobNode?.maxRetries !== 3
+  || actionNode?.description !== "Run and validate the fixture review."
+  || actionNode?.capabilities?.accepts?.length !== 0
+  || actionNode?.capabilities?.provides?.length !== 0
+  || actionNode?.maxRetries !== 3
   || workNode?.type !== "human"
   || workNode?.task !== "Review the fixture project and surface concrete risks."
   || validationNode?.type !== "human"
@@ -219,7 +220,7 @@ if (workspace.automation?.version !== 17
   || workspace.canvasTheme?.version !== 4
   || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.canvasThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v17 Graph/Graph Node fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v18 Reward-MDP fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
@@ -235,7 +236,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "13") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 13`);
+if (version !== "14") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 14`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
   git -C "$SMOKE_ROOT/project" status --short >&2

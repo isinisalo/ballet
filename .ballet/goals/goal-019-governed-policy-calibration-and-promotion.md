@@ -1,7 +1,7 @@
 ---
 id: goal-019
 title: Hallittu policy-kalibrointi ja mallipromootio
-status: accepted
+status: superseded
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
@@ -9,10 +9,12 @@ tags:
   - policy
   - calibration
   - governance
-version: 2
+version: 3
 ---
 
 # Hallittu policy-kalibrointi ja mallipromootio
+
+> Superseded by `goal-020`. Calibration/shadow/promotion ei kuulu aktiiviseen tuotteeseen.
 
 ## Tavoite
 

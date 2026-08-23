@@ -14,6 +14,8 @@ version: 1
 
 # Kolmitasoinen Graph Node -domain ja agenttiohjattu reititys
 
+> `adr-031` supersedoi tämän päätöksen scoped routing-, orchestrator- ja Repair-osat. Kolmitasoinen Graph/GraphNode/Action Node -authoring sekä Work→Validation-invariantti säilyvät.
+
 ## Konteksti
 
 Strict-v13 mallinsi project-global-rakenteen `ProjectLoop`eina, niiden sisäisen rakenteen erillisenä Workflow'na ja tavallisen flow'n deterministic named transitioneina. Käyttäjän haluama mentaalimalli on kuitenkin yksi sisäkkäinen `Graph → GraphNode → JobNode → Work/Validation` -rakenne, jossa orchestrator tekee kaikki tasojen väliset reitityspäätökset. Kaksi rinnakkaista Graph/Workflow-käsitettä, persisted child-to-child Edget ja schedule-domain lisäsivät selitystä ilman, että ne olivat uuden rakenteen välttämättömiä primitivejä.

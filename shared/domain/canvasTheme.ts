@@ -14,7 +14,7 @@ export interface CanvasTheme {
     color: string;
     labelColor: string;
     style: CanvasConnectionLineStyle;
-    repairStyle: CanvasConnectionLineStyle;
+    retryStyle: CanvasConnectionLineStyle;
     crossScopeStyle: CanvasConnectionLineStyle;
   };
   connectionPoint: {
@@ -38,7 +38,7 @@ export const defaultCanvasTheme: CanvasTheme = {
     color: "#76d4ca",
     labelColor: "#c1c6d7",
     style: "solid",
-    repairStyle: "dotted",
+    retryStyle: "dotted",
     crossScopeStyle: "dashed"
   },
   connectionPoint: { style: "near", color: "#e3fffb" }

@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 5,
+  "version": 6,
   "manifest": {
     "id": "design",
     "title": "DESIGN",
@@ -34,24 +34,6 @@
         "codex"
       ],
       "network": "forbidden"
-    },
-    {
-      "key": "orchestrator-luna",
-      "title": "Cost-sensitive orchestrator",
-      "description": "Map to a low-cost provider profile such as Luna medium network-off.",
-      "providers": [
-        "codex"
-      ],
-      "network": "forbidden"
-    },
-    {
-      "key": "repair-sol",
-      "title": "Capable repair",
-      "description": "Map to a capable repair profile such as Sol medium network-off.",
-      "providers": [
-        "codex"
-      ],
-      "network": "forbidden"
     }
   ],
   "stateContract": {
@@ -73,22 +55,6 @@
     ],
     "provides": [
       "graph:desired-state.defined"
-    ],
-    "recommendedGraphRoutes": [
-      {
-        "direction": "outgoing",
-        "result": "PASS",
-        "capability": "graph:desired-state.defined",
-        "description": "PASS success routes design to plan.",
-        "outcomeId": "success"
-      },
-      {
-        "direction": "outgoing",
-        "result": "FAIL",
-        "capability": "graph:desired-state.requested",
-        "description": "FAIL failure routes design to design.",
-        "outcomeId": "failure"
-      }
     ]
   },
   "resources": [
@@ -189,7 +155,7 @@
           "evaluation"
         ]
       },
-      "body": "\n# arc42 Evaluation Agent\n\n## Role\n\nEvaluate delivered behavior against measurable quality scenarios and assess risks, technical debt, architecture drift and decision fitness.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → initiative BRIEF/PLAN/EVIDENCE and canonical arc42 sources → Node task → runtime/test evidence.\n\n## Writes\n\nMay update section 11, TRACEABILITY, initiative REVIEW, METHOD-HEALTH and non-decision status/handoff records. Do not modify the evaluated implementation/tests, silently change accepted ADRs, alter automation behavior or write externally.\n\n## Sources and evidence\n\nUse actual checks, diffs and runtime evidence. Mark missing evidence, risk and drift explicitly. Derive improvement actions only from Findings linked to QS/RISK/ADR/BB IDs and measurable impact; never invent WHAT/WHY.\n\n## State patch\n\nPatch evaluation/architecture/handoff reference fields only, including evidence/finding/risk IDs and check summaries. Validation FAIL does not patch State.\n\n## Stop rules\n\nReturn `completed` for an evidence-backed evaluation, `needs_input` when a human decision or ambiguous repair target remains, `blocked` for unavailable essential evidence and `failed` for execution failure. As a Validation role, never modify the subject under review. Never return hidden chain-of-thought.\n"
+      "body": "\n# arc42 Evaluation Agent\n\n## Role\n\nEvaluate delivered behavior against measurable quality scenarios and assess risks, technical debt, architecture drift and decision fitness.\n\n## Authority order\n\nSystem contract → explicit human decisions and accepted Goals/ADRs → initiative BRIEF/PLAN/EVIDENCE and canonical arc42 sources → Node task → runtime/test evidence.\n\n## Writes\n\nMay update section 11, TRACEABILITY, initiative REVIEW, METHOD-HEALTH and non-decision status/handoff records. Do not modify the evaluated implementation/tests, silently change accepted ADRs, alter automation behavior or write externally.\n\n## Sources and evidence\n\nUse actual checks, diffs and runtime evidence. Mark missing evidence, risk and drift explicitly. Derive improvement actions only from Findings linked to QS/RISK/ADR/BB IDs and measurable impact; never invent WHAT/WHY.\n\n## State patch\n\nPatch evaluation/architecture/handoff reference fields only, including evidence/finding/risk IDs and check summaries. Validation FAIL does not patch State.\n\n## Stop rules\n\nReturn `completed` for an evidence-backed evaluation, `needs_input` when a human decision or ambiguous correction targets remains, `blocked` for unavailable essential evidence and `failed` for execution failure. As a Validation role, never modify the subject under review. Never return hidden chain-of-thought.\n"
     },
     {
       "kind": "instruction",
@@ -217,7 +183,7 @@
           "validation"
         ]
       },
-      "body": "\n# Graph Engineering Independent Reviewer\n\nValidate the paired Job independently against its task, accepted Goals and ADRs, canonical arc42 sources, current bounded State, tracker evidence and actual checks. Do not edit the artifact under review.\n\nReturn only `PASS | FAIL`, bounded evidence and, on FAIL, an optional target-free repair request describing the required capability. Never name or select another Job Node, Graph Node, route or terminal; the current Graph Node Orchestrator owns that decision.\n\nDo not infer success from absent evidence. Report a human-owned WHAT/WHY choice, quality priority or measure, significant ADR or deployment authorization as FAIL evidence with a target-free repair request; the orchestrator decides whether the run needs human input. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.\n"
+      "body": "\n# Graph Engineering Independent Reviewer\n\nValidate the paired Job independently against its task, accepted Goals and ADRs, canonical arc42 sources, current bounded State, tracker evidence and actual checks. Do not edit the artifact under review.\n\nReturn only `PASS | FAIL`, bounded evidence and, on FAIL, an optional target-free correction evidence describing the required capability. Never name or select another Job Node, Graph Node, route or terminal; the current Graph Reward-MDP runtime owns that decision.\n\nDo not infer success from absent evidence. Report a human-owned WHAT/WHY choice, quality priority or measure, significant ADR or deployment authorization as FAIL evidence with a target-free correction evidence; the deterministic runtime decides whether the run needs human input. PASS may patch only bounded `GraphEngineeringStateV1` references; FAIL never patches State.\n"
     },
     {
       "kind": "skill",
@@ -273,21 +239,7 @@
       "name": "conformance-review",
       "description": "Compare a bounded implementation or document change against accepted architecture. Use for diff reviews, architecture drift detection, acceptance preparation and independent Validation.",
       "metadata": {},
-      "body": "\n# Conformance review\n\n1. Read the initiative BRIEF/PLAN and referenced QS/ADR/CON/BB/RT/DEP IDs.\n2. Inspect the actual diff and relevant tests; sample critical source when the change is broad.\n3. Classify each mismatch as intended architecture update, implementation defect, documentation drift, risk/debt or an Open question.\n4. Cite exact files, stable IDs and evidence. Do not treat provider prose as control evidence.\n5. Do not modify the implementation while acting as Validation. Request local retry or capability repair with a measurable expected correction.\n6. Record acceptance/conformance evidence and remaining limitations in initiative EVIDENCE/REVIEW.\n"
-    },
-    {
-      "kind": "instruction",
-      "key": "graph-node-orchestrator",
-      "title": "Graph Node Orchestrator",
-      "metadata": {},
-      "body": "\n# Graph Node Orchestrator\n\nSelect exactly one Job Node or `PASS | FAIL` terminal from the immutable candidate enum supplied for the current Graph Node decision. Use the current State revision, Job result and evidence, requested capability and candidate descriptions. Do not perform Job work, change State, edit files, broaden permissions or invent a target.\n\nReturn `dispatch`, `complete`, `delegate_repair` or `needs_input` using the strict structured outcome. A dispatch must name one enum member verbatim. Delegate only to the snapshot's local Repair Node. Escalation to Graph scope is available only through the Repair contract, never as a normal continuation.\n\nNever choose by array order, hidden project conventions or an identifier outside the candidate enum. Do not expose hidden chain-of-thought.\n"
-    },
-    {
-      "kind": "instruction",
-      "key": "repair-node",
-      "title": "Repair Node",
-      "metadata": {},
-      "body": "\n# Repair Node\n\nRepair only the bounded failure described by the immutable Repair Request. You may change validated State or artifacts inside the current Run worktree, then return to the exact Validation frame, dispatch one allowlisted repair candidate, or escalate to the parent scope. You may propose a future routing configuration change as an artifact, but the current snapshot, candidate enum and permissions remain immutable.\n\nDo not rerun Work when returning to Validation, reset its retry count, write outside the Run worktree, perform an external write without exact human authorization, or select an out-of-snapshot target. At Graph scope, escalate an unresolved case to human `needs_input`.\n\nReturn concise evidence and the strict Repair outcome. Do not expose hidden chain-of-thought.\n"
+      "body": "\n# Conformance review\n\n1. Read the initiative BRIEF/PLAN and referenced QS/ADR/CON/BB/RT/DEP IDs.\n2. Inspect the actual diff and relevant tests; sample critical source when the change is broad.\n3. Classify each mismatch as intended architecture update, implementation defect, documentation drift, risk/debt or an Open question.\n4. Cite exact files, stable IDs and evidence. Do not treat provider prose as control evidence.\n5. Do not modify the implementation while acting as Validation. Request local retry or typed capability escalation with a measurable expected correction.\n6. Record acceptance/conformance evidence and remaining limitations in initiative EVIDENCE/REVIEW.\n"
     }
   ],
   "graphNode": {
@@ -304,17 +256,7 @@
     "stateContract": {
       "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
     },
-    "repairNode": {
-      "key": "graph-node-repair",
-      "description": "Repairs difficult local failures before Graph escalation.",
-      "task": "Repair only bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate.",
-      "profileSlot": "repair-sol",
-      "primaryInstruction": "repair-node",
-      "skills": [],
-      "maxRepairDepth": 3,
-      "maxRepairAttempts": 3
-    },
-    "jobNodes": [
+    "actionNodes": [
       {
         "key": "01-introduction-and-goals",
         "description": "Maintain arc42 01 Introduction and Goals.",
@@ -876,346 +818,6 @@
         "outcomeId": "failure",
         "result": "FAIL"
       }
-    ],
-    "strategy": {
-      "kind": "agent_v1",
-      "orchestrator": {
-        "key": "graph-node-orchestrator",
-        "description": "Selects one allowed Job Node or terminal from a strict candidate enum.",
-        "profileSlot": "orchestrator-luna",
-        "primaryInstruction": "graph-node-orchestrator",
-        "skills": [],
-        "maxTransitions": 256,
-        "maxRouteAttempts": 3,
-        "routing": {
-          "start": {
-            "key": "graph-node-start",
-            "candidates": [
-              {
-                "target": {
-                  "jobNode": "01-introduction-and-goals"
-                },
-                "description": "Allowed initial Job Node."
-              }
-            ]
-          },
-          "continuation": [
-            {
-              "key": "01-introduction-and-goals-pass-route",
-              "sourceJobNode": "01-introduction-and-goals",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "02-constraints"
-                  },
-                  "description": "Allowed PASS continuation after 01-introduction-and-goals."
-                }
-              ]
-            },
-            {
-              "key": "01-introduction-and-goals-fail-route",
-              "sourceJobNode": "01-introduction-and-goals",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 01-introduction-and-goals."
-                }
-              ]
-            },
-            {
-              "key": "02-constraints-pass-route",
-              "sourceJobNode": "02-constraints",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "03-context-and-scope"
-                  },
-                  "description": "Allowed PASS continuation after 02-constraints."
-                }
-              ]
-            },
-            {
-              "key": "02-constraints-fail-route",
-              "sourceJobNode": "02-constraints",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 02-constraints."
-                }
-              ]
-            },
-            {
-              "key": "03-context-and-scope-pass-route",
-              "sourceJobNode": "03-context-and-scope",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "04-solution-strategy"
-                  },
-                  "description": "Allowed PASS continuation after 03-context-and-scope."
-                }
-              ]
-            },
-            {
-              "key": "03-context-and-scope-fail-route",
-              "sourceJobNode": "03-context-and-scope",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 03-context-and-scope."
-                }
-              ]
-            },
-            {
-              "key": "04-solution-strategy-pass-route",
-              "sourceJobNode": "04-solution-strategy",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "05-building-block-view"
-                  },
-                  "description": "Allowed PASS continuation after 04-solution-strategy."
-                }
-              ]
-            },
-            {
-              "key": "04-solution-strategy-fail-route",
-              "sourceJobNode": "04-solution-strategy",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 04-solution-strategy."
-                }
-              ]
-            },
-            {
-              "key": "05-building-block-view-pass-route",
-              "sourceJobNode": "05-building-block-view",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "06-runtime-view"
-                  },
-                  "description": "Allowed PASS continuation after 05-building-block-view."
-                }
-              ]
-            },
-            {
-              "key": "05-building-block-view-fail-route",
-              "sourceJobNode": "05-building-block-view",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 05-building-block-view."
-                }
-              ]
-            },
-            {
-              "key": "06-runtime-view-pass-route",
-              "sourceJobNode": "06-runtime-view",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "07-deployment-view"
-                  },
-                  "description": "Allowed PASS continuation after 06-runtime-view."
-                }
-              ]
-            },
-            {
-              "key": "06-runtime-view-fail-route",
-              "sourceJobNode": "06-runtime-view",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 06-runtime-view."
-                }
-              ]
-            },
-            {
-              "key": "07-deployment-view-pass-route",
-              "sourceJobNode": "07-deployment-view",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "08-crosscutting-concepts"
-                  },
-                  "description": "Allowed PASS continuation after 07-deployment-view."
-                }
-              ]
-            },
-            {
-              "key": "07-deployment-view-fail-route",
-              "sourceJobNode": "07-deployment-view",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 07-deployment-view."
-                }
-              ]
-            },
-            {
-              "key": "08-crosscutting-concepts-pass-route",
-              "sourceJobNode": "08-crosscutting-concepts",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "09-architecture-decisions"
-                  },
-                  "description": "Allowed PASS continuation after 08-crosscutting-concepts."
-                }
-              ]
-            },
-            {
-              "key": "08-crosscutting-concepts-fail-route",
-              "sourceJobNode": "08-crosscutting-concepts",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 08-crosscutting-concepts."
-                }
-              ]
-            },
-            {
-              "key": "09-architecture-decisions-pass-route",
-              "sourceJobNode": "09-architecture-decisions",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "10-quality-requirements"
-                  },
-                  "description": "Allowed PASS continuation after 09-architecture-decisions."
-                }
-              ]
-            },
-            {
-              "key": "09-architecture-decisions-fail-route",
-              "sourceJobNode": "09-architecture-decisions",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 09-architecture-decisions."
-                }
-              ]
-            },
-            {
-              "key": "10-quality-requirements-pass-route",
-              "sourceJobNode": "10-quality-requirements",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "11-risks-and-technical-debt"
-                  },
-                  "description": "Allowed PASS continuation after 10-quality-requirements."
-                }
-              ]
-            },
-            {
-              "key": "10-quality-requirements-fail-route",
-              "sourceJobNode": "10-quality-requirements",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 10-quality-requirements."
-                }
-              ]
-            },
-            {
-              "key": "11-risks-and-technical-debt-pass-route",
-              "sourceJobNode": "11-risks-and-technical-debt",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNode": "12-glossary"
-                  },
-                  "description": "Allowed PASS continuation after 11-risks-and-technical-debt."
-                }
-              ]
-            },
-            {
-              "key": "11-risks-and-technical-debt-fail-route",
-              "sourceJobNode": "11-risks-and-technical-debt",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 11-risks-and-technical-debt."
-                }
-              ]
-            },
-            {
-              "key": "12-glossary-pass-route",
-              "sourceJobNode": "12-glossary",
-              "result": "PASS",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "PASS"
-                  },
-                  "description": "Allowed PASS continuation after 12-glossary."
-                }
-              ]
-            },
-            {
-              "key": "12-glossary-fail-route",
-              "sourceJobNode": "12-glossary",
-              "result": "FAIL",
-              "candidates": [
-                {
-                  "target": {
-                    "terminal": "FAIL"
-                  },
-                  "description": "Allowed FAIL terminal after 12-glossary."
-                }
-              ]
-            }
-          ],
-          "repair": []
-        }
-      }
-    }
+    ]
   }
 }

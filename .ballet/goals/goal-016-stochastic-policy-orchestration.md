@@ -1,18 +1,20 @@
 ---
 id: goal-016
 title: Geneerinen SSP/SMDP-policyorkestrointi
-status: accepted
+status: superseded
 createdAt: '2026-08-22T00:00:00.000Z'
-updatedAt: '2026-08-22T00:00:00.000Z'
+updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
   - tavoite
   - policy
   - ssp
   - smdp
-version: 2
+version: 3
 ---
 
 # Geneerinen SSP/SMDP-policyorkestrointi
+
+> Superseded by `goal-020`. Tämä tiedosto säilyy historiallisena audit trailina eikä kuvaa aktiivista strategiavalintaa.
 
 ## Tavoite
 

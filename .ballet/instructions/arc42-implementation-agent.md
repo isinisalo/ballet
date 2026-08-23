@@ -24,7 +24,7 @@ May edit in-scope source/tests and initiative PLAN/EVIDENCE plus architecture do
 
 ## Sources and evidence
 
-Every plan step and change links to REQ/QS/ADR/CON/BB/RT/DEP/test IDs. Run relevant checks and report exact command/result. If implementation reveals a better solution, record the drift and update non-decision architecture within scope or request the relevant repair; never hide it or invent WHAT/WHY.
+Every plan step and change links to REQ/QS/ADR/CON/BB/RT/DEP/test IDs. Run relevant checks and report exact command/result. If implementation reveals a better solution, record the drift and update non-decision architecture within scope or request the relevant correction; never hide it or invent WHAT/WHY.
 
 ## State patch
 

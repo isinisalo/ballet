@@ -4,7 +4,7 @@ title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 15
+version: 17
 tags:
   - arc42
   - requirements
@@ -19,10 +19,9 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 
 ## Tila ja väitteiden luokittelu
 
-- **Hyväksytty päätös:** `goal-001`–`goal-019` määrittävät hyväksytyn tuotteen tarkoituksen ja laajuuden. `goal-017`–`goal-019` omistavat hierarchical policy-, capability-first- sekä immutable offline calibration/shadow/human promotion -tavoitteet.
-- **Toteutettu policy-intentio:** `goal-016` / `REQ-016` tuo Graph-scopeen geneerisen finite SSP/SMDP -policystrategian explicit `agent_v1 | ssp_v1` -valintana.
-- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v17 Graph/GraphNode/JobNode-domainin, Snapshot v10 / observation v3 / SQLite v13 -option-cost-evidenssin, explicit agent/SSP scoped routingin, outcome-aware policy coren, capability-first upper-level-authoringin ja säilyvän Job industrial flow'n.
-- **Hyväksytty domain:** `goal-015` / `adr-023` määrittää viiden project-local GraphNoden, 17 aggregate JobNoden sekä Luna/Sol-profiilien säilyvän baseline-intention; Portti A:n portable package on Graph Node Module v5 ja upper-level-projektio on ADR-029:n review-rajalla.
+- **Hyväksytty päätös:** `goal-020` / `REQ-020` ja `adr-031` omistavat aktiivisen yhden Graph-tason Reward-MDP:n. Goalit 016/017/019 ovat superseded; niiden intentio säilyy historiallisena.
+- **Toteutettu fakta:** nykyinen työpuu sisältää checkout-local-palvelun, strict-v18 Graph/GraphNode/ActionNode-domainin, Snapshot v11 / observation v4 / SQLite v14 -runtime-evidenssin, immutable compiled Reward-MDP:n, capability-first-authoringin ja protected Action Node industrial flow'n.
+- **Hyväksytty domain:** viisi GraphNodea ja 17 ordered Action Nodea ovat project-local baseline. Graph Node Module v6 ei kanna local policya tai Repair-resursseja.
 - **Paikallinen evidenssi:** toteutuksen ajantasaisuus osoitetaan testeillä, buildilla ja `validate:arc42`-tarkistuksella; yksittäisen initiative-työn tulokset kirjataan sen EVIDENCE-tiedostoon.
 - **Avoin riski:** ensimmäisen tuotantokaltaisen pilotin mitatut menetelmä- ja palautumisarvot puuttuvat vielä; katso [osio 11](11-risks-and-technical-debt.md).
 
@@ -33,22 +32,23 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-001 | goal-001 | Toimi checkout-local-komentokeskuksena ilman Ballet-tiliä tai etäohjaustasoa. | Loopback-palvelu, täsmällinen checkout-raja ja paikallinen käyttöliittymä. | QS-001 |
 | REQ-002 | goal-002 | Pidä projektin intentio ja automaatio siirrettävänä, versionhallittuna ja katselmoitavana. | `.ballet/project.json`, instructionit, skillit, Goals, ADR:t ja arc42 ovat project-local-lähteitä. | QS-002 |
 | REQ-003 | goal-003 | Koosta provider-suoritus eksplisiittisestä `ExecutionProfile`-valinnasta, primary instructionista ja valituista skilleistä. | Deterministinen prompt composition ja provider-neutral adapter -raja. | QS-011 |
-| REQ-004 | goal-004 | Suorita työn tuottaminen ja validointi revisionoidulla Statella, rajatulla retryllä, repairilla ja ajastuksella. | Strict-v13 `ProjectWorkflow`, `JobNode`, `ValidationNode`, `PassEdge`, `FailEdge`, `State`, RunBook-transition ja erillinen repair-edge. | QS-003 |
+| REQ-004 | goal-004 säilyvä osa | Suorita työn tuottaminen ja validointi revisionoidulla Statella ja rajatulla retryllä. | Ordered `ProjectActionNode`, Work→Validation, `retry | escalate`, atominen State/acceptance-commit ja strict outcome v9. Schedule- ja Repair-osat ovat superseded. | QS-003, QS-026 |
 | REQ-005 | goal-005 | Eristä jokainen Root Run todennettavaan Git-worktreehen äläkä mergeä tai pushaa automaattisesti. | Immutable snapshot, erillinen branch/worktree ja eksplisiittinen ihmisvaltuutus ulkoisiin kirjoituksiin. | QS-004 |
 | REQ-006 | goal-006 | Persistoi runtime-tila ja tarjoa restart-safe-evidenssi sekä observability. | SQLite-transaktiot, revisionit, tapahtumat ja recovery/reconciliation. | QS-012 |
-| REQ-007 | goal-007 | Tarjoa tiheä, saavutettava ja yksiselitteinen operaattorikokemus. | Kanoniseen dataan perustuvat Graph/Workflow Engineering ja Run mission control. | QS-013 |
+| REQ-007 | goal-007 | Tarjoa tiheä, saavutettava ja yksiselitteinen operaattorikokemus. | Capability-first Graph/GraphNode-authoring, protected Action flow ja factual Run/policy evidence. | QS-013, QS-024 |
 | REQ-008 | goal-008 | Tue validoitua macOS-paketointia ja checkout-kohtaista lifecycle-hallintaa. | arm64/x64-julkaisu, CLI ja launchd-palvelu. | QS-007 |
-| REQ-009 | goal-009 | Käytä arc42:ta jaettuna arkkitehtuuritotuutena ja Ballet Loopseja jatkuvana evidenssipohjaisena menetelmänä. | 12 kanonista osiota, DESIGNin 12 osiokohtaista JobNodea, viiden Loopin project-local RunBook ja vakaat trace-ketjut. | QS-005, QS-006, QS-008 |
-| REQ-010 | goal-010 | Tarkasta, asenna, vie ja poista siirrettäviä yhden Loopin moduuleja ilman runtime-aikaista pakettiriippuvuutta. | Rajattu JSON-paketti sekä inspect/plan/commit-materialisointi project-local-resursseiksi. | QS-009 |
-| REQ-011 | goal-011 | Authoroi Loopsit erillisten Context-, composition- ja selected-Loop-detail-projektioiden kautta yksiselitteisellä Edge-omistajuudella. | Kolmitasoinen authoring-projektio, joka ei lisää runtime-entiteettejä. | QS-010 |
-| REQ-012 | goal-012 | Authoroi project-global graph ja yhden Loopin sisäinen rakenne täsmälleen Graph Engineering / Loop Engineering -näkymissä sekä reititä kaikki cross-Loop-valinnat capabilityn ja snapshot-allowlistin kautta Orchestratorilla. | Strict-v11 graph/capability hard cut, `LoopNode`- ja Orchestrator-control-projektiot sekä selected-Loop-only Loop Engineering. | QS-014 |
-| REQ-013 | goal-013 | Authoroi valitun Loopin sisäinen Workflow erillisinä Job/Validation-nodeina ja eksplisiittisinä Pass/Fail Edgeinä sekä eskaloi retryrajan jälkeinen FAIL Graph Orchestratorille. | Strict-v12/v2 Workflow hard cut, kiinteät Job→Validation- ja retry-siirtymät, Workflow PASS/FAIL -endpointit ja canonical `view=workflow`. | QS-015 |
-| REQ-014 | goal-014 | Suorita Graph deterministisenä viiden Loopin RunBookina, pidä tavalliset transitionit erillään repair call/returnista ja sovita release-/implementation-työ fail-closedisti `tk`:hon. | Strict-v13/v3 hard cut, exact snapshot-transitionit, `GraphOrchestrationStateV1`, SQLite v9 tracker-outbox, GraphEngineeringStateV1 ja project-local DESIGN/PLAN/BUILD/DEPLOY/VERIFY-data. | QS-016, QS-017, QS-018 |
-| REQ-015 | goal-015 | Korvaa aktiivinen Loop/Workflow-malli kolmella Graph/GraphNode/JobNode-tasolla, anna scoped orchestratorien tehdä tasojen väliset päätökset ja käsittele vaikeat poikkeukset bounded Repair Nodella. | Strict-v14/v4/v7/v8/v9/v10 hard cut, scoped candidate-enumit, Luna/Sol-project profiles, Graph/GraphNode Runeja ja kolme suojattua avaruuscanvasia. | QS-019, QS-020 |
-| REQ-016 | goal-016 | Valitse Graph Runin seuraava user-defined GraphNode explicit finite SSP/SMDP -päätösmallista erottaen Capability Graph, Decision Model, Policy Projection ja Execution Graph. | Bounded Decision State, GraphNode Option, hard `A(s)`, snapshotted transition/cost/terminal model, proper-policy value iteration ja per-epoch evidence; explicit `agent_v1 | ssp_v1` ilman fallbackia. | QS-021 |
-| REQ-017 | goal-017 | Käytä outcome-aware finite SSP/SMDP v2 -policya sekä GraphNode-optionin että sen JobNode-actionin valintaan ja pidä actual state canonical projectorin omistuksessa. | Scoped `P(outcome,nextState|state,action)`, intrinsic outcomes, proper global/local policy, model-miss observation, immutable provenance ja explicit `agent_v1 | ssp_v2` Portti A:ssa. | QS-022, QS-023 |
-| REQ-018 | goal-018 | Näytä mitä järjestelmä voi tehdä capability-first-korteilla ja authoroi global/local policy omissa URL-omisteisissa osioissaan säilyttäen Job flow'n. | Capability Graph / Decision Model ja Jobs / Local Decision Model & Repair -osiot, atominen CRUD, scoped Run evidence ja ADR-025/027 Job-flow. | QS-024 |
-| REQ-019 | goal-019 | Muodosta immutable observations-evidenssistä deterministisiä offline candidate modeleja ja promotoi tai rollbackaa exact model hash vain eksplisiittisellä ihmisaktivoinnilla. | Provider-neutral cost dimensions, hierarchy-safe attribution, dataset/model registry, joint calibration, evaluation, shadow provenance ja append-only promotion/activation events. | QS-025 |
+| REQ-009 | goal-009 | Käytä arc42:ta jaettuna arkkitehtuuritotuutena ja project-local GraphNodeja jatkuvana evidenssipohjaisena menetelmänä. | 12 kanonista osiota, DESIGNin 12 ordered Action Nodea, viiden GraphNoden default Graph ja vakaat trace-ketjut. | QS-005, QS-006, QS-008 |
+| REQ-010 | goal-010 säilyvä osa | Tarkasta, asenna, vie ja poista siirrettäviä Graph Node Moduleja ilman runtime-aikaista pakettiriippuvuutta. | Strict Module v6 ja inspect/plan/config-last-materialisointi project-local-resursseiksi. | QS-009 |
+| REQ-011 | goal-011 säilyvä osa | Authoroi Graph, GraphNode ja Action Node selkeissä URL-omisteisissa projektioissa. | Kolmitasoinen authoring, capability cards ja protected Action flow ilman client-owned topologyä. | QS-010, QS-024 |
+| REQ-012 | goal-012 | Historiallinen Graph/Loop authoring- ja orchestrator-vaihe. | Superseded; aktiivinen raja on REQ-020 / ADR-031. | QS-014 (historical) |
+| REQ-013 | goal-013 | Historiallinen Workflow/Edge-vaihe. | Superseded; Work→Validation ja bounded retry säilyvät Action Nodessa. | QS-015 (historical) |
+| REQ-014 | goal-014 | Historiallinen exact RunBook -vaihe. | Superseded; project-local DESIGN/PLAN/BUILD/DEPLOY/VERIFY ja tracker-outbox säilyvät, control kuuluu REQ-020:lle. | QS-016–QS-018 (historical/säilyvin osin) |
+| REQ-015 | goal-015 säilyvä osa | Säilytä Graph/GraphNode/Action Node -authoring ja Graph/GraphNode Root Run -rajat. | Strict v18, ordered Action Node execution ja protected flow; scoped orchestrator/Repair-osat ovat superseded. | QS-020, QS-026 |
+| REQ-016 | goal-016 | Historiallinen Graph-only finite SSP/SMDP -vaihe. | Superseded kokonaan goal-020:llä ja ADR-031:llä. | QS-021 (historical) |
+| REQ-017 | goal-017 | Historiallinen scoped outcome-aware SSP-vaihe. | Superseded kokonaan; local policyä ei ole. | QS-022, QS-023 (historical) |
+| REQ-018 | goal-018 säilyvä osa | Näytä capabilityt korteilla ja Graph Decision Model omassa URL-osiossaan säilyttäen protected Action flow. | Capability Graph / Reward Decision Model, ordered Actions, atominen CRUD ja factual Run evidence; local Decision Model/Repair on poistettu. | QS-024 |
+| REQ-019 | goal-019 | Historiallinen offline calibration/promotion -vaihe. | Superseded; observations ovat immutable audit evidenceä eivätkä muuta tai promotoi mallia. | QS-025 (historical) |
+| REQ-020 | goal-020 | Valitse seuraava GraphNode yhdestä outcome-aware discounted Reward-MDP:stä, jonka reward perustuu evidenssillä varmennettuun acceptance-progressiin ja jonka hard authorization, policy ja runtime ovat immutable-snapshotattuja. | Strict v18/v3/v6/v11/v9/v10/v11/v4/v14, acceptance-ledger, authorization-snapshot, deterministic compiler/absorption, ordered Action Node execution ja local policy/Repair -poisto. | QS-026 |
 
 Täydelliset mitattavat skenaariot ja evidenssistatukset ovat [osiossa 10](10-quality-requirements.md), ja päästä päähän -ketjut ovat [TRACEABILITYssa](TRACEABILITY.md).
 
@@ -68,14 +68,14 @@ Prioriteettijärjestys on hyväksytty Goal- ja ADR-korpuksessa. Yksittäinen ini
 | Ohjelmistoarkkitehti | Näkee rakenteet, rajapinnat, transaktiot, päätökset, riskit ja driftin yhtenä kokonaisuutena. | arc42-osiot, ADR-linkit, TRACEABILITY ja conformance review. |
 | Kehittäjä | Saa rajatun muutospinnan, lähdekoodiankkurit, invariantit ja toistettavat tarkistukset. | PLAN, BB/RT/CON-kuvaukset, testit ja build. |
 | AI-agentti | Saa yksiselitteisen nykytilan, sallitut resurssit, roolin, output-skeeman ja pysähtymisehdot ilman implisiittistä projektityönkulkua. | Immutable snapshot, `TaskEnvelope`, instruction/skill-resoluutio ja Validation-tulos. |
-| Agenttioperaattori | Näkee, mitä ajetaan, missä roolissa ja mihin kanoniseen faktaan näkymä perustuu. | Mission, All Loops, live inspector, attempt/revision/repair/return/finalization. |
+| Agenttioperaattori | Näkee, mitä ajetaan, miksi policy valitsi actionin ja mihin kanoniseen faktaan näkymä perustuu. | Graph/GraphNode Run, Q/V/reward/PPM/acceptance-evidenssi, Action Node, attempt, revision ja finalization. |
 | Riippumaton katselmoija | Arvioi BRIEF/PLAN/QS-kriteerien täyttymisen muuttamatta arvioitavaa toteutusta. | Diffi, nimetty evidenssi, testitulokset ja REVIEW. |
 | Release-operaattori | Valtuuttaa ja havaitsee täsmällisen package/release/deploy/rollback-toimenpiteen. | Julkaisutarkistus ja erillinen ihmisvaltuutus. |
 | Ylläpitäjä | Pystyy käynnistämään checkout-kohtaisen palvelun uudelleen menettämättä tai monistamatta työtä. | launchd/CLI-status, SQLite ja recovery-evidenssi. |
 
 ## Rajaus
 
-Ballet omistaa yleiset Graph-, GraphNode-, aggregate JobNode-, scoped orchestrator/repair-, runtime-, provider-, persistence- ja authoring-primitivet. Roadmap-, milestone-, release- ja arc42-menettelyt ovat project-local-dataa. Tilit, keskitetty control plane, schedule, standalone JobNode Run, automaattinen merge/push sekä yleinen projektinhallintapalvelu ovat rajauksen ulkopuolella.
+Ballet omistaa yleiset Graph-, GraphNode-, aggregate Action Node-, Work/Validation-, Graph Reward-MDP-, acceptance-, authorization-, runtime-, provider-, persistence- ja authoring-primitivet. Roadmap-, milestone-, release- ja arc42-menettelyt ovat project-local-dataa. Tilit, keskitetty control plane, schedule, standalone Action Node Run, local solver, Repair-rooli, automaattinen merge/push sekä yleinen projektinhallintapalvelu ovat rajauksen ulkopuolella.
 
 ## Kanoniset lähteet
 
@@ -86,7 +86,7 @@ Ballet omistaa yleiset Graph-, GraphNode-, aggregate JobNode-, scoped orchestrat
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-023`, `adr-026` ja accepted `adr-028`–`adr-030`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin ja `adr-031`.
 
 ## Evidenssi
 
@@ -96,8 +96,6 @@ Goal-frontmatter, project-skeema, toteutuksen lähdeankkurit ja trace-matriisi o
 
 - Initiative-kohtaiset sidosryhmät, hyväksymismitat ja mahdollinen `needs_input` täsmennetään aina BRIEFissä.
 - Ensimmäinen end-to-end-pilotti määrittää menetelmäterveyden lähtöarvot.
-- Ensimmäinen SSP-pilotti kalibroi domain expertin probability/cost-priorit ja dokumentoi Decision Staten tunnetut Markov-gap-kohdat.
-- Phase 3 tarvitsee project ownerin hyväksymät exact joint priors-, scalarization-, sample-, coverage- ja readiness-inputit.
 
 ## Seuraava katselmointiperuste
 

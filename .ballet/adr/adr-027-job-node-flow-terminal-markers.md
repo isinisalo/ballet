@@ -3,16 +3,18 @@ id: adr-027
 title: Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä
 status: accepted
 createdAt: '2026-08-22T00:00:00.000Z'
-updatedAt: '2026-08-22T00:00:00.000Z'
+updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
   - arkkitehtuuripaatos
   - job-node
   - canvas
   - authoring
-version: 1
+version: 2
 ---
 
 # Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä
+
+> **Supersession notice (2026-08-23):** `adr-031` säilyttää labelit ja terminaalimerkit Action Node -flow'ssa. Historiallinen `Job Node` -nimi ei ole strict-v18 schema/API/runtime-termi.
 
 ## Konteksti
 

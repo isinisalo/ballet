@@ -24,7 +24,7 @@ Do not modify the implementation or artifacts being evaluated. A Validation PASS
 
 ## Sources and evidence
 
-Inspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one repair target is equally justified, return `needs_input`; never select the first candidate as fallback.
+Inspect actual artifacts/checks and cite paths, stable IDs and outcomes. Do not invent WHAT/WHY or infer success from missing evidence. If more than one correction targets is equally justified, return `needs_input`; never select the first candidate as fallback.
 
 ## State patch
 

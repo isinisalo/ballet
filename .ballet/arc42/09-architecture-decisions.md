@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 22
+version: 23
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-023:n domain/runtime-invariantit, ADR-025/027:n Job Node -canvaspäätökset ja ADR-026:n Graph-scope finite SSP/SMDP-policystrategia säilyvät. Project owner hyväksyi ADR-027–ADR-030-ketjun commitissa `26698dda09c9e9fda5284d4bfa578d6084581dc5`.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-031 omistaa aktiivisen yhden Graph Reward-MDP:n. ADR-026/028/030 ovat superseded; ADR-023:n routing/orchestrator/Repair- ja ADR-029:n local-policy/Repair-osat ovat superseded. ADR-025/027:n protected Action Node flow sekä ADR-029:n capability-first-osat säilyvät.
 
 ## Päätösindeksi
 
@@ -47,14 +47,15 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-023:n domain/runtime-i
 | adr-020 | accepted; version/Graph continuation partly superseded by adr-022; canvas projection partly superseded by adr-021 | Workflow domain, runtime and persistence invariants | [Workflow Engineering ja erilliset Job- ja Validation-nodet](../adr/adr-020-workflow-engineering.md) |
 | adr-021 | accepted | Workflow Engineering canvas projection | [Workflow-canvas projisoi Validationin JobNoden sisään](../adr/adr-021-workflow-canvas-job-projektio.md) |
 | adr-022 | accepted | Strict-v13 named Graph RunBook, tracker reconciliation and five-Loop project default | [Deterministinen Graph Engineering RunBook ja kaksistoreinen tk-sovitus](../adr/adr-022-deterministinen-graph-engineering-runbook.md) |
-| adr-023 | accepted | Strict-v14 three-level Graph Node domain, scoped agent routing and bounded repair | [Kolmitasoinen Graph Node -domain ja agenttiohjattu reititys](../adr/adr-023-three-level-graph-node-orchestration.md) |
+| adr-023 | accepted; routing/orchestrator/Repair superseded by adr-031 | Three-level Graph Node domain and ordered Work/Validation aggregate | [Kolmitasoinen Graph Node -domain ja agenttiohjattu reititys](../adr/adr-023-three-level-graph-node-orchestration.md) |
 | adr-024 | accepted | PASS/FAIL-result endpointsien canvas-projektio | [PASS/FAIL-result endpointsien canvas-projektio](../adr/adr-024-pass-fail-canvas-projektio.md) |
 | adr-025 | accepted | Job Node industrial flow -authoring-projektio | [Job Node authoring käyttää industrial flow -projektiota](../adr/adr-025-job-node-industrial-flow-canvas.md) |
-| adr-026 | accepted | Graph-scope finite SSP/SMDP policy strategy | [Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa](../adr/adr-026-stochastic-ssp-smdp-policy-orchestration.md) |
+| adr-026 | superseded by adr-031 | Historical Graph-scope SSP/SMDP policy | [Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa](../adr/adr-026-stochastic-ssp-smdp-policy-orchestration.md) |
 | adr-027 | accepted | Job Node flow labels and terminal markers | [Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä](../adr/adr-027-job-node-flow-terminal-markers.md) |
-| adr-028 | accepted | Outcome-aware hierarchical scoped SSP/SMDP v2 | [Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya](../adr/adr-028-outcome-aware-hierarchical-ssp-smdp.md) |
-| adr-029 | accepted | Capability-first Graph/GraphNode authoring | [Graph ja GraphNode authoroidaan capability-first-korttinäkymissä](../adr/adr-029-capability-first-card-authoring.md) |
-| adr-030 | accepted | Governed offline policy calibration and promotion | [Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla](../adr/adr-030-governed-offline-calibration-and-promotion.md) |
+| adr-028 | superseded by adr-031 | Historical outcome-aware hierarchical scoped SSP/SMDP v2 | [Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya](../adr/adr-028-outcome-aware-hierarchical-ssp-smdp.md) |
+| adr-029 | accepted; local-policy/Repair superseded by adr-031 | Capability-first Graph/GraphNode authoring and protected Action flow | [Graph ja GraphNode authoroidaan capability-first-korttinäkymissä](../adr/adr-029-capability-first-card-authoring.md) |
+| adr-030 | superseded by adr-031 | Historical offline policy calibration and promotion | [Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla](../adr/adr-030-governed-offline-calibration-and-promotion.md) |
+| adr-031 | accepted | Single Graph Reward-MDP, immutable acceptance/authorization and strict cut | [Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä](../adr/adr-031-single-graph-reward-mdp.md) |
 
 ## Supersession-suhteet
 
@@ -178,8 +179,7 @@ Kaikki yllä indeksoidut ADR:t; `adr-011` määrittää indeksointi- ja source-o
 
 ## Avoimet kysymykset
 
-- ADR-028/029 vaativat eksplisiittisen acceptance-päätöksen. ADR-028:n Portti B vaatii lisäksi kalibroidun pilotin ja erillisen agenttirouting-poiston approvalin.
-- ADR-030 vaatii eksplisiittisen acceptance-päätöksen ennen Phase 2:n observation/calibration-sopimusleikkausta.
+- ADR-031 on accepted ja supersession on toteutettu strict hard cutina. Tuotantokaltainen Reward-MDP-pilotti sekä final human visual review puuttuvat edelleen, eikä niitä päätellä teknisestä hyväksynnästä.
 
 ## Seuraava katselmointiperuste
 

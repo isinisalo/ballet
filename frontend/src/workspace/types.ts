@@ -15,7 +15,7 @@ export type View =
 
 export type SaveCollection = "skills";
 export type EngineeringLevel = "graph" | "graph_node" | "action_node";
-export type EngineeringSection = "capabilities" | "decision-model" | "actions" | "local-decision-model";
+export type EngineeringSection = "capabilities" | "decision-model" | "actions";
 export type ProjectDocumentCreateKind = "adr" | "goal" | "instruction";
 
 export interface RouteState {
@@ -47,7 +47,6 @@ export const emptyData: AppData = {
   resourceIssues: [],
   graphNodeInvocations: [],
   activeRootRuns: [],
-  routingDecisions: [],
   automation: defaultProjectAutomationConfig(),
   automationIssues: [],
   canvasTheme: structuredClone(defaultCanvasTheme),

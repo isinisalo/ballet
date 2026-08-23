@@ -1,4 +1,9 @@
 import type { ProjectExecutionComposition, ProjectGraph } from "../../shared/domain/automation.js";
+import type {
+  AcceptanceLedgerSnapshotV1,
+  AuthorizationSnapshotV1,
+  DecisionStateV3
+} from "../../shared/domain/decisionModel.js";
 import type { ExecutionRuntimeBinding, RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type { RootRunKind } from "../../shared/domain/runs.js";
 import { CanvasThemeRepository } from "../canvas-themes/CanvasThemeRepository.js";
@@ -9,7 +14,10 @@ import { resolveExecutionResources } from "../execution/ExecutionResourceCatalog
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { GraphRunStateError } from "../runtime/GraphRunErrors.js";
 import { capabilityModelSha256, decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
+import { compileRewardPolicy } from "../policy/RewardMdpCompiler.js";
+import { resolveAdmissibleActions } from "../policy/AdmissibleActionResolver.js";
 import { validateProjectAutomationConfig } from "../automation/validateAutomationConfig.js";
+import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 
 export class GraphExecutionPlanner {
   constructor(
@@ -17,34 +25,19 @@ export class GraphExecutionPlanner {
     private readonly runtime: LocalRuntimeService
   ) {}
 
-  async create(
-    workspace: PreparedRootWorkspace,
-    kind: RootRunKind,
-    targetId: string
-  ): Promise<RootExecutionSnapshot> {
+  async create(workspace: PreparedRootWorkspace, kind: RootRunKind, targetId: string): Promise<RootExecutionSnapshot> {
     const loaded = new ProjectConfigurationRepository().load(workspace.path);
-    if (!loaded.config || loaded.issues.length > 0) {
-      throw new GraphRunStateError(loaded.issues[0]?.message ?? "Project configuration v17 is unavailable.");
-    }
+    if (!loaded.config || loaded.issues.length > 0) throw new GraphRunStateError(
+      loaded.issues[0]?.message ?? "Project configuration v18 is unavailable."
+    );
     const readinessIssues = validateProjectAutomationConfig(
-      { version: 17, graph: loaded.config.graph }, loaded.config.executionProfiles
+      { version: 18, graph: loaded.config.graph }, loaded.config.executionProfiles
     );
     if (readinessIssues.length) throw new GraphRunStateError(readinessIssues[0]!.message);
-    const selected = kind === "graph"
-      ? loaded.config.graph.graphNodes
-      : loaded.config.graph.graphNodes.filter(({ id }) => id === targetId);
-    if (kind === "graph" && loaded.config.graph.id !== targetId) {
-      throw new GraphRunStateError(`Graph ${targetId} was not found.`);
-    }
-    if (kind === "graph_node" && selected.length !== 1) {
-      throw new GraphRunStateError(`Graph Node ${targetId} was not found.`);
-    }
-    const graph: ProjectGraph = kind === "graph"
-      ? structuredClone(loaded.config.graph)
-      : { ...structuredClone(loaded.config.graph), graphNodes: structuredClone(selected) };
-    const compositions = collectCompositions(graph);
-    const profileIds = [...new Set(compositions.map(({ executionProfileId }) => executionProfileId))].sort();
-    const profiles = profileIds.map((id) => {
+    assertTarget(loaded.config.graph, kind, targetId);
+    const graph = structuredClone(loaded.config.graph);
+    const compositions = collectCompositions(graph, kind === "graph_node" ? targetId : undefined);
+    const profiles = [...new Set(compositions.map(({ executionProfileId }) => executionProfileId))].sort().map((id) => {
       const profile = loaded.config!.executionProfiles.find((candidate) => candidate.id === id);
       if (!profile) throw new GraphRunStateError(`Execution profile ${id} is missing from the immutable snapshot.`);
       return profile;
@@ -53,16 +46,31 @@ export class GraphExecutionPlanner {
     const runtimes: ExecutionRuntimeBinding[] = [];
     for (const profile of profiles) {
       const resolved = await this.configurations.require(profile, readOnlyRoots);
-      runtimes.push({
-        executionProfileId: profile.id,
-        runtime: (await this.runtime.preflight(resolved)).runtime
-      });
+      runtimes.push({ executionProfileId: profile.id, runtime: (await this.runtime.preflight(resolved)).runtime });
     }
     const theme = await new CanvasThemeRepository().load(workspace.path);
     if (theme.issues.length > 0) throw new GraphRunStateError(theme.issues[0]!.message);
+    const authorization = authorizationSnapshot();
+    const acceptanceLedger = acceptanceSnapshot(graph);
+    const modelSha256 = decisionModelSha256(graph.strategy.model);
+    const projectedStates = projectedStateCatalog(graph, authorization);
+    const actionIds = graph.graphNodes.map(({ id }) => id);
+    const admissibleActionsByState = Object.fromEntries(graph.strategy.model.states.map((state) => [
+      state.id,
+      state.terminal ? [] : resolveAdmissibleActions(graph.strategy, projectedStates.get(state.id)!, actionIds).actionIds
+    ]));
+    const compiledPolicy = compileRewardPolicy({
+      model: graph.strategy.model,
+      capabilityModel: graph.strategy.capabilityModel,
+      admissibleActionsByState,
+      modelSha256
+    });
+    if (compiledPolicy.status !== "compiled") throw new GraphRunStateError(
+      compiledPolicy.message ?? `Reward-MDP compilation failed with ${compiledPolicy.status}.`
+    );
     return {
-      version: 10,
-      policyObservationContractVersion: 3,
+      version: 11,
+      policyObservationContractVersion: 4,
       rootKind: kind,
       ...(kind === "graph_node" ? { rootGraphNodeId: targetId } : {}),
       project: {
@@ -73,40 +81,68 @@ export class GraphExecutionPlanner {
       },
       issueTracker: structuredClone(loaded.config.issueTracker),
       graph,
-      graphDecision: graph.strategy.kind === "ssp_v2" ? {
-        strategyKind: "ssp_v2",
-        modelVersion: graph.strategy.model.version,
-        modelSha256: decisionModelSha256(graph.strategy.model),
+      decisionModel: {
+        strategyKind: "reward_mdp_v3",
+        modelVersion: 3,
+        modelSha256,
         capabilityModelSha256: capabilityModelSha256(graph.strategy.capabilityModel)
-      } : { strategyKind: "agent_v1" },
-      graphNodeDecisions: Object.fromEntries(graph.graphNodes.map((graphNode) => [graphNode.id,
-        graphNode.strategy.kind === "ssp_v2" ? {
-          strategyKind: "ssp_v2" as const,
-          modelVersion: graphNode.strategy.model.version,
-          modelSha256: decisionModelSha256(graphNode.strategy.model),
-          capabilityModelSha256: capabilityModelSha256(graphNode.strategy.capabilityModel)
-        } : { strategyKind: "agent_v1" as const }
-      ])),
+      },
       theme: theme.theme,
       executionProfiles: structuredClone(profiles),
       runtimes,
       resources: await resolveExecutionResources(workspace.path, compositions),
+      authorization,
+      acceptanceLedger,
+      compiledPolicy,
       createdAt: new Date().toISOString()
     };
   }
 }
 
-const collectCompositions = (graph: ProjectGraph): Array<ProjectExecutionComposition & { id: string }> => {
-  const result: Array<ProjectExecutionComposition & { id: string }> = graph.strategy.kind === "agent_v1"
-    ? [graph.strategy.orchestrator] : [];
-  if (graph.repairNode) result.push(graph.repairNode);
+function assertTarget(graph: ProjectGraph, kind: RootRunKind, targetId: string): void {
+  if (kind === "graph" && graph.id !== targetId) throw new GraphRunStateError(`Graph ${targetId} was not found.`);
+  if (kind === "graph_node" && !graph.graphNodes.some(({ id }) => id === targetId)) {
+    throw new GraphRunStateError(`Graph Node ${targetId} was not found.`);
+  }
+}
+
+function collectCompositions(graph: ProjectGraph, graphNodeId?: string): Array<ProjectExecutionComposition & { id: string }> {
+  const result: Array<ProjectExecutionComposition & { id: string }> = [];
   for (const graphNode of graph.graphNodes) {
-    if (graphNode.strategy.kind === "agent_v1") result.push(graphNode.strategy.orchestrator);
-    if (graphNode.repairNode) result.push(graphNode.repairNode);
-    for (const job of graphNode.jobNodes) {
-      if (job.workNode.type === "agent") result.push(job.workNode);
-      if (job.validationNode.type === "agent") result.push(job.validationNode);
+    if (graphNodeId && graphNode.id !== graphNodeId) continue;
+    for (const action of graphNode.actionNodes) {
+      if (action.workNode.type === "agent") result.push(action.workNode);
+      if (action.validationNode.type === "agent") result.push(action.validationNode);
     }
   }
   return result;
-};
+}
+
+function authorizationSnapshot(): AuthorizationSnapshotV1 {
+  const facts = { localExecutionAuthorized: true, externalWritesAuthorized: false };
+  return { version: 1, facts, sha256: jsonSha256(facts) };
+}
+
+function acceptanceSnapshot(graph: ProjectGraph): AcceptanceLedgerSnapshotV1 {
+  const entries = graph.strategy.model.acceptance.obligations.map(({ obligationId, weight }) => ({
+    obligationId,
+    weight,
+    status: "pending" as const,
+    evidenceRefs: []
+  })).sort((left, right) => left.obligationId.localeCompare(right.obligationId));
+  return { version: 1, entries, sha256: jsonSha256(entries) };
+}
+
+function projectedStateCatalog(
+  graph: ProjectGraph,
+  authorization: AuthorizationSnapshotV1
+): Map<string, DecisionStateV3> {
+  return new Map(graph.strategy.model.states.map((state) => [state.id, {
+    stateId: state.id,
+    features: { ...state.values },
+    verifiedProgressPpm: 0,
+    featureVectorSha256: jsonSha256(state.values),
+    sourceStateRevision: 0,
+    evidenceRefs: [authorization.sha256]
+  }]));
+}

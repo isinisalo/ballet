@@ -1,7 +1,7 @@
 ---
 id: adr-026
 title: Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa
-status: accepted
+status: superseded
 createdAt: '2026-08-22T00:00:00.000Z'
 updatedAt: '2026-08-22T00:00:00.000Z'
 tags:
@@ -9,10 +9,12 @@ tags:
   - policy
   - ssp
   - smdp
-version: 2
+version: 3
 ---
 
 # Graph-scope käyttää eksplisiittistä finite SSP/SMDP -policystrategiaa
+
+> Superseded by `adr-031`; historiallinen perustelu säilyy audit trailina.
 
 ## Status ja päätöstarve
 

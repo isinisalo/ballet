@@ -28,7 +28,7 @@ describe("canonical Graph Engineering routing", () => {
 
   it("keeps capability and decision-model sections in the URL", () => {
     expect(routeFromPath("/automation/graph?section=decision-model")).toMatchObject({ engineeringSection: "decision-model" });
-    expect(routeFromPath("/automation/graph/nodes/build?section=local-decision-model")).toMatchObject({ engineeringSection: "local-decision-model" });
+    expect(routeFromPath("/automation/graph/nodes/build?section=local-decision-model")).toMatchObject({ engineeringSection: "actions" });
   });
 
   it("parses Graph and GraphNode Run routes", () => {

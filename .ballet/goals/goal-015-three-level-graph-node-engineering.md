@@ -3,16 +3,18 @@ id: goal-015
 title: Kolmitasoinen Graph Node Engineering ja agenttiohjattu reititys
 status: accepted
 createdAt: '2026-08-22T00:00:00.000Z'
-updatedAt: '2026-08-22T00:00:00.000Z'
+updatedAt: '2026-08-23T00:00:00.000Z'
 tags:
   - tavoite
   - graph-engineering
   - graph-node
   - orchestrator
-version: 2
+version: 3
 ---
 
 # Kolmitasoinen Graph Node Engineering ja agenttiohjattu reititys
+
+> **Supersession notice (2026-08-23):** `goal-020` / `adr-031` säilyttää kolmitasoisen Graph/GraphNode/Action Node -authoring-intention mutta korvaa `JobNode`-domainnimen, scoped orchestratorit ja Repair-polun yhdellä Graph Reward-MDP:llä sekä ordered Action Node executionilla. Alla oleva teksti on alkuperäinen historiallinen intentio, ei strict-v18 runtime-sopimus.
 
 ## Tavoite
 

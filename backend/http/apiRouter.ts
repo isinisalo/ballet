@@ -77,27 +77,7 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
   }));
   router.get("/project/config-status", route(async (_req, res) => res.json(await readProjectConfigStatus(options.store.root))));
 
-  router.get("/graph-node-modules/library", route(async (_req, res) => res.json(await options.store.listGraphNodeModuleLibrary())));
-  router.post("/graph-node-modules/inspect", route(async (req, res) => {
-    const input = parseBody(graphNodeModuleInspectRequestSchema, req);
-    res.json(options.store.inspectGraphNodeModule(input.package, input.source));
-  }));
-  router.post("/graph-node-modules/install-plan", route(async (req, res) =>
-    res.json(await options.store.planGraphNodeModuleInstall(parseBody(graphNodeModuleInstallPlanRequestSchema, req)))));
-  router.post("/graph-node-modules/install", route(async (req, res) => {
-    const installed = await options.store.installGraphNodeModule(parseBody(graphNodeModuleInstallCommitRequestSchema, req));
-    options.invalidations.publish({ type: "workspace-changed", reason: "graph-node-module-install" });
-    res.status(201).json(installed);
-  }));
-  router.post("/graph-node-modules/export", route(async (req, res) =>
-    res.json(await options.store.exportGraphNodeModule(parseBody(graphNodeModuleExportRequestSchema, req)))));
-  router.get("/graph-node-modules/status", route(async (_req, res) => res.json(await options.store.graphNodeModuleStatuses())));
-  router.delete("/graph-node-modules/installed/:graphNodeId", route(async (req, res) => {
-    const { graphNodeId } = parseParams(graphNodeModuleParamsSchema, req);
-    await options.store.removeInstalledGraphNodeModule(graphNodeId);
-    options.invalidations.publish({ type: "workspace-changed", reason: "graph-node-module-remove" });
-    res.status(204).end();
-  }));
+  registerGraphNodeModuleRoutes(router, options);
 
   router.post("/runtime/refresh", route(async (req, res) => {
     parseBody(emptyBodySchema, req);
@@ -188,6 +168,32 @@ export const createApiRouter = (options: ApiRouterOptions): express.Router => {
 
   return router;
 };
+
+function registerGraphNodeModuleRoutes(router: express.Router, options: ApiRouterOptions): void {
+  router.get("/graph-node-modules/library", route(async (_req, res) =>
+    res.json(await options.store.listGraphNodeModuleLibrary())));
+  router.post("/graph-node-modules/inspect", route(async (req, res) => {
+    const input = parseBody(graphNodeModuleInspectRequestSchema, req);
+    res.json(options.store.inspectGraphNodeModule(input.package, input.source));
+  }));
+  router.post("/graph-node-modules/install-plan", route(async (req, res) =>
+    res.json(await options.store.planGraphNodeModuleInstall(parseBody(graphNodeModuleInstallPlanRequestSchema, req)))));
+  router.post("/graph-node-modules/install", route(async (req, res) => {
+    const installed = await options.store.installGraphNodeModule(parseBody(graphNodeModuleInstallCommitRequestSchema, req));
+    options.invalidations.publish({ type: "workspace-changed", reason: "graph-node-module-install" });
+    res.status(201).json(installed);
+  }));
+  router.post("/graph-node-modules/export", route(async (req, res) =>
+    res.json(await options.store.exportGraphNodeModule(parseBody(graphNodeModuleExportRequestSchema, req)))));
+  router.get("/graph-node-modules/status", route(async (_req, res) =>
+    res.json(await options.store.graphNodeModuleStatuses())));
+  router.delete("/graph-node-modules/installed/:graphNodeId", route(async (req, res) => {
+    const { graphNodeId } = parseParams(graphNodeModuleParamsSchema, req);
+    await options.store.removeInstalledGraphNodeModule(graphNodeId);
+    options.invalidations.publish({ type: "workspace-changed", reason: "graph-node-module-remove" });
+    res.status(204).end();
+  }));
+}
 
 const route = (handler: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
   (req, res, next) => { void handler(req, res).catch(next); };

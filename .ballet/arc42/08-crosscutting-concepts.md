@@ -4,7 +4,7 @@ title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 18
+version: 19
 tags:
   - arc42
   - concepts
@@ -19,24 +19,25 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-011 säilyvät hyväksyttyinä tai historiallisina konsepteina. CON-012:n accepted finite policy boundary laajenee Portti A:n implementationissa outcome-aware global/local-scopeen; CON-011:n Work/Validation/Repair-invariantit säilyvät strict-v17-rajassa.
+CON-001–CON-010 säilyvät yleisinä tai historiallisina konsepteina. CON-011/012:n scoped routing/Repair/learning-osat ovat superseded. CON-013 omistaa strict-v18 yhden Graph Reward-MDP:n, immutable acceptance/authorizationin ja compiled-policy-rajan.
 
 ## Konseptikartta
 
 | ID | Konsepti | Soveltuu | QS | Toteutusankkurit |
 | --- | --- | --- | --- | --- |
 | CON-001 | Least-authority local execution: loopback API, eksplisiittinen Origin-politiikka, worktree-only Node-kirjoitukset, network-off-oletus ja ihmisen external-write-valtuutus. | BB-002, BB-004, BB-006, BB-007 | QS-001, QS-004, QS-007 | ADR-006, ADR-008, workspace permission policy |
-| CON-002 | Durable canonical control: strict role outcomes, atomiset State patchit, append-only revisionit, bounded retry, repair-frame ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012, QS-015 | ADR-015, ADR-020, runtime/state/queue-storet |
+| CON-002 | Durable canonical control: strict role outcomes, atomiset State- ja acceptance-ledger-patchit, append-only revisionit, bounded Validation retry ja runtime-owned continuation. | BB-004–BB-006 | QS-003, QS-012, QS-015 | ADR-015, ADR-020, ADR-031, runtime/state/queue-storet |
 | CON-003 | Deterministinen execution composition: System → primary → vakaasti järjestetyt skillit → `TaskEnvelope` → role/output schema, kaikki snapshotattuna ja hashattuna. | BB-003, BB-004, BB-006 | QS-002, QS-004, QS-011 | ADR-012, ADR-013, `ExecutionComposition` |
 | CON-004 | Siirrettävät project resources: repository-polut omistavat configin, dokumentit, instructionit ja skillit; machine state jää `.git/ballet`-hakemistoon. | BB-003, BB-008, BB-009 | QS-002, QS-005, QS-009 | ADR-002, ADR-014, ADR-016, resource catalog |
-| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. Capability-first cards omistavat upper-level-authoringin ja protected industrial flow vain Job Noden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013, QS-014, QS-020, QS-024 | [DESIGN.md](../../DESIGN.md), `CapabilityCards.tsx`, `DecisionModelWorkspace.tsx`, `JobFlowCanvas.tsx`, scoped Run read models |
+| CON-005 | Cyber-industrial operator UI ja canonical projection: dense, accessible, token-driven React/Tailwind/shadcn-pinnat näyttävät vain nimetyn runtime/project-totuuden. Capability-first cards omistavat upper-level-authoringin ja protected industrial flow vain Action Noden. | BB-001, BB-002, BB-005 | QS-001, QS-010, QS-013, QS-020, QS-024 | [DESIGN.md](../../DESIGN.md), `CapabilityCards.tsx`, `DecisionModelWorkspace.tsx`, `ActionFlowCanvas.tsx`, Graph Reward-MDP Run read models |
 | CON-006 | Evidenssipohjainen arc42 Method: stable ID:t, väitetyypit, initiative handoff, traceability, conformance ja mitattu method health. | BB-003–BB-005, BB-008 | QS-005, QS-006, QS-008 | goal-009, ADR-011, project-local arc42-resurssit |
 | CON-007 | Copy-to-project module trust: strict rajattu JSON, canonical hash, deterministic namespace, compatible profile slots, revalidated plan, config-last commit ja content-derived provenance. | BB-001–BB-003, BB-009 | QS-002, QS-004, QS-009 | ADR-016, Loop module schemas/service/tests |
-| CON-008 | Workflow structural integrity: jokainen Job omistaa yhden Validationin, jokaisella Validationilla on yksi PassEdge ja FailEdge, Jobit ovat saavutettavia ja vähintään yksi PASS-tulos saavutetaan; validate/retry ovat kiinteitä runtime-siirtymiä. Canvas projisoi parin yhdeksi Job-artworkiksi ja vain persisted Edget. | BB-001, BB-003–BB-006, BB-009 | QS-003, QS-009, QS-015 | ADR-020, ADR-021, project/workflow schema, Workflow runtime ja canvas |
+| CON-008 | Ordered Action integrity: jokainen Action Node omistaa yhden Workin ja yhden Validationin; GraphNode suorittaa Action Nodet array-järjestyksessä ja Validation retry on bounded. Canvas projisoi sopimuksen ilman authoroitavia child Edgejä. | BB-001, BB-003–BB-006, BB-009 | QS-003, QS-009, QS-026 | ADR-020 säilyvin osin, ADR-031, strict v18 schema/runtime |
 | CON-009 | Named RunBook determinism: Graphin `(source, decision, outcome)` on yksikäsitteinen, Validation valitsee vain snapshotatun enumin, runtime ratkaisee exact transitionin, DONE on eksplisiittinen ja transition count rajattu. | BB-001, BB-003–BB-006, BB-009 | QS-016, QS-017 | ADR-022, v13 schema, v6 snapshot/envelope/outcome, GraphRunbookEngine |
 | CON-010 | Tracker reconciliation: SQLite outbox on runtime-intention canonical lähde, external-ref on idempotenssiavain ja Run etenee vasta strict `tk`-sovituksen jälkeen; bounded State sisältää vain viitteitä. | BB-004, BB-005, BB-010 | QS-012, QS-018 | ADR-007, ADR-022, runtime schema v9, TkTracker, TrackerOutbox |
 | CON-011 | Scoped agent routing and repair containment: Graph- ja Graph Node -orchestrator saavat vain snapshotatun parent-scope-enumin; Work→Validation ja retry ovat Job-aggregaatin kiinteitä invariantteja; invalidi target ei vaikuta, bounded Repair ei laajenna targetteja/oikeuksia ja palaa samaan Validationiin. Job industrial flow näyttää Work/Validation-, retry- ja terminaalimerkit; Graph Node Orchestrator omistaa routingin ilman Job-canvasin parent-junctionia. | BB-001, BB-003–BB-006, BB-009 | QS-019, QS-020 | ADR-023, ADR-025, ADR-027, v14 schema, v7 snapshot/envelope/outcome, GraphRoutingEngine, EngineeringShell |
 | CON-012 | Finite policy boundary: Capability Model omistaa outcomes/actions/hard guards; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa `P(outcome,nextState|state,action)`/cost/terminalit; sama solver tuottaa global/local Q/V/actionin; actual state tulee aina projectorilta. Policy Projection on derived evidence ja Execution Graph factual observations. Hard controls poistavat actionin `A(s)`:stä, probabilityt/costit eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011, BB-012 | QS-002, QS-012, QS-013, QS-021–QS-025 | ADR-026, ADR-028, ADR-030, config v17/snapshot v10/observation v3/SQLite v13, RT-016/RT-019 |
+| CON-013 | Single Graph Reward-MDP boundary: Capability Model omistaa outcomes/actions/guards; Decision Model omistaa `P(outcome,s′|s,a)`, rewardin, γ:n, acceptance-state-katalogin ja deterministic solver-boundit; erilliset immutable authorization/acceptance-snapshotit rajaavat Staten ja `A(s)`:n; compiled policy on execution snapshotin read-only osa. | BB-001–BB-005, BB-013 | QS-002, QS-004, QS-012, QS-013, QS-026 | ADR-031, config v18/snapshot v11/observation v4/SQLite v14, RT-020 |
 
 ## Turvallisuus ja auktorisointi
 
@@ -55,14 +56,14 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 
 | Raja | Validointi | Virheen muoto | Sivuvaikutus |
 | --- | --- | --- | --- |
-| Project config/resources | Strict-v14 Graph/GraphNode/JobNode/candidate-rakenne ilman legacy-readeria, dual-writeä tai silent defaultia. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
+| Project config/resources | Strict-v18 Graph/Reward-MDP/GraphNode/ordered Action Node -rakenne ilman legacy-readeria, dual-writeä tai silent compatibilityä. | Tarkka issue-lista, käynnistys/commit estyy. | Ei osittaista config- tai Run-muutosta. |
 | HTTP/API | Shared request/response schema ja application precondition. | 4xx odotetulle inputille, 5xx vain odottamattomalle virheelle. | Service-transaktio ei ala malformed-inputilla. |
 | Composition | Profiili, instructionit, skillit, order, envelope ja output schema. | `ExecutionCompositionError` tai vastaava blocking outcome. | Nolla jonotettua taskia ja nolla fallbackia. |
 | Runtime outcome | Roolikohtainen strict schema, current revision ja rajat. | Failed/needs_input/interrupted/terminal outcome. | Vain atomisesti commitoitu fakta näkyy. |
-| Graph Node module | Koko, UTF-8, strict v4 schema, canonical hash, explicit mapping, peer-target-kielto, conflict, stale plan ja active Run. | Domain issue -lista. | Config-last ja rollback; ei puuttuvia referenssejä. |
+| Graph Node module | Koko, UTF-8, strict v6 schema, canonical hash, explicit mapping, local-policy/Repair-kielto, conflict, stale plan ja active Run. | Domain issue -lista. | Config-last ja rollback; ei puuttuvia referenssejä. |
 | `tk` adapteri | Capability probe, strict JSONL/Markdown, external-ref, parent/dependency, cycle, cwd/store, timeout ja output limit. | Preflight issue tai pending/error outbox. | Root Run/provider/transition ei etene; ulkoinen osittainen vaikutus sovitetaan Resume/startupissa. |
 | UI projection | Shared DTO ja exhaustive presentation mapping. | Unknown/explicit unavailable; ei arvattua tilaa. | Display-only; canonical data ei muutu. |
-| Draft SSP policy | Finite domains, exact state mapping, ppm-summa, positive microcost, explicit terminal, proper-policy/MEC, bounded convergence ja stable tie-break. | Typed model/state/solver issue. | Action/dispatch = 0, policy fallback = 0 ja project model ennallaan. |
+| Draft Reward-MDP | Finite domains, exact acceptance-state mapping, ppm-summa, integer rewardit, success terminal, absorbing policy, deterministic iteration bound ja stable tie-break. | Typed model/state/solver issue. | Action/dispatch = 0 ja project model ennallaan. |
 
 Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logirivi tai providerin teksti ei yksinään muuta control flow’ta. Retry on rajattu runtime-sääntö, ei yleinen “catch and try again” -käytäntö.
 
@@ -78,9 +79,9 @@ Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logi
 
 ## Determinismi ja provenance
 
-Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Scoped orchestratorin allowed target enum tulee samasta immutable snapshotista kuin runtime-validointi; providerin target-teksti ei voi laajentaa joukkoa. Graph Node Module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
+Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Runtime muodostaa hard `A(s)`:n immutable authorization-snapshotista; providerin teksti tai project State ei voi laajentaa joukkoa. Graph Node Module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
 
-CON-012 laajentaa saman provenance-periaatteen Decision Modeliin: canonical feature/state/action/transition/cost/terminal/solver JSON tuottaa model hashin. Stable ID -järjestys, fixed-point input, compensated successor summation, epsilon, iteration count, residual ja policy hash ovat decision evidenceä. Execution observation viittaa model hashiin mutta ei kirjoita modelia.
+CON-013 ulottaa saman provenance-periaatteen Graph Reward-MDP:hen: canonical state/action/outcome/transition/reward/acceptance/solver JSON tuottaa model hashin. Stable ID -järjestys, integer-mikroyksiköt, exact PPM, iteration count, residual sekä Q/V/policy hash ovat decision evidenceä. Execution observation viittaa immutableen modeliin mutta ei mutatoi sitä.
 
 ## Evidenssi, observability ja tietoluokitus
 
@@ -106,21 +107,21 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 ## UI:n totuusperiaate
 
 - `DESIGN.md` omistaa värit, typografian, spacingin, radius-säännöt ja visuaalisen periaatteen.
-- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | job_node`: Graph Engineering näyttää Capability Graph / Decision Model -korttiosiot; Graph Node näyttää parentin Jobs / Local Decision Model & Repair -korttiosiot; Job Node näyttää Work/Validation ID -kortit, samalla tasolla olevat Pass?/Retry?-junctionit, vasemmalla leijuvan Retry count -ghostin ja samalla tasolla olevat Continue/Escalate-terminaalimerkit.
+- Aktiiviset authoring-projektiot ovat canonical `graph | graph_node | action_node`: Graph Engineering näyttää Capability Graph / Reward Decision Model -korttiosiot; Graph Node näyttää parentin Ordered Actions -kortit; Action Node näyttää Work/Validation ID -kortit, Pass?/Retry?-junctionit, Retry count -ghostin ja Continue/Escalate-terminaalimerkit.
 - Job-flow ei renderöi Next job -targetia eikä Graph Node Orchestrator -junctionia. Vain Work/Validation avaavat inspectorin; kaikki muut merkit ovat ei-interaktiivisia eivätkä ole candidate-, topology- tai runtime-kirjoituksia.
 - Capability/Jobs-kortti näyttää vain oman scopen authoroidun sopimuksen. Layout tai valinta ei omista topologiaa eikä foreign-scope-nodea näytetä.
-- Run-projektio näyttää Graph- tai GraphNode-Rootin immutable snapshotin ja canonical positionin ilman standalone JobNode Runia.
-- Position, role, profile, attempt, revision, repair, return ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
+- Run-projektio näyttää Graph- tai GraphNode-Rootin immutable snapshotin ja canonical positionin ilman standalone Action Node Runia.
+- Position, role, profile, attempt, revision, acceptance, retry/escalate ja finalization tulevat snapshotista ja canonical persistence -projektiosta.
 - Visuaalinen card status tai Job-flow artwork/yhteys auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
-- Draft policy UI erottaa Configure-owned Capability/Decision Modelin Run-owned Decision State/policy evidence/Execution Graphista. Most Likely Rollout on bounded cumulative-probability-projektio, ei tallennettu Current Plan tai dispatch authority.
+- Draft policy UI erottaa Configure-owned Capability/Reward Decision Modelin Run-owned Decision State/acceptance/policy evidence/Execution Graphista. Compiled policy -projektio ei ole tallennettu Current Plan eikä dispatch authority UI:ssa.
 - Prosenttia, ETA:a, elapsed-telemetriaa tai provider-tekstistä pääteltyä statusta ei esitetä, ellei tuleva kanoninen sopimus ja ADR sitä erikseen määritä.
 
 ## Versiointi ja yhteensopivuus
 
-- `.ballet/project.json` käyttää strict-v17-skeemaa: graph omistaa yhteisen Staten, explicit `agent_v1 | ssp_v2` -strategian ja 1–40 GraphNodea; GraphNode omistaa oman strategian/repairin, intrinsic outcomet ja aggregate JobNodet.
-- V16-toteutus ei säilytä v15-readeria, `ssp_v1`:tä, Loop/Workflow/schedule/Edge/start-ID-readereita, reittialiaksia, dual-writeä tai silent defaultia.
+- `.ballet/project.json` käyttää strict-v18-skeemaa: graph omistaa yhteisen Staten, yhden `reward_mdp_v3`-strategian ja 1–40 GraphNodea; GraphNode omistaa intrinsic outcomet ja ordered aggregate Action Nodet.
+- V18-toteutus ei säilytä vanhaa strategy-readeria, Loop/Workflow/schedule/Edge/start-ID-readereita, reittialiaksia, dual-writeä tai silent compatibilityä.
 - Shared API/TypeScript-sopimuksen semanttinen muutos vaatii toteutuksen ja kuluttajien koordinoidun päivityksen sekä testit.
-- SQLite schema v13 käyttää GraphNode-/JobNode-invocationeja, scoped orchestrator/repair request/decision/frame -evidenssiä sekä append-only scoped policy decision/outcome-aware observation/model-miss -evidenssiä. V11-tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen archive/remediation-ohjeen ja epäonnistuu suljetusti.
+- SQLite schema v14 käyttää GraphNode-/ActionNode-/Work/Validation-invocationeja sekä append-only Graph policy decision/outcome-aware observation/acceptance-evidenssiä. Vanhaa tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen remediation-ohjeen ja epäonnistuu suljetusti.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
 
@@ -130,13 +131,13 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-023`, `adr-025`–`adr-030`.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-020`, `adr-025` ja `adr-031`. ADR-023:n sekä ADR-026–030:n supersedoidut osat säilyvät vain historiallisena audit trailina.
 
 ## Evidenssi
 
 Konseptit mapittuvat BB-, RT-, DEP- ja QS-tunnisteisiin. TRACEABILITY nimeää testit ja evidenssit; tämän dokumentaatiotyön conformance review tarkistaa, ettei kuvaus väitä runtime-sopimuksen muutosta.
 
-CON-012:n scoped Portti A -evidenssi on TEST-022/023 ja EVID-022/023:ssa; calibrated pilot pysyy avoimena.
+CON-013:n toteutusevidenssi on TEST-026/EVID-026/GRM-evid-004-ketjussa; tuotantokaltainen Reward-MDP-pilotti pysyy avoimena.
 
 ## Avoimet kysymykset
 

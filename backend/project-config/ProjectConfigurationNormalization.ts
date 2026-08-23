@@ -1,47 +1,42 @@
-import type { ProjectExecutionComposition, ProjectGraphNodeDecisionStrategyV2 } from "../../shared/domain/automation.js";
-import type { ProjectGraphDecisionStrategyV2, ProjectSspDecisionStrategyV2 } from "../../shared/domain/decisionModel.js";
+import type { ProjectRewardDecisionStrategyV3 } from "../../shared/domain/decisionModel.js";
 
-export const normalizeGraphStrategy = (
-  strategy: ProjectGraphDecisionStrategyV2,
-  normalizeComposition: <T extends ProjectExecutionComposition>(composition: T) => T
-): ProjectGraphDecisionStrategyV2 => strategy.kind === "agent_v1" ? {
-  kind: "agent_v1",
-  orchestrator: normalizeComposition(strategy.orchestrator)
-} : {
-  ...structuredClone(strategy),
-  capabilityModel: {
-    version: 2,
-    outcomes: [...strategy.capabilityModel.outcomes].sort((left, right) => compareIds(left.id, right.id)),
-    actions: [...strategy.capabilityModel.actions].map((action) => ({
-      actionId: action.actionId,
-      guards: action.guards.map((guard) => ({
-        featureId: guard.featureId,
-        allowedValues: [...guard.allowedValues].sort(compareIds)
-      })).sort((left, right) => compareIds(left.featureId, right.featureId))
-    })).sort((left, right) => compareIds(left.actionId, right.actionId))
-  }
-};
-
-export const normalizeGraphNodeStrategy = (
-  strategy: ProjectGraphNodeDecisionStrategyV2,
-  normalizeComposition: <T extends ProjectExecutionComposition>(composition: T) => T
-): ProjectGraphNodeDecisionStrategyV2 => strategy.kind === "agent_v1"
-  ? { kind: "agent_v1", orchestrator: normalizeComposition(strategy.orchestrator) }
-  : normalizeSspStrategy(strategy);
-
-export const normalizeSspStrategy = (strategy: ProjectSspDecisionStrategyV2): ProjectSspDecisionStrategyV2 => ({
-  ...structuredClone(strategy),
-  capabilityModel: {
-    version: 2,
-    outcomes: [...strategy.capabilityModel.outcomes].sort((left, right) => compareIds(left.id, right.id)),
-    actions: [...strategy.capabilityModel.actions].map((action) => ({
-      actionId: action.actionId,
-      guards: action.guards.map((guard) => ({
-        featureId: guard.featureId,
-        allowedValues: [...guard.allowedValues].sort(compareIds)
-      })).sort((left, right) => compareIds(left.featureId, right.featureId))
-    })).sort((left, right) => compareIds(left.actionId, right.actionId))
-  }
-});
+export function normalizeGraphStrategy(strategy: ProjectRewardDecisionStrategyV3): ProjectRewardDecisionStrategyV3 {
+  return {
+    ...structuredClone(strategy),
+    capabilityModel: {
+      version: 3,
+      outcomes: [...strategy.capabilityModel.outcomes].sort((left, right) => compareIds(left.id, right.id)),
+      actions: strategy.capabilityModel.actions.map((action) => ({
+        actionId: action.actionId,
+        guards: action.guards.map((guard) => ({
+          featureId: guard.featureId,
+          allowedValues: [...guard.allowedValues].sort(compareIds)
+        })).sort((left, right) => compareIds(left.featureId, right.featureId))
+      })).sort((left, right) => compareIds(left.actionId, right.actionId))
+    },
+    model: {
+      ...structuredClone(strategy.model),
+      acceptance: {
+        version: 1,
+        obligations: [...strategy.model.acceptance.obligations]
+          .sort((left, right) => compareIds(left.obligationId, right.obligationId))
+      },
+      features: strategy.model.features.map((feature) => ({
+        ...structuredClone(feature), domain: [...feature.domain].sort(compareIds)
+      })).sort((left, right) => compareIds(left.id, right.id)),
+      states: strategy.model.states.map((state) => ({
+        ...structuredClone(state),
+        values: Object.fromEntries(Object.entries(state.values).sort(([left], [right]) => compareIds(left, right))),
+        verifiedObligationIds: [...state.verifiedObligationIds].sort(compareIds),
+        invalidatedObligationIds: [...state.invalidatedObligationIds].sort(compareIds)
+      })).sort((left, right) => compareIds(left.id, right.id)),
+      stateActions: strategy.model.stateActions.map((row) => ({
+        ...structuredClone(row),
+        successors: [...row.successors].sort((left, right) => compareIds(left.outcomeId, right.outcomeId)
+          || compareIds(left.nextStateId, right.nextStateId))
+      })).sort((left, right) => compareIds(left.stateId, right.stateId) || compareIds(left.actionId, right.actionId))
+    }
+  };
+}
 
 const compareIds = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0;

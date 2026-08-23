@@ -2,63 +2,48 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { graphNodeModulePackageV5Schema } from "../../shared/api/graph-node-module-schemas.js";
+import { graphNodeModulePackageV6Schema } from "../../shared/api/graph-node-module-schemas.js";
 import { projectConfigSchema } from "../../shared/api/workspace-schemas.js";
-import type { GraphNodeModulePackageV5 } from "../../shared/domain/graphNodeModules.js";
+import type { GraphNodeModulePackageV6 } from "../../shared/domain/graphNodeModules.js";
 import { GraphNodeModuleService } from "../../backend/graph-node-modules/GraphNodeModuleService.js";
-import { ProjectConfigurationSourceError } from "../../backend/project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "../../backend/services/RuntimeDatabaseProvider.js";
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("project-local Graph Engineering v17", () => {
-  it("contains five capability-first Graph Nodes and 17 aggregate Job Nodes", async () => {
+describe("project-local Graph Engineering strict v18", () => {
+  it("contains one global Reward-MDP, five options and 17 ordered Action Nodes", async () => {
     const config = projectConfigSchema.parse(JSON.parse(await readFile(".ballet/project.json", "utf8")));
-    expect(config.version).toBe(17);
-    expect(config.graph.graphNodes.map(({ id }) => id)).toEqual(["design","plan","build","deploy","verify"]);
-    expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)).toHaveLength(17);
-    expect(config.graph.graphNodes.flatMap(({ jobNodes }) => jobNodes)
-      .every((job) => job.workNode && job.validationNode)).toBe(true);
-    expect(config.graph.strategy.kind).toBe("agent_v1");
-    if (config.graph.strategy.kind !== "agent_v1") throw new Error("Expected agent strategy.");
-    expect(config.graph.strategy.orchestrator).toMatchObject({
-      executionProfileId: "codex-gpt-5-6-luna-medium-network-off",
-      maxRouteAttempts: 3,
-      maxTransitions: 256
-    });
-    expect(config.graph.repairNode).toMatchObject({
-      executionProfileId: "codex-gpt-5-6-sol-medium-network-off",
-      maxRepairAttempts: 3,
-      maxRepairDepth: 3
-    });
-    for (const graphNode of config.graph.graphNodes) {
-      expect(graphNode.strategy.kind).toBe("agent_v1");
-      if (graphNode.strategy.kind !== "agent_v1") throw new Error("Expected pilot agent strategy.");
-      expect(graphNode.strategy.orchestrator.executionProfileId).toBe("codex-gpt-5-6-luna-medium-network-off");
-      expect(graphNode.repairNode?.executionProfileId).toBe("codex-gpt-5-6-sol-medium-network-off");
-      expect(graphNode).not.toHaveProperty("nodeStyle");
-    }
+    expect(config.version).toBe(18);
+    expect(config.graph.graphNodes.map(({ id }) => id)).toEqual(["design", "plan", "build", "deploy", "verify"]);
+    expect(config.graph.graphNodes.flatMap(({ actionNodes }) => actionNodes)).toHaveLength(17);
+    expect(config.graph.strategy.kind).toBe("reward_mdp_v3");
+    expect(config.graph.strategy.model.discountPpm).toBe(990_000);
+    expect(config.graph.strategy.model.states).toHaveLength(63);
+    expect(config.graph.strategy.model.stateActions.some(({ stateId }) =>
+      config.graph.strategy.model.stateActions.filter((row) => row.stateId === stateId).length >= 2)).toBe(true);
+    expect(config.graph.strategy.model.stateActions.every(({ successors }) =>
+      successors.reduce((sum, branch) => sum + branch.probabilityPpm, 0) === 1_000_000
+      && successors.every(({ provenance }) => provenance === "default_prior"))).toBe(true);
+    expect(JSON.stringify(config)).not.toMatch(/agent_v1|repairNode|RepairNode/);
   });
 
-  it("publishes 14 strict Graph Node Module v5 packages without peer targets or upper artwork", async () => {
+  it("publishes 14 strict Graph Node Module v6 packages without local policy or Repair resources", async () => {
     const packages = await readPackages();
     expect(packages).toHaveLength(14);
     expect(new Set(packages.map(({ manifest }) => manifest.id)).size).toBe(14);
     for (const pkg of packages) {
-      expect(pkg).toMatchObject({ format: "ballet-graph-node-module", version: 5 });
-      expect(pkg.graphNode.jobNodes.length).toBeGreaterThan(0);
-      expect(pkg.graphNode.strategy).toMatchObject({ kind: "agent_v1" });
-      expect(pkg.graphNode.outcomes).toEqual(expect.arrayContaining([
-        { outcomeId: "success", result: "PASS" }, { outcomeId: "failure", result: "FAIL" }
-      ]));
-      expect(pkg.graphNode).not.toHaveProperty("nodeStyle");
-      expect(pkg.graphNode.repairNode).toBeDefined();
+      expect(pkg).toMatchObject({ format: "ballet-graph-node-module", version: 6 });
+      expect(pkg.graphNode.actionNodes.length).toBeGreaterThan(0);
+      expect(pkg.graphNode.outcomes.length).toBeGreaterThan(0);
+      expect(pkg.graphNode).not.toHaveProperty("strategy");
+      expect(pkg.graphNode).not.toHaveProperty("repairNode");
+      expect(JSON.stringify(pkg.resources)).not.toMatch(/Graph Node Orchestrator|Repair Node/);
       expect(peerGraphTargetPaths(pkg)).toEqual([]);
     }
   });
 
-  it("roundtrips all packages through inspect, plan, install, export and remove", async () => {
+  it("roundtrips every v6 package through inspect, plan, install, export and remove", async () => {
     for (const pkg of await readPackages()) {
       const root = await emptyProject(pkg.stateContract.requiredKeys);
       const modules = service(root);
@@ -67,20 +52,20 @@ describe("project-local Graph Engineering v17", () => {
       expect(inspection.valid, pkg.manifest.id).toBe(true);
       const mappings = Object.fromEntries(pkg.profileSlots.map((slot) => [
         slot.key,
-        /sol|repair/i.test(`${slot.key} ${slot.title}`) ? "sol" : "luna"
+        slot.network === "required" ? "sol-network-on" : "sol-network-off"
       ]));
-      const unmapped = await modules.plan({ package: pkg, source });
-      expect(unmapped.canInstall, pkg.manifest.id).toBe(false);
-      expect(unmapped.issues.some(({ code }) => code === "PROFILE_MAPPING_REQUIRED")).toBe(true);
+      if (pkg.profileSlots.length) {
+        const unmapped = await modules.plan({ package: pkg, source });
+        expect(unmapped.canInstall, pkg.manifest.id).toBe(false);
+        expect(unmapped.issues.some(({ code }) => code === "PROFILE_MAPPING_REQUIRED")).toBe(true);
+      }
       const plan = await modules.plan({ package: pkg, source, profileMappings: mappings });
       expect(plan.canInstall, `${pkg.manifest.id}: ${JSON.stringify(plan.issues)}`).toBe(true);
       const installed = await modules.commit({
-        package: pkg, source, profileMappings: mappings, expectedPlanHash: plan.planHash
-      }).catch((error: unknown) => {
-        if (error instanceof ProjectConfigurationSourceError) {
-          throw new Error(`${pkg.manifest.id}: ${JSON.stringify(error.issues)}`);
-        }
-        throw error;
+        package: pkg,
+        source,
+        profileMappings: mappings,
+        expectedPlanHash: plan.planHash
       });
       expect(installed).toMatchObject({
         graphNodeId: pkg.manifest.id,
@@ -88,7 +73,7 @@ describe("project-local Graph Engineering v17", () => {
         status: "exact"
       });
       const exported = await modules.exportGraphNode({ graphNodeId: installed.graphNodeId });
-      expect(exported.package).toMatchObject({ format: "ballet-graph-node-module", version: 5 });
+      expect(exported.package).toMatchObject({ format: "ballet-graph-node-module", version: 6 });
       expect(exported.sha256).toMatch(/^[a-f0-9]{64}$/);
       expect((await modules.statuses())[0]).toMatchObject({ graphNodeId: installed.graphNodeId, status: "exact" });
       await modules.remove(installed.graphNodeId);
@@ -97,7 +82,7 @@ describe("project-local Graph Engineering v17", () => {
   });
 });
 
-const readPackages = async (): Promise<GraphNodeModulePackageV5[]> => {
+const readPackages = async (): Promise<GraphNodeModulePackageV6[]> => {
   const library = path.resolve(".ballet/graph-node-library");
   const categories = (await readdir(library, { withFileTypes: true })).filter((entry) => entry.isDirectory());
   const files = (await Promise.all(categories.map(async (entry) =>
@@ -105,7 +90,7 @@ const readPackages = async (): Promise<GraphNodeModulePackageV5[]> => {
       .filter((name) => name.endsWith(".ballet-graph-node.json"))
       .map((name) => path.join(library, entry.name, name))))).flat().sort();
   return Promise.all(files.map(async (file) =>
-    graphNodeModulePackageV5Schema.parse(JSON.parse(await readFile(file, "utf8")))));
+    graphNodeModulePackageV6Schema.parse(JSON.parse(await readFile(file, "utf8")))));
 };
 
 const peerGraphTargetPaths = (value: unknown, current = "$"): string[] => {
@@ -117,82 +102,84 @@ const peerGraphTargetPaths = (value: unknown, current = "$"): string[] => {
 };
 
 const emptyProject = async (requiredKeys: string[]): Promise<string> => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v5-module-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v6-module-"));
   roots.push(root);
-  await mkdir(path.join(root, ".ballet/instructions"), { recursive: true });
-  await Promise.all(["global-orch","global-repair","local-orch","local-repair"].map((id) =>
-    writeFile(path.join(root, `.ballet/instructions/${id}.md`),
-      `---\nid: ${id}\ntitle: ${id}\n---\nOperate only inside the immutable candidate set.\n`)));
+  await mkdir(path.join(root, ".ballet"), { recursive: true });
   await writeFile(path.join(root, ".ballet/project.json"), JSON.stringify({
-    version: 17,
+    version: 18,
     executionProfiles: [
-      { id: "luna", name: "Luna", provider: "codex", model: "gpt-5.6-luna", reasoningEffort: "medium", networkAccess: false },
-      { id: "sol", name: "Sol", provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "medium", networkAccess: false }
+      { id: "sol-network-off", name: "Sol off", provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high", networkAccess: false },
+      { id: "sol-network-on", name: "Sol on", provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high", networkAccess: true }
     ],
     issueTracker: {
-      kind: "tk", testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
-      orchestrationDirectory: ".tickets/orchestration", workDirectory: ".tickets/work"
+      kind: "tk",
+      testedRevision: "d778bb520ee526c314c26f2bb876447e0a19caa5",
+      orchestrationDirectory: ".tickets/orchestration",
+      workDirectory: ".tickets/work"
     },
     graph: {
-      id: "test-graph", name: "Test Graph",
+      id: "test-graph",
+      name: "Test Graph",
       state: { description: "Test state", initial: Object.fromEntries(requiredKeys.map((key) => [key, null])) },
-      strategy: { kind: "agent_v1", orchestrator: orchestrator("global", "global-orch", [
-        { target: { graphNodeId: "placeholder" }, description: "Placeholder" },
-        terminal("PASS"), terminal("FAIL")
-      ], "placeholder") },
-      repairNode: repair("global-repair", "global-repair"),
-      graphNodes: [{
-        id: "placeholder", description: "Placeholder",
-        capabilities: { accepts: ["test:input"], provides: ["test:output"] },
-        outcomes: [{ outcomeId: "success", result: "PASS" }, { outcomeId: "failure", result: "FAIL" }],
-        stateContract: { description: "Test state" },
-        strategy: { kind: "agent_v1", orchestrator: orchestrator("local", "local-orch", [
-          { target: { jobNodeId: "placeholder-job" }, description: "Placeholder job" },
-          terminal("PASS"), terminal("FAIL")
-        ], "placeholder-job") },
-        repairNode: repair("local-repair", "local-repair"),
-        jobNodes: [{
-          id: "placeholder-job", description: "Placeholder Job",
-          capabilities: { accepts: ["test:input"], provides: ["test:output"] },
-          outcomes: [{ outcomeId: "success", result: "PASS" }, { outcomeId: "failure", result: "FAIL" }], maxRetries: 1,
-          workNode: {
-            id: "placeholder-work", type: "human", description: "Work", task: "Work",
-            nodeStyle: "vector-planet", nodeSize: "medium"
-          },
-          validationNode: {
-            id: "placeholder-validation", type: "human", description: "Validate", task: "Validate",
-            nodeStyle: "vector-planet", nodeSize: "medium"
-          }
-        }]
-      }]
+      strategy: baseStrategy(),
+      graphNodes: [baseGraphNode("alpha"), baseGraphNode("beta")]
     }
   }, null, 2));
   return root;
 };
 
-const orchestrator = (
-  id: string, instruction: string, startCandidates: unknown[], childId: string
-) => ({
-  id, description: "Route",
-  executionProfileId: "luna", primaryInstructionId: `project:${instruction}`, skillIds: [],
-  maxTransitions: 256, maxRouteAttempts: 3,
-  routing: {
-    start: { id: `${id}-start`, candidates: startCandidates },
-    continuation: [
-      { id: `${id}-pass`, sourceId: childId, result: "PASS", candidates: [terminal("PASS"), terminal("FAIL")] },
-      { id: `${id}-fail`, sourceId: childId, result: "FAIL", candidates: [terminal("PASS"), terminal("FAIL")] }
+const baseStrategy = () => ({
+  kind: "reward_mdp_v3",
+  id: "test-policy",
+  description: "Test Reward-MDP",
+  capabilityModel: {
+    version: 3,
+    outcomes: [
+      { id: "alpha-pass", description: "Alpha passes", result: "PASS", penaltyClass: "none" },
+      { id: "beta-pass", description: "Beta passes", result: "PASS", penaltyClass: "none" }
     ],
-    repair: []
+    actions: [{ actionId: "alpha", guards: [] }, { actionId: "beta", guards: [] }]
+  },
+  model: {
+    version: 3,
+    discountPpm: 990_000,
+    acceptance: { version: 1, obligations: [{ obligationId: "accepted", description: "Accepted", weight: 1 }] },
+    reward: {
+      actionCostMicros: 1_000_000,
+      completionBonusMicros: 25_000_000,
+      progressPotentialScaleMicros: 100_000_000,
+      outcomePenaltyMicros: { none: 0, transient: 2_000_000, implementation_defect: 5_000_000, invalid_plan: 12_000_000, invalid_design: 25_000_000 }
+    },
+    features: [],
+    states: [
+      { id: "open", values: {}, verifiedObligationIds: [], invalidatedObligationIds: [] },
+      { id: "done", values: {}, verifiedObligationIds: ["accepted"], invalidatedObligationIds: [], terminal: "success" }
+    ],
+    stateActions: [
+      { stateId: "open", actionId: "alpha", successors: [{ outcomeId: "alpha-pass", nextStateId: "done", probabilityPpm: 1_000_000, provenance: "default_prior" }] },
+      { stateId: "open", actionId: "beta", successors: [{ outcomeId: "beta-pass", nextStateId: "done", probabilityPpm: 1_000_000, provenance: "default_prior" }] }
+    ],
+    solver: { algorithm: "discounted_value_iteration_v3", maxIterations: 1_000, convergenceToleranceMicros: 1 }
   }
 });
-const repair = (id: string, instruction: string) => ({
-  id, description: "Repair", task: "Repair",
-  executionProfileId: "sol", primaryInstructionId: `project:${instruction}`, skillIds: [],
-  maxRepairDepth: 3, maxRepairAttempts: 3
+
+const baseGraphNode = (id: "alpha" | "beta") => ({
+  id,
+  description: id,
+  capabilities: { accepts: [], provides: [] },
+  outcomes: [{ outcomeId: `${id}-pass`, result: "PASS" }],
+  stateContract: { description: "Test state" },
+  actionNodes: [{
+    id: `${id}-job`,
+    description: `${id} job`,
+    capabilities: { accepts: [], provides: [] },
+    outcomes: [{ outcomeId: `${id}-pass`, result: "PASS" }],
+    maxRetries: 0,
+    workNode: { id: `${id}-work`, type: "human", description: "Work", task: "Work", nodeStyle: "flat", nodeSize: "medium" },
+    validationNode: { id: `${id}-validation`, type: "human", description: "Validate", task: "Validate", nodeStyle: "flat", nodeSize: "medium" }
+  }]
 });
-const terminal = (result: "PASS" | "FAIL") => ({
-  target: { terminal: result }, description: result
-});
+
 const service = (root: string) => new GraphNodeModuleService(() => root, {
   runtimeDatabase: () => ({ activeGraphNodeIds: () => new Set<string>() })
 } as unknown as RuntimeDatabaseProvider);

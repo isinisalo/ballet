@@ -1,5 +1,5 @@
 {
-  "version": 17,
+  "version": 18,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -15,6 +15,22 @@
       "provider": "codex",
       "model": "gpt-5.6-luna",
       "reasoningEffort": "medium",
+      "networkAccess": true
+    },
+    {
+      "id": "codex-gpt-5-6-sol-high-network-off",
+      "name": "Codex GPT-5.6 Sol · High · Network off",
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "high",
+      "networkAccess": false
+    },
+    {
+      "id": "codex-gpt-5-6-sol-high-network-on",
+      "name": "Codex GPT-5.6 Sol · High · Network on",
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "high",
       "networkAccess": true
     },
     {
@@ -73,11 +89,10 @@
           "activeIssueId": null,
           "remainingIssueCount": 0
         },
-        "deployment": {
-          "targetEnvironment": null,
-          "authorization": null,
-          "evidenceRefs": []
-        },
+      "deployment": {
+        "targetEnvironment": null,
+        "evidenceRefs": []
+      },
         "verification": {
           "status": "not_started",
           "result": null,
@@ -87,26 +102,86 @@
       }
     },
     "strategy": {
-      "kind": "ssp_v2",
-      "id": "graph-engineering-policy",
-      "description": "Outcome-aware finite SSP policy for graph-engineering.",
+      "kind": "reward_mdp_v3",
+      "id": "graph-engineering-reward-mdp",
+      "description": "Selects temporally extended Graph Node options from factual acceptance progress.",
       "capabilityModel": {
-        "version": 2,
+        "version": 3,
         "outcomes": [
           {
-            "id": "outcome-1",
-            "description": "Describe this semantic outcome."
+            "id": "build-success",
+            "description": "The implementation is independently verified.",
+            "result": "PASS",
+            "penaltyClass": "none"
+          },
+          {
+            "id": "deploy-success",
+            "description": "The authorized deployment is independently verified.",
+            "result": "PASS",
+            "penaltyClass": "none"
+          },
+          {
+            "id": "design-incomplete",
+            "description": "The design remains invalid or incomplete.",
+            "result": "FAIL",
+            "penaltyClass": "invalid_design"
+          },
+          {
+            "id": "design-valid",
+            "description": "The design is valid and accepted.",
+            "result": "PASS",
+            "penaltyClass": "none"
+          },
+          {
+            "id": "implementation-defect",
+            "description": "Verification exposed an implementation defect.",
+            "result": "FAIL",
+            "penaltyClass": "implementation_defect"
+          },
+          {
+            "id": "invalid-design",
+            "description": "Verification exposed an invalid design.",
+            "result": "FAIL",
+            "penaltyClass": "invalid_design"
+          },
+          {
+            "id": "invalid-plan",
+            "description": "Verification exposed an invalid plan.",
+            "result": "FAIL",
+            "penaltyClass": "invalid_plan"
+          },
+          {
+            "id": "more-work",
+            "description": "Verification found remaining release work.",
+            "result": "FAIL",
+            "penaltyClass": "none"
+          },
+          {
+            "id": "plan-incomplete",
+            "description": "The plan requires further planning work.",
+            "result": "FAIL",
+            "penaltyClass": "invalid_plan"
+          },
+          {
+            "id": "plan-valid",
+            "description": "The release plan is executable and accepted.",
+            "result": "PASS",
+            "penaltyClass": "none"
+          },
+          {
+            "id": "release-complete",
+            "description": "All acceptance obligations are verified.",
+            "result": "PASS",
+            "penaltyClass": "none"
+          },
+          {
+            "id": "transient-deployment-error",
+            "description": "A transient deployment error occurred.",
+            "result": "FAIL",
+            "penaltyClass": "transient"
           }
         ],
         "actions": [
-          {
-            "actionId": "build",
-            "guards": []
-          },
-          {
-            "actionId": "deploy",
-            "guards": []
-          },
           {
             "actionId": "design",
             "guards": []
@@ -116,37 +191,3334 @@
             "guards": []
           },
           {
+            "actionId": "build",
+            "guards": []
+          },
+          {
+            "actionId": "deploy",
+            "guards": []
+          },
+          {
             "actionId": "verify",
             "guards": []
           }
         ]
       },
       "model": {
-        "version": 2,
-        "features": [],
-        "states": [],
-        "stateActions": [],
-        "solver": {
-          "algorithm": "ssp_value_iteration_v2",
-          "epsilon": 0.000001,
-          "maxIterations": 1000,
-          "maxSolveMillis": 250
+        "version": 3,
+        "discountPpm": 990000,
+        "acceptance": {
+          "version": 1,
+          "obligations": [
+            {
+              "obligationId": "design-accepted",
+              "description": "The desired state and architecture are accepted.",
+              "weight": 1
+            },
+            {
+              "obligationId": "plan-accepted",
+              "description": "The selected release plan is executable and accepted.",
+              "weight": 1
+            },
+            {
+              "obligationId": "build-verified",
+              "description": "The release implementation is independently verified.",
+              "weight": 1
+            },
+            {
+              "obligationId": "deploy-verified",
+              "description": "The authorized deployment result is independently verified.",
+              "weight": 1
+            },
+            {
+              "obligationId": "release-verified",
+              "description": "The release satisfies the accepted desired state.",
+              "weight": 1
+            }
+          ]
         },
-        "projection": {
-          "maxDecisionEpochs": 8,
-          "maxProjectionNodes": 64
+        "reward": {
+          "actionCostMicros": 1000000,
+          "completionBonusMicros": 25000000,
+          "progressPotentialScaleMicros": 100000000,
+          "outcomePenaltyMicros": {
+            "none": 0,
+            "transient": 2000000,
+            "implementation_defect": 5000000,
+            "invalid_plan": 12000000,
+            "invalid_design": 25000000
+          }
+        },
+        "features": [],
+        "states": [
+          {
+            "id": "done",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [],
+            "terminal": "success"
+          },
+          {
+            "id": "ledger-iiiii",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiiip",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiiiv",
+            "values": {},
+            "verifiedObligationIds": [
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiipp",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiivi",
+            "values": {},
+            "verifiedObligationIds": [
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiivp",
+            "values": {},
+            "verifiedObligationIds": [
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiivv",
+            "values": {},
+            "verifiedObligationIds": [
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-iippp",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-iivii",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-iivip",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-iiviv",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-iivpp",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-iivvi",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-iivvp",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-iivvv",
+            "values": {},
+            "verifiedObligationIds": [
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-ipppp",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": [
+              "design-accepted"
+            ]
+          },
+          {
+            "id": "ledger-iviii",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-iviip",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-iviiv",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivipp",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivivi",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivivp",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivivv",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivppp",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted"
+            ]
+          },
+          {
+            "id": "ledger-ivvii",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivvip",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivviv",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivvpp",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted"
+            ]
+          },
+          {
+            "id": "ledger-ivvvi",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-ivvvp",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted"
+            ]
+          },
+          {
+            "id": "ledger-ivvvv",
+            "values": {},
+            "verifiedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "design-accepted"
+            ]
+          },
+          {
+            "id": "ledger-ppppp",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": []
+          },
+          {
+            "id": "ledger-viiii",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-viiip",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-viiiv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-viipp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-viivi",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-viivp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-viivv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-vippp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-vivii",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-vivip",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-viviv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-vivpp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-vivvi",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-vivvp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-vivvv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "plan-accepted"
+            ]
+          },
+          {
+            "id": "ledger-vpppp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted"
+            ],
+            "invalidatedObligationIds": []
+          },
+          {
+            "id": "ledger-vviii",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified",
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-vviip",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-vviiv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified",
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvipp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvivi",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvivp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvivv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "deploy-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "build-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvppp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted"
+            ],
+            "invalidatedObligationIds": []
+          },
+          {
+            "id": "ledger-vvvii",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "deploy-verified",
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvvip",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": [
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvviv",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "release-verified"
+            ],
+            "invalidatedObligationIds": [
+              "deploy-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvvpp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified"
+            ],
+            "invalidatedObligationIds": []
+          },
+          {
+            "id": "ledger-vvvvi",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": [
+              "release-verified"
+            ]
+          },
+          {
+            "id": "ledger-vvvvp",
+            "values": {},
+            "verifiedObligationIds": [
+              "design-accepted",
+              "plan-accepted",
+              "build-verified",
+              "deploy-verified"
+            ],
+            "invalidatedObligationIds": []
+          }
+        ],
+        "stateActions": [
+          {
+            "stateId": "ledger-iiiii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiiii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viiii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiiip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiiip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viiip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiiiv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiiiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viiiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiipp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiivi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiivp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiivv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iippp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iippp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vippp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iivii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iivip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iiviv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iivpp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iivvi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iivvp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iivvv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivvv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivvv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ipppp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ipppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vpppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iviii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iviii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iviip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iviip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-iviiv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iviiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivipp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivivi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivivp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivivv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivppp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivvii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivvip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivviv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivvpp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivvvi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivvvp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ivvvv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvvv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "done",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-ppppp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ipppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vpppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viiii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiiii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viiii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viiii",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiiii",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viiii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viiip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiiip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viiip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viiip",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiiip",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viiip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viiiv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiiiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viiiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viiiv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiiiv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viiiv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viipp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viipp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiipp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viipp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viivi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viivi",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiivi",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viivi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viivp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viivp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiivp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viivp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viivv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viivv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiivv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viivv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvivv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vippp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iippp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vippp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vippp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iippp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vippp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvppp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivii",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iivii",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivip",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iivip",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viviv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iiviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-viviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-viviv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iiviv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viviv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivpp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivpp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iivpp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivpp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivvi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivvi",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iivvi",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivvp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivvp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iivvp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivvv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iivvv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vivvv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vivvv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iivvv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivvv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "done",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vpppp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ipppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vpppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vpppp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ipppp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vippp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvppp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviii",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iviii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viiii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iviii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviii",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iviii",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viiii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviip",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iviip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viiip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iviip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviip",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iviip",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viiip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviiv",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iviiv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viiiv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviiv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-iviiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vviiv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-iviiv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viiiv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvipp",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivipp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viipp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvipp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvipp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivipp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viipp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivi",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivivi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viivi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivi",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivivi",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viivi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivp",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivivp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viivp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivivp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viivp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivv",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "done",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivivv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viivv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvivv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvivv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivivv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viivv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvivv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvppp",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivppp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vippp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvppp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvppp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvppp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivppp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vippp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvppp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvii",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvii",
+            "actionId": "deploy",
+            "successors": [
+              {
+                "outcomeId": "deploy-success",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvii",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvii",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvii",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvii",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvip",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvip",
+            "actionId": "deploy",
+            "successors": [
+              {
+                "outcomeId": "deploy-success",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvip",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvip",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvip",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvip",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvviv",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivviv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viviv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvviv",
+            "actionId": "deploy",
+            "successors": [
+              {
+                "outcomeId": "deploy-success",
+                "nextStateId": "done",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vviiv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-viviv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvviv",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvviv",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivviv",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-viviv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvviv",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvpp",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvpp",
+            "actionId": "deploy",
+            "successors": [
+              {
+                "outcomeId": "deploy-success",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvipp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvpp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvpp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvpp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivpp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvpp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvi",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvi",
+            "actionId": "deploy",
+            "successors": [
+              {
+                "outcomeId": "deploy-success",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvi",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvi",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvvi",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvi",
+            "actionId": "verify",
+            "successors": [
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivi",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvvi",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivvi",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "more-work",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "release-complete",
+                "nextStateId": "done",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvp",
+            "actionId": "build",
+            "successors": [
+              {
+                "outcomeId": "build-success",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvp",
+            "actionId": "deploy",
+            "successors": [
+              {
+                "outcomeId": "deploy-success",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 250000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvp",
+            "actionId": "design",
+            "successors": [
+              {
+                "outcomeId": "design-incomplete",
+                "nextStateId": "ledger-ivvvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "design-valid",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvp",
+            "actionId": "plan",
+            "successors": [
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvvp",
+                "probabilityPpm": 333334,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "plan-valid",
+                "nextStateId": "ledger-vvvvp",
+                "probabilityPpm": 333333,
+                "provenance": "default_prior"
+              }
+            ]
+          },
+          {
+            "stateId": "ledger-vvvvp",
+            "actionId": "verify",
+            "successors": [
+              {
+                "outcomeId": "implementation-defect",
+                "nextStateId": "ledger-vvivp",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "nextStateId": "ledger-ivvvp",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "nextStateId": "ledger-vivvp",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "more-work",
+                "nextStateId": "ledger-vvvvi",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "release-complete",
+                "nextStateId": "done",
+                "probabilityPpm": 200000,
+                "provenance": "default_prior"
+              }
+            ]
+          }
+        ],
+        "solver": {
+          "algorithm": "discounted_value_iteration_v3",
+          "maxIterations": 10000,
+          "convergenceToleranceMicros": 1
         }
       }
-    },
-    "repairNode": {
-      "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-      "primaryInstructionId": "project:repair-node",
-      "skillIds": [],
-      "id": "graph-repair",
-      "description": "Repairs difficult Graph state or worktree failures before human escalation.",
-      "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-      "maxRepairDepth": 3,
-      "maxRepairAttempts": 3
     },
     "graphNodes": [
       {
@@ -160,96 +3532,20 @@
             "graph:desired-state.defined"
           ]
         },
-        "outcomes": [],
+        "outcomes": [
+          {
+            "outcomeId": "design-valid",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "design-incomplete",
+            "result": "FAIL"
+          }
+        ],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "strategy": {
-          "kind": "ssp_v2",
-          "id": "design-policy",
-          "description": "Outcome-aware finite SSP policy for design.",
-          "capabilityModel": {
-            "version": 2,
-            "outcomes": [],
-            "actions": [
-              {
-                "actionId": "design-01-introduction-and-goals",
-                "guards": []
-              },
-              {
-                "actionId": "design-02-constraints",
-                "guards": []
-              },
-              {
-                "actionId": "design-03-context-and-scope",
-                "guards": []
-              },
-              {
-                "actionId": "design-04-solution-strategy",
-                "guards": []
-              },
-              {
-                "actionId": "design-05-building-block-view",
-                "guards": []
-              },
-              {
-                "actionId": "design-06-runtime-view",
-                "guards": []
-              },
-              {
-                "actionId": "design-07-deployment-view",
-                "guards": []
-              },
-              {
-                "actionId": "design-08-crosscutting-concepts",
-                "guards": []
-              },
-              {
-                "actionId": "design-09-architecture-decisions",
-                "guards": []
-              },
-              {
-                "actionId": "design-10-quality-requirements",
-                "guards": []
-              },
-              {
-                "actionId": "design-11-risks-and-technical-debt",
-                "guards": []
-              },
-              {
-                "actionId": "design-12-glossary",
-                "guards": []
-              }
-            ]
-          },
-          "model": {
-            "version": 2,
-            "features": [],
-            "states": [],
-            "stateActions": [],
-            "solver": {
-              "algorithm": "ssp_value_iteration_v2",
-              "epsilon": 0.000001,
-              "maxIterations": 1000,
-              "maxSolveMillis": 250
-            },
-            "projection": {
-              "maxDecisionEpochs": 8,
-              "maxProjectionNodes": 64
-            }
-          }
-        },
-        "repairNode": {
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "id": "design-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
+        "actionNodes": [
           {
             "id": "design-01-introduction-and-goals",
             "description": "Maintain arc42 01 Introduction and Goals.",
@@ -257,7 +3553,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -265,7 +3570,7 @@
               "id": "design-01-introduction-and-goals-work",
               "description": "Maintain arc42 01 Introduction and Goals.",
               "task": "Update only `.ballet/arc42/01-introduction-and-goals.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-requirements-agent",
               "skillIds": [
                 "project:arc42/document-maintenance",
@@ -278,8 +3583,8 @@
               "nodeSize": "small",
               "id": "design-01-introduction-and-goals-validation",
               "description": "Validate arc42 01 Introduction and Goals.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -294,7 +3599,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -302,7 +3616,7 @@
               "id": "design-02-constraints-work",
               "description": "Maintain arc42 02 Constraints.",
               "task": "Update only `.ballet/arc42/02-constraints.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-requirements-agent",
               "skillIds": [
                 "project:arc42/document-maintenance"
@@ -314,8 +3628,8 @@
               "nodeSize": "small",
               "id": "design-02-constraints-validation",
               "description": "Validate arc42 02 Constraints.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -330,7 +3644,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -338,7 +3661,7 @@
               "id": "design-03-context-and-scope-work",
               "description": "Maintain arc42 03 Context and Scope.",
               "task": "Update only `.ballet/arc42/03-context-and-scope.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-requirements-agent",
               "skillIds": [
                 "project:arc42/architecture-views",
@@ -351,8 +3674,8 @@
               "nodeSize": "small",
               "id": "design-03-context-and-scope-validation",
               "description": "Validate arc42 03 Context and Scope.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -367,7 +3690,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -375,7 +3707,7 @@
               "id": "design-04-solution-strategy-work",
               "description": "Maintain arc42 04 Solution Strategy.",
               "task": "Update only `.ballet/arc42/04-solution-strategy.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-solution-strategy-agent",
               "skillIds": [
                 "project:arc42/architecture-views",
@@ -388,8 +3720,8 @@
               "nodeSize": "small",
               "id": "design-04-solution-strategy-validation",
               "description": "Validate arc42 04 Solution Strategy.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -404,7 +3736,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -412,7 +3753,7 @@
               "id": "design-05-building-block-view-work",
               "description": "Maintain arc42 05 Building Block View.",
               "task": "Update only `.ballet/arc42/05-building-block-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-building-block-agent",
               "skillIds": [
                 "project:arc42/architecture-views",
@@ -425,8 +3766,8 @@
               "nodeSize": "small",
               "id": "design-05-building-block-view-validation",
               "description": "Validate arc42 05 Building Block View.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -441,7 +3782,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -449,7 +3799,7 @@
               "id": "design-06-runtime-view-work",
               "description": "Maintain arc42 06 Runtime View.",
               "task": "Update only `.ballet/arc42/06-runtime-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-runtime-deployment-agent",
               "skillIds": [
                 "project:arc42/architecture-views",
@@ -462,8 +3812,8 @@
               "nodeSize": "small",
               "id": "design-06-runtime-view-validation",
               "description": "Validate arc42 06 Runtime View.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -478,7 +3828,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -486,7 +3845,7 @@
               "id": "design-07-deployment-view-work",
               "description": "Maintain arc42 07 Deployment View.",
               "task": "Update only `.ballet/arc42/07-deployment-view.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-runtime-deployment-agent",
               "skillIds": [
                 "project:arc42/architecture-views",
@@ -499,8 +3858,8 @@
               "nodeSize": "small",
               "id": "design-07-deployment-view-validation",
               "description": "Validate arc42 07 Deployment View.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -515,7 +3874,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -523,7 +3891,7 @@
               "id": "design-08-crosscutting-concepts-work",
               "description": "Maintain arc42 08 Crosscutting Concepts.",
               "task": "Update only `.ballet/arc42/08-crosscutting-concepts.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-crosscutting-concepts-agent",
               "skillIds": [
                 "project:arc42/decision-records",
@@ -536,8 +3904,8 @@
               "nodeSize": "small",
               "id": "design-08-crosscutting-concepts-validation",
               "description": "Validate arc42 08 Crosscutting Concepts.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -552,7 +3920,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -560,7 +3937,7 @@
               "id": "design-09-architecture-decisions-work",
               "description": "Maintain arc42 09 Architecture Decisions.",
               "task": "Update only `.ballet/arc42/09-architecture-decisions.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-decision-agent",
               "skillIds": [
                 "project:arc42/decision-records",
@@ -573,8 +3950,8 @@
               "nodeSize": "small",
               "id": "design-09-architecture-decisions-validation",
               "description": "Validate arc42 09 Architecture Decisions.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -589,7 +3966,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -597,7 +3983,7 @@
               "id": "design-10-quality-requirements-work",
               "description": "Maintain arc42 10 Quality Requirements.",
               "task": "Update only `.ballet/arc42/10-quality-requirements.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-requirements-agent",
               "skillIds": [
                 "project:arc42/quality-scenarios",
@@ -610,8 +3996,8 @@
               "nodeSize": "small",
               "id": "design-10-quality-requirements-validation",
               "description": "Validate arc42 10 Quality Requirements.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -626,7 +4012,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -634,7 +4029,7 @@
               "id": "design-11-risks-and-technical-debt-work",
               "description": "Maintain arc42 11 Risks and Technical Debt.",
               "task": "Update only `.ballet/arc42/11-risks-and-technical-debt.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-evaluation-agent",
               "skillIds": [
                 "project:arc42/document-maintenance",
@@ -647,8 +4042,8 @@
               "nodeSize": "small",
               "id": "design-11-risks-and-technical-debt-validation",
               "description": "Validate arc42 11 Risks and Technical Debt.",
-              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. This is an intermediate Validation: do not return transitionOutcome or edit artifacts. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -663,7 +4058,16 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "design-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "design-incomplete",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "sol",
@@ -671,7 +4075,7 @@
               "id": "design-12-glossary-work",
               "description": "Maintain arc42 12 Glossary.",
               "task": "Update only `.ballet/arc42/12-glossary.md` from accepted Goals, ADRs, repository evidence and explicit human decisions. Return needs_input instead of inventing WHAT/WHY, a significant ADR, or a quality priority/measure.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:arc42-documentation-agent",
               "skillIds": [
                 "project:arc42/document-maintenance",
@@ -684,8 +4088,8 @@
               "nodeSize": "small",
               "id": "design-12-glossary-validation",
               "description": "Validate arc42 12 Glossary.",
-              "task": "Validate only this canonical section. On PASS select success; on exhausted terminal FAIL select failure. Do not edit artifacts.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate only this canonical section. On PASS select success; on exhausted terminal FAIL select failure. Do not edit artifacts. Return only a configured semantic outcome. On conclusive PASS, verify design-accepted; on conclusive FAIL, apply the obligation invalidation implied by the outcome; every acceptance change requires evidence. Retry is bounded by maxRetries and otherwise escalates the typed outcome to the Graph Reward-MDP.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -707,101 +4111,24 @@
             "graph:release.planned"
           ]
         },
-        "outcomes": [],
+        "outcomes": [
+          {
+            "outcomeId": "plan-valid",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "plan-incomplete",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "invalid-design",
+            "result": "FAIL"
+          }
+        ],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "strategy": {
-          "kind": "agent_v1",
-          "orchestrator": {
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:graph-node-orchestrator",
-            "skillIds": [],
-            "id": "plan-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-            "maxTransitions": 256,
-            "maxRouteAttempts": 3,
-            "routing": {
-              "start": {
-                "id": "plan-start",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "plan-select-release"
-                    },
-                    "description": "Allowed initial Job Node for plan."
-                  }
-                ]
-              },
-              "continuation": [
-                {
-                  "id": "plan-select-release-pass-route",
-                  "sourceId": "plan-select-release",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "jobNodeId": "plan-materialize-work"
-                      },
-                      "description": "Allowed PASS continuation after plan-select-release."
-                    }
-                  ]
-                },
-                {
-                  "id": "plan-select-release-fail-route",
-                  "sourceId": "plan-select-release",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after plan-select-release."
-                    }
-                  ]
-                },
-                {
-                  "id": "plan-materialize-work-pass-route",
-                  "sourceId": "plan-materialize-work",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "PASS"
-                      },
-                      "description": "Allowed PASS continuation after plan-materialize-work."
-                    }
-                  ]
-                },
-                {
-                  "id": "plan-materialize-work-fail-route",
-                  "sourceId": "plan-materialize-work",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after plan-materialize-work."
-                    }
-                  ]
-                }
-              ],
-              "repair": []
-            }
-          }
-        },
-        "repairNode": {
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "id": "plan-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
+        "actionNodes": [
           {
             "id": "plan-select-release",
             "description": "Select the first eligible planned release.",
@@ -809,7 +4136,20 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "plan-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "terra",
@@ -817,7 +4157,7 @@
               "id": "plan-select-release-work",
               "description": "Select the first eligible planned release.",
               "task": "Read the ordered Story/Release Map, select its first eligible planned release, validate design, acceptance and environment references, and patch only bounded State references. Return needs_input for ambiguous priority.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-plan-agent",
               "skillIds": [
                 "project:arc42/traceability"
@@ -829,8 +4169,8 @@
               "nodeSize": "small",
               "id": "plan-select-release-validation",
               "description": "Validate selected release.",
-              "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate the first eligible release and its references. Intermediate Validation: no transitionOutcome. Return only a configured semantic outcome. Do not change the acceptance ledger in this intermediate Validation step.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -845,7 +4185,20 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "plan-valid",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "plan-incomplete",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "terra",
@@ -853,7 +4206,7 @@
               "id": "plan-materialize-work-work",
               "description": "Materialize the selected release work idempotently.",
               "task": "Use only ballet tracker. Upsert one ballet-release:<stable-id> epic and its implementation issues with stable external refs, acceptance references, parent and dependencies. Do not duplicate tasks in the Story/Release Map.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-plan-agent",
               "skillIds": [
                 "project:arc42/traceability"
@@ -865,8 +4218,8 @@
               "nodeSize": "small",
               "id": "plan-materialize-work-validation",
               "description": "Validate materialized release work.",
-              "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Validate stable refs, parent links, acceptance, dependencies, no cycles or duplicates. PASS success; terminal FAIL failure. Return only a configured semantic outcome. On conclusive PASS, verify plan-accepted; on conclusive FAIL, apply the obligation invalidation implied by the outcome; every acceptance change requires evidence. Retry is bounded by maxRetries and otherwise escalates the typed outcome to the Graph Reward-MDP.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -889,75 +4242,28 @@
             "graph:release.work-remaining"
           ]
         },
-        "outcomes": [],
+        "outcomes": [
+          {
+            "outcomeId": "build-success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "implementation-defect",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "invalid-plan",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "invalid-design",
+            "result": "FAIL"
+          }
+        ],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "strategy": {
-          "kind": "agent_v1",
-          "orchestrator": {
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:graph-node-orchestrator",
-            "skillIds": [],
-            "id": "build-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-            "maxTransitions": 256,
-            "maxRouteAttempts": 3,
-            "routing": {
-              "start": {
-                "id": "build-start",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "build-one-ready-issue"
-                    },
-                    "description": "Allowed initial Job Node for build."
-                  }
-                ]
-              },
-              "continuation": [
-                {
-                  "id": "build-one-ready-issue-pass-route",
-                  "sourceId": "build-one-ready-issue",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "PASS"
-                      },
-                      "description": "Allowed PASS continuation after build-one-ready-issue."
-                    }
-                  ]
-                },
-                {
-                  "id": "build-one-ready-issue-fail-route",
-                  "sourceId": "build-one-ready-issue",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after build-one-ready-issue."
-                    }
-                  ]
-                }
-              ],
-              "repair": []
-            }
-          }
-        },
-        "repairNode": {
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "id": "build-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
+        "actionNodes": [
           {
             "id": "build-one-ready-issue",
             "description": "Implement exactly one ready issue.",
@@ -965,7 +4271,24 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "build-success",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "terra",
@@ -973,7 +4296,7 @@
               "id": "build-one-ready-issue-work",
               "description": "Implement exactly one ready issue.",
               "task": "Call ballet tracker claim exactly once for the selected release. Prefer its in_progress issue, then ready issues by priority, created and ID. Implement only it, run checks and note evidence; never claim another issue.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-build-agent",
               "skillIds": [
                 "project:arc42/traceability"
@@ -985,8 +4308,8 @@
               "nodeSize": "small",
               "id": "build-one-ready-issue-validation",
               "description": "Validate one issue implementation.",
-              "task": "Close only accepted work. PASS more_work while child issues remain, otherwise success. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "Close only accepted work. PASS more_work while child issues remain, otherwise success. Terminal FAIL implementation_defect, invalid_plan, or invalid_design. Return only a configured semantic outcome. On conclusive PASS, verify build-verified; on conclusive FAIL, apply the obligation invalidation implied by the outcome; every acceptance change requires evidence. Retry is bounded by maxRetries and otherwise escalates the typed outcome to the Graph Reward-MDP.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -1007,75 +4330,28 @@
             "graph:release.deployed"
           ]
         },
-        "outcomes": [],
+        "outcomes": [
+          {
+            "outcomeId": "deploy-success",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "transient-deployment-error",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "implementation-defect",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "invalid-plan",
+            "result": "FAIL"
+          }
+        ],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "strategy": {
-          "kind": "agent_v1",
-          "orchestrator": {
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:graph-node-orchestrator",
-            "skillIds": [],
-            "id": "deploy-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-            "maxTransitions": 256,
-            "maxRouteAttempts": 3,
-            "routing": {
-              "start": {
-                "id": "deploy-start",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "deploy-release"
-                    },
-                    "description": "Allowed initial Job Node for deploy."
-                  }
-                ]
-              },
-              "continuation": [
-                {
-                  "id": "deploy-release-pass-route",
-                  "sourceId": "deploy-release",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "PASS"
-                      },
-                      "description": "Allowed PASS continuation after deploy-release."
-                    }
-                  ]
-                },
-                {
-                  "id": "deploy-release-fail-route",
-                  "sourceId": "deploy-release",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after deploy-release."
-                    }
-                  ]
-                }
-              ],
-              "repair": []
-            }
-          }
-        },
-        "repairNode": {
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "id": "deploy-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
+        "actionNodes": [
           {
             "id": "deploy-release",
             "description": "Deploy one explicitly authorized release.",
@@ -1083,7 +4359,24 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "deploy-success",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "transient-deployment-error",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "terra",
@@ -1091,7 +4384,7 @@
               "id": "deploy-release-work",
               "description": "Deploy one explicitly authorized release.",
               "task": "Prepare exact environment, version, actions and rollback plan; return needs_input before any external write. Continue only with explicit authorization for those exact actions and record evidence refs.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-deploy-agent",
               "skillIds": [
                 "project:arc42/architecture-views"
@@ -1103,8 +4396,8 @@
               "nodeSize": "small",
               "id": "deploy-release-validation",
               "description": "Validate authorization and deployment evidence.",
-              "task": "PASS success. Terminal FAIL transient_deployment_error, implementation_defect, or invalid_plan. Do not deploy.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "PASS success. Terminal FAIL transient_deployment_error, implementation_defect, or invalid_plan. Do not deploy. Return only a configured semantic outcome. On conclusive PASS, verify deploy-verified; on conclusive FAIL, apply the obligation invalidation implied by the outcome; every acceptance change requires evidence. Retry is bounded by maxRetries and otherwise escalates the typed outcome to the Graph Reward-MDP.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"
@@ -1126,75 +4419,32 @@
             "graph:release.verified"
           ]
         },
-        "outcomes": [],
+        "outcomes": [
+          {
+            "outcomeId": "release-complete",
+            "result": "PASS"
+          },
+          {
+            "outcomeId": "more-work",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "implementation-defect",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "invalid-plan",
+            "result": "FAIL"
+          },
+          {
+            "outcomeId": "invalid-design",
+            "result": "FAIL"
+          }
+        ],
         "stateContract": {
           "description": "Bounded GraphEngineeringStateV1 references shared by every Graph Node in one Graph Run."
         },
-        "strategy": {
-          "kind": "agent_v1",
-          "orchestrator": {
-            "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-            "primaryInstructionId": "project:graph-node-orchestrator",
-            "skillIds": [],
-            "id": "verify-orchestrator",
-            "description": "Chooses exactly one allowed child target or terminal from the immutable candidate snapshot.",
-            "maxTransitions": 256,
-            "maxRouteAttempts": 3,
-            "routing": {
-              "start": {
-                "id": "verify-start",
-                "candidates": [
-                  {
-                    "target": {
-                      "jobNodeId": "verify-release"
-                    },
-                    "description": "Allowed initial Job Node for verify."
-                  }
-                ]
-              },
-              "continuation": [
-                {
-                  "id": "verify-release-pass-route",
-                  "sourceId": "verify-release",
-                  "result": "PASS",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "PASS"
-                      },
-                      "description": "Allowed PASS continuation after verify-release."
-                    }
-                  ]
-                },
-                {
-                  "id": "verify-release-fail-route",
-                  "sourceId": "verify-release",
-                  "result": "FAIL",
-                  "candidates": [
-                    {
-                      "target": {
-                        "terminal": "FAIL"
-                      },
-                      "description": "Allowed FAIL terminal after verify-release."
-                    }
-                  ]
-                }
-              ],
-              "repair": []
-            }
-          }
-        },
-        "repairNode": {
-          "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
-          "primaryInstructionId": "project:repair-node",
-          "skillIds": [],
-          "id": "verify-repair",
-          "description": "Repairs difficult Graph Node state or worktree failures before human escalation.",
-          "task": "Use only the immutable snapshot, allowed repair candidates and current run worktree. Repair bounded State or artifacts, return to the same Validation, dispatch an allowed repair target, or escalate. Never expand permissions or candidate targets.",
-          "maxRepairDepth": 3,
-          "maxRepairAttempts": 3
-        },
-        "jobNodes": [
+        "actionNodes": [
           {
             "id": "verify-release",
             "description": "Verify the deployed release.",
@@ -1202,7 +4452,28 @@
               "accepts": [],
               "provides": []
             },
-            "outcomes": [],
+            "outcomes": [
+              {
+                "outcomeId": "release-complete",
+                "result": "PASS"
+              },
+              {
+                "outcomeId": "more-work",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "implementation-defect",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-plan",
+                "result": "FAIL"
+              },
+              {
+                "outcomeId": "invalid-design",
+                "result": "FAIL"
+              }
+            ],
             "maxRetries": 2,
             "workNode": {
               "nodeStyle": "terra",
@@ -1210,7 +4481,7 @@
               "id": "verify-release-work",
               "description": "Verify the deployed release.",
               "task": "Check all 12 arc42 sections, release acceptance, deployment and ticket evidence. Create or reopen a bug before classifying an implementation defect; close the release only after acceptance.",
-              "executionProfileId": "codex-gpt-5-6-sol-medium-network-off",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-verify-agent",
               "skillIds": [
                 "project:arc42/conformance-review",
@@ -1224,8 +4495,8 @@
               "nodeSize": "small",
               "id": "verify-release-validation",
               "description": "Validate release verification.",
-              "task": "PASS more_work when releases remain; complete only with no release, acceptance or design gap. Terminal FAIL implementation_defect, invalid_plan, or invalid_design.",
-              "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
+              "task": "PASS more_work when releases remain; complete only with no release, acceptance or design gap. Terminal FAIL implementation_defect, invalid_plan, or invalid_design. Return only a configured semantic outcome. On conclusive PASS, verify release-verified; on conclusive FAIL, apply the obligation invalidation implied by the outcome; every acceptance change requires evidence. Retry is bounded by maxRetries and otherwise escalates the typed outcome to the Graph Reward-MDP.",
+              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
               "primaryInstructionId": "project:graph-engineering-reviewer",
               "skillIds": [
                 "project:arc42/conformance-review"

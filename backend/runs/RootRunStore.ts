@@ -133,9 +133,9 @@ export class RootRunStore {
 }
 
 const assertSnapshot = (value: RootExecutionSnapshot): RootExecutionSnapshot => {
-  if (value.version !== 10 || value.policyObservationContractVersion !== 3 || !["graph","graph_node"].includes(value.rootKind)
-    || !value.graph || !Array.isArray(value.graph.graphNodes)) {
-    throw new Error("Root execution snapshot v10 is invalid.");
+  if (value.version !== 11 || value.policyObservationContractVersion !== 4 || !["graph","graph_node"].includes(value.rootKind)
+    || !value.graph || !Array.isArray(value.graph.graphNodes) || value.compiledPolicy.version !== 3) {
+    throw new Error("Root execution snapshot v11 is invalid.");
   }
   return structuredClone(value);
 };

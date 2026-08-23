@@ -1,37 +1,45 @@
-// Module lifecycle stays in one service because inspect/plan/install/export/remove share one package provenance and rollback boundary.
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { graphNodeModulePackageV5Schema } from "../../shared/api/graph-node-module-schemas.js";
+import { graphNodeModulePackageV6Schema } from "../../shared/api/graph-node-module-schemas.js";
 import type {
-  ProjectExecutionComposition,
-  ProjectGraphNode,
-  ProjectGraphNodeRouteTarget,
-  ProjectJobNode,
-  ProjectValidationNode,
-  ProjectWorkNode
-} from "../../shared/domain/automation.js";
-import type {
-  GraphNodeModuleCompositionV5,
   GraphNodeModuleExportResult,
-  GraphNodeModuleGraphNodeV5,
   GraphNodeModuleInspection,
   GraphNodeModuleInstallPlan,
   GraphNodeModuleIssue,
   GraphNodeModuleLibraryEntry,
-  GraphNodeModulePackageV5,
-  GraphNodeModuleResourceV5,
+  GraphNodeModulePackageV6,
   InstalledGraphNodeModuleStatus,
-  InstalledGraphNodeModuleV5,
-  InstalledGraphNodeModulesFileV5
+  InstalledGraphNodeModulesFileV6
 } from "../../shared/domain/graphNodeModules.js";
-import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "../services/RuntimeDatabaseProvider.js";
+import {
+  dematerializeGraphNode,
+  graphNodeCompositions,
+  renderResource
+} from "./GraphNodeModuleMapping.js";
+import {
+  canonicalModuleJson,
+  createModulePlan,
+  installedModuleRecord,
+  installedModulesPath,
+  installModuleGraphNode,
+  invalidModuleInspection,
+  moduleContentHash,
+  moduleExportResources,
+  moduleSha256,
+  moduleSourceIssues,
+  removeModuleGraphNode,
+  walkModuleLibrary
+} from "./GraphNodeModuleOperations.js";
 
 export class GraphNodeModuleError extends Error {
-  constructor(message: string, readonly issues: GraphNodeModuleIssue[]) { super(message); this.name = "GraphNodeModuleError"; }
+  constructor(message: string, readonly issues: GraphNodeModuleIssue[]) {
+    super(message);
+    this.name = "GraphNodeModuleError";
+  }
 }
 
 export class GraphNodeModuleService {
@@ -42,14 +50,16 @@ export class GraphNodeModuleService {
     let value = input;
     if (typeof input === "string") {
       try { value = JSON.parse(input) as unknown; }
-      catch { return invalidInspection(source, input, "INVALID_JSON", "Package is not valid JSON."); }
+      catch { return invalidModuleInspection(source, input, "INVALID_JSON", "Package is not valid JSON."); }
     }
     const raw = JSON.stringify(value);
-    if (Buffer.byteLength(raw, "utf8") > 524_288) return invalidInspection(source, raw, "PACKAGE_TOO_LARGE", "Package exceeds 524288 bytes.");
-    if (isRecord(value) && (value.format !== "ballet-graph-node-module" || value.version !== 5)) {
-      return invalidInspection(source, raw, "SCHEMA_DOWNGRADE", "Only Graph Node Module v5 packages are accepted.");
+    if (Buffer.byteLength(raw, "utf8") > 524_288) return invalidModuleInspection(
+      source, raw, "PACKAGE_TOO_LARGE", "Package exceeds 524288 bytes."
+    );
+    if (isRecord(value) && (value.format !== "ballet-graph-node-module" || value.version !== 6)) {
+      return invalidModuleInspection(source, raw, "SCHEMA_DOWNGRADE", "Only Graph Node Module v6 packages are accepted.");
     }
-    const parsed = graphNodeModulePackageV5Schema.safeParse(value);
+    const parsed = graphNodeModulePackageV6Schema.safeParse(value);
     if (!parsed.success) return {
       valid: false, source, sizeBytes: Buffer.byteLength(raw, "utf8"),
       issues: parsed.error.issues.map((issue) => ({
@@ -57,49 +67,46 @@ export class GraphNodeModuleService {
         path: issue.path.map(String).join("."), message: issue.message
       }))
     };
-    const canonicalJson = canonical(parsed.data);
+    const canonicalJson = canonicalModuleJson(parsed.data);
     return {
-      valid: true,
-      package: parsed.data,
-      canonicalJson,
-      sha256: sha256(canonicalJson),
-      source,
-      sizeBytes: Buffer.byteLength(canonicalJson, "utf8"),
-      issues: []
+      valid: true, package: parsed.data, canonicalJson, sha256: moduleSha256(canonicalJson), source,
+      sizeBytes: Buffer.byteLength(canonicalJson, "utf8"), issues: []
     };
   }
 
   async listLibrary(): Promise<GraphNodeModuleLibraryEntry[]> {
     const directory = path.join(this.root(), ".ballet", "graph-node-library");
-    const files = await walk(directory).catch(() => []);
+    const files = await walkModuleLibrary(directory).catch(() => []);
     return Promise.all(files.filter((file) => file.endsWith(".ballet-graph-node.json")).sort().map(async (filename) => {
       const source = path.relative(this.root(), filename);
-      const body = await readFile(filename, "utf8");
-      const inspection = this.inspect(body, source);
+      const inspection = this.inspect(await readFile(filename, "utf8"), source);
       return {
-        source,
-        sha256: inspection.sha256,
-        sizeBytes: inspection.sizeBytes,
-        valid: inspection.valid,
-        manifest: inspection.package?.manifest,
-        permissions: inspection.package?.permissions,
-        package: inspection.package,
-        issues: inspection.issues
+        source, sha256: inspection.sha256, sizeBytes: inspection.sizeBytes, valid: inspection.valid,
+        manifest: inspection.package?.manifest, permissions: inspection.package?.permissions,
+        package: inspection.package, issues: inspection.issues
       };
     }));
   }
 
-  async plan(input: { package: unknown; source: string; profileMappings?: Record<string, string> }): Promise<GraphNodeModuleInstallPlan> {
+  async plan(input: {
+    package: unknown; source: string; profileMappings?: Record<string, string>;
+  }): Promise<GraphNodeModuleInstallPlan> {
     const inspection = this.inspect(input.package, input.source);
-    if (!inspection.valid || !inspection.package || !inspection.sha256) throw new GraphNodeModuleError("Graph Node Module is invalid.", inspection.issues);
+    if (!inspection.valid || !inspection.package || !inspection.sha256) throw new GraphNodeModuleError(
+      "Graph Node Module is invalid.", inspection.issues
+    );
     const loaded = this.projects.load(this.root());
-    if (!loaded.config) throw new GraphNodeModuleError("Project configuration is invalid.", loaded.issues.map((issue) => ({ code: "INVALID_SCHEMA", path: issue.path, message: issue.message })));
-    return this.createPlan(inspection.package, inspection.sha256, input.source, input.profileMappings ?? {}, loaded.config);
+    if (!loaded.config) throw new GraphNodeModuleError("Project configuration is invalid.", moduleSourceIssues(loaded.issues));
+    return createModulePlan(inspection.package, inspection.sha256, input.source, input.profileMappings ?? {}, loaded.config);
   }
 
-  async commit(input: { package: unknown; source: string; profileMappings?: Record<string, string>; expectedPlanHash: string }): Promise<InstalledGraphNodeModuleStatus> {
+  async commit(input: {
+    package: unknown; source: string; profileMappings?: Record<string, string>; expectedPlanHash: string;
+  }): Promise<InstalledGraphNodeModuleStatus> {
     const plan = await this.plan(input);
-    if (plan.planHash !== input.expectedPlanHash) throw new GraphNodeModuleError("Install plan is stale.", [{ code: "PLAN_STALE", path: "expectedPlanHash", message: "Re-inspect and approve the current install plan." }]);
+    if (plan.planHash !== input.expectedPlanHash) throw new GraphNodeModuleError("Install plan is stale.", [{
+      code: "PLAN_STALE", path: "expectedPlanHash", message: "Re-inspect and approve the current install plan."
+    }]);
     if (!plan.canInstall) throw new GraphNodeModuleError("Graph Node Module cannot be installed.", plan.issues);
     const inspection = this.inspect(input.package, input.source);
     const pkg = inspection.package!;
@@ -114,25 +121,11 @@ export class GraphNodeModuleService {
         await writeFile(filename, renderResource(resource.resourceId, definition), { encoding: "utf8", flag: "wx" });
         written.push(filename);
       }
-      const next = installGraphNode(loaded.config, plan.graphNode);
-      this.projects.putAutomation(this.root(), { version: 17, graph: next.graph });
-      const persistedGraphNode = this.projects.load(this.root()).config?.graph.graphNodes.find(
-        ({ id }) => id === plan.graphNode.id
-      );
-      if (!persistedGraphNode) throw new GraphNodeModuleError("Installed Graph Node was not persisted.", [{
-        code: "GRAPH_NODE_NOT_FOUND", path: "graphNode.id", message: plan.graphNode.id
-      }]);
-      const record: InstalledGraphNodeModuleV5 = {
-        moduleId: pkg.manifest.id, moduleVersion: pkg.manifest.version, title: pkg.manifest.title,
-        source: input.source, packageSha256: inspection.sha256!, graphNodeId: plan.graphNode.id,
-        installedAt: new Date().toISOString(), profileMappings: Object.fromEntries(plan.profileMappings.map((mapping) => [mapping.slot.key, mapping.selectedProfileId!])),
-        idRemapping: plan.idRemapping, stateContract: pkg.stateContract, capabilities: pkg.capabilities,
-        ownedResources: plan.resources.map((resource) => ({
-          kind: resource.kind, resourceId: resource.resourceId, relativePath: resource.relativePath,
-          installedSha256: resource.sha256
-        })),
-        installedContentSha256: contentHash(persistedGraphNode, plan.resources.map(({ relativePath, sha256: digest }) => ({ relativePath, sha256: digest })))
-      };
+      const next = installModuleGraphNode(loaded.config, plan.graphNode);
+      this.projects.putAutomation(this.root(), { version: 18, graph: next.graph });
+      const persisted = this.projects.load(this.root()).config?.graph.graphNodes.find(({ id }) => id === plan.graphNode.id);
+      if (!persisted) throw new GraphNodeModuleError("Installed Graph Node was not persisted.", []);
+      const record = installedModuleRecord(pkg, inspection.sha256!, input.source, plan, persisted);
       const installed = await this.readInstalled();
       installed.installed.push(record);
       await this.writeInstalled(installed);
@@ -147,265 +140,108 @@ export class GraphNodeModuleService {
     const records = await this.readInstalled();
     const loaded = this.projects.load(this.root()).config;
     return Promise.all(records.installed.map(async (record) => {
-      const graphNode = loaded?.graph.graphNodes.find((candidate) => candidate.id === record.graphNodeId);
+      const graphNode = loaded?.graph.graphNodes.find(({ id }) => id === record.graphNodeId);
       const missingResources: string[] = [];
-      const resourceHashes: Array<{ relativePath: string; sha256: string }> = [];
+      const hashes: Array<{ relativePath: string; sha256: string }> = [];
       for (const resource of record.ownedResources) {
         const source = await readFile(path.join(this.root(), resource.relativePath), "utf8").catch(() => undefined);
         if (source === undefined) missingResources.push(resource.resourceId);
-        else resourceHashes.push({ relativePath: resource.relativePath, sha256: sha256(source) });
+        else hashes.push({ relativePath: resource.relativePath, sha256: moduleSha256(source) });
       }
-      const currentContentSha256 = graphNode ? contentHash(graphNode, resourceHashes) : undefined;
+      const currentContentSha256 = graphNode ? moduleContentHash(graphNode, hashes) : undefined;
       return {
         ...record,
-        status: !graphNode || missingResources.length ? "missing-resources" : currentContentSha256 === record.installedContentSha256 ? "exact" : "modified",
-        currentContentSha256,
-        missingResources
+        status: !graphNode || missingResources.length ? "missing-resources"
+          : currentContentSha256 === record.installedContentSha256 ? "exact" : "modified",
+        currentContentSha256, missingResources
       };
     }));
   }
 
   async remove(graphNodeId: string): Promise<void> {
-    if (this.runtimeDatabaseProvider.runtimeDatabase().activeGraphNodeIds().has(graphNodeId)) throw new GraphNodeModuleError("Graph Node has an active Run.", [{ code: "ACTIVE_RUN", path: "graphNodeId", message: graphNodeId }]);
+    if (this.runtimeDatabaseProvider.runtimeDatabase().activeGraphNodeIds().has(graphNodeId)) throw new GraphNodeModuleError(
+      "Graph Node has an active Run.", [{ code: "ACTIVE_RUN", path: "graphNodeId", message: graphNodeId }]
+    );
     const installed = await this.readInstalled();
     const record = installed.installed.find((candidate) => candidate.graphNodeId === graphNodeId);
-    if (!record) throw new GraphNodeModuleError("Module is not installed.", [{ code: "MODULE_NOT_INSTALLED", path: "graphNodeId", message: graphNodeId }]);
+    if (!record) throw new GraphNodeModuleError("Module is not installed.", [{
+      code: "MODULE_NOT_INSTALLED", path: "graphNodeId", message: graphNodeId
+    }]);
     const loaded = this.projects.load(this.root());
     if (!loaded.config) throw new GraphNodeModuleError("Project configuration is invalid.", []);
-    const graph = loaded.config.graph;
-    const graphNodes = graph.graphNodes.filter((candidate) => candidate.id !== graphNodeId);
-    if (!graphNodes.length) throw new GraphNodeModuleError("A project must retain at least one Graph Node.", [{ code: "ID_CONFLICT", path: "graphNodeId", message: graphNodeId }]);
-    const cleanCandidates = <T extends { target: ProjectGraphNodeRouteTarget | { graphNodeId: string } }>(values: T[]) => values.filter((candidate) => !("graphNodeId" in candidate.target) || candidate.target.graphNodeId !== graphNodeId);
-    if (graph.strategy.kind !== "agent_v1") throw new GraphNodeModuleError(
-      "SSP Graph Node removal requires an atomic Configure update to its generic decision metadata.",
-      [{ code: "INVALID_SCHEMA", path: "graph.strategy", message: graphNodeId }]
-    );
-    const routing = graph.strategy.orchestrator.routing;
-    const nextGraph = {
-      ...graph,
-      graphNodes,
-      strategy: { kind: "agent_v1" as const, orchestrator: {
-        ...graph.strategy.orchestrator,
-        routing: {
-          ...routing,
-          start: { ...routing.start, candidates: cleanCandidates(routing.start.candidates) },
-          continuation: routing.continuation.filter((rule) => rule.sourceId !== graphNodeId).map((rule) => ({ ...rule, candidates: cleanCandidates(rule.candidates) })),
-          repair: routing.repair.filter((rule) => rule.sourceId !== graphNodeId).map((rule) => ({ ...rule, candidates: cleanCandidates(rule.candidates) }))
-        }
-      } }
-    };
-    this.projects.putAutomation(this.root(), { version: 17, graph: nextGraph });
+    const graph = removeModuleGraphNode(loaded.config, graphNodeId);
+    if (!graph) throw new GraphNodeModuleError("A project must retain a Graph Node.", []);
+    this.projects.putAutomation(this.root(), { version: 18, graph });
     for (const resource of record.ownedResources) await unlink(path.join(this.root(), resource.relativePath)).catch(() => undefined);
     installed.installed = installed.installed.filter((candidate) => candidate.graphNodeId !== graphNodeId);
     await this.writeInstalled(installed);
   }
 
-  async exportGraphNode(input: { graphNodeId: string; title?: string; description?: string; version?: string; category?: string; tags?: string[] }): Promise<GraphNodeModuleExportResult> {
+  async exportGraphNode(input: {
+    graphNodeId: string; title?: string; description?: string; version?: string; category?: string; tags?: string[];
+  }): Promise<GraphNodeModuleExportResult> {
     const config = this.projects.load(this.root()).config;
-    const graphNode = config?.graph.graphNodes.find((candidate) => candidate.id === input.graphNodeId);
-    if (!config || !graphNode) throw new GraphNodeModuleError("Graph Node was not found.", [{ code: "GRAPH_NODE_NOT_FOUND", path: "graphNodeId", message: input.graphNodeId }]);
+    const graphNode = config?.graph.graphNodes.find(({ id }) => id === input.graphNodeId);
+    if (!config || !graphNode) throw new GraphNodeModuleError("Graph Node was not found.", [{
+      code: "GRAPH_NODE_NOT_FOUND", path: "graphNodeId", message: input.graphNodeId
+    }]);
     const catalog = await loadProjectResources(this.root());
-    const compositionValues = graphNodeCompositions(graphNode);
-    const profileIds = [...new Set(compositionValues.map((composition) => composition.executionProfileId))].sort();
+    const compositions = graphNodeCompositions(graphNode);
+    const profileIds = [...new Set(compositions.map(({ executionProfileId }) => executionProfileId))].sort();
     const profileSlots = profileIds.map((profileId, index) => {
-      const profile = config.executionProfiles.find((candidate) => candidate.id === profileId)!;
-      return { key: `slot-${index + 1}`, title: profile.name, description: `Map ${profile.name}.`, providers: [profile.provider], network: profile.networkAccess ? "required" as const : "forbidden" as const };
+      const profile = config.executionProfiles.find(({ id }) => id === profileId)!;
+      return {
+        key: `slot-${index + 1}`, title: profile.name, description: `Map ${profile.name}.`,
+        providers: [profile.provider], network: profile.networkAccess ? "required" as const : "forbidden" as const
+      };
     });
-    const slotByProfile = new Map(profileIds.map((profileId, index) => [profileId, profileSlots[index].key]));
-    const resourceIds = [...new Set(compositionValues.flatMap((composition) => [composition.primaryInstructionId, ...composition.skillIds]))];
-    const resources = resourceIds.map((resourceId): GraphNodeModuleResourceV5 => {
-      const instruction = catalog.instructions.find((entry) => entry.id === resourceId);
-      if (instruction) return { kind: "instruction", key: localResourceKey(resourceId), title: instruction.title, metadata: {}, body: instruction.body };
-      const skill = catalog.skills.find((entry) => entry.id === resourceId);
-      if (skill) return { kind: "skill", key: localResourceKey(resourceId), name: skill.name, description: skill.description, metadata: skill.metadata, body: skill.body };
-      throw new GraphNodeModuleError("Referenced resource is missing.", [{ code: "INVALID_SCHEMA", path: resourceId, message: resourceId }]);
-    });
-    const pkg: GraphNodeModulePackageV5 = {
-      format: "ballet-graph-node-module", version: 5,
-      manifest: { id: graphNode.id, title: input.title ?? graphNode.description, description: input.description ?? graphNode.description, version: input.version ?? "1.0.0", category: input.category, tags: input.tags ?? [] },
-      permissions: { network: profileSlots.some((slot) => slot.network === "required") ? "required" : "forbidden", externalWrites: false },
+    const slotByProfile = new Map(profileIds.map((profileId, index) => [profileId, profileSlots[index]!.key]));
+    const resources = moduleExportResources(compositions, catalog);
+    if (!resources) throw new GraphNodeModuleError("Referenced resource is missing.", []);
+    const pkg: GraphNodeModulePackageV6 = {
+      format: "ballet-graph-node-module", version: 6,
+      manifest: {
+        id: graphNode.id, title: input.title ?? graphNode.description,
+        description: input.description ?? graphNode.description, version: input.version ?? "1.0.0",
+        category: input.category, tags: input.tags ?? []
+      },
+      permissions: {
+        network: profileSlots.some((slot) => slot.network === "required") ? "required" : "forbidden",
+        externalWrites: false
+      },
       profileSlots,
-      stateContract: { id: `${graphNode.id}-state`, version: "1.0.0", description: graphNode.stateContract.description, requiredKeys: [] },
-      capabilities: { requires: [], accepts: graphNode.capabilities.accepts, provides: graphNode.capabilities.provides, recommendedGraphRoutes: [] },
+      stateContract: {
+        id: `${graphNode.id}-state`, version: "1.0.0",
+        description: graphNode.stateContract.description, requiredKeys: []
+      },
+      capabilities: { requires: [], accepts: graphNode.capabilities.accepts, provides: graphNode.capabilities.provides },
       resources,
       graphNode: dematerializeGraphNode(graphNode, slotByProfile)
     };
-    const parsed = graphNodeModulePackageV5Schema.parse(pkg);
-    const canonicalJson = canonical(parsed);
-    return { package: parsed, canonicalJson, sha256: sha256(canonicalJson), filename: `${graphNode.id}.ballet-graph-node.json` };
+    const parsed = graphNodeModulePackageV6Schema.parse(pkg);
+    const canonicalJson = canonicalModuleJson(parsed);
+    return { package: parsed, canonicalJson, sha256: moduleSha256(canonicalJson), filename: `${graphNode.id}.ballet-graph-node.json` };
   }
 
-  private createPlan(pkg: GraphNodeModulePackageV5, packageSha256: string, source: string, mappings: Record<string, string>, project: ProjectConfiguration): GraphNodeModuleInstallPlan {
-    const issues: GraphNodeModuleIssue[] = [];
-    const profileMappings = pkg.profileSlots.map((slot) => {
-      const candidates = project.executionProfiles.filter((profile) => slot.providers.includes(profile.provider) && networkCompatible(slot.network, profile)).map(profileCandidate);
-      const selectedProfileId = mappings[slot.key];
-      const selected = candidates.find((candidate) => candidate.id === selectedProfileId);
-      const issue = !selectedProfileId
-        ? { code: "PROFILE_MAPPING_REQUIRED" as const, path: `profileMappings.${slot.key}`, message: "Choose an execution profile explicitly." }
-        : !selected ? { code: "PROFILE_INCOMPATIBLE" as const, path: `profileMappings.${slot.key}`, message: `Profile ${selectedProfileId} is incompatible.` } : undefined;
-      if (issue) issues.push(issue);
-      return { slot, selectedProfileId, candidates, compatible: Boolean(selected), issue };
-    });
-    const profileMap = new Map(profileMappings.flatMap((mapping) => mapping.selectedProfileId ? [[mapping.slot.key, mapping.selectedProfileId] as const] : []));
-    const idRemapping = moduleRemapping(pkg);
-    const graphNode = materializeGraphNode(pkg.graphNode, idRemapping, profileMap);
-    if (project.graph.graphNodes.some((candidate) => candidate.id === graphNode.id)) issues.push({ code: "ID_CONFLICT", path: "graphNode.key", message: `Graph Node ${graphNode.id} already exists.` });
-    const resources = pkg.resources.map((resource) => {
-      const resourceId = resource.kind === "instruction" ? idRemapping.instructions[resource.key] : idRemapping.skills[resource.key];
-      const relativePath = resource.kind === "instruction" ? `.ballet/instructions/${resourceId.slice(8)}.md` : `.agents/skills/${resourceId.slice(8)}/SKILL.md`;
-      const rendered = renderResource(resourceId, resource);
-      return { kind: resource.kind, key: resource.key, resourceId, relativePath, sha256: sha256(rendered), bytes: Buffer.byteLength(rendered), action: "create" as const };
-    });
-    const base = { packageSha256, source, module: pkg.manifest, graphNode, idRemapping, resources, profileMappings, conflicts: [], issues, canInstall: issues.length === 0 };
-    return { ...base, planHash: sha256(canonical(base)) };
-  }
-
-  private async readInstalled(): Promise<InstalledGraphNodeModulesFileV5> {
-    const source = await readFile(installedPath(this.root()), "utf8").catch(() => undefined);
-    if (!source) return { version: 5, installed: [] };
-    const value = JSON.parse(source) as InstalledGraphNodeModulesFileV5;
-    if (value.version !== 5 || !Array.isArray(value.installed)) throw new GraphNodeModuleError("Installed module registry is invalid.", [{ code: "INVALID_SCHEMA", path: ".ballet/graph-node-modules.json", message: "Expected version 5." }]);
+  private async readInstalled(): Promise<InstalledGraphNodeModulesFileV6> {
+    const source = await readFile(installedModulesPath(this.root()), "utf8").catch(() => undefined);
+    if (!source) return { version: 6, installed: [] };
+    const value = JSON.parse(source) as InstalledGraphNodeModulesFileV6;
+    if (value.version !== 6 || !Array.isArray(value.installed)) throw new GraphNodeModuleError(
+      "Installed module registry is invalid.", [{
+        code: "INVALID_SCHEMA", path: ".ballet/graph-node-modules.json", message: "Expected version 6."
+      }]
+    );
     return value;
   }
-  private async writeInstalled(value: InstalledGraphNodeModulesFileV5) {
-    const filename = installedPath(this.root());
+
+  private async writeInstalled(value: InstalledGraphNodeModulesFileV6): Promise<void> {
+    const filename = installedModulesPath(this.root());
     await mkdir(path.dirname(filename), { recursive: true });
     const temporary = `${filename}.${process.pid}.${randomUUID()}.tmp`;
     await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf8");
     await rename(temporary, filename);
   }
 }
-
-const installedPath = (root: string) => path.join(root, ".ballet", "graph-node-modules.json");
-const invalidInspection = (source: string, raw: string, code: GraphNodeModuleIssue["code"], message: string): GraphNodeModuleInspection => ({ valid: false, source, sizeBytes: Buffer.byteLength(raw), issues: [{ code, path: "package", message }] });
-const canonical = (value: unknown): string => JSON.stringify(sortValue(value));
-const sortValue = (value: unknown): unknown => Array.isArray(value) ? value.map(sortValue) : isRecord(value) ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortValue(value[key])])) : value;
-const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
-const walk = async (directory: string): Promise<string[]> => (await readdir(directory, { withFileTypes: true })).flatMap((entry) => entry.isDirectory() ? [] : [path.join(directory, entry.name)]).concat((await Promise.all((await readdir(directory, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => walk(path.join(directory, entry.name))))).flat());
-const profileCandidate = (profile: ExecutionProfile) => ({ id: profile.id, name: profile.name, provider: profile.provider, networkAccess: profile.networkAccess });
-const networkCompatible = (requirement: string, profile: ExecutionProfile) => requirement === "optional" || (requirement === "required") === profile.networkAccess;
-const moduleRemapping = (pkg: GraphNodeModulePackageV5) => ({
-  graphNode: { [pkg.graphNode.key]: pkg.manifest.id },
-  nodes: Object.fromEntries([pkg.graphNode.strategy.orchestrator, ...(pkg.graphNode.repairNode ? [pkg.graphNode.repairNode] : []), ...pkg.graphNode.jobNodes.flatMap((job) => [job, job.workNode, job.validationNode])].map((node) => [node.key, `${pkg.manifest.id}-${node.key}`])),
-  rules: Object.fromEntries([pkg.graphNode.strategy.orchestrator.routing.start, ...pkg.graphNode.strategy.orchestrator.routing.continuation, ...pkg.graphNode.strategy.orchestrator.routing.repair].map((rule) => [rule.key, `${pkg.manifest.id}-${rule.key}`])),
-  instructions: Object.fromEntries(pkg.resources.filter((resource) => resource.kind === "instruction").map((resource) => [resource.key, `project:${pkg.manifest.id}-${resource.key}`])),
-  skills: Object.fromEntries(pkg.resources.filter((resource) => resource.kind === "skill").map((resource) => [resource.key, `project:${pkg.manifest.id}-${resource.key}`]))
-});
-type Remapping = ReturnType<typeof moduleRemapping>;
-const composition = (value: GraphNodeModuleCompositionV5, remap: Remapping, profiles: Map<string, string>): ProjectExecutionComposition => ({
-  executionProfileId: profiles.get(value.profileSlot) ?? "",
-  primaryInstructionId: remap.instructions[value.primaryInstruction],
-  skillIds: value.skills.map((key) => remap.skills[key])
-});
-const materializeExecutable = <T extends GraphNodeModuleGraphNodeV5["jobNodes"][number]["workNode"] | GraphNodeModuleGraphNodeV5["jobNodes"][number]["validationNode"]>(value: T, remap: Remapping, profiles: Map<string, string>): ProjectWorkNode | ProjectValidationNode => {
-  const base = {
-    id: remap.nodes[value.key], description: value.description, task: value.task,
-    nodeStyle: value.nodeStyle, nodeSize: value.nodeSize
-  };
-  return value.type === "human"
-    ? { ...base, type: "human" }
-    : { ...base, type: "agent", ...composition(value, remap, profiles) };
-};
-const materializeGraphNode = (value: GraphNodeModuleGraphNodeV5, remap: Remapping, profiles: Map<string, string>): ProjectGraphNode => ({
-  id: remap.graphNode[value.key], description: value.description,
-  capabilities: structuredClone(value.capabilities), stateContract: { ...value.stateContract },
-  outcomes: structuredClone(value.outcomes),
-  strategy: { kind: "agent_v1", orchestrator: {
-    id: remap.nodes[value.strategy.orchestrator.key], description: value.strategy.orchestrator.description,
-    ...composition(value.strategy.orchestrator, remap, profiles), maxTransitions: value.strategy.orchestrator.maxTransitions,
-    maxRouteAttempts: value.strategy.orchestrator.maxRouteAttempts,
-    routing: {
-      start: { id: remap.rules[value.strategy.orchestrator.routing.start.key], candidates: value.strategy.orchestrator.routing.start.candidates.map((candidate) => materializeCandidate(candidate, remap)) },
-      continuation: value.strategy.orchestrator.routing.continuation.map((rule) => ({ id: remap.rules[rule.key], sourceId: remap.nodes[rule.sourceJobNode], result: rule.result, candidates: rule.candidates.map((candidate) => materializeCandidate(candidate, remap)) })),
-      repair: value.strategy.orchestrator.routing.repair.map((rule) => ({ id: remap.rules[rule.key], sourceId: remap.nodes[rule.sourceJobNode], capability: rule.capability, candidates: rule.candidates.map((candidate) => materializeCandidate(candidate, remap)) }))
-    }
-  } },
-  ...(value.repairNode ? { repairNode: { id: remap.nodes[value.repairNode.key], description: value.repairNode.description, task: value.repairNode.task, ...composition(value.repairNode, remap, profiles), maxRepairDepth: value.repairNode.maxRepairDepth, maxRepairAttempts: value.repairNode.maxRepairAttempts } } : {}),
-  jobNodes: value.jobNodes.map((job): ProjectJobNode => ({
-    id: remap.nodes[job.key], description: job.description,
-    capabilities: structuredClone(job.capabilities), maxRetries: job.maxRetries,
-    outcomes: structuredClone(job.outcomes),
-    workNode: materializeExecutable(job.workNode, remap, profiles) as ProjectWorkNode,
-    validationNode: materializeExecutable(job.validationNode, remap, profiles) as ProjectValidationNode
-  }))
-});
-const materializeCandidate = (candidate: { target: { jobNode: string } | { terminal: "PASS" | "FAIL" }; description: string }, remap: Remapping) => ({ target: "jobNode" in candidate.target ? { jobNodeId: remap.nodes[candidate.target.jobNode] } : { terminal: candidate.target.terminal }, description: candidate.description });
-const installGraphNode = (config: ProjectConfiguration, graphNode: ProjectGraphNode): ProjectConfiguration => ({
-  ...config,
-  graph: {
-    ...config.graph,
-    graphNodes: [...config.graph.graphNodes, graphNode],
-    strategy: config.graph.strategy.kind === "agent_v1" ? { kind: "agent_v1", orchestrator: {
-      ...config.graph.strategy.orchestrator,
-      routing: {
-        ...config.graph.strategy.orchestrator.routing,
-        start: {
-          ...config.graph.strategy.orchestrator.routing.start,
-          candidates: [...config.graph.strategy.orchestrator.routing.start.candidates, { target: { graphNodeId: graphNode.id }, description: `Installed Graph Node ${graphNode.id}.` }]
-        }
-      }
-    } } : (() => { throw new GraphNodeModuleError(
-      "SSP Graph Node installation requires explicit generic Capability Graph and Decision Model metadata.",
-      [{ code: "INVALID_SCHEMA", path: "graph.strategy", message: graphNode.id }]
-    ); })()
-  }
-});
-const renderResource = (resourceId: string, resource: GraphNodeModuleResourceV5) => {
-  const localId = resourceId.slice(8);
-  const title = resource.kind === "instruction" ? resource.title : resource.name;
-  return `---\nid: ${localId}\ntitle: ${JSON.stringify(title)}\ncreatedAt: ${new Date().toISOString().slice(0, 10)}\nupdatedAt: ${new Date().toISOString().slice(0, 10)}\n---\n${resource.body.startsWith("\n") ? "" : "\n"}${resource.body.trimEnd()}\n`;
-};
-const contentHash = (graphNode: ProjectGraphNode, resources: Array<{ relativePath: string; sha256: string }>) => sha256(canonical({ graphNode, resources: [...resources].sort((a, b) => a.relativePath.localeCompare(b.relativePath)) }));
-const graphNodeCompositions = (node: ProjectGraphNode): ProjectExecutionComposition[] => [
-  ...(node.strategy.kind === "agent_v1" ? [node.strategy.orchestrator] : []),
-  ...(node.repairNode ? [node.repairNode] : []),
-  ...node.jobNodes.flatMap((job) => [...(job.workNode.type === "agent" ? [job.workNode] : []), ...(job.validationNode.type === "agent" ? [job.validationNode] : [])])
-];
-const localResourceKey = (resourceId: string) => resourceId.slice(8).replace(/^[^-]+-/, "");
-const dematerializeComposition = (value: ProjectExecutionComposition, slots: Map<string, string>) => ({ profileSlot: slots.get(value.executionProfileId)!, primaryInstruction: localResourceKey(value.primaryInstructionId), skills: value.skillIds.map(localResourceKey) });
-const dematerializeExecutable = (
-  value: ProjectWorkNode | ProjectValidationNode,
-  slots: Map<string, string>
-): GraphNodeModuleGraphNodeV5["jobNodes"][number]["workNode"] => {
-  const base = {
-    key: value.id, description: value.description, task: value.task,
-    nodeStyle: value.nodeStyle, nodeSize: value.nodeSize
-  };
-  return value.type === "human"
-    ? { ...base, type: "human" }
-    : { ...base, type: "agent", ...dematerializeComposition(value, slots) };
-};
-const dematerializeGraphNode = (node: ProjectGraphNode, slots: Map<string, string>): GraphNodeModuleGraphNodeV5 => ({
-  key: node.id, description: node.description,
-  capabilities: structuredClone(node.capabilities), stateContract: { ...node.stateContract },
-  outcomes: structuredClone(node.outcomes),
-  strategy: { kind: "agent_v1", orchestrator: {
-    key: requireAgentStrategy(node).orchestrator.id, description: requireAgentStrategy(node).orchestrator.description,
-    ...dematerializeComposition(requireAgentStrategy(node).orchestrator, slots),
-    maxTransitions: requireAgentStrategy(node).orchestrator.maxTransitions,
-    maxRouteAttempts: requireAgentStrategy(node).orchestrator.maxRouteAttempts,
-    routing: {
-      start: { key: requireAgentStrategy(node).orchestrator.routing.start.id, candidates: requireAgentStrategy(node).orchestrator.routing.start.candidates.map(dematerializeCandidate) },
-      continuation: requireAgentStrategy(node).orchestrator.routing.continuation.map((rule) => ({ key: rule.id, sourceJobNode: rule.sourceId, result: rule.result, candidates: rule.candidates.map(dematerializeCandidate) })),
-      repair: requireAgentStrategy(node).orchestrator.routing.repair.map((rule) => ({ key: rule.id, sourceJobNode: rule.sourceId, capability: rule.capability, candidates: rule.candidates.map(dematerializeCandidate) }))
-    }
-  } },
-  ...(node.repairNode ? { repairNode: { key: node.repairNode.id, description: node.repairNode.description, task: node.repairNode.task, ...dematerializeComposition(node.repairNode, slots), maxRepairDepth: node.repairNode.maxRepairDepth, maxRepairAttempts: node.repairNode.maxRepairAttempts } } : {}),
-  jobNodes: node.jobNodes.map((job) => ({
-    key: job.id, description: job.description,
-    capabilities: structuredClone(job.capabilities), maxRetries: job.maxRetries,
-    outcomes: structuredClone(job.outcomes),
-    workNode: dematerializeExecutable(job.workNode, slots),
-    validationNode: dematerializeExecutable(job.validationNode, slots)
-  }))
-});
-const requireAgentStrategy = (node: ProjectGraphNode) => {
-  if (node.strategy.kind !== "agent_v1") throw new GraphNodeModuleError(
-    "Graph Node Module v5 exports intrinsic contracts but not project-specific local Decision Models.",
-    [{ code: "INVALID_SCHEMA", path: "graphNode.strategy", message: "Select explicit local agent_v1 before export." }]
-  );
-  return node.strategy;
-};
-const dematerializeCandidate = (candidate: { target: ProjectGraphNodeRouteTarget; description: string }) => ({ target: "jobNodeId" in candidate.target ? { jobNode: candidate.target.jobNodeId } : { terminal: candidate.target.terminal }, description: candidate.description });
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);

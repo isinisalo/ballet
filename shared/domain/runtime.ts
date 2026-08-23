@@ -31,8 +31,7 @@ export interface GraphStateRevision {
 }
 
 export type GraphStateRevisionMetadata = Omit<GraphStateRevision, "state" | "outcome"> & { patchOmitted: boolean };
-export type NodeRunRole = "work" | "validation" | "orchestrator" | "repair";
-export type OrchestrationScope = "graph" | "graph_node";
+export type NodeRunRole = "work" | "validation";
 export type NodeRunStatus =
   | "queued" | "running" | "waiting_for_input" | "completed"
   | "blocked" | "failed" | "cancelled" | "interrupted";
@@ -58,91 +57,23 @@ export type WorkNodeOutcome =
     }
   | CheckedOutcomeBase & { role: "work"; state: "blocked" | "failed" };
 
-export interface ValidationRepairRequest {
-  reason: string;
-  requestedCapability: string;
-  evidenceRefs: string[];
-}
-
 export interface ValidationNodeOutcome extends CheckedOutcomeBase {
   role: "validation";
   state: "completed";
   decision: NodeResult;
-  outcomeId?: string;
+  outcomeId: string;
+  disposition?: "retry" | "escalate";
   evidence: JsonValue;
   feedback?: string;
   expectedCorrection?: string;
-  repairRequest?: ValidationRepairRequest;
+  acceptance: {
+    verifyObligationIds: string[];
+    invalidateObligationIds: string[];
+    evidenceRefs: string[];
+  };
   statePatch?: StatePatch;
 }
-
-export type OrchestratorNodeOutcome =
-  | OutcomeBase & {
-      role: "orchestrator";
-      state: "completed";
-      action: "dispatch";
-      target: string;
-      reason: string;
-      dispatchInput?: JsonValue;
-    }
-  | OutcomeBase & {
-      role: "orchestrator";
-      state: "completed";
-      action: "complete";
-      result: NodeResult;
-      outcomeId?: string;
-      reason: string;
-    }
-  | OutcomeBase & {
-      role: "orchestrator";
-      state: "completed";
-      action: "delegate_repair";
-      reason: string;
-    }
-  | OutcomeBase & {
-      role: "orchestrator";
-      state: "needs_input";
-      action: "needs_input";
-      question: string;
-      context: string;
-    };
-
-export type RepairNodeOutcome =
-  | OutcomeBase & {
-      role: "repair";
-      state: "completed";
-      action: "revalidate";
-      artifacts: Record<string, JsonValue>;
-      statePatch?: StatePatch;
-    }
-  | OutcomeBase & {
-      role: "repair";
-      state: "completed";
-      action: "dispatch";
-      target: string;
-      reason: string;
-      artifacts: Record<string, JsonValue>;
-      statePatch?: StatePatch;
-    }
-  | OutcomeBase & {
-      role: "repair";
-      state: "completed";
-      action: "escalate";
-      reason: string;
-    }
-  | OutcomeBase & {
-      role: "repair";
-      state: "needs_input";
-      action: "needs_input";
-      question: string;
-      context: string;
-    };
-
-export type CanonicalNodeOutcome =
-  | WorkNodeOutcome
-  | ValidationNodeOutcome
-  | OrchestratorNodeOutcome
-  | RepairNodeOutcome;
+export type CanonicalNodeOutcome = WorkNodeOutcome | ValidationNodeOutcome;
 
 export interface RootRun {
   rootRunId: string;
@@ -173,27 +104,24 @@ export interface GraphNodeInvocation {
   graphNodeInvocationId: string;
   graphNodeId: string;
   rootRunId: string;
-  parentGraphNodeInvocationId?: string;
   policyDecisionId?: string;
-  source: "orchestrator" | "policy" | "repair" | "root";
+  source: "policy" | "root";
   status: InvocationStatus;
   input?: JsonValue;
   snapshot: ProjectGraphNode;
   entryStateRevision: number;
   completionStateRevision?: number;
-  nestingDepth: number;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
 }
 
-export interface JobNodeInvocation {
-  jobNodeInvocationId: string;
+export interface ActionNodeInvocation {
+  actionNodeInvocationId: string;
   rootRunId: string;
   graphNodeInvocationId: string;
   graphNodeId: string;
-  jobNodeId: string;
-  policyDecisionId?: string;
+  actionNodeId: string;
   workAttempt: number;
   status: InvocationStatus;
   stateRevisionBefore: number;
@@ -208,11 +136,10 @@ export interface NodeRun {
   nodeRunId: string;
   rootRunId: string;
   graphNodeInvocationId?: string;
-  jobNodeInvocationId?: string;
-  scope?: OrchestrationScope;
+  actionNodeInvocationId?: string;
   role: NodeRunRole;
   graphNodeId?: string;
-  jobNodeId?: string;
+  actionNodeId?: string;
   nodeDefinitionId: string;
   executionTaskId?: string;
   input?: JsonValue;
@@ -232,6 +159,6 @@ export interface NodeRun {
 }
 
 export interface GraphNodeInvocationDetails extends GraphNodeInvocation {
-  jobNodeInvocations: JobNodeInvocation[];
+  actionNodeInvocations: ActionNodeInvocation[];
   nodeRuns: NodeRun[];
 }

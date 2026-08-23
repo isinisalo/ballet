@@ -1,5 +1,5 @@
 {
-  "version": 17,
+  "version": 18,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -24,70 +24,175 @@
       "initial": {}
     },
     "strategy": {
-      "kind": "agent_v1",
-      "orchestrator": {
-      "id": "fixture-graph-orchestrator",
-      "description": "Route the fixture Graph from its Graph Node to a terminal.",
-      "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-      "primaryInstructionId": "project:reviewer",
-      "skillIds": [],
-      "maxTransitions": 256,
-      "maxRouteAttempts": 3,
-      "routing": {
-        "start": {
-          "id": "fixture-graph-start",
-          "candidates": [
+      "kind": "reward_mdp_v3",
+      "id": "fixture-reward-mdp",
+      "description": "Select the fixture review through one immutable compiled policy.",
+      "capabilityModel": {
+        "version": 3,
+        "outcomes": [
+          {
+            "id": "failure",
+            "description": "The fixture review failed validation.",
+            "result": "FAIL",
+            "penaltyClass": "implementation_defect"
+          },
+          {
+            "id": "success",
+            "description": "The fixture review passed validation.",
+            "result": "PASS",
+            "penaltyClass": "none"
+          }
+        ],
+        "actions": [
+          {
+            "actionId": "clarify-node",
+            "guards": []
+          },
+          {
+            "actionId": "review-node",
+            "guards": []
+          }
+        ]
+      },
+      "model": {
+        "version": 3,
+        "discountPpm": 990000,
+        "acceptance": {
+          "version": 1,
+          "obligations": [
             {
-              "target": {
-                "graphNodeId": "review-node"
-              },
-              "description": "Start the fixture Graph at its review Graph Node."
+              "obligationId": "review-accepted",
+              "description": "The fixture review is accepted with evidence.",
+              "weight": 1
             }
           ]
         },
-        "continuation": [
+        "reward": {
+          "actionCostMicros": 1000000,
+          "completionBonusMicros": 25000000,
+          "progressPotentialScaleMicros": 100000000,
+          "outcomePenaltyMicros": {
+            "none": 0,
+            "transient": 2000000,
+            "implementation_defect": 5000000,
+            "invalid_plan": 12000000,
+            "invalid_design": 25000000
+          }
+        },
+        "features": [],
+        "states": [
           {
-            "id": "review-node-pass",
-            "sourceId": "review-node",
-            "result": "PASS",
-            "candidates": [
+            "id": "review-complete",
+            "values": {},
+            "verifiedObligationIds": ["review-accepted"],
+            "invalidatedObligationIds": [],
+            "terminal": "success"
+          },
+          {
+            "id": "review-pending",
+            "values": {},
+            "verifiedObligationIds": [],
+            "invalidatedObligationIds": []
+          }
+        ],
+        "stateActions": [
+          {
+            "stateId": "review-pending",
+            "actionId": "clarify-node",
+            "successors": [
               {
-                "target": {
-                  "terminal": "PASS"
-                },
-                "description": "Complete the fixture Graph after a passing review."
+                "outcomeId": "failure",
+                "nextStateId": "review-pending",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "success",
+                "nextStateId": "review-complete",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
               }
             ]
           },
           {
-            "id": "review-node-fail",
-            "sourceId": "review-node",
-            "result": "FAIL",
-            "candidates": [
+            "stateId": "review-pending",
+            "actionId": "review-node",
+            "successors": [
               {
-                "target": {
-                  "terminal": "FAIL"
-                },
-                "description": "End the fixture Graph after a failed review."
+                "outcomeId": "failure",
+                "nextStateId": "review-pending",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
+              },
+              {
+                "outcomeId": "success",
+                "nextStateId": "review-complete",
+                "probabilityPpm": 500000,
+                "provenance": "default_prior"
               }
             ]
           }
         ],
-        "repair": []
-      }
+        "solver": {
+          "algorithm": "discounted_value_iteration_v3",
+          "maxIterations": 10000,
+          "convergenceToleranceMicros": 1
+        }
       }
     },
     "graphNodes": [
       {
+        "id": "clarify-node",
+        "description": "Clarify the fixture before review.",
+        "capabilities": {
+          "accepts": ["fixture:requirements.requested"],
+          "provides": ["fixture:requirements.clarified"]
+        },
+        "outcomes": [
+          { "outcomeId": "success", "result": "PASS" },
+          { "outcomeId": "failure", "result": "FAIL" }
+        ],
+        "stateContract": {
+          "description": "Bounded fixture clarification references."
+        },
+        "actionNodes": [
+          {
+            "id": "clarify-action",
+            "description": "Clarify and validate the fixture request.",
+            "capabilities": {
+              "accepts": [],
+              "provides": []
+            },
+            "outcomes": [
+              { "outcomeId": "success", "result": "PASS" },
+              { "outcomeId": "failure", "result": "FAIL" }
+            ],
+            "maxRetries": 1,
+            "workNode": {
+              "id": "clarify-work",
+              "type": "human",
+              "description": "Clarify the fixture request.",
+              "task": "Clarify the fixture request.",
+              "nodeStyle": "terra",
+              "nodeSize": "medium"
+            },
+            "validationNode": {
+              "id": "clarify-validation",
+              "type": "human",
+              "description": "Validate fixture clarification.",
+              "task": "Confirm that fixture clarification is actionable.",
+              "nodeStyle": "luna",
+              "nodeSize": "small"
+            }
+          }
+        ]
+      },
+      {
         "id": "review-node",
         "description": "Review the fixture project.",
         "capabilities": {
-          "accepts": [
-            "fixture:review.requested"
-          ],
-          "provides": [
-            "fixture:review.completed"
-          ]
+          "accepts": ["fixture:review.requested"],
+          "provides": ["fixture:review.completed"]
         },
         "outcomes": [
           { "outcomeId": "success", "result": "PASS" },
@@ -96,63 +201,9 @@
         "stateContract": {
           "description": "Bounded fixture review references."
         },
-        "strategy": {
-          "kind": "agent_v1",
-          "orchestrator": {
-          "id": "review-node-orchestrator",
-          "description": "Route the fixture review Job Node to a terminal.",
-          "executionProfileId": "codex-gpt-5-6-luna-medium-network-off",
-          "primaryInstructionId": "project:reviewer",
-          "skillIds": [],
-          "maxTransitions": 256,
-          "maxRouteAttempts": 3,
-          "routing": {
-            "start": {
-              "id": "review-node-start",
-              "candidates": [
-                {
-                  "target": {
-                    "jobNodeId": "review-job"
-                  },
-                  "description": "Start the fixture review Job Node."
-                }
-              ]
-            },
-            "continuation": [
-              {
-                "id": "review-job-pass",
-                "sourceId": "review-job",
-                "result": "PASS",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "PASS"
-                    },
-                    "description": "Complete the fixture review."
-                  }
-                ]
-              },
-              {
-                "id": "review-job-fail",
-                "sourceId": "review-job",
-                "result": "FAIL",
-                "candidates": [
-                  {
-                    "target": {
-                      "terminal": "FAIL"
-                    },
-                    "description": "Fail the fixture review."
-                  }
-                ]
-              }
-            ],
-            "repair": []
-          }
-          }
-        },
-        "jobNodes": [
+        "actionNodes": [
           {
-            "id": "review-job",
+            "id": "review-action",
             "description": "Run and validate the fixture review.",
             "capabilities": {
               "accepts": [],

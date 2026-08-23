@@ -36,13 +36,13 @@ export function LocalProviderTable({ providers }: { providers: LocalProviderStat
 
 function ProviderRow({ provider }: { provider: LocalProviderStatus }) {
   const readiness = providerReadiness(provider);
-  const repairCommand = provider.provider === "codex" ? "codex login" : "copilot login";
+  const loginCommand = provider.provider === "codex" ? "codex login" : "copilot login";
   const policy = provider.capabilities.policy;
   return (
     <TableRow>
       <TableCell><span className="block font-medium">{providerLabel(provider.provider)}</span><span className="block font-mono text-[0.62rem] text-muted-foreground">{provider.command}</span></TableCell>
       <TableCell className="font-mono text-xs">{provider.cliVersion ?? "—"}</TableCell>
-      <TableCell><span className="font-mono text-[0.65rem]">{provider.authStatus}</span>{provider.authStatus !== "ready" ? <code className="mt-1 block whitespace-nowrap text-[0.62rem] text-tertiary">Run locally: {repairCommand}</code> : null}</TableCell>
+      <TableCell><span className="font-mono text-[0.65rem]">{provider.authStatus}</span>{provider.authStatus !== "ready" ? <code className="mt-1 block whitespace-nowrap text-[0.62rem] text-tertiary">Run locally: {loginCommand}</code> : null}</TableCell>
       <TableCell><OperationalStatus compact label={readiness.label} tone={statusTone[readiness.tone]} />{provider.healthMessage ? <span className="mt-1 block max-w-64 whitespace-normal text-[0.65rem] text-muted-foreground">{provider.healthMessage}</span> : null}</TableCell>
       <TableCell className="max-w-72 whitespace-normal font-mono text-[0.65rem] text-muted-foreground">{provider.capabilities.models.length ? provider.capabilities.models.map((model) => `${model.label || model.id}${model.reasoningOptions.length ? ` (${model.reasoningOptions.join("/")})` : ""}`).join(" · ") : "No models reported"}</TableCell>
       <TableCell className="font-mono text-[0.65rem] text-muted-foreground">write {policy.workspaceWrite ? "yes" : "no"} · network {policy.networkControl ? "yes" : "no"} · roots {policy.readOnlyRoots ? "yes" : "no"}</TableCell>

@@ -11,19 +11,18 @@ const runtime = z.object({
 }).strict();
 
 export const executionSpecSchema = z.object({
-  version: z.literal(10),
+  version: z.literal(11),
   taskId: z.string(),
   kind: z.literal("node_execution"),
   rootRunId: z.string(),
   graphNodeInvocationId: z.string().optional(),
-  jobNodeInvocationId: z.string().optional(),
+  actionNodeInvocationId: z.string().optional(),
   nodeRunId: z.string(),
   evidence: z.object({
-    compositionVersion: z.literal(9),
+    compositionVersion: z.literal(10),
     graphNodeId: z.string().optional(),
-    jobNodeId: z.string().optional(),
-    nodeRole: z.enum(["work", "validation", "orchestrator", "repair"]),
-    orchestrationScope: z.enum(["graph", "graph_node"]).optional(),
+    actionNodeId: z.string().optional(),
+    nodeRole: z.enum(["work", "validation"]),
     nodeDefinitionId: z.string(),
     executionProfile: executionProfileSchema,
     resources: z.array(z.object({
@@ -31,11 +30,10 @@ export const executionSpecSchema = z.object({
       id: z.string(), relativePath: z.string().optional(), sourceSha256: sha256
     }).strict()),
     prompt: z.string(), promptSha256: sha256,
-    taskEnvelopeVersion: z.literal(8), taskEnvelopeSha256: sha256,
-    outputSchemaVersion: z.literal(8),
+    taskEnvelopeVersion: z.literal(9), taskEnvelopeSha256: sha256,
+    outputSchemaVersion: z.literal(9),
     outputSchemaId: z.enum([
-      "work-node-outcome-v8", "validation-node-outcome-v8",
-      "orchestrator-node-outcome-v8", "repair-node-outcome-v8"
+      "work-node-outcome-v9", "validation-node-outcome-v9"
     ]),
     outputSchema: z.record(z.string(), z.json()), outputSchemaSha256: sha256
   }).strict(),

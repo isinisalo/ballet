@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 20
+version: 21
 tags:
   - arc42
   - architecture
@@ -13,13 +13,9 @@ tags:
 
 # Balletin arc42-arkkitehtuuri-indeksi
 
-## Tarkoitus
+## Nykytila
 
-Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorakenne virallisen [arc42:n 12 osion](https://docs.arc42.org/home/) mukaisesti. Balletin project-local GraphNodet toteuttavat jatkuvan menetelmän, joka ylläpitää rakennetta evidenssin ja ihmisarvion kautta.
-
-## Tila
-
-12-osioinen baseline on hyväksytty. Nykyinen implementation käyttää strict-v17 Graph/GraphNode/JobNode/strategy-sopimusta, explicit scoped `agent_v1 | ssp_v2` -strategioita ilman fallbackia, Graph Node Module v5:tä, Root Snapshot v10:tä, policy observation v3:a, Task Envelope/outcome v8:aa, composition v9:ää, ExecutionSpec v10:tä ja SQLite schema v13:a. `goal-017`–`goal-019` ja `adr-027`–`adr-030` ovat accepted; Phase 2 option-cost-evidenssi on toteutettu. Phase 3, calibrated pilot ja Portti B odottavat omia input-/ihmisporttejaan. Aktiivinen korpus on suomenkielinen; lähdekoodin nimet, stable ID:t ja vakiintuneet Ballet-termit säilyvät englanniksi.
+12-osioinen baseline on accepted. Aktiivinen implementation on `goal-020` / `adr-031`: yksi Graph-tason `reward_mdp_v3`, immutable acceptance- ja authorization-snapshotit, kerran compiled discounted policy ja ordered GraphNode execution. Strict cut on v18/v3/v6/v11/v9/v10/v11/v4/v14. Scoped agent/local-policy/Repair/shadow/promotion-mallit ovat historiallisia, eivät active runtimea.
 
 ## Osiot
 
@@ -36,63 +32,33 @@ Tämä hakemisto on Balletin kanoninen, versionhallittu arkkitehtuurin tietorake
 11. [Riskit ja tekninen velka](11-risks-and-technical-debt.md)
 12. [Sanasto](12-glossary.md)
 
-## Canvasit
-
-- [Tech Stack Canvas](canvases/TECH-STACK-CANVAS.md): 12 Mermaid-kortin pikayhteenveto teknologiapinosta, sizingistä, integraatioista, laadunvarmistuksesta ja tunnetuista stack-aukoista.
-- [Architecture Communication Canvas](canvases/ARCHITECTURE-COMMUNICATION-CANVAS.md): yhdeksän Mermaid-kortin yhteenveto arvolupauksesta, sidosryhmistä, toiminnoista, vastuista, päätösten trade-offeista ja riskeistä.
-- [Architecture Inception Canvas](canvases/ARCHITECTURE-INCEPTION-CANVAS.md): kahdeksan Mermaid-kortin retrospektiivinen business case, aloitusrajat, top-3-laatu, hypoteesit ja tekniset haasteet.
-
-Canvasit ovat `draft`-tilaisia Markdown + Mermaid -projektioita. Korttiruudukko on pikayhteenveto ja sen alla oleva Markdown jäljitettävä tarkennus. Ne eivät omista WHAT/WHY:tä, hyväksyttyä päätöstä, arkkitehtuuriosion yksityiskohtaa tai toteutuksen totuutta; ristiriidassa kanoninen lähde voittaa.
-
 ## Tukilähteet
 
-- [STATUS](STATUS.md): persistent project status ja yksi seuraava handoff.
-- [TRACEABILITY](TRACEABILITY.md): Goal/REQ–QS–ratkaisu–testi–evidenssi-suhteet.
-- [METHOD-HEALTH](METHOD-HEALTH.md): menetelmän mitatut toimintahavainnot ja muutoshypoteesit.
-- [STATE-CONTRACT](STATE-CONTRACT.md): rajattu runtime State; Markdown säilyy pitkäikäisenä totuutena.
-- [Migration assessment](migration/ASSESSMENT.md): historiallinen lähtötilan evidenssi, jota ei uudelleenkirjoiteta.
+- [STATUS](STATUS.md): pitkäikäinen nykytila ja yksi seuraava handoff.
+- [TRACEABILITY](TRACEABILITY.md): Goal/REQ–QS–ADR/CON–BB–RT–TEST–EVID-ketjut.
+- [METHOD-HEALTH](METHOD-HEALTH.md): vain mitattu menetelmäevidenssi.
+- [STATE-CONTRACT](STATE-CONTRACT.md): bounded project State; authorization ja acceptance pysyvät erillisinä snapshoteina.
+- [Graph Reward-MDP initiative](initiatives/graph-reward-mdp/BRIEF.md): tämän hard cutin BRIEF/PLAN/EVIDENCE/REVIEW.
 - [Initiative template](initiatives/TEMPLATE/BRIEF.md): uuden rajatun työn rakenne.
-- [Comprehensive documentation initiative](initiatives/comprehensive-arc42-documentation/BRIEF.md): tämän suomenkielisen kattavan dokumentaation draft-ketju.
-- [Architecture canvases initiative](initiatives/architecture-canvases/BRIEF.md): kolmen canvas-projektion draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju.
-- [Graph and Loop Engineering initiative](initiatives/graph-and-loop-engineering/BRIEF.md): accepted v11-päätöksen BRIEF/PLAN/EVIDENCE/REVIEW-ketju; domain/config/snapshot/module/runtime sekä routing/Graph/Loop Engineering -tekninen evidenssi on kerätty, ihmisacceptance on pending.
-- [Workflow Engineering initiative](initiatives/workflow-engineering/BRIEF.md): accepted `goal-013` / `adr-020` / `adr-021` -päätösrajan draft BRIEF/PLAN/EVIDENCE/REVIEW-ketju; strict-v12/v2-tekninen evidenssi ja Job-only canvas-korjaus arvioidaan erikseen, final gate ja ihmisacceptance ovat pending.
-- [Graph Engineering RunBook initiative](initiatives/graph-engineering-runbook/BRIEF.md): accepted `goal-014` / `adr-022` -rajan strict-v13/V3-, tracker-, viiden Loopin data-, Graph UI- ja conformance-evidenssi.
-- [Three-level Graph Node Engineering initiative](initiatives/three-level-graph-node-engineering/BRIEF.md): accepted `goal-015` / `adr-023` -rajan strict-v14/V4/V10-, scoped routing/repair-, kolmen canvasin ja conformance-evidenssi.
-- [Job Node industrial flow canvas initiative](initiatives/job-node-industrial-flow-canvas/BRIEF.md): accepted `adr-025`/`adr-027`:n bounded UI-, a11y-, desktop/narrow- ja conformance-evidenssi ilman runtime-sopimusmuutosta.
-- [Stochastic Policy Orchestration initiative](initiatives/stochastic-policy-orchestration/BRIEF.md): accepted `goal-016` / `adr-026` finite SSP/SMDP Graph-policy; core implementation evidence on kerätty ja projection/pilot/conformance ovat review-rajalla.
-- [Outcome-aware hierarchical policy initiative](initiatives/outcome-aware-hierarchical-policy/BRIEF.md): accepted `goal-017` / `adr-028` scoped outcome-aware `ssp_v2`, proper-policy-, projection-, observation- ja pilotointiketju.
-- [Capability-first authoring initiative](initiatives/capability-first-authoring/BRIEF.md): accepted `goal-018` / `adr-029` upper-level card authoring ja Run-policy/evidence-projektio ADR-025/027:n Job-flow'ta muuttamatta.
-- [Governed policy calibration and promotion initiative](initiatives/governed-policy-calibration-and-promotion/BRIEF.md): accepted `goal-019` / `adr-030` observation-cost-, offline candidate-, evaluation-, shadow- ja human activation/rollback -ketju; Phase 2 on toteutettu.
+
+Vanhat initiativet säilyvät historiallisena evidenssinä. Niiden scoped agent/SSP/Repair/calibration-väitteet eivät ohita `adr-031`:n supersessionia.
 
 ## Kanoninen omistajuus
 
 | Lähde | Omistaa | Ei omista |
 | --- | --- | --- |
-| `.ballet/goals/**` | WHAT/WHY, rajaus ja hyväksymisaie | Arkkitehtuuripäätöksen koko perustelu |
-| `.ballet/adr/**` | Hyväksytyt arkkitehtuuripäätökset ja supersession | Runtime-logi tai initiative-evidenssi |
-| Osiot 1–12 | Pitkäikäiset arkkitehtuurinäkymät ja selitykset | Goal/ADR-tekstin kopio |
-| `canvases/**` | Tiivis teknologia-, kommunikaatio- tai inception-projektio | Uusi WHAT/WHY, päätös tai rinnakkainen arkkitehtuuritotuus |
-| `initiatives/<id>/**` | Rajatun muutoksen BRIEF/PLAN/EVIDENCE/REVIEW | Koko projektin rinnakkainen arkkitehtuurikorpus |
-| `STATUS` / `TRACEABILITY` / `METHOD-HEALTH` | Persistent handoff, suhteet ja mitattu menetelmätila | Runtime-logidumppi |
-| `DESIGN.md` | UI-designjärjestelmä | Runtime-control semantics |
-| `.git/ballet` | Machine-local canonical runtime state | Versionhallittu project truth |
+| `.ballet/goals/**` | WHAT/WHY ja supersession | Runtime-toteutuksen yksityiskohta |
+| `.ballet/adr/**` | Arkkitehtuuripäätös ja trade-off | Runtime-logi |
+| Osiot 1–12 | Pitkäikäiset arkkitehtuurinäkymät | Goal/ADR-tekstin kopio |
+| Initiative | Rajattu sopimus, suunnitelma, evidenssi ja review | Koko projektin rinnakkainen totuus |
+| `STATUS` / `TRACEABILITY` / `METHOD-HEALTH` | Handoff, suhteet ja mitattu tila | Keksitty pilottievidenssi |
+| `DESIGN.md` | UI-tokenit ja suojattu canvas | Runtime control state |
+| `.git/ballet` | Machine-local runtime truth | Versionhallittu intentio |
 
 ## Työskentelysääntö
 
-Uusi initiative alkaa TEMPLATE-hakemiston kopiosta omilla vakailla ID:illä ja `draft`-tilassa. Active Graph ja GraphNode runtime käyttävät kumpikin eksplisiittistä `agent_v1`- tai `ssp_v2`-strategiaa ilman runtime-fallbackia. `ssp_v2` ratkaisee GraphNode-optionin tai JobNode-actionin scopekohtaisesta proper policysta; Work→Validation, bounded retry ja scoped Repair ovat Job Noden kiinteitä invariantteja. Epäselvä WHAT/WHY, prioriteetti, projisoimaton state tai merkittävä valinta pysähtyy `needs_input`-tilaan.
-
-## Relevantit päätökset
-
-`goal-009`–`goal-019`, `adr-011`, `adr-013`–`adr-016` ja `adr-023`–`adr-030`.
+Epäselvä WHAT/WHY, laatuprioriteetti, merkittävä ADR tai external-write-valtuutus pysähtyy `needs_input`-tilaan. Validation-evidenssi ei valtuuta deployta. Policy observation ei mutatoi immutablea mallia.
 
 ## Evidenssi
 
-Virallinen [arc42-dokumentaatio](https://docs.arc42.org/home/) määrittää osiorakenteen. Paikallinen `npm run validate:arc42` tarkistaa dokumentti- ja trace-sopimuksen, strict-v17 scoped strategy -konfiguraation sekä project-local-menetelmäresurssit.
-
-## Avoimet kysymykset
-
-- Initiative-kohtaista kysymystä ei nosteta project-tasolle, ellei vaikutus ylitä initiative-rajaa.
-
-## Seuraava katselmointiperuste
-
-Katselmoi indeksi, kun kanoninen polku, section ownership, initiative template tai persistent handoff muuttuu.
+`npm run validate:arc42` tarkistaa dokumenttirakenteen, linkit, trace-ID:t, project-resurssit ja strict-v18 Reward-MDP -defaultin. Tuotantokaltainen pilotti on pending, kunnes nimetty Root Run -evidenssi on olemassa.

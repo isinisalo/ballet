@@ -2,7 +2,12 @@ import type { JsonValue, ProjectGraph } from "./automation.js";
 import type { CanvasTheme } from "./canvasTheme.js";
 import type { ExecutionPolicy, RuntimeProvider } from "./localRuntime.js";
 import type { ExecutionProfile, ProjectIssueTrackerConfig } from "./projectConfig.js";
-import type { CanonicalNodeOutcome, NodeRunRole, OrchestrationScope } from "./runtime.js";
+import type { CanonicalNodeOutcome, NodeRunRole } from "./runtime.js";
+import type {
+  AcceptanceLedgerSnapshotV1,
+  AuthorizationSnapshotV1,
+  CompiledRewardPolicyV3
+} from "./decisionModel.js";
 
 export type {
   ExecutionPolicy, LocalCheckoutStatus, LocalProviderHealth, LocalProviderStatus,
@@ -40,52 +45,46 @@ export interface ExecutionResourceSnapshot {
 export interface ExecutionRuntimeBinding { executionProfileId: string; runtime: ExecutionRuntimeSnapshot; }
 
 export interface RootExecutionSnapshot {
-  version: 10;
-  policyObservationContractVersion: 3;
+  version: 11;
+  policyObservationContractVersion: 4;
   rootKind: "graph" | "graph_node";
   rootGraphNodeId?: string;
   project: ExecutionProjectSnapshot;
   issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;
-  graphDecision: {
-    strategyKind: "agent_v1" | "ssp_v2";
-    modelVersion?: 2;
-    modelSha256?: string;
-    capabilityModelSha256?: string;
+  decisionModel: {
+    strategyKind: "reward_mdp_v3";
+    modelVersion: 3;
+    modelSha256: string;
+    capabilityModelSha256: string;
   };
-  graphNodeDecisions: Record<string, {
-    strategyKind: "agent_v1" | "ssp_v2";
-    modelVersion?: 2;
-    modelSha256?: string;
-    capabilityModelSha256?: string;
-  }>;
   theme: CanvasTheme;
   executionProfiles: ExecutionProfile[];
   runtimes: ExecutionRuntimeBinding[];
   resources: ExecutionResourceSnapshot[];
+  authorization: AuthorizationSnapshotV1;
+  acceptanceLedger: AcceptanceLedgerSnapshotV1;
+  compiledPolicy: CompiledRewardPolicyV3;
   createdAt: string;
 }
 
 export type ExecutionResourceEvidence = Omit<ExecutionResourceSnapshot, "content">;
 export interface ExecutionPromptEvidence {
-  compositionVersion: 9;
+  compositionVersion: 10;
   graphNodeId?: string;
-  jobNodeId?: string;
+  actionNodeId?: string;
   nodeRole: NodeRunRole;
-  orchestrationScope?: OrchestrationScope;
   nodeDefinitionId: string;
   executionProfile: ExecutionProfile;
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
-  taskEnvelopeVersion: 8;
+  taskEnvelopeVersion: 9;
   taskEnvelopeSha256: string;
-  outputSchemaVersion: 8;
+  outputSchemaVersion: 9;
   outputSchemaId:
-    | "work-node-outcome-v8"
-    | "validation-node-outcome-v8"
-    | "orchestrator-node-outcome-v8"
-    | "repair-node-outcome-v8";
+    | "work-node-outcome-v9"
+    | "validation-node-outcome-v9";
   outputSchema: Record<string, JsonValue>;
   outputSchemaSha256: string;
 }
@@ -93,12 +92,12 @@ export interface ExecutionPromptEvidence {
 export type ExecutionTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 export type ExecutionTaskKind = "node_execution";
 export interface ExecutionSpec {
-  version: 10;
+  version: 11;
   taskId: string;
   kind: ExecutionTaskKind;
   rootRunId: string;
   graphNodeInvocationId?: string;
-  jobNodeInvocationId?: string;
+  actionNodeInvocationId?: string;
   nodeRunId: string;
   evidence: ExecutionPromptEvidence;
   runtime: ExecutionRuntimeSnapshot;

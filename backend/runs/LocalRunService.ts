@@ -21,8 +21,6 @@ import { RootRunStore } from "./RootRunStore.js";
 import {
   currentPosition, decodeRunCursor, encodeRunCursor, isActiveRootStatus, publicRootSummary
 } from "./RunReadProjection.js";
-import { derivePolicyProjection } from "../policy/PolicyProjection.js";
-import { reconstructExecutionGraph, summarizePolicyTelemetry } from "../policy/PolicyRunReadModel.js";
 
 export interface LocalRunServiceOptions {
   context: ProjectContext;
@@ -102,52 +100,15 @@ export class LocalRunService {
     const graphNodeInvocations = this.options.database.listRootGraphNodeInvocations(rootRunId);
     const tasks = this.options.executions.listByRoot(rootRunId);
     const state = this.options.database.readRootState(rootRunId);
-    const persistedOrchestration = this.options.database.readRootOrchestration(rootRunId);
-    const strategies = Object.fromEntries([
-      ...(root.executionSnapshot.graph.strategy.kind === "ssp_v2"
-        ? [["graph", root.executionSnapshot.graph.strategy] as const] : []),
-      ...graphNodeInvocations.flatMap((invocation) => {
-        const graphNode = root.executionSnapshot.graph.graphNodes.find(({ id }) => id === invocation.graphNodeId);
-        return graphNode?.strategy.kind === "ssp_v2"
-          ? [[invocation.graphNodeInvocationId, graphNode.strategy] as const] : [];
-      })
-    ]);
-    const latestByScope = new Map<string, typeof persistedOrchestration.policyDecisions[number]>();
-    for (const decision of persistedOrchestration.policyDecisions) latestByScope.set(decision.scopeKey, decision);
-    const policyProjections = Object.fromEntries([...latestByScope].flatMap(([scopeKey, decision]) => {
-      const strategy = strategies[scopeKey];
-      if (!strategy || !decision.state || decision.solverStatus !== "converged") return [];
-      const actionIds = decision.scope === "graph"
-        ? root.executionSnapshot.graph.graphNodes.map(({ id }) => id)
-        : root.executionSnapshot.graph.graphNodes.find(({ id }) => id === graphNodeInvocations.find(
-          ({ graphNodeInvocationId }) => graphNodeInvocationId === scopeKey
-        )?.graphNodeId)?.jobNodes.map(({ id }) => id) ?? [];
-      return [[scopeKey, derivePolicyProjection({
-        strategy, scope: decision.scope, currentStateId: decision.state.stateId,
-        snapshotActionIds: actionIds, modelSha256: decision.modelSha256, source: "run_snapshot"
-      })]];
-    }));
-    const orchestration = {
-      ...persistedOrchestration,
-      policyProjections,
-      executionGraph: reconstructExecutionGraph({
-        strategies,
-        decisions: persistedOrchestration.policyDecisions,
-        observations: persistedOrchestration.policyObservations,
-        invocations: graphNodeInvocations
-      }),
-      policyTelemetry: summarizePolicyTelemetry(persistedOrchestration.policyObservations)
-    };
-    const repair = this.options.database.readRootRepair(rootRunId);
+    const orchestration = this.options.database.readRootOrchestration(rootRunId);
     return {
       ...publicRootSummary(root),
-      current: currentPosition(root, graphNodeInvocations, tasks, repair),
+      current: currentPosition(root, graphNodeInvocations, tasks),
       executionSnapshot: root.executionSnapshot,
       graphNodeInvocations,
       tasks,
       state,
       orchestration,
-      repair,
       controlFlowEvents: this.options.database.listControlFlowEvents(rootRunId)
     };
   }
@@ -222,12 +183,12 @@ export class LocalRunService {
       const taskId = randomUUID();
       const evidence = composeExecutionPrompt(root.executionSnapshot, this.options.database.buildTaskEnvelope(node.nodeRunId));
       const spec = {
-        version: 10 as const,
+        version: 11 as const,
         taskId,
         kind: "node_execution" as const,
         rootRunId,
         graphNodeInvocationId: node.graphNodeInvocationId,
-        jobNodeInvocationId: node.jobNodeInvocationId,
+        actionNodeInvocationId: node.actionNodeInvocationId,
         nodeRunId: node.nodeRunId,
         evidence,
         runtime: runtimeForNode(root.executionSnapshot, evidence.executionProfile.id),
@@ -278,8 +239,7 @@ export class LocalRunService {
   private summary(root: ReturnType<RootRunStore["require"]>) {
     const invocations = this.options.database.listRootGraphNodeInvocations(root.rootRunId);
     const tasks = this.options.executions.listByRoot(root.rootRunId);
-    const repair = this.options.database.readRootRepair(root.rootRunId);
-    return { ...publicRootSummary(root), current: currentPosition(root, invocations, tasks, repair) };
+    return { ...publicRootSummary(root), current: currentPosition(root, invocations, tasks) };
   }
 
   private detailRequired(rootRunId: string): RootRunDetail {
@@ -292,9 +252,9 @@ export class LocalRunService {
 
 const isHumanNode = (snapshot: ReturnType<RootRunStore["require"]>["executionSnapshot"], node: NodeRun): boolean => {
   const graphNode = snapshot.graph.graphNodes.find(({ id }) => id === node.graphNodeId);
-  const job = graphNode?.jobNodes.find(({ id }) => id === node.jobNodeId);
-  return node.role === "work" ? job?.workNode.type === "human"
-    : node.role === "validation" ? job?.validationNode.type === "human" : false;
+  const action = graphNode?.actionNodes.find(({ id }) => id === node.actionNodeId);
+  return node.role === "work" ? action?.workNode.type === "human"
+    : node.role === "validation" ? action?.validationNode.type === "human" : false;
 };
 const message = (error: unknown): string => error instanceof Error ? error.message : String(error);
 const isTerminal = (status: string): status is "completed"|"blocked"|"failed"|"cancelled" =>

@@ -1,12 +1,8 @@
-export const projectConfigurationVersion = 17 as const;
+export const projectConfigurationVersion = 18 as const;
 export const maxProjectStateBytes = 262_144;
-export const maxJobRetriesLimit = 100;
+export const maxActionRetriesLimit = 100;
 export const maxProjectGraphNodes = 40;
-export const maxGraphNodeJobNodes = 64;
-export const maxOrchestratorTransitions = 256;
-export const maxRouteAttemptsLimit = 3;
-export const maxRepairAttemptsLimit = 100;
-export const maxRepairDepthLimit = 100;
+export const maxGraphNodeActionNodes = 64;
 export const maxNodeCapabilities = 64;
 export const maxNodeCapabilityLength = 200;
 export const nodeCapabilityPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*:[a-z][a-z0-9]*(?:[._/-][a-z0-9]+)*$/;
@@ -116,7 +112,7 @@ export interface ProjectHumanValidationNode extends ProjectExecutableNodeBase {
 
 export type ProjectValidationNode = ProjectAgentValidationNode | ProjectHumanValidationNode;
 
-export interface ProjectJobNode {
+export interface ProjectActionNode {
   id: string;
   description: string;
   capabilities: ProjectNodeCapabilities;
@@ -127,85 +123,20 @@ export interface ProjectJobNode {
   validationNode: ProjectValidationNode;
 }
 
-export interface ProjectGraphNodeTarget { graphNodeId: string; }
-export interface ProjectJobNodeTarget { jobNodeId: string; }
-export interface ProjectTerminalTarget { terminal: NodeResult; }
-
-export type ProjectGraphRouteTarget = ProjectGraphNodeTarget | ProjectTerminalTarget;
-export type ProjectGraphNodeRouteTarget = ProjectJobNodeTarget | ProjectTerminalTarget;
-
-export interface ProjectRouteCandidate<TTarget> {
-  target: TTarget;
-  description: string;
-}
-
-export interface ProjectStartCandidateRule<TTarget> {
-  id: string;
-  candidates: ProjectRouteCandidate<TTarget>[];
-}
-
-export interface ProjectContinuationCandidateRule<TTarget> {
-  id: string;
-  sourceId: string;
-  result: NodeResult;
-  candidates: ProjectRouteCandidate<TTarget>[];
-}
-
-export interface ProjectRepairCandidateRule<TTarget> {
-  id: string;
-  sourceId: string;
-  capability: string;
-  candidates: ProjectRouteCandidate<TTarget>[];
-}
-
-export interface ProjectCandidateRouting<TTarget> {
-  start: ProjectStartCandidateRule<TTarget>;
-  continuation: ProjectContinuationCandidateRule<TTarget>[];
-  repair: ProjectRepairCandidateRule<TTarget>[];
-}
-
-export interface ProjectOrchestrator<TTarget> extends ProjectExecutionComposition {
-  id: string;
-  description: string;
-  maxTransitions: number;
-  maxRouteAttempts: number;
-  routing: ProjectCandidateRouting<TTarget>;
-}
-
-export interface ProjectRepairNode extends ProjectExecutionComposition {
-  id: string;
-  description: string;
-  task: string;
-  maxRepairDepth: number;
-  maxRepairAttempts: number;
-}
-
-export interface ProjectAgentGraphNodeStrategyV1 {
-  kind: "agent_v1";
-  orchestrator: ProjectOrchestrator<ProjectGraphNodeRouteTarget>;
-}
-
-export type ProjectGraphNodeDecisionStrategyV2 =
-  | ProjectAgentGraphNodeStrategyV1
-  | import("./decisionModel.js").ProjectSspDecisionStrategyV2;
-
 export interface ProjectGraphNode {
   id: string;
   description: string;
   capabilities: ProjectNodeCapabilities;
   outcomes: ProjectIntrinsicOutcome[];
   stateContract: ProjectStateContract;
-  strategy: ProjectGraphNodeDecisionStrategyV2;
-  repairNode?: ProjectRepairNode;
-  jobNodes: ProjectJobNode[];
+  actionNodes: ProjectActionNode[];
 }
 
 export interface ProjectGraph {
   id: string;
   name: string;
   state: ProjectStateDefinition;
-  strategy: import("./decisionModel.js").ProjectGraphDecisionStrategyV2;
-  repairNode?: ProjectRepairNode;
+  strategy: import("./decisionModel.js").ProjectRewardDecisionStrategyV3;
   graphNodes: ProjectGraphNode[];
 }
 
@@ -214,21 +145,6 @@ export interface ProjectAutomationConfig {
   graph: ProjectGraph;
 }
 
-export const defaultProjectOrchestrator = <TTarget>(): ProjectOrchestrator<TTarget> => ({
-  id: "orchestrator",
-  description: "Selects the next allowed target from the immutable candidate set.",
-  executionProfileId: "",
-  primaryInstructionId: "",
-  skillIds: [],
-  maxTransitions: maxOrchestratorTransitions,
-  maxRouteAttempts: maxRouteAttemptsLimit,
-  routing: {
-    start: { id: "start", candidates: [] },
-    continuation: [],
-    repair: []
-  }
-});
-
 export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
   version: projectConfigurationVersion,
   graph: {
@@ -236,8 +152,35 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
     name: "Graph Engineering",
     state: { description: "Shared immutable-snapshot Graph state.", initial: {} },
     strategy: {
-      kind: "agent_v1",
-      orchestrator: defaultProjectOrchestrator<ProjectGraphRouteTarget>()
+      kind: "reward_mdp_v3",
+      id: "graph-reward-mdp",
+      description: "Selects Graph Nodes from a compiled discounted Reward-MDP policy.",
+      capabilityModel: { version: 3, outcomes: [], actions: [] },
+      model: {
+        version: 3,
+        discountPpm: 990_000,
+        acceptance: { version: 1, obligations: [] },
+        reward: {
+          actionCostMicros: 1_000_000,
+          completionBonusMicros: 25_000_000,
+          progressPotentialScaleMicros: 100_000_000,
+          outcomePenaltyMicros: {
+            none: 0,
+            transient: 2_000_000,
+            implementation_defect: 5_000_000,
+            invalid_plan: 12_000_000,
+            invalid_design: 25_000_000
+          }
+        },
+        features: [],
+        states: [],
+        stateActions: [],
+        solver: {
+          algorithm: "discounted_value_iteration_v3",
+          maxIterations: 10_000,
+          convergenceToleranceMicros: 1
+        }
+      }
     },
     graphNodes: []
   }
@@ -251,12 +194,6 @@ export const isProjectAgentValidationNode = (
 export const isProjectHumanValidationNode = (
   node: ProjectValidationNode
 ): node is ProjectHumanValidationNode => node.type === "human";
-
-export const routeTargetKey = (target: ProjectGraphRouteTarget | ProjectGraphNodeRouteTarget): string => {
-  if ("graphNodeId" in target) return `graph-node:${target.graphNodeId}`;
-  if ("jobNodeId" in target) return `job-node:${target.jobNodeId}`;
-  return `terminal:${target.terminal}`;
-};
 
 export interface ProjectAutomationIssue {
   path: string;

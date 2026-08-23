@@ -3,8 +3,8 @@ id: arc42-section-03
 title: Konteksti ja rajaus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-22'
-version: 4
+updatedAt: '2026-08-23'
+version: 5
 tags:
   - arc42
   - context
@@ -20,7 +20,7 @@ Tämä osio määrittää Balletin liiketoiminta- ja teknisen järjestelmärajan
 
 ## Tila
 
-Konteksti vastaa nykyistä checkout-local-arkkitehtuuria. Kolmitasoiset Graph Engineering-, Graph Node- ja Job Node -näkymät sekä Graph/GraphNode Run -näkymät ovat käyttöliittymäprojektioita saman rajan sisällä; ne eivät ole uusia runtime-järjestelmiä.
+Konteksti vastaa nykyistä checkout-local-arkkitehtuuria. Kolmitasoiset Graph Engineering-, Graph Node- ja Action Node -näkymät sekä Graph/GraphNode Run -näkymät ovat käyttöliittymäprojektioita saman rajan sisällä; ne eivät ole uusia runtime-järjestelmiä.
 
 ## Liiketoimintakonteksti
 
@@ -39,7 +39,7 @@ Ballet auttaa projektin omistajaa ja toimitustiimiä määrittelemään, suoritt
 | Osapuoli | Balletiin tuleva tieto | Balletista lähtevä tieto/vaikutus | Luottamusraja |
 | --- | --- | --- | --- |
 | Projektin omistaja/operaattori | Goalit, project-resurssit, Run-käsky, Human Validation ja ulkoinen valtuutus. | UI/CLI-tila, evidenssi, worktree-tulos ja pyydetty päätös. | Ihminen säilyttää WHAT/WHY:n ja ulkoisten toimien vallan. |
-| Kehittäjä tai AI-agentti | Rajattu toteutus, analyysi ja schema-validi outcome. | Task Envelope, resurssit, rooli, tila ja korjauspyyntö. | Providerin vastaus ei ole kanoninen ennen validointia ja commitointia. |
+| Kehittäjä tai AI-agentti | Rajattu toteutus, analyysi ja schema-validi outcome. | Task Envelope, resurssit, rooli, tila ja acceptance-evidenssi. | Providerin vastaus ei ole kanoninen ennen validointia ja commitointia. |
 | Riippumaton katselmoija | Conformance- ja hyväksymishavainto. | BRIEF, PLAN, diffi, testit ja EVIDENCE. | Katselmointi ei saa hiljaisesti muuttaa arvioitavaa toteutusta. |
 | Git-checkout | Lähdekoodi, Goals, ADR:t, arc42, project config, instructionit, skillit ja historia. | Vain ihmisvaltuutettu integraatio; Node-työ tehdään Root Run -worktreessä. | Active checkout ja Run-worktree ovat eri kirjoitusalueita. |
 | GitHub/CI/CD/release-kohde | Remote-status ja ulkoinen evidenssi. | Push, release, deploy tai rollback vain täsmällisellä valtuutuksella. | Verkko ja ulkoinen kirjoitus ovat oletuksena pois päältä. |
@@ -57,10 +57,10 @@ flowchart LR
   api -->|"Task Envelope + exact prompt"| lanes["Provider-kohtaiset FIFO-kaistat"]
   lanes <-->|"strict outcome"| codex["Codex app-server"]
   lanes <-->|"strict outcome"| copilot["GitHub Copilot SDK/CLI"]
-  package["Graph Node Module v4 JSON"] -->|"browser file content / library package"| api
+  package["Graph Node Module v6 JSON"] -->|"browser file content / library package"| api
 ```
 
-React SPA käyttää Expressin loopback-API:a. Backend lukee strict-v14 project-local-resurssit, muodostaa Graph- tai GraphNode-Runille immutable Root Snapshot v7:n, luo branch/worktreen, jonottaa scoped role -tehtävät ja persistoi runtime-faktat SQLite v10:een. Adapterit saavat täsmällisesti koostetun promptin, strict target-enumin ja output-skeeman. Vain validoitu outcome voi tuottaa atomisen State-revision, invocationin tai ohjausvirtatapahtuman.
+React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Config v18 -resurssit, muodostaa Graph- tai GraphNode-Runille immutable Root Snapshot v11:n, kääntää Graph Reward-MDP:n kerran policy-taulukoksi, luo branch/worktreen ja persistoi runtime-faktat SQLite v14:ään. Adapterit saavat täsmällisesti koostetun Task Envelope v9:n, roolikohtaisen output-skeeman ja rajatut resurssit. Vain validoitu outcome ja Validationin evidenssi voivat tuottaa atomisen State-, acceptance-ledger- tai policy observation -revision.
 
 ## I/O-, kanava- ja luottamusrajakartoitus
 
@@ -88,19 +88,19 @@ React SPA käyttää Expressin loopback-API:a. Backend lukee strict-v14 project-
 - Automaattinen merge, push, release, deploy tai rollback.
 - Mielivaltaisen pakettipolun tai etärekisterin lataaminen backendissä.
 - Project-specific roadmap-, milestone-, acceptance- tai arc42-menettely platform-koodissa.
-- Standalone JobNode Run, schedule tai compatibility control plane vanhalle domainille.
+- Standalone Action Node Run, schedule tai compatibility control plane vanhalle domainille.
 
 ## Kanoniset lähteet
 
-`README.md`, `goal-001`, `goal-003`, `goal-005`, `goal-008`, `goal-010`, `goal-015` ja ADR-001/005/006/008/009/016/023.
+`README.md`, `goal-001`, `goal-003`, `goal-005`, `goal-008`, `goal-010`, `goal-015`, `goal-020` ja ADR-001/005/006/008/009/016/031.
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`, `adr-016` ja `adr-023`.
+`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`, `adr-016` ja `adr-031`.
 
 ## Evidenssi
 
-Local API-, checkout identity-, provider adapter-, Git worktree-, recovery- ja Graph Node Module -testit kattavat toteutetut tekniset rajat. Uuden boundaryn evidenssi indeksoidaan EVID-019/020-ketjuun.
+Local API-, checkout identity-, provider adapter-, Git worktree-, recovery- ja Graph Node Module -testit kattavat toteutetut tekniset rajat. Reward-MDP-rajan evidenssi indeksoidaan EVID-026/GRM-evid-004-ketjuun.
 
 ## Avoimet kysymykset
 

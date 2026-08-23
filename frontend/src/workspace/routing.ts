@@ -39,7 +39,7 @@ const automationRoute = (url: URL): RouteState | undefined => {
     view: "automation",
     engineeringLevel: "graph_node",
     graphNodeId: decodeURIComponent(graphNode[1]),
-    engineeringSection: url.searchParams.get("section") === "local-decision-model" ? "local-decision-model" : "actions"
+    engineeringSection: "actions"
   };
   return undefined;
 };
@@ -103,7 +103,7 @@ export const skillDocumentPath = (relativePath: string) => `/skills?path=${encod
 export const skillCreatePath = () => "/skills?new=1";
 const sectionQuery = (section?: EngineeringSection) => section ? `?section=${encodeURIComponent(section)}` : "";
 export const automationGraphPath = (section?: "capabilities" | "decision-model") => `/automation/graph${sectionQuery(section)}`;
-export const automationGraphNodePath = (graphNodeId: string, section?: "actions" | "local-decision-model") =>
+export const automationGraphNodePath = (graphNodeId: string, section?: "actions") =>
   `/automation/graph/nodes/${encodeURIComponent(graphNodeId)}${sectionQuery(section)}`;
 export const automationActionNodePath = (graphNodeId: string, actionNodeId: string) =>
   `${automationGraphNodePath(graphNodeId)}/actions/${encodeURIComponent(actionNodeId)}`;

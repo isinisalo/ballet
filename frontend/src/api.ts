@@ -5,8 +5,8 @@ import type {
   ExecutionProfileSaveRequest,
   CanvasTheme,
   ProjectAutomationConfig,
-  PolicyPreviewResultV2,
-  PolicyPreviewRequestV2,
+  PolicyPreviewResultV3,
+  PolicyPreviewRequestV3,
   InstalledGraphNodeModuleStatus,
   GraphNodeModuleExportRequest,
   GraphNodeModuleExportResult,
@@ -40,8 +40,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(config)
     }),
-  previewPolicy: (input: PolicyPreviewRequestV2) =>
-    request<PolicyPreviewResultV2>("/api/automation/policy-preview", {
+  previewPolicy: (input: PolicyPreviewRequestV3) =>
+    request<PolicyPreviewResultV3>("/api/automation/policy-preview", {
       method: "POST",
       body: JSON.stringify(input)
     }),
