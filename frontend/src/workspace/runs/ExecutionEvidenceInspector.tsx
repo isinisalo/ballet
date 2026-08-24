@@ -1,20 +1,20 @@
-import type { PolicyCostMeasureV1, PolicyOptionObservationV4 } from "@shared/api/workspace-contracts";
+import type { PolicyCostMeasureV1, PolicyOptionObservationV5 } from "@shared/api/workspace-contracts";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ExecutionEvidenceInspector({ observation, onClose }: {
-  observation: PolicyOptionObservationV4;
+  observation: PolicyOptionObservationV5;
   onClose: () => void;
 }) {
   const mobile = useIsMobile();
   const body = <ScrollArea className="min-h-0 flex-1"><div className="grid gap-4 p-4">
-    <EvidenceGroup label="Decision state before" value={`${observation.stateBefore.stateId}\n${JSON.stringify(observation.stateBefore.features, null, 2)}`} />
+    <EvidenceGroup label="Decision state before" value={`${observation.stateBefore.scope}${observation.stateBefore.graphNodeId ? ` · ${observation.stateBefore.graphNodeId}` : ""}\n${observation.stateBefore.stateId}`} />
     <EvidenceGroup label="Selected action" value={observation.actionId} />
-    <EvidenceGroup label="Configured P(outcome,state′|state,action)" value={observation.expectedOutcomeDistribution.map(({ outcomeId, nextStateId, probabilityPpm, provenance }) => `${outcomeId} → ${nextStateId}: ${formatProbability(probabilityPpm)} · ${provenance}`).join("\n")} />
+    <EvidenceGroup label="Configured P(outcome,target|state,action)" value={observation.expectedOutcomeDistribution.map(({ outcomeId, target, probabilityPpm, provenance }) => `${outcomeId} → ${target.kind === "state" ? target.stateId : `${target.terminal}${target.emitOutcomeId ? ` · emit ${target.emitOutcomeId}` : ""}`}: ${formatProbability(probabilityPpm)} · ${provenance}`).join("\n")} />
     <EvidenceGroup label="Observed semantic outcome" value={`${observation.observedOutcomeId} · ${observation.verifiedResult}`} />
-    <EvidenceGroup label="Canonical actual projected state" value={observation.actualState ? `${observation.actualState.stateId}\n${JSON.stringify(observation.actualState.features, null, 2)}` : "Projection unavailable"} />
+    <EvidenceGroup label="Deterministic branch result" value={observation.actualState ? observation.actualState.stateId : observation.terminal ? `terminal · ${observation.terminal}` : "Unavailable"} />
     <EvidenceGroup label="Acceptance ledger" value={observation.acceptanceLedgerAfter.entries.map(({ obligationId, status, weight }) => `${obligationId}: ${status} (${weight})`).join("\n")} />
     <EvidenceGroup label="Realized reward" value={`${formatMicros(observation.realizedRewardMicros)} · ${observation.modelMatch}`} />
     <EvidenceGroup label="Observed provider-neutral cost" value={formatObservedCost(observation)} />
@@ -29,7 +29,7 @@ const formatProbability = (ppm: number) => `${(ppm / 10_000).toFixed(2)}%`;
 const formatMicros = (micros: number) => `${(micros / 1_000_000).toFixed(3)} reward`;
 const formatMeasure = (measure: PolicyCostMeasureV1, unit = "") => measure.status === "known"
   ? `${measure.value.toLocaleString()}${unit}` : `unknown (${measure.reason})`;
-const formatObservedCost = ({ observedCost }: PolicyOptionObservationV4) => {
+const formatObservedCost = ({ observedCost }: PolicyOptionObservationV5) => {
   const dimensions = observedCost.dimensions;
   return [
     `duration: ${formatMeasure(dimensions.durationMillis, " ms")}`,

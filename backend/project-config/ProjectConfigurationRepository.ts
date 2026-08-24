@@ -75,14 +75,14 @@ export class ProjectConfigurationRepository {
         issues: [sourceIssue("invalid_json", ".ballet/project.json", error instanceof Error ? error.message : "Project config is not valid JSON.")]
       };
     }
-    if (isRecord(value) && value.version !== 18) return {
+    if (isRecord(value) && value.version !== 19) return {
       path: filename,
       exists: true,
       source,
       issues: [sourceIssue(
         "invalid_schema",
         "version",
-        `Strict project config version 18 is required; version ${String(value.version)} is not supported.`
+        `Strict project config version 19 is required; version ${String(value.version)} is not supported.`
       )]
     };
     const parsed = projectConfigSchema.safeParse(value);
@@ -97,7 +97,7 @@ export class ProjectConfigurationRepository {
     assertWritable(loaded);
     const config = normalize({
       ...loaded.config,
-      version: 18,
+      version: 19,
       graph: automation.graph,
     });
     this.write(root, config);
@@ -112,7 +112,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 18,
+      version: 19,
       executionProfiles: [...loaded.config.executionProfiles, profile]
     });
     this.write(root, config);
@@ -127,7 +127,7 @@ export class ProjectConfigurationRepository {
     }
     const config = normalize({
       ...loaded.config,
-      version: 18,
+      version: 19,
       executionProfiles: loaded.config.executionProfiles.map((candidate) =>
         candidate.id === profile.id ? profile : candidate)
     });
@@ -141,7 +141,7 @@ export class ProjectConfigurationRepository {
     if (!loaded.config!.executionProfiles.some((profile) => profile.id === executionProfileId)) return loaded.config!;
     const config = normalize({
       ...loaded.config!,
-      version: 18,
+      version: 19,
       executionProfiles: loaded.config!.executionProfiles.filter((profile) => profile.id !== executionProfileId)
     });
     this.write(root, config);
@@ -175,7 +175,7 @@ export class ProjectConfigurationRepository {
 }
 
 const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
-  version: 18,
+  version: 19,
   executionProfiles: config.executionProfiles
     .map((profile) => ({
       id: profile.id,
@@ -190,6 +190,11 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
   graph: {
     ...config.graph,
     state: { ...config.graph.state, initial: structuredClone(config.graph.state.initial) },
+    acceptance: {
+      version: 1,
+      obligations: [...config.graph.acceptance.obligations]
+        .sort((left, right) => compareIds(left.obligationId, right.obligationId))
+    },
     strategy: normalizeGraphStrategy(config.graph.strategy),
     graphNodes: config.graph.graphNodes.map((graphNode) => ({
       ...graphNode,
@@ -198,7 +203,12 @@ const normalize = (config: ProjectConfiguration): ProjectConfiguration => ({
         provides: [...graphNode.capabilities.provides].sort(compareIds)
       },
       stateContract: { ...graphNode.stateContract },
-      outcomes: [...graphNode.outcomes].sort((left, right) => compareIds(left.outcomeId, right.outcomeId)),
+      strategy: normalizeGraphStrategy(graphNode.strategy),
+      outcomes: graphNode.outcomes.map((outcome) => ({
+        ...outcome,
+        acceptanceEffects: [...outcome.acceptanceEffects]
+          .sort((left, right) => compareIds(left.obligationId, right.obligationId))
+      })).sort((left, right) => compareIds(left.outcomeId, right.outcomeId)),
       actionNodes: graphNode.actionNodes.map((actionNode) => ({
         ...actionNode,
         outcomes: [...actionNode.outcomes].sort((left, right) => compareIds(left.outcomeId, right.outcomeId)),

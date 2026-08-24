@@ -4,7 +4,7 @@ title: Konteksti ja rajaus
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 5
+version: 6
 tags:
   - arc42
   - context
@@ -57,10 +57,10 @@ flowchart LR
   api -->|"Task Envelope + exact prompt"| lanes["Provider-kohtaiset FIFO-kaistat"]
   lanes <-->|"strict outcome"| codex["Codex app-server"]
   lanes <-->|"strict outcome"| copilot["GitHub Copilot SDK/CLI"]
-  package["Graph Node Module v6 JSON"] -->|"browser file content / library package"| api
+  package["Graph Node Module v7 JSON + local policy"] -->|"browser file content / library package"| api
 ```
 
-React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Config v18 -resurssit, muodostaa Graph- tai GraphNode-Runille immutable Root Snapshot v11:n, kääntää Graph Reward-MDP:n kerran policy-taulukoksi, luo branch/worktreen ja persistoi runtime-faktat SQLite v14:ään. Adapterit saavat täsmällisesti koostetun Task Envelope v9:n, roolikohtaisen output-skeeman ja rajatut resurssit. Vain validoitu outcome ja Validationin evidenssi voivat tuottaa atomisen State-, acceptance-ledger- tai policy observation -revision.
+React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Config v19 -resurssit, muodostaa Graph- tai GraphNode-Runille immutable Root Snapshot v12:n, kääntää global/reachable-local Reward-MDP:t erillisiksi policy-taulukoiksi, luo branch/worktreen ja persistoi runtime-faktat SQLite v15:een. Adapterit saavat Task Envelope v9:n. Vain validoitu typed outcome sekä exact acceptance-effect-portin läpäisevä Validation-evidenssi voivat tuottaa atomisen State-, ledger- tai scope-observation-revision.
 
 ## I/O-, kanava- ja luottamusrajakartoitus
 

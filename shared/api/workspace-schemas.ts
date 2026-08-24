@@ -152,6 +152,20 @@ const intrinsicOutcomesSchema = z.array(z.object({
   (outcomes) => new Set(outcomes.map(({ outcomeId }) => outcomeId)).size === outcomes.length,
   "Intrinsic outcome ids must be unique."
 );
+const graphNodeOutcomesSchema = z.array(z.object({
+  outcomeId: entityIdSchema,
+  result: z.enum(["PASS", "FAIL"]),
+  acceptanceEffects: z.array(z.object({
+    obligationId: entityIdSchema,
+    status: z.enum(["verified", "invalidated"])
+  }).strict()).max(1_024).refine(
+    (effects) => new Set(effects.map(({ obligationId }) => obligationId)).size === effects.length,
+    "An outcome may classify each acceptance obligation once."
+  )
+}).strict()).max(64).refine(
+  (outcomes) => new Set(outcomes.map(({ outcomeId }) => outcomeId)).size === outcomes.length,
+  "Intrinsic outcome ids must be unique."
+);
 const actionNodeSchema = z.object({
   id: entityIdSchema,
   description: descriptionSchema,
@@ -172,14 +186,25 @@ const graphNodeSchema = z.object({
   id: entityIdSchema,
   description: descriptionSchema,
   capabilities: capabilitiesSchema,
-  outcomes: intrinsicOutcomesSchema,
+  outcomes: graphNodeOutcomesSchema,
+  acceptanceObligationId: entityIdSchema.optional(),
   stateContract: z.object({ description: descriptionSchema }).strict(),
+  strategy: rewardDecisionStrategySchema,
   actionNodes: z.array(actionNodeSchema).min(1).max(maxGraphNodeActionNodes)
+}).strict();
+const acceptanceLedgerDefinitionSchema = z.object({
+  version: z.literal(1),
+  obligations: z.array(z.object({
+    obligationId: entityIdSchema,
+    description: descriptionSchema,
+    weight: z.number().int().safe().positive()
+  }).strict()).max(1_024)
 }).strict();
 const graphSchema = z.object({
   id: entityIdSchema,
   name: z.string().trim().min(1).max(200),
   state: z.object({ description: descriptionSchema, initial: initialStateSchema }).strict(),
+  acceptance: acceptanceLedgerDefinitionSchema,
   strategy: rewardDecisionStrategySchema,
   graphNodes: z.array(graphNodeSchema).min(1).max(maxProjectGraphNodes)
 }).strict();
@@ -194,16 +219,25 @@ export const projectIssueTrackerSchema = z.object({
 }).strict() satisfies z.ZodType<ProjectIssueTrackerConfig>;
 
 export const automationConfigSchema = z.object({
-  version: z.literal(18),
+  version: z.literal(19),
   graph: graphSchema
 }).strict() as z.ZodType<ProjectAutomationConfig>;
 
 export const policyPreviewRequestSchema = z.object({
   config: automationConfigSchema,
-}).strict();
+  scope: z.enum(["graph", "graph_node"]),
+  graphNodeId: entityIdSchema.optional()
+}).strict().superRefine((request, context) => {
+  if (request.scope === "graph_node" && !request.graphNodeId) context.addIssue({
+    code: "custom", path: ["graphNodeId"], message: "Graph Node preview requires graphNodeId."
+  });
+  if (request.scope === "graph" && request.graphNodeId) context.addIssue({
+    code: "custom", path: ["graphNodeId"], message: "Graph preview cannot select graphNodeId."
+  });
+});
 
 const projectConfigBaseSchema = z.object({
-  version: z.literal(18),
+  version: z.literal(19),
   executionProfiles: z.array(executionProfileSchema),
   issueTracker: projectIssueTrackerSchema,
   graph: graphSchema

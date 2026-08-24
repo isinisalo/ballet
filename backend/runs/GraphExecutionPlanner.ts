@@ -2,7 +2,7 @@ import type { ProjectExecutionComposition, ProjectGraph } from "../../shared/dom
 import type {
   AcceptanceLedgerSnapshotV1,
   AuthorizationSnapshotV1,
-  DecisionStateV3
+  CompiledRewardPolicyV4
 } from "../../shared/domain/decisionModel.js";
 import type { ExecutionRuntimeBinding, RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type { RootRunKind } from "../../shared/domain/runs.js";
@@ -13,9 +13,12 @@ import type { RuntimeConfigurationService } from "../execution/RuntimeConfigurat
 import { resolveExecutionResources } from "../execution/ExecutionResourceCatalog.js";
 import type { PreparedRootWorkspace } from "../execution/git/LocalWorkspaceManager.js";
 import { GraphRunStateError } from "../runtime/GraphRunErrors.js";
-import { capabilityModelSha256, decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
-import { compileRewardPolicy } from "../policy/RewardMdpCompiler.js";
-import { resolveAdmissibleActions } from "../policy/AdmissibleActionResolver.js";
+import {
+  compilePolicyScope,
+  describePolicyScope,
+  policyGuardContext,
+  scopedDecisionModelSha256
+} from "../policy/PolicyScope.js";
 import { validateProjectAutomationConfig } from "../automation/validateAutomationConfig.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
 
@@ -28,10 +31,10 @@ export class GraphExecutionPlanner {
   async create(workspace: PreparedRootWorkspace, kind: RootRunKind, targetId: string): Promise<RootExecutionSnapshot> {
     const loaded = new ProjectConfigurationRepository().load(workspace.path);
     if (!loaded.config || loaded.issues.length > 0) throw new GraphRunStateError(
-      loaded.issues[0]?.message ?? "Project configuration v18 is unavailable."
+      loaded.issues[0]?.message ?? "Project configuration v19 is unavailable."
     );
     const readinessIssues = validateProjectAutomationConfig(
-      { version: 18, graph: loaded.config.graph }, loaded.config.executionProfiles
+      { version: 19, graph: loaded.config.graph }, loaded.config.executionProfiles
     );
     if (readinessIssues.length) throw new GraphRunStateError(readinessIssues[0]!.message);
     assertTarget(loaded.config.graph, kind, targetId);
@@ -52,25 +55,32 @@ export class GraphExecutionPlanner {
     if (theme.issues.length > 0) throw new GraphRunStateError(theme.issues[0]!.message);
     const authorization = authorizationSnapshot();
     const acceptanceLedger = acceptanceSnapshot(graph);
-    const modelSha256 = decisionModelSha256(graph.strategy.model);
-    const projectedStates = projectedStateCatalog(graph, authorization);
-    const actionIds = graph.graphNodes.map(({ id }) => id);
-    const admissibleActionsByState = Object.fromEntries(graph.strategy.model.states.map((state) => [
-      state.id,
-      state.terminal ? [] : resolveAdmissibleActions(graph.strategy, projectedStates.get(state.id)!, actionIds).actionIds
-    ]));
-    const compiledPolicy = compileRewardPolicy({
-      model: graph.strategy.model,
-      capabilityModel: graph.strategy.capabilityModel,
-      admissibleActionsByState,
-      modelSha256
+    const guardContext = policyGuardContext({
+      graphState: graph.state.initial,
+      stateRevision: 0,
+      authorization,
+      acceptanceLedger
     });
-    if (compiledPolicy.status !== "compiled") throw new GraphRunStateError(
-      compiledPolicy.message ?? `Reward-MDP compilation failed with ${compiledPolicy.status}.`
-    );
+    const global = kind === "graph" ? compilePolicyScope(graph, "graph", guardContext) : undefined;
+    if (global && global.status !== "compiled") throw compileError("Graph", global);
+    const localIds = kind === "graph" ? graph.graphNodes.map(({ id }) => id) : [targetId];
+    const localPolicies: Record<string, CompiledRewardPolicyV4> = {};
+    for (const graphNodeId of localIds) {
+      const compiled = compilePolicyScope(graph, "graph_node", guardContext, graphNodeId);
+      if (compiled.status !== "compiled") throw compileError(`Graph Node ${graphNodeId}`, compiled);
+      localPolicies[graphNodeId] = compiled;
+    }
+    const graphNodeDecisionModels = Object.fromEntries(localIds.map((graphNodeId) => {
+      const descriptor = describePolicyScope(graph, "graph_node", graphNodeId);
+      return [graphNodeId, {
+        strategyKind: "reward_mdp_v4" as const,
+        modelVersion: 4 as const,
+        modelSha256: scopedDecisionModelSha256(descriptor)
+      }];
+    }));
     return {
-      version: 11,
-      policyObservationContractVersion: 4,
+      version: 12,
+      policyObservationContractVersion: 5,
       rootKind: kind,
       ...(kind === "graph_node" ? { rootGraphNodeId: targetId } : {}),
       project: {
@@ -81,11 +91,15 @@ export class GraphExecutionPlanner {
       },
       issueTracker: structuredClone(loaded.config.issueTracker),
       graph,
-      decisionModel: {
-        strategyKind: "reward_mdp_v3",
-        modelVersion: 3,
-        modelSha256,
-        capabilityModelSha256: capabilityModelSha256(graph.strategy.capabilityModel)
+      decisionModels: {
+        ...(kind === "graph" ? {
+          global: {
+            strategyKind: "reward_mdp_v4" as const,
+            modelVersion: 4 as const,
+            modelSha256: scopedDecisionModelSha256(describePolicyScope(graph, "graph"))
+          }
+        } : {}),
+        graphNodes: graphNodeDecisionModels
       },
       theme: theme.theme,
       executionProfiles: structuredClone(profiles),
@@ -93,10 +107,14 @@ export class GraphExecutionPlanner {
       resources: await resolveExecutionResources(workspace.path, compositions),
       authorization,
       acceptanceLedger,
-      compiledPolicy,
+      compiledPolicies: { ...(global ? { global } : {}), graphNodes: localPolicies },
       createdAt: new Date().toISOString()
     };
   }
+}
+
+function compileError(label: string, compiled: CompiledRewardPolicyV4): GraphRunStateError {
+  return new GraphRunStateError(compiled.message ?? `${label} Reward-MDP compilation failed with ${compiled.status}.`);
 }
 
 function assertTarget(graph: ProjectGraph, kind: RootRunKind, targetId: string): void {
@@ -124,25 +142,11 @@ function authorizationSnapshot(): AuthorizationSnapshotV1 {
 }
 
 function acceptanceSnapshot(graph: ProjectGraph): AcceptanceLedgerSnapshotV1 {
-  const entries = graph.strategy.model.acceptance.obligations.map(({ obligationId, weight }) => ({
+  const entries = graph.acceptance.obligations.map(({ obligationId, weight }) => ({
     obligationId,
     weight,
     status: "pending" as const,
     evidenceRefs: []
   })).sort((left, right) => left.obligationId.localeCompare(right.obligationId));
   return { version: 1, entries, sha256: jsonSha256(entries) };
-}
-
-function projectedStateCatalog(
-  graph: ProjectGraph,
-  authorization: AuthorizationSnapshotV1
-): Map<string, DecisionStateV3> {
-  return new Map(graph.strategy.model.states.map((state) => [state.id, {
-    stateId: state.id,
-    features: { ...state.values },
-    verifiedProgressPpm: 0,
-    featureVectorSha256: jsonSha256(state.values),
-    sourceStateRevision: 0,
-    evidenceRefs: [authorization.sha256]
-  }]));
 }

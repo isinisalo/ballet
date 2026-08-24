@@ -6,21 +6,21 @@ The canonical architecture starts at [`ARCHITECTURE.md`](ARCHITECTURE.md). This 
 
 ## Current contract
 
-- Project Config v18 owns one Graph, its Graph Nodes, ordered Action Nodes and one Graph-level `reward_mdp_v3` Decision Model.
-- The finite discounted Reward-MDP is `(S,A,P,R,γ)` with `γ = 0.99`. It is compiled once into the immutable Root Snapshot v11; runtime projects the factual state, forms hard `A(s)` from a separate authorization snapshot and performs a policy lookup.
-- Acceptance progress comes only from stable obligation IDs and Validation evidence. Project State cannot supply authorization or a numeric progress estimate.
-- Each Graph Node runs its Action Nodes in array order. Each Action Node contains Work and Validation; Validation can `retry` within `maxRetries` or `escalate` a typed semantic outcome to the Graph policy.
-- Task Envelope and role outcomes are v9, composition v10, ExecutionSpec v11, policy observation v4, Graph Node Module v6 and SQLite v14.
-- There are no local Decision Models, scoped orchestrators, Repair Nodes, schedules, standalone Action Node Runs, compatibility readers, migrations or dual writes.
+- Project Config v19 owns one Graph, its global GraphNode-ID `reward_mdp_v4`, GraphNodes and each GraphNode's ActionNode-ID local `reward_mdp_v4`.
+- Global and required local policies compile separately once into Root Snapshot v12. Runtime performs deterministic policy lookups; the observed typed outcome selects a state/terminal branch.
+- Acceptance is a separate Graph-owned ledger. Only explicitly bound obligations shape global progress; adding a node or splitting an ActionNode adds no progress reward.
+- Runtime follows global→GraphNode→local→ActionNode→Work→Validation→local→global. Validation can `retry` within `maxRetries`; Continue/Escalate always return through the local policy.
+- Task Envelope/outcomes are v9, composition v10, ExecutionSpec v11, policy decision/observation v5, Graph Node Module v7 and SQLite v15.
+- There are no free policy-state catalogs, scoped LLM orchestrators, Repair Nodes, schedules, standalone Action Node Runs, compatibility readers, migrations or dual writes.
 
-The repository default Graph has DESIGN, PLAN, BUILD, DEPLOY and VERIFY options plus a DONE terminal. At least one reachable decision state offers multiple admissible options. External writes such as merge, push, release, deploy and rollback still require exact human authorization.
+The repository default Graph is 5×5 with 15 modeled cells; PLAN is 2×2 with 3 and DESIGN 12×12 with 78. Terminals are branch targets, not matrix rows. External writes such as merge, push, release, deploy and rollback still require exact human authorization.
 
 ## Project and local state
 
 Version-controlled project truth remains in the checkout:
 
-- `.ballet/project.json` — strict Project Config v18;
-- `.ballet/graph-node-library/**/*.ballet-graph-node.json` — strict Graph Node Module v6 packages;
+- `.ballet/project.json` — strict Project Config v19;
+- `.ballet/graph-node-library/**/*.ballet-graph-node.json` — strict Graph Node Module v7 packages;
 - `.ballet/instructions/**/*.md` and `.agents/skills/**/SKILL.md` — selectable prompt resources;
 - `.ballet/arc42/**`, `.ballet/goals/**`, `.ballet/adr/**` and `DESIGN.md` — architecture, decisions and UI canon;
 - `.ballet/releases/**` and `.tickets/**` — project-local delivery data.
@@ -29,7 +29,7 @@ Machine-local runtime state lives under `.git/ballet` and does not appear in Git
 
 | Path | Contents |
 | --- | --- |
-| `.git/ballet/state.sqlite` | Strict SQLite v14 Run, Action Node, policy, acceptance, tracker and execution facts |
+| `.git/ballet/state.sqlite` | Strict SQLite v15 Run, Action Node, scoped policy, acceptance, tracker and execution facts |
 | `.git/ballet/settings.json` | Provider and optional `tk` command overrides plus read-only roots |
 | `.git/ballet/service.json` | Checkout service identity and loopback port |
 | `.git/ballet/worktrees/` | Root Run worktrees, including retained failures |
@@ -86,13 +86,13 @@ The service still starts when a provider is unavailable; Runtime and Run preflig
 
 Configure edits repository-backed project resources:
 
-- Graph capabilities and its Reward Decision Model;
-- Graph Nodes and their ordered Action Nodes;
+- Graph capabilities and its 5×5/N×N Reward Decision Model;
+- Graph Nodes, their Action Nodes and local N×N Decision Models;
 - each Action Node's Work, Validation and bounded retry contract;
 - ExecutionProfiles, instructions, skills and the project canvas theme;
 - Graph Node Module inspect/plan/install/export/remove flows.
 
-Run offers Graph and GraphNode roots only. A Graph Run snapshots the project, authorization, acceptance ledger, execution resources and compiled policy before dispatch. Provider output remains untrusted until the role schema and immutable semantic outcome enum accept it. Successful roots are committed; failed, cancelled or interrupted roots retain their worktree for inspection. Ballet never merges or pushes the result automatically.
+Run offers Graph and GraphNode roots only. A Graph Run snapshots the project, authorization, acceptance ledger, execution resources and compiled global/reachable-local policies before dispatch; a GraphNode Run needs only its local policy. Provider output remains untrusted until the role schema, branch and acceptance-effect gate accept it. Ballet never merges or pushes the result automatically.
 
 ## CLI reference
 
@@ -158,4 +158,4 @@ git diff --check
 make latest
 ```
 
-The release smoke test loads native dependencies, starts the packaged server against the committed strict-v18 fixture, validates Graph Node Module v6 discovery and the Reward-MDP workspace through the API, checks SQLite v14 creation, confirms Git cleanliness and exercises graceful shutdown.
+The release smoke test loads native dependencies, starts the packaged server against the committed strict-v19 fixture, validates Graph Node Module v7 discovery and hierarchical Reward-MDP data through the API, checks SQLite v15 creation, confirms Git cleanliness and exercises graceful shutdown.

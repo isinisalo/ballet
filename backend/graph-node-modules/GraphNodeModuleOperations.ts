@@ -5,9 +5,9 @@ import type { ProjectGraphNode } from "../../shared/domain/automation.js";
 import type {
   GraphNodeModuleInstallPlan,
   GraphNodeModuleIssue,
-  GraphNodeModulePackageV6,
-  GraphNodeModuleResourceV6,
-  InstalledGraphNodeModuleV6
+  GraphNodeModulePackageV7,
+  GraphNodeModuleResourceV7,
+  InstalledGraphNodeModuleV7
 } from "../../shared/domain/graphNodeModules.js";
 import type { ExecutionProfile, ProjectConfiguration } from "../../shared/domain/projectConfig.js";
 import {
@@ -19,7 +19,7 @@ import {
 } from "./GraphNodeModuleMapping.js";
 
 export function createModulePlan(
-  pkg: GraphNodeModulePackageV6,
+  pkg: GraphNodeModulePackageV7,
   packageSha256: string,
   source: string,
   mappings: Record<string, string>,
@@ -58,28 +58,11 @@ export function installModuleGraphNode(
   config: ProjectConfiguration,
   graphNode: ProjectGraphNode
 ): ProjectConfiguration {
-  const catalog = config.graph.strategy.capabilityModel;
-  const existingOutcomes = new Map(catalog.outcomes.map((outcome) => [outcome.id, outcome]));
-  const outcomes = [...catalog.outcomes];
-  for (const intrinsic of graphNode.outcomes) if (!existingOutcomes.has(intrinsic.outcomeId)) outcomes.push({
-    id: intrinsic.outcomeId,
-    description: `${graphNode.id}: ${intrinsic.outcomeId}`,
-    result: intrinsic.result,
-    penaltyClass: intrinsic.result === "PASS" ? "none" : "implementation_defect"
-  });
   return {
     ...config,
     graph: {
       ...config.graph,
-      graphNodes: [...config.graph.graphNodes, graphNode],
-      strategy: {
-        ...config.graph.strategy,
-        capabilityModel: {
-          version: 3,
-          outcomes,
-          actions: [...catalog.actions, { actionId: graphNode.id, guards: [] }]
-        }
-      }
+      graphNodes: [...config.graph.graphNodes, graphNode]
     }
   };
 }
@@ -87,32 +70,32 @@ export function installModuleGraphNode(
 export function removeModuleGraphNode(config: ProjectConfiguration, graphNodeId: string) {
   const graphNodes = config.graph.graphNodes.filter(({ id }) => id !== graphNodeId);
   if (graphNodes.length === 0) return undefined;
-  const usedOutcomes = new Set(graphNodes.flatMap(({ outcomes }) => outcomes.map(({ outcomeId }) => outcomeId)));
-  return {
-    ...config.graph,
-    graphNodes,
-    strategy: {
-      ...config.graph.strategy,
-      capabilityModel: {
-        version: 3 as const,
-        actions: config.graph.strategy.capabilityModel.actions.filter(({ actionId }) => actionId !== graphNodeId),
-        outcomes: config.graph.strategy.capabilityModel.outcomes.filter(({ id }) => usedOutcomes.has(id))
-      },
-      model: {
-        ...config.graph.strategy.model,
-        stateActions: config.graph.strategy.model.stateActions.filter(({ actionId }) => actionId !== graphNodeId)
+  if (graphNodeRemovalReferences(config, graphNodeId).length > 0) return undefined;
+  return { ...config.graph, graphNodes };
+}
+
+export function graphNodeRemovalReferences(config: ProjectConfiguration, graphNodeId: string): string[] {
+  const model = config.graph.strategy.model;
+  const references = model.initialStateId === graphNodeId ? ["graph.strategy.model.initialStateId"] : [];
+  model.stateActions.forEach((row, index) => {
+    if (row.stateId === graphNodeId) references.push(`graph.strategy.model.stateActions.${index}.stateId`);
+    if (row.actionId === graphNodeId) references.push(`graph.strategy.model.stateActions.${index}.actionId`);
+    row.successors.forEach((branch, branchIndex) => {
+      if (branch.target.kind === "state" && branch.target.stateId === graphNodeId) {
+        references.push(`graph.strategy.model.stateActions.${index}.successors.${branchIndex}.target.stateId`);
       }
-    }
-  };
+    });
+  });
+  return references;
 }
 
 export function installedModuleRecord(
-  pkg: GraphNodeModulePackageV6,
+  pkg: GraphNodeModulePackageV7,
   packageSha256: string,
   source: string,
   plan: GraphNodeModuleInstallPlan,
   persisted: ProjectGraphNode
-): InstalledGraphNodeModuleV6 {
+): InstalledGraphNodeModuleV7 {
   const resourceHashes = plan.resources.map(({ relativePath, sha256: digest }) => ({ relativePath, sha256: digest }));
   return {
     moduleId: pkg.manifest.id, moduleVersion: pkg.manifest.version, title: pkg.manifest.title,
@@ -130,10 +113,10 @@ export function installedModuleRecord(
 export function moduleExportResources(
   compositions: ReturnType<typeof graphNodeCompositions>,
   catalog: Awaited<ReturnType<typeof import("../documents/projectResourceCatalog.js").loadProjectResources>>
-): GraphNodeModuleResourceV6[] | undefined {
+): GraphNodeModuleResourceV7[] | undefined {
   const ids = [...new Set(compositions.flatMap((composition) =>
     [composition.primaryInstructionId, ...composition.skillIds]))];
-  const resources: GraphNodeModuleResourceV6[] = [];
+  const resources: GraphNodeModuleResourceV7[] = [];
   for (const resourceId of ids) {
     const instruction = catalog.instructions.find(({ id }) => id === resourceId);
     if (instruction) {
@@ -177,7 +160,7 @@ export const moduleContentHash = (
   resources: [...resources].sort((left, right) => left.relativePath.localeCompare(right.relativePath))
 }));
 
-const resourcePlan = (resource: GraphNodeModuleResourceV6, remap: ReturnType<typeof moduleRemapping>) => {
+const resourcePlan = (resource: GraphNodeModuleResourceV7, remap: ReturnType<typeof moduleRemapping>) => {
   const resourceId = resource.kind === "instruction" ? remap.instructions[resource.key] : remap.skills[resource.key];
   const relativePath = resource.kind === "instruction"
     ? `.ballet/instructions/${resourceId.slice(8)}.md` : `.agents/skills/${resourceId.slice(8)}/SKILL.md`;

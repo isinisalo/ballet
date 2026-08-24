@@ -1,6 +1,6 @@
 import type {
   AppData,
-  PolicyPreviewResultV3,
+  PolicyPreviewResultV4,
   ProjectAutomationConfig
 } from "@shared/api/workspace-contracts";
 import { automationActionNodePath, automationGraphNodePath } from "../routing";
@@ -12,7 +12,7 @@ import { CapabilityCards } from "./CapabilityCards";
 import { DecisionModelWorkspace } from "./DecisionModelWorkspace";
 import { EngineeringInspector } from "./EngineeringInspector";
 import { ActionFlowCanvas } from "./ActionFlowCanvas";
-import { actionNodeReferences } from "./graphNodeAuthoring";
+import { actionNodeReferences, graphNodeReferences } from "./graphNodeAuthoring";
 
 type GraphNode = ProjectAutomationConfig["graph"]["graphNodes"][number];
 type ActionNode = GraphNode["actionNodes"][number];
@@ -33,31 +33,46 @@ export function AutomationLevelContent({
   selection: AutomationSelection;
   setSelection: (selection: AutomationSelection) => void;
   locked: boolean;
-  policyResult?: PolicyPreviewResultV3;
+  policyResult?: PolicyPreviewResultV4;
   policyLoading: boolean;
   navigate: WorkspaceNavigation["navigate"];
   setDialog: (dialog: AutomationDialogState | undefined) => void;
 }) {
   if (level === "graph") {
     if (section === "decision-model") return <DecisionModelWorkspace
-      strategy={draft.graph.strategy} actionOrder={draft.graph.graphNodes.map(({ id }) => id)}
+      scope="graph" strategy={draft.graph.strategy} nodes={draft.graph.graphNodes}
+      acceptance={draft.graph.acceptance}
       issues={policyResult?.issues ?? []} preview={policyResult}
       loading={policyLoading} locked={locked}
       onStrategyChange={(strategy) => setDraft((config) => ({ ...config, graph: { ...config.graph, strategy } }))}
+      onZoomNode={(id) => navigate(automationGraphNodePath(id, "decision-model"))}
     />;
     return <CapabilityCards
       nodes={draft.graph.graphNodes} kind="Graph Node" locked={locked}
       onAdd={() => setDialog({ kind: "create" })} onOpen={(id) => navigate(automationGraphNodePath(id))}
       onEdit={(id) => setDialog({ kind: "edit", id })} onRename={(id) => setDialog({ kind: "rename", id })}
-      onDelete={(id) => setDialog({ kind: "delete", id })}
+      onDelete={(id) => setDialog({ kind: "delete", id })} deleteIssues={(id) => graphNodeReferences(draft, id)}
     />;
   }
-  if (level === "graph_node" && graphNode) return <CapabilityCards
-    nodes={graphNode.actionNodes} kind="Action Node" locked={locked}
-    onAdd={() => setDialog({ kind: "create" })} onOpen={(id) => navigate(automationActionNodePath(graphNode.id, id))}
-    onEdit={(id) => setDialog({ kind: "edit", id })} onRename={(id) => setDialog({ kind: "rename", id })}
-    onDelete={(id) => setDialog({ kind: "delete", id })} deleteIssues={(id) => actionNodeReferences(graphNode, id)}
-  />;
+  if (level === "graph_node" && graphNode) {
+    if (section === "decision-model") return <DecisionModelWorkspace
+      scope="graph_node" strategy={graphNode.strategy} nodes={graphNode.actionNodes}
+      issues={policyResult?.issues ?? []} preview={policyResult} loading={policyLoading} locked={locked}
+      onStrategyChange={(strategy) => setDraft((config) => ({
+        ...config,
+        graph: {
+          ...config.graph,
+          graphNodes: config.graph.graphNodes.map((node) => node.id === graphNode.id ? { ...node, strategy } : node)
+        }
+      }))}
+    />;
+    return <CapabilityCards
+      nodes={graphNode.actionNodes} kind="Action Node" locked={locked}
+      onAdd={() => setDialog({ kind: "create" })} onOpen={(id) => navigate(automationActionNodePath(graphNode.id, id))}
+      onEdit={(id) => setDialog({ kind: "edit", id })} onRename={(id) => setDialog({ kind: "rename", id })}
+      onDelete={(id) => setDialog({ kind: "delete", id })} deleteIssues={(id) => actionNodeReferences(graphNode, id)}
+    />;
+  }
   if (level === "action_node" && graphNode && actionNode) return <div className="flex min-h-0 flex-1">
     <ActionFlowCanvas
       action={actionNode} selected={selection === "work" || selection === "validation" ? selection : undefined}

@@ -1,10 +1,11 @@
 export type {
-  PolicyDecisionRecordV3,
-  PolicyOptionObservationV4
+  PolicyDecisionRecordV5,
+  PolicyOptionObservationV5
 } from "./decisionModel.js";
 
 export type ControlFlowEventKind =
   | "policy_decided" | "policy_invalid" | "policy_observed"
+  | "policy_terminal" | "acceptance_mismatch"
   | "graph_node_dispatched" | "action_node_dispatched" | "work_completed"
   | "validation_pass" | "validation_fail_retry" | "validation_fail_escalate"
   | "root_needs_input" | "root_cancelled" | "root_terminal" | "execution_interrupted";

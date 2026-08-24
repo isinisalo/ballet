@@ -4,7 +4,7 @@ title: Ajonaikainen näkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 18
+version: 19
 tags:
   - arc42
   - runtime
@@ -15,60 +15,64 @@ arc42Section: 6
 
 ## Tarkoitus ja tila
 
-Tämä osio kuvaa strict-v18:n aktiiviset arkkitehtonisesti merkittävät runtime-skenaariot. Aiemmat RT-001–RT-019-tunnisteet säilyvät historiallisessa trace- ja initiative-evidenssissä, mutta niiden Loop/Workflow-, scoped orchestrator-, SSP-, Repair-, shadow- tai promotion-polut eivät ole nykyistä runtimea. RT-020 omistaa yhden Graph Reward-MDP:n suorituksen.
+Tämä osio kuvaa strict-v19:n aktiiviset arkkitehtonisesti merkittävät runtime-skenaariot. RT-020/021:n single-policy/array-order-osat ovat historiallisia; RT-022:n recovery, RT-023:n GraphNode Root Run ja RT-024:n module-polku säilyvät ADR-033:n tarkentamina. RT-025 omistaa hierarkkisen global/local-suorituksen.
 
-## RT-020: Graph Reward-MDP Root Run
+## RT-025: hierarchical Reward-MDP Root Run
 
 ```mermaid
 sequenceDiagram
   actor Operator as Operaattori
   participant Planner as GraphExecutionPlanner
   participant Compiler as RewardMdpCompiler
-  participant Store as SQLite v14
+  participant Store as SQLite v15
   participant Runtime as RuntimeFlowCoordinator
   participant Provider as Work / Validation provider
 
   Operator->>Planner: Start Graph Run
-  Planner->>Planner: Validate strict v18 resources
+  Planner->>Planner: Validate strict v19 resources
   Planner->>Planner: Snapshot project State, authorization and acceptance obligations
-  Planner->>Compiler: Compile canonical Reward-MDP once
-  Compiler-->>Planner: absorbing policy + Q/V + hash
-  Planner->>Store: Commit Root Snapshot v11 and ledger
-  loop decision epoch until terminal
-    Runtime->>Runtime: Project state and ledger; form hard A(s)
-    Runtime->>Store: Persist compiled-policy decision
-    Runtime->>Runtime: Dispatch selected GraphNode option
-    loop ordered Action Nodes
-      Runtime->>Provider: Work Task Envelope v9
+  Planner->>Compiler: Compile global + reachable local scopes
+  Compiler-->>Planner: absorbing policies + Q/V + hashes
+  Planner->>Store: Commit Root Snapshot v12 and ledger
+  loop combined global/local decisions ≤ 256
+    Runtime->>Store: Persist global decision v5
+    Runtime->>Runtime: Dispatch selected GraphNode
+    loop local policy until terminal
+      Runtime->>Store: Persist local decision v5
+      Runtime->>Provider: selected Action Work v9
       Provider-->>Runtime: strict Work outcome
-      Runtime->>Provider: Validation Task Envelope v9
-      Provider-->>Runtime: outcome ID + PASS/FAIL + evidence + retry/escalate
-      alt bounded retry
-        Runtime->>Provider: same Action Node Work, next attempt
-      else continue or escalate
-        Runtime->>Store: Atomic State/ledger/outcome facts
+      Runtime->>Provider: paired Validation v9
+      Provider-->>Runtime: typed outcome + PASS/FAIL + evidence + retry/escalate
+      alt bounded retry remains
+        Runtime->>Provider: same Action Work, next attempt
+      else observed local branch
+        Runtime->>Store: Local observation v5 and state/terminal
       end
     end
-    Runtime->>Store: Observation v4 + realized reward
+    alt acceptance effects match exact ledger delta
+      Runtime->>Store: Atomic ledger + global observation v5 + branch
+    else mismatch
+      Runtime->>Store: needs_input before ledger/global state effect
+    end
   end
-  Runtime-->>Operator: DONE or typed terminal failure/block
+  Runtime-->>Operator: typed terminal success/failure/block
 ```
 
-Planner ei käytä wall-clock-timeoutia policy-päätökseen. Compiler canonicalisoi set-mäiset inputit, exact PPM -branchit ja integer-mikroyksiköt, ratkaisee deterministic value iterationin iteration boundilla ja stable lexical tie-breakillä sekä tarkistaa valitun policyn almost-sure absorptionin. Invalidi tai absorboitumaton malli luo nolla Root Runia.
+Planner ei käytä wall-clock-timeoutia policy-päätökseen. Compiler johtaa ID:t nodeista, canonicalisoi sparse exact-PPM-branchit ja integer-mikroyksiköt sekä ratkaisee jokaisen scopen deterministic iteration boundilla ja stable lexical tie-breakillä. Graph Run vaatii global + reachable local absorptionin; GraphNode Run vain target-localin.
 
-Runtime ei ratkaise mallia uudelleen eikä mutatoi probabilityjä, rewardia tai prioreja havainnoista. Project State ei voi antaa valtuutusta eikä numeerista LLM-progressia hyväksytä. Unauthorized action poistuu `A(s)`:stä, saa decision-evidenssissä Q-arvon 0 ja dispatchaantuu nolla kertaa.
+Runtime ei ratkaise mallia uudelleen, arvo successor-tilaa eikä mutatoi probabilityjä/rewardia. Havaittu outcome-ID valitsee branchin deterministisesti. `Continue` palauttaa outcome-ID:n local policylle; `Escalate` saavuttaa global policyn vain local-terminalin emitted GraphNode-outcomena. Unauthorized action poistuu `A(s)`:stä ja dispatchaantuu nolla kertaa.
 
-## RT-021: ordered Action Node execution
+### Action Node ja acceptance-portti
 
-1. GraphNode invocation snapshottaa oman Action Node -arraynsa.
-2. Runtime dispatchaa ensimmäisen Action Noden Workin.
-3. Schema-validi Work `completed` johtaa aina saman Action Noden Validationiin.
-4. Validation PASS jatkaa seuraavaan array-alkioon tai päättää option typed PASS-outcomella.
-5. Validation FAIL + `retry` ajaa saman Workin uudelleen vain, kun `maxRetries` sallii uuden yrityksen.
-6. FAIL + `escalate` tai loppunut retry päättää option typed FAIL-outcomella Graph-MDP:lle.
-7. Vain Validation voi evidenssillä verify- tai invalidate-obligaation. Duplicate verify ei muuta progressia.
+1. Local compiled policy valitsee ActionNoden nykyisestä ActionNode-ID-statesta.
+2. Schema-validi Work `completed` johtaa aina saman ActionNoden Validationiin.
+3. Validation FAIL + `retry` ajaa saman Workin uudelleen vain `maxRetries`-rajan sisällä.
+4. PASS, `escalate` tai loppunut retry palauttaa typed ActionNode-outcomen local branchille.
+5. State target käynnistää seuraavan local lookupin; terminal target emittoi authoroidun GraphNode-outcomen.
+6. Terminal Validationin acceptance-deltan ja evidenssin on vastattava emitted GraphNode-outcome-effectejä exactisti.
+7. Duplicate verify, sitomaton GraphNode tai ActionNode-splittaus ei tuota Graph-progress-rewardia.
 
-Action Nodejen välillä ei ole child-to-child policyä, routeria tai authoroitavaa Edgeä. Array-järjestys on execution contract.
+Action Nodejen välillä ei ole authoroitavaa Edgeä tai provider-routeria. Local policy on ainoa ActionNodejen välisen control flow'n omistaja.
 
 ## RT-022: restart, cancellation ja idempotenssi
 
@@ -80,11 +84,11 @@ Action Nodejen välillä ei ole child-to-child policyä, routeria tai authoroita
 
 ## RT-023: GraphNode Root Run
 
-GraphNode Root Run käyttää samaa strict snapshot-, worktree-, Action Node-, Work/Validation-, retry/escalate- ja persistence-polkuja, mutta ei tee Graph-policy-dispatchia. Se suorittaa vain valitun option eikä jatka peer-GraphNodeen.
+GraphNode Root Run käyttää samaa strict snapshot-, worktree-, local policy-, Work/Validation-, retry/escalate- ja persistence-polkuja, mutta ei compileeraa tai dispatchaa global policya. Se päättyy local terminaliin eikä jatka peer-GraphNodeen.
 
 ## RT-024: Graph Node Module
 
-Module inspect rajoittaa koon, validoi strict v6 JSON:n ja laskee canonical hashin. Plan näyttää namespacen, profile/resource mappingin, konfliktit ja provenance-muutokset. Commit re-plannaa samasta inputista, materialisoi resource closuren ja kirjoittaa Project Config v18:n viimeisenä. Runtime ei lue packagea. Export/remove säilyttävät shared resource- ja active Run -rajat.
+Module inspect rajoittaa koon, validoi strict v7 JSON:n mukaan lukien local policyn ja laskee canonical hashin. Plan näyttää namespacen, profile/resource mappingin, konfliktit ja provenance-muutokset. Commit re-plannaa samasta inputista, materialisoi resource closuren ja kirjoittaa Project Config v19:n viimeisenä. Uusi node jättää global-matriisin incomplete-tilaan. Runtime ei lue packagea.
 
 ## Skenaarioindeksi
 
@@ -109,11 +113,12 @@ Module inspect rajoittaa koon, validoi strict v6 JSON:n ja laskee canonical hash
 | RT-017 | historical | Scoped outcome-aware SSP. |
 | RT-018 | historical | Scoped policy draft/readiness. |
 | RT-019 | historical | Offline calibration/shadow/promotion. |
-| RT-020 | active | Graph Reward-MDP Root Run. |
-| RT-021 | active | Ordered Action Node execution. |
+| RT-020 | historical | Single Graph Reward-MDP; säilyvät periaatteet ovat RT-025:ssä. |
+| RT-021 | historical | Array-ordered Action execution; Work→Validation/retry säilyy RT-025:ssä. |
 | RT-022 | active | Restart, cancellation and idempotency. |
 | RT-023 | active | GraphNode Root Run. |
-| RT-024 | active | Graph Node Module v6 materialization. |
+| RT-024 | active | Graph Node Module v7 materialization. |
+| RT-025 | active | Hierarchical global/local Reward-MDP Root Run. |
 
 ## Samanaikaisuusmalli
 
@@ -131,7 +136,8 @@ Module inspect rajoittaa koon, validoi strict v6 JSON:n ja laskee canonical hash
 | Nonterminal recurrent class / iteration-bound failure | Compile hylätään, Run = 0. | Korjaa finite model. |
 | Out-of-enum outcome tai acceptance ilman evidenssiä | Transaction rollback; State/ledger/control effect = 0. | Korjaa Validation-output tai project outcome -katalogi. |
 | Work/Validation technical failure | Root/option failaa tai blokkaantuu ilman semanttisen outcomen keksimistä. | Korjaa tekninen syy ja käynnistä valtuutettu uusi ajo. |
-| Retryrajan ylitys | Retryä ei dispatchata; typed outcome eskaloituu Graph-MDP:lle. | Policy valitsee seuraavan actionin tai terminalin. |
+| Retryrajan ylitys | Retryä ei dispatchata; typed outcome palaa local policylle. | Local branch valitsee state-targetin tai terminalin. |
+| Acceptance-effect mismatch | Root pysähtyy `needs_input`:iin; ledger/global state effect = 0. | Korjaa Validation-evidenssi tai authoroitu GraphNode-outcome ja vastaa uudelleen. |
 | Provider preflight/protocol failure | Tehtävä failed/interrupted ilman provider-fallbackia. | Korjaa profiili/provider ja käynnistä uusi yritys. |
 | Persistence failure | Koko transaction rollback. | Restart/retry viimeisestä commitista. |
 | Module stale/conflict | Commit estyy; configia ei kirjoiteta. | Inspect/plan uudelleen nykytilasta. |
@@ -139,7 +145,7 @@ Module inspect rajoittaa koon, validoi strict v6 JSON:n ja laskee canonical hash
 
 ## Kanoniset lähteet ja evidenssi
 
-`adr-031` omistaa control semanticsin. `backend/policy/RewardMdpCompiler.ts`, `backend/runs/GraphExecutionPlanner.ts`, `backend/runtime/RuntimeFlowCoordinator.ts`, `backend/runtime/RuntimePolicyStore.ts` ja `backend/storage/RuntimeSchema.ts` omistavat suoritettavan käytöksen. `TEST-026` / `EVID-026` / `GRM-evid-004` kattavat deterministic policy-, ledger-, authorization-, ordered execution-, retry/escalate-, restart- ja persistence-skenaariot. Tuotantokaltainen pilotti pysyy avoimena.
+`adr-033` omistaa control semanticsin. `backend/policy/PolicyScope.ts`, `backend/policy/RewardMdpCompiler.ts`, `backend/runs/GraphExecutionPlanner.ts`, `backend/runtime/RuntimeFlowCoordinator.ts`, `backend/runtime/RuntimePolicyStore.ts` ja `backend/storage/RuntimeSchema.ts` omistavat suoritettavan käytöksen. `TEST-027` / `EVID-027` kattavat deterministic scope-policy-, ledger-gate-, authorization-, retry/escalate-, restart- ja persistence-skenaariot. Tuotantokaltainen pilotti pysyy avoimena.
 
 ## Seuraava katselmointiperuste
 

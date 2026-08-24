@@ -1,6 +1,7 @@
 import type { JsonValue, NodeResult, ProjectGraphNode, ProjectNodeAppearance } from "./automation.js";
+import type { ProjectScopedRewardDecisionStrategyV4 } from "./decisionModel.js";
 
-export const graphNodeModulePackageVersion = 6 as const;
+export const graphNodeModulePackageVersion = 7 as const;
 export const maxGraphNodeModulePackageBytes = 524_288;
 export const maxGraphNodeModuleResources = 64;
 export const maxGraphNodeModuleNodes = 64;
@@ -11,54 +12,55 @@ export type GraphNodeModuleNetworkRequirement = "required" | "forbidden" | "opti
 export type GraphNodeModuleExternalWritesPermission = false | "requires-human-authorization";
 export type GraphNodeModuleProvenanceStatus = "exact" | "modified" | "missing-resources";
 
-export interface GraphNodeModuleManifestV6 {
+export interface GraphNodeModuleManifestV7 {
   id: string; title: string; description: string; version: string; category?: string; tags: string[];
 }
-export interface GraphNodeModulePermissionsV6 {
+export interface GraphNodeModulePermissionsV7 {
   network: GraphNodeModuleNetworkRequirement; externalWrites: GraphNodeModuleExternalWritesPermission;
 }
-export interface GraphNodeModuleProfileSlotV6 {
+export interface GraphNodeModuleProfileSlotV7 {
   key: string; title: string; description: string; providers: Array<"codex" | "copilot">;
   network: GraphNodeModuleNetworkRequirement;
 }
-export interface GraphNodeModuleCompositionV6 { profileSlot: string; primaryInstruction: string; skills: string[]; }
-export interface GraphNodeModuleIntrinsicOutcomeV6 { outcomeId: string; result: NodeResult; }
-export interface GraphNodeModuleExecutableV6 extends ProjectNodeAppearance {
+export interface GraphNodeModuleCompositionV7 { profileSlot: string; primaryInstruction: string; skills: string[]; }
+export interface GraphNodeModuleIntrinsicOutcomeV7 { outcomeId: string; result: NodeResult; }
+export interface GraphNodeModuleExecutableV7 extends ProjectNodeAppearance {
   key: string; description: string; task: string;
 }
-export type GraphNodeModuleWorkNodeV6 =
-  | GraphNodeModuleExecutableV6 & GraphNodeModuleCompositionV6 & { type: "agent" }
-  | GraphNodeModuleExecutableV6 & { type: "human" };
-export type GraphNodeModuleValidationNodeV6 =
-  | GraphNodeModuleExecutableV6 & GraphNodeModuleCompositionV6 & { type: "agent" }
-  | GraphNodeModuleExecutableV6 & { type: "human" };
-export interface GraphNodeModuleActionNodeV6 {
+export type GraphNodeModuleWorkNodeV7 =
+  | GraphNodeModuleExecutableV7 & GraphNodeModuleCompositionV7 & { type: "agent" }
+  | GraphNodeModuleExecutableV7 & { type: "human" };
+export type GraphNodeModuleValidationNodeV7 =
+  | GraphNodeModuleExecutableV7 & GraphNodeModuleCompositionV7 & { type: "agent" }
+  | GraphNodeModuleExecutableV7 & { type: "human" };
+export interface GraphNodeModuleActionNodeV7 {
   key: string; description: string; capabilities: { accepts: string[]; provides: string[] };
-  outcomes: GraphNodeModuleIntrinsicOutcomeV6[]; maxRetries: number;
-  workNode: GraphNodeModuleWorkNodeV6; validationNode: GraphNodeModuleValidationNodeV6;
+  outcomes: GraphNodeModuleIntrinsicOutcomeV7[]; maxRetries: number;
+  workNode: GraphNodeModuleWorkNodeV7; validationNode: GraphNodeModuleValidationNodeV7;
 }
-export interface GraphNodeModuleGraphNodeV6 {
+export interface GraphNodeModuleGraphNodeV7 {
   key: string; description: string; capabilities: { accepts: string[]; provides: string[] };
-  outcomes: GraphNodeModuleIntrinsicOutcomeV6[]; stateContract: { description: string };
-  actionNodes: GraphNodeModuleActionNodeV6[];
+  outcomes: GraphNodeModuleIntrinsicOutcomeV7[]; stateContract: { description: string };
+  strategy: ProjectScopedRewardDecisionStrategyV4;
+  actionNodes: GraphNodeModuleActionNodeV7[];
 }
-export type GraphNodeModuleResourceV6 =
+export type GraphNodeModuleResourceV7 =
   | { kind: "instruction"; key: string; title: string; metadata: Record<string, JsonValue>; body: string }
   | { kind: "skill"; key: string; name: string; description: string; metadata: Record<string, JsonValue>; body: string };
-export interface GraphNodeModuleStateContractV6 {
+export interface GraphNodeModuleStateContractV7 {
   id: string; version: string; description: string; requiredKeys: string[];
 }
-export interface GraphNodeModuleCapabilitiesV6 { requires: string[]; accepts: string[]; provides: string[]; }
-export interface GraphNodeModulePackageV6 {
+export interface GraphNodeModuleCapabilitiesV7 { requires: string[]; accepts: string[]; provides: string[]; }
+export interface GraphNodeModulePackageV7 {
   format: "ballet-graph-node-module";
   version: typeof graphNodeModulePackageVersion;
-  manifest: GraphNodeModuleManifestV6;
-  permissions: GraphNodeModulePermissionsV6;
-  profileSlots: GraphNodeModuleProfileSlotV6[];
-  stateContract: GraphNodeModuleStateContractV6;
-  capabilities: GraphNodeModuleCapabilitiesV6;
-  resources: GraphNodeModuleResourceV6[];
-  graphNode: GraphNodeModuleGraphNodeV6;
+  manifest: GraphNodeModuleManifestV7;
+  permissions: GraphNodeModulePermissionsV7;
+  profileSlots: GraphNodeModuleProfileSlotV7[];
+  stateContract: GraphNodeModuleStateContractV7;
+  capabilities: GraphNodeModuleCapabilitiesV7;
+  resources: GraphNodeModuleResourceV7[];
+  graphNode: GraphNodeModuleGraphNodeV7;
 }
 
 export type GraphNodeModuleErrorCode =
@@ -69,7 +71,7 @@ export type GraphNodeModuleErrorCode =
   | "ACTIVE_RUN" | "PLAN_STALE" | "GRAPH_NODE_NOT_FOUND" | "MODULE_NOT_INSTALLED";
 export interface GraphNodeModuleIssue { code: GraphNodeModuleErrorCode; path: string; message: string; }
 export interface GraphNodeModuleInspection {
-  valid: boolean; package?: GraphNodeModulePackageV6; sha256?: string; canonicalJson?: string;
+  valid: boolean; package?: GraphNodeModulePackageV7; sha256?: string; canonicalJson?: string;
   source: string; sizeBytes: number; issues: GraphNodeModuleIssue[];
 }
 export interface GraphNodeModuleIdRemapping {
@@ -80,7 +82,7 @@ export interface GraphNodeModuleProfileCandidate {
   id: string; name: string; provider: "codex" | "copilot"; networkAccess: boolean;
 }
 export interface GraphNodeModuleProfileMappingPlan {
-  slot: GraphNodeModuleProfileSlotV6; selectedProfileId?: string; candidates: GraphNodeModuleProfileCandidate[];
+  slot: GraphNodeModuleProfileSlotV7; selectedProfileId?: string; candidates: GraphNodeModuleProfileCandidate[];
   compatible: boolean; issue?: GraphNodeModuleIssue;
 }
 export interface GraphNodeModuleResourceWritePlan {
@@ -92,7 +94,7 @@ export interface GraphNodeModuleConflict {
   target: string; message: string; blocking: boolean;
 }
 export interface GraphNodeModuleInstallPlan {
-  planHash: string; packageSha256: string; source: string; module: GraphNodeModuleManifestV6;
+  planHash: string; packageSha256: string; source: string; module: GraphNodeModuleManifestV7;
   graphNode: ProjectGraphNode; idRemapping: GraphNodeModuleIdRemapping;
   resources: GraphNodeModuleResourceWritePlan[]; profileMappings: GraphNodeModuleProfileMappingPlan[];
   conflicts: GraphNodeModuleConflict[]; issues: GraphNodeModuleIssue[]; canInstall: boolean;
@@ -100,21 +102,21 @@ export interface GraphNodeModuleInstallPlan {
 export interface GraphNodeModuleOwnedResource {
   kind: "instruction" | "skill"; resourceId: string; relativePath: string; installedSha256: string;
 }
-export interface InstalledGraphNodeModuleV6 {
+export interface InstalledGraphNodeModuleV7 {
   moduleId: string; moduleVersion: string; title: string; source: string; packageSha256: string;
   graphNodeId: string; installedAt: string; profileMappings: Record<string, string>;
-  idRemapping: GraphNodeModuleIdRemapping; stateContract: GraphNodeModuleStateContractV6;
-  capabilities: GraphNodeModuleCapabilitiesV6; ownedResources: GraphNodeModuleOwnedResource[];
+  idRemapping: GraphNodeModuleIdRemapping; stateContract: GraphNodeModuleStateContractV7;
+  capabilities: GraphNodeModuleCapabilitiesV7; ownedResources: GraphNodeModuleOwnedResource[];
   installedContentSha256: string;
 }
-export interface InstalledGraphNodeModulesFileV6 { version: 6; installed: InstalledGraphNodeModuleV6[]; }
-export interface InstalledGraphNodeModuleStatus extends InstalledGraphNodeModuleV6 {
+export interface InstalledGraphNodeModulesFileV7 { version: 7; installed: InstalledGraphNodeModuleV7[]; }
+export interface InstalledGraphNodeModuleStatus extends InstalledGraphNodeModuleV7 {
   status: GraphNodeModuleProvenanceStatus; currentContentSha256?: string; missingResources: string[];
 }
 export interface GraphNodeModuleLibraryEntry {
-  source: string; sha256?: string; sizeBytes: number; valid: boolean; manifest?: GraphNodeModuleManifestV6;
-  permissions?: GraphNodeModulePermissionsV6; package?: GraphNodeModulePackageV6; issues: GraphNodeModuleIssue[];
+  source: string; sha256?: string; sizeBytes: number; valid: boolean; manifest?: GraphNodeModuleManifestV7;
+  permissions?: GraphNodeModulePermissionsV7; package?: GraphNodeModulePackageV7; issues: GraphNodeModuleIssue[];
 }
 export interface GraphNodeModuleExportResult {
-  package: GraphNodeModulePackageV6; canonicalJson: string; sha256: string; filename: string;
+  package: GraphNodeModulePackageV7; canonicalJson: string; sha256: string; filename: string;
 }

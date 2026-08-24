@@ -1,4 +1,4 @@
-export const projectConfigurationVersion = 18 as const;
+export const projectConfigurationVersion = 19 as const;
 export const maxProjectStateBytes = 262_144;
 export const maxActionRetriesLimit = 100;
 export const maxProjectGraphNodes = 40;
@@ -71,6 +71,15 @@ export interface ProjectIntrinsicOutcome {
   result: NodeResult;
 }
 
+export interface ProjectAcceptanceEffect {
+  obligationId: string;
+  status: "verified" | "invalidated";
+}
+
+export interface ProjectGraphNodeOutcome extends ProjectIntrinsicOutcome {
+  acceptanceEffects: ProjectAcceptanceEffect[];
+}
+
 export interface ProjectStateDefinition {
   description: string;
   initial: JsonValue;
@@ -127,8 +136,10 @@ export interface ProjectGraphNode {
   id: string;
   description: string;
   capabilities: ProjectNodeCapabilities;
-  outcomes: ProjectIntrinsicOutcome[];
+  outcomes: ProjectGraphNodeOutcome[];
+  acceptanceObligationId?: string;
   stateContract: ProjectStateContract;
+  strategy: import("./decisionModel.js").ProjectScopedRewardDecisionStrategyV4;
   actionNodes: ProjectActionNode[];
 }
 
@@ -136,7 +147,8 @@ export interface ProjectGraph {
   id: string;
   name: string;
   state: ProjectStateDefinition;
-  strategy: import("./decisionModel.js").ProjectRewardDecisionStrategyV3;
+  acceptance: import("./decisionModel.js").AcceptanceLedgerDefinitionV1;
+  strategy: import("./decisionModel.js").ProjectScopedRewardDecisionStrategyV4;
   graphNodes: ProjectGraphNode[];
 }
 
@@ -151,19 +163,19 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
     id: "graph-engineering",
     name: "Graph Engineering",
     state: { description: "Shared immutable-snapshot Graph state.", initial: {} },
+    acceptance: { version: 1, obligations: [] },
     strategy: {
-      kind: "reward_mdp_v3",
+      kind: "reward_mdp_v4",
       id: "graph-reward-mdp",
       description: "Selects Graph Nodes from a compiled discounted Reward-MDP policy.",
-      capabilityModel: { version: 3, outcomes: [], actions: [] },
       model: {
-        version: 3,
+        version: 4,
+        initialStateId: "unconfigured",
         discountPpm: 990_000,
-        acceptance: { version: 1, obligations: [] },
         reward: {
           actionCostMicros: 1_000_000,
-          completionBonusMicros: 25_000_000,
-          progressPotentialScaleMicros: 100_000_000,
+          terminalSuccessBonusMicros: 25_000_000,
+          acceptanceProgressPotentialScaleMicros: 100_000_000,
           outcomePenaltyMicros: {
             none: 0,
             transient: 2_000_000,
@@ -172,11 +184,9 @@ export const defaultProjectAutomationConfig = (): ProjectAutomationConfig => ({
             invalid_design: 25_000_000
           }
         },
-        features: [],
-        states: [],
         stateActions: [],
         solver: {
-          algorithm: "discounted_value_iteration_v3",
+          algorithm: "discounted_value_iteration_v4",
           maxIterations: 10_000,
           convergenceToleranceMicros: 1
         }

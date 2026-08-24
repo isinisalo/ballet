@@ -151,11 +151,12 @@ if (!Array.isArray(entries)
   || entries[0]?.manifest?.title !== "Clarify requirements"
   || entries[0]?.permissions?.externalWrites !== false
   || entries[0]?.package?.format !== "ballet-graph-node-module"
-  || entries[0]?.package?.version !== 6
+  || entries[0]?.package?.version !== 7
   || entries[0]?.package?.capabilities?.accepts?.[0] !== "fixture:requirements.requested"
   || entries[0]?.package?.capabilities?.provides?.[0] !== "fixture:requirements.clarified"
   || entries[0]?.package?.graphNode?.actionNodes?.length !== 1
-  || entries[0]?.package?.graphNode?.actionNodes?.[0]?.key !== "clarify") {
+  || entries[0]?.package?.graphNode?.actionNodes?.[0]?.key !== "clarify"
+  || entries[0]?.package?.graphNode?.strategy?.kind !== "reward_mdp_v4") {
   throw new Error("packaged Ballet server did not list the fixture Graph Node Module package");
 }
 ' "$SMOKE_ROOT/graph-node-library.json"
@@ -176,7 +177,7 @@ const workNode = actionNode?.workNode;
 const validationNode = actionNode?.validationNode;
 const architect = workspace.instructions?.find((item) => item.id === "project:architect");
 const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 18
+if (workspace.automation?.version !== 19
   || workspace.automation.graph?.graphNodes?.length !== 2
   || graphNode?.id !== "review-node"
   || graphNode?.description !== "Review the fixture project."
@@ -186,12 +187,14 @@ if (workspace.automation?.version !== 18
   || workspace.automation.graph?.state?.description !== "Provider-neutral context shared by the fixture Graph."
   || JSON.stringify(workspace.automation.graph?.state?.initial) !== "{}"
   || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || workspace.automation.graph?.strategy?.kind !== "reward_mdp_v3"
+  || workspace.automation.graph?.strategy?.kind !== "reward_mdp_v4"
   || workspace.automation.graph?.strategy?.id !== "fixture-reward-mdp"
   || workspace.automation.graph?.strategy?.model?.discountPpm !== 990000
   || workspace.automation.graph?.strategy?.model?.stateActions?.[0]?.successors
     ?.reduce((sum, successor) => sum + successor.probabilityPpm, 0) !== 1000000
-  || Object.hasOwn(graphNode ?? {}, "strategy")
+  || workspace.automation.graph?.strategy?.model?.stateActions?.length !== 3
+  || graphNode?.strategy?.kind !== "reward_mdp_v4"
+  || graphNode?.strategy?.model?.stateActions?.length !== 1
   || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "success" && outcome.result === "PASS")
   || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "failure" && outcome.result === "FAIL")
   || actionNode?.description !== "Run and validate the fixture review."
@@ -220,7 +223,7 @@ if (workspace.automation?.version !== 18
   || workspace.canvasTheme?.version !== 4
   || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
   || workspace.canvasThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v18 Reward-MDP fixture workspace");
+  throw new Error("packaged Ballet server did not load the strict v19 hierarchical Reward-MDP fixture workspace");
 }
 ' "$SMOKE_ROOT/workspace.json" || {
   cat "$SMOKE_ROOT/server.err.log" >&2
@@ -236,7 +239,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "14") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 14`);
+if (version !== "15") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 15`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
   git -C "$SMOKE_ROOT/project" status --short >&2

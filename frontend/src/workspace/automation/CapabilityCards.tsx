@@ -28,7 +28,7 @@ export function CapabilityCards({ nodes, kind, locked, onAdd, onOpen, onEdit, on
           <ContractLine label="Accepts" values={node.capabilities.accepts} />
           <ContractLine label="Provides" values={node.capabilities.provides} />
           <div className="flex flex-wrap gap-1">{node.outcomes.length ? node.outcomes.map((outcome) => <Badge key={outcome.outcomeId} variant={outcome.result === "PASS" ? "secondary" : "destructive"}>{outcome.outcomeId} · {outcome.result}</Badge>) : <span className="font-mono text-[0.65rem] text-muted-foreground">No intrinsic outcomes</span>}</div>
-          <div className="font-mono text-[0.65rem] text-muted-foreground">{graphNode ? `${graphNode.actionNodes.length} ordered Action Node${graphNode.actionNodes.length === 1 ? "" : "s"}` : `retry limit: ${(node as ProjectActionNode).maxRetries}`}</div>
+          <div className="font-mono text-[0.65rem] text-muted-foreground">{graphNode ? `${graphNode.actionNodes.length} Action Node${graphNode.actionNodes.length === 1 ? "" : "s"} · ${graphNode.actionNodes.length}×${graphNode.actionNodes.length} local policy` : `retry limit: ${(node as ProjectActionNode).maxRetries}`}</div>
           {refs.length ? <p className="text-[0.7rem] text-destructive" title={refs.join("\n")}>Delete blocked: {refs.length} policy reference{refs.length === 1 ? "" : "s"}</p> : null}
         </div>
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-1 border-t border-divider-strong p-2">

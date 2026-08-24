@@ -14,9 +14,9 @@ import type {
 } from "./runtime.js";
 import type {
   AcceptanceLedgerSnapshotV1,
-  CompiledRewardPolicyV3,
-  PolicyDecisionRecordV3,
-  PolicyOptionObservationV4
+  CompiledRewardPolicyV4,
+  PolicyDecisionRecordV5,
+  PolicyOptionObservationV5
 } from "./decisionModel.js";
 
 export type BalletMode = "configure" | "run";
@@ -47,9 +47,9 @@ export interface RootRunStateProjection {
   historyTruncated: boolean;
 }
 export interface RootRunOrchestrationProjection {
-  policyDecisions: PolicyDecisionRecordV3[];
-  policyObservations: PolicyOptionObservationV4[];
-  compiledPolicy: CompiledRewardPolicyV3;
+  policyDecisions: PolicyDecisionRecordV5[];
+  policyObservations: PolicyOptionObservationV5[];
+  compiledPolicies: { global?: CompiledRewardPolicyV4; graphNodes: Record<string, CompiledRewardPolicyV4> };
   acceptanceLedger: AcceptanceLedgerSnapshotV1;
 }
 export interface RootRunFinalization {

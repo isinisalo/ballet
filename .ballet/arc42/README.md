@@ -4,7 +4,7 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 21
+version: 22
 tags:
   - arc42
   - architecture
@@ -15,7 +15,7 @@ tags:
 
 ## Nykytila
 
-12-osioinen baseline on accepted. Aktiivinen implementation on `goal-020` / `adr-031`: yksi Graph-tason `reward_mdp_v3`, immutable acceptance- ja authorization-snapshotit, kerran compiled discounted policy ja ordered GraphNode execution. Strict cut on v18/v3/v6/v11/v9/v10/v11/v4/v14. Scoped agent/local-policy/Repair/shadow/promotion-mallit ovat historiallisia, eivät active runtimea.
+12-osioinen baseline on accepted. Aktiivinen implementation on `goal-021` / `adr-033`: Graphin GraphNode-ID `reward_mdp_v4`, jokaisen GraphNoden ActionNode-ID `reward_mdp_v4`, erillinen acceptance-portti ja kerran compiled global/local-policyt. Strict cut on v19/v4/v7/v12/v9/v10/v11/v5/v15.
 
 ## Osiot
 
@@ -38,10 +38,10 @@ tags:
 - [TRACEABILITY](TRACEABILITY.md): Goal/REQ–QS–ADR/CON–BB–RT–TEST–EVID-ketjut.
 - [METHOD-HEALTH](METHOD-HEALTH.md): vain mitattu menetelmäevidenssi.
 - [STATE-CONTRACT](STATE-CONTRACT.md): bounded project State; authorization ja acceptance pysyvät erillisinä snapshoteina.
-- [Graph Reward-MDP initiative](initiatives/graph-reward-mdp/BRIEF.md): tämän hard cutin BRIEF/PLAN/EVIDENCE/REVIEW.
+- [Hierarchical Reward-MDP initiative](initiatives/hierarchical-reward-mdp/BRIEF.md): tämän hard cutin BRIEF/PLAN/EVIDENCE/REVIEW.
 - [Initiative template](initiatives/TEMPLATE/BRIEF.md): uuden rajatun työn rakenne.
 
-Vanhat initiativet säilyvät historiallisena evidenssinä. Niiden scoped agent/SSP/Repair/calibration-väitteet eivät ohita `adr-031`:n supersessionia.
+Vanhat initiativet säilyvät historiallisena evidenssinä. Niiden single-policy/scoped agent/SSP/Repair/calibration-väitteet eivät ohita `adr-033`:n supersessionia.
 
 ## Kanoninen omistajuus
 
@@ -61,4 +61,4 @@ Epäselvä WHAT/WHY, laatuprioriteetti, merkittävä ADR tai external-write-valt
 
 ## Evidenssi
 
-`npm run validate:arc42` tarkistaa dokumenttirakenteen, linkit, trace-ID:t, project-resurssit ja strict-v18 Reward-MDP -defaultin. Tuotantokaltainen pilotti on pending, kunnes nimetty Root Run -evidenssi on olemassa.
+`npm run validate:arc42` tarkistaa dokumenttirakenteen, linkit, trace-ID:t, project-resurssit sekä strict-v19 global 15/25 + local 84-cell -defaultin. Tuotantokaltainen pilotti on pending, kunnes nimetty Root Run -evidenssi on olemassa.

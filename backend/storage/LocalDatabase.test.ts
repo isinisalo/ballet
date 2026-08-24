@@ -9,7 +9,7 @@ import { localDatabaseTableNames } from "./RuntimeSchema.js";
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe("LocalDatabase strict schema v14", () => {
+describe("LocalDatabase strict schema v15", () => {
   it("creates only the Reward-MDP runtime inventory", async () => {
     const database = await createDatabase();
     const connection = database.connection();
@@ -20,7 +20,7 @@ describe("LocalDatabase strict schema v14", () => {
     expect(tables).not.toEqual(expect.arrayContaining([
       "repair_frames", "routing_requests", "routing_decisions", "policy_projections", "policy_telemetry"
     ]));
-    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("14");
+    expect(connection.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("15");
     expect(connection.pragma("foreign_keys", { simple: true })).toBe(1);
     database.close();
   });
@@ -67,20 +67,20 @@ describe("LocalDatabase strict schema v14", () => {
     untouched.close();
   });
 
-  it("rejects schema v13 with archive guidance and does not mutate it", async () => {
+  it("rejects schema v14 with archive guidance and does not mutate it", async () => {
     const filename = path.join(await temporaryRoot(), "state.sqlite");
     const previous = new Database(filename);
     previous.exec(`
       CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-      INSERT INTO metadata (key, value) VALUES ('schema_version', '13');
+      INSERT INTO metadata (key, value) VALUES ('schema_version', '14');
       CREATE TABLE repair_frames (repair_frame_id TEXT PRIMARY KEY);
     `);
     previous.close();
     expect(() => new LocalDatabase(filename).connection()).toThrow(
-      "Unsupported Ballet state schema 13; expected 14."
+      "Unsupported Ballet state schema 14; expected 15."
     );
     const untouched = new Database(filename, { readonly: true });
-    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("13");
+    expect(untouched.prepare("SELECT value FROM metadata WHERE key = 'schema_version'").pluck().get()).toBe("14");
     expect(untouched.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").pluck().all())
       .toContain("repair_frames");
     untouched.close();
@@ -91,7 +91,7 @@ const columns = (connection: Database.Database, table: string): string[] =>
   (connection.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(({ name }) => name);
 const createDatabase = async () => new LocalDatabase(path.join(await temporaryRoot(), "state.sqlite"));
 const temporaryRoot = async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v14-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "ballet-v15-"));
   roots.push(root);
   return root;
 };

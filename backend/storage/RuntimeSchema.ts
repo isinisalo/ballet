@@ -1,4 +1,4 @@
-export const localDatabaseSchemaVersion = 14;
+export const localDatabaseSchemaVersion = 15;
 
 export const localDatabaseTableNames = [
   "acceptance_ledger_entries", "control_flow_events", "execution_events", "execution_tasks",
@@ -55,6 +55,7 @@ export const runtimeSchema = `
     root_run_id TEXT NOT NULL REFERENCES root_runs(root_run_id) ON DELETE CASCADE,
     graph_node_invocation_id TEXT NOT NULL REFERENCES graph_node_invocations(graph_node_invocation_id) ON DELETE CASCADE,
     graph_node_id TEXT NOT NULL, action_node_id TEXT NOT NULL,
+    policy_decision_id TEXT NOT NULL REFERENCES policy_decisions(policy_decision_id),
     work_attempt INTEGER NOT NULL DEFAULT 0 CHECK (work_attempt >= 0),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','completed','blocked','failed','cancelled')),
     state_revision_before INTEGER NOT NULL, state_revision_after INTEGER, active_node_run_id TEXT,
@@ -109,6 +110,7 @@ export const runtimeSchema = `
     sequence INTEGER NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN (
       'policy_decided','policy_invalid','policy_observed','graph_node_dispatched','action_node_dispatched',
+      'policy_terminal','acceptance_mismatch',
       'work_completed','validation_pass','validation_fail_retry','validation_fail_escalate',
       'root_needs_input','root_cancelled','root_terminal','execution_interrupted'
     )),

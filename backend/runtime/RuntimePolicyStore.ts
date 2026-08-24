@@ -2,8 +2,8 @@ import type Database from "better-sqlite3";
 import { policyDecisionRecordSchema, policyOptionObservationSchema } from "../../shared/api/runtime-schemas.js";
 import type {
   AcceptanceLedgerSnapshotV1,
-  PolicyDecisionRecordV3,
-  PolicyOptionObservationV4
+  PolicyDecisionRecordV5,
+  PolicyOptionObservationV5
 } from "../../shared/domain/decisionModel.js";
 import type { RootExecutionSnapshot } from "../../shared/domain/runtime.js";
 import type { RootRunOrchestrationProjection } from "../../shared/domain/runs.js";
@@ -63,7 +63,7 @@ export class RuntimePolicyStore {
     return this.ledger(rootRunId);
   }
 
-  insertDecision(record: PolicyDecisionRecordV3): void {
+  insertDecision(record: PolicyDecisionRecordV5): void {
     const parsed = policyDecisionRecordSchema.parse(record);
     this.connection().prepare(`
       INSERT INTO policy_decisions (policy_decision_id, root_run_id, epoch, record_json, created_at)
@@ -71,14 +71,21 @@ export class RuntimePolicyStore {
     `).run(parsed.policyDecisionId, parsed.rootRunId, parsed.epoch, canonicalJson(jsonValue(parsed)), parsed.createdAt);
   }
 
-  latestDecision(rootRunId: string): PolicyDecisionRecordV3 | undefined {
+  decision(policyDecisionId: string): PolicyDecisionRecordV5 | undefined {
+    const row = this.connection().prepare(`
+      SELECT record_json FROM policy_decisions WHERE policy_decision_id = ?
+    `).get(policyDecisionId) as Row | undefined;
+    return row ? policyDecisionRecordSchema.parse(JSON.parse(String(row.record_json))) as PolicyDecisionRecordV5 : undefined;
+  }
+
+  latestDecision(rootRunId: string): PolicyDecisionRecordV5 | undefined {
     const row = this.connection().prepare(`
       SELECT record_json FROM policy_decisions WHERE root_run_id = ? ORDER BY epoch DESC LIMIT 1
     `).get(rootRunId) as Row | undefined;
-    return row ? policyDecisionRecordSchema.parse(JSON.parse(String(row.record_json))) as PolicyDecisionRecordV3 : undefined;
+    return row ? policyDecisionRecordSchema.parse(JSON.parse(String(row.record_json))) as PolicyDecisionRecordV5 : undefined;
   }
 
-  insertObservation(observation: PolicyOptionObservationV4): void {
+  insertObservation(observation: PolicyOptionObservationV5): void {
     const parsed = policyOptionObservationSchema.parse(observation);
     this.connection().prepare(`
       INSERT INTO policy_observations (
@@ -92,15 +99,15 @@ export class RuntimePolicyStore {
     const decisions = (this.connection().prepare(`
       SELECT record_json FROM policy_decisions WHERE root_run_id = ? ORDER BY epoch
     `).all(rootRunId) as Row[]).map((row) =>
-      policyDecisionRecordSchema.parse(JSON.parse(String(row.record_json))) as PolicyDecisionRecordV3);
+      policyDecisionRecordSchema.parse(JSON.parse(String(row.record_json))) as PolicyDecisionRecordV5);
     const observations = (this.connection().prepare(`
       SELECT record_json FROM policy_observations WHERE root_run_id = ? ORDER BY created_at
     `).all(rootRunId) as Row[]).map((row) =>
-      policyOptionObservationSchema.parse(JSON.parse(String(row.record_json))) as PolicyOptionObservationV4);
+      policyOptionObservationSchema.parse(JSON.parse(String(row.record_json))) as PolicyOptionObservationV5);
     return {
       policyDecisions: decisions,
       policyObservations: observations,
-      compiledPolicy: snapshot.compiledPolicy,
+      compiledPolicies: snapshot.compiledPolicies,
       acceptanceLedger: this.ledger(rootRunId)
     };
   }

@@ -9,7 +9,12 @@ type CapabilityNode = ProjectGraphNode | ProjectActionNode;
 
 export function CapabilityContractDialog({ node, open, locked, onOpenChange, onSave }: {
   node?: CapabilityNode; open: boolean; locked: boolean; onOpenChange: (open: boolean) => void;
-  onSave: (patch: Pick<CapabilityNode, "description" | "capabilities" | "outcomes"> & { stateDescription?: string }) => void;
+  onSave: (patch: {
+    description: string;
+    capabilities: CapabilityNode["capabilities"];
+    outcomes: ProjectIntrinsicOutcome[];
+    stateDescription?: string;
+  }) => void;
 }) {
   const [description, setDescription] = useState("");
   const [accepts, setAccepts] = useState("");

@@ -1,8 +1,10 @@
 import type Database from "better-sqlite3";
-import type { ProjectGraphNode, ProjectActionNode } from "../../shared/domain/automation.js";
+import type { ProjectGraphNode } from "../../shared/domain/automation.js";
 import type {
-  DecisionProjectionContextV3,
-  DecisionStateV3
+  AcceptanceLedgerSnapshotV1,
+  DecisionActionModelRowV4,
+  DecisionTransitionV4,
+  PolicyDecisionRecordV5
 } from "../../shared/domain/decisionModel.js";
 import type {
   CanonicalNodeOutcome,
@@ -11,36 +13,37 @@ import type {
   ValidationNodeOutcome,
   WorkNodeOutcome
 } from "../../shared/domain/runtime.js";
-import { maxControlFlowTransitions } from "../../shared/domain/runtime.js";
 import type { TaskEnvelopeV9 } from "../../shared/domain/taskEnvelope.js";
-import { resolveAdmissibleActions } from "../policy/AdmissibleActionResolver.js";
-import { projectDecisionState } from "../policy/DecisionStateProjector.js";
-import { rewardBreakdown } from "../policy/RewardMdpCompiler.js";
+import { RuntimeDecisionDispatcher } from "./RuntimeDecisionDispatcher.js";
 import { RuntimeEventStore } from "./RuntimeEventStore.js";
 import {
   assertValidationOutcome,
-  type DecisionInput,
+  cancelRuntimeInvocations,
   eventDetail,
   actionDefinition,
-  latestValidation,
-  nextAction,
   now,
-  observationRecord,
-  policyDecisionRecord,
   requireGraphNode,
   rootExecutionSnapshot,
   setRootRunStatus,
-  terminalStatus
+  terminalStatus,
+  writeRootTerminal
 } from "./RuntimeFlowSupport.js";
 import { RuntimeInvocationStore } from "./RuntimeInvocationStore.js";
 import { RuntimePolicyStore } from "./RuntimePolicyStore.js";
+import {
+  acceptanceEffectsMatch,
+  buildGlobalObservation,
+  buildLocalObservation,
+  expectedAcceptanceEffects,
+  requirePolicyBranch,
+  requirePolicyRow
+} from "./RuntimePolicyTransition.js";
 import { RuntimeStateStore } from "./RuntimeStateStore.js";
 import { RuntimeTaskEnvelopeBuilder } from "./RuntimeTaskEnvelopeBuilder.js";
 
-type Row = Record<string, unknown>;
-
 export class RuntimeFlowCoordinator {
   private readonly envelopes: RuntimeTaskEnvelopeBuilder;
+  private readonly decisions: RuntimeDecisionDispatcher;
 
   constructor(
     private readonly connection: () => Database.Database,
@@ -50,6 +53,14 @@ export class RuntimeFlowCoordinator {
     private readonly events: RuntimeEventStore
   ) {
     this.envelopes = new RuntimeTaskEnvelopeBuilder(connection, invocations, policies, states);
+    this.decisions = new RuntimeDecisionDispatcher(
+      connection,
+      invocations,
+      policies,
+      states,
+      events,
+      (rootRunId, status, message) => this.terminalize(rootRunId, status, undefined, message)
+    );
   }
 
   initialize(rootRunId: string): void {
@@ -57,14 +68,25 @@ export class RuntimeFlowCoordinator {
     this.policies.initializeLedger(rootRunId, snapshot.acceptanceLedger);
     this.setRootStatus(rootRunId, "running");
     if (snapshot.rootKind === "graph_node") {
-      this.dispatchGraphNode(rootRunId, requireGraphNode(snapshot, snapshot.rootGraphNodeId!), "root");
-    } else this.decide(rootRunId, { epochKind: "start" });
+      const graphNode = requireGraphNode(snapshot, snapshot.rootGraphNodeId!);
+      const invocation = this.decisions.createGraphNode(rootRunId, graphNode, "root");
+      this.decisions.decideLocal(
+        rootRunId,
+        invocation.graphNodeInvocationId,
+        graphNode.strategy.model.initialStateId,
+        "start"
+      );
+    } else this.decisions.decideGlobal(rootRunId, snapshot.graph.strategy.model.initialStateId, "start");
   }
 
   applyOutcome(rootRunId: string, nodeRunId: string, outcome: CanonicalNodeOutcome): void {
     const node = this.invocations.requireNode(nodeRunId);
     if (node.rootRunId !== rootRunId || node.role !== outcome.role) throw new Error("Node outcome is outside its execution contract.");
-    if (node.status !== "running" && node.status !== "queued") throw new Error(`Node Run ${nodeRunId} cannot accept an outcome.`);
+    const correctableMismatch = node.status === "waiting_for_input" && node.role === "validation";
+    if (!correctableMismatch && node.status !== "running" && node.status !== "queued") {
+      throw new Error(`Node Run ${nodeRunId} cannot accept an outcome.`);
+    }
+    if (correctableMismatch) this.setRootStatus(rootRunId, "running");
     if (outcome.role === "work") this.afterWork(node, outcome);
     else this.afterValidation(node, outcome);
   }
@@ -72,19 +94,7 @@ export class RuntimeFlowCoordinator {
   buildTaskEnvelope(nodeRunId: string): TaskEnvelopeV9 { return this.envelopes.build(nodeRunId); }
 
   cancel(rootRunId: string): void {
-    const at = now();
-    this.connection().prepare(`
-      UPDATE node_runs SET status = 'cancelled', updated_at = ?, completed_at = ?
-      WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
-    `).run(at, at, rootRunId);
-    this.connection().prepare(`
-      UPDATE action_node_invocations SET status = 'cancelled', updated_at = ?, completed_at = ?
-      WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
-    `).run(at, at, rootRunId);
-    this.connection().prepare(`
-      UPDATE graph_node_invocations SET status = 'cancelled', updated_at = ?, completed_at = ?
-      WHERE root_run_id = ? AND status IN ('queued','running','waiting_for_input')
-    `).run(at, at, rootRunId);
+    cancelRuntimeInvocations(this.connection(), rootRunId);
     this.setRootStatus(rootRunId, "cancelled");
     this.events.append(rootRunId, "root_cancelled", { stateRevision: this.states.revision(rootRunId) });
   }
@@ -124,9 +134,14 @@ export class RuntimeFlowCoordinator {
     this.invocations.setNodeOutcome(node.nodeRunId, outcome, "completed");
     const action = actionDefinition(this.invocations, node);
     const validation = this.invocations.createNode({
-      rootRunId: node.rootRunId, graphNodeInvocationId: node.graphNodeInvocationId!,
-      actionNodeInvocationId: node.actionNodeInvocationId!, graphNodeId: node.graphNodeId!, actionNodeId: node.actionNodeId!,
-      role: "validation", nodeDefinitionId: action.validationNode.id, attempt: node.attempt
+      rootRunId: node.rootRunId,
+      graphNodeInvocationId: node.graphNodeInvocationId!,
+      actionNodeInvocationId: node.actionNodeInvocationId!,
+      graphNodeId: node.graphNodeId!,
+      actionNodeId: node.actionNodeId!,
+      role: "validation",
+      nodeDefinitionId: action.validationNode.id,
+      attempt: node.attempt
     });
     this.events.append(node.rootRunId, "work_completed", {
       ...eventDetail(this.states, node), targetNodeRunId: validation.nodeRunId
@@ -134,172 +149,168 @@ export class RuntimeFlowCoordinator {
   }
 
   private afterValidation(node: NodeRun, outcome: ValidationNodeOutcome): void {
-    const graph = this.invocations.graphNode(node.graphNodeInvocationId!).snapshot;
+    const graphNodeInvocation = this.invocations.graphNode(node.graphNodeInvocationId!);
+    const graphNode = graphNodeInvocation.snapshot;
     const action = actionDefinition(this.invocations, node);
-    assertValidationOutcome(graph, action, outcome);
-    if (outcome.statePatch) this.states.apply(node.rootRunId, node.nodeRunId, outcome.statePatch, outcome);
-    this.policies.applyAcceptance(node.rootRunId, node.nodeRunId, outcome.acceptance);
-    this.invocations.setNodeOutcome(node.nodeRunId, outcome, "completed");
+    assertValidationOutcome(action, outcome);
+    const actionInvocation = this.invocations.action(node.actionNodeInvocationId!);
+    const decision = this.requireDecision(actionInvocation.policyDecisionId, "graph_node");
+    const row = requirePolicyRow(graphNode.strategy.model.stateActions, decision.state.stateId, action.id);
+    const branch = requirePolicyBranch(row, outcome.outcomeId);
     const retryAllowed = outcome.decision === "FAIL" && outcome.disposition === "retry" && node.attempt <= action.maxRetries;
+    const expectedEffects = retryAllowed ? [] : expectedAcceptanceEffects(graphNode, branch);
+    if (!acceptanceEffectsMatch(outcome, expectedEffects)) {
+      this.invocations.setNodeOutcome(node.nodeRunId, outcome, "waiting_for_input");
+      this.setRootStatus(node.rootRunId, "waiting_for_input");
+      this.events.append(node.rootRunId, "acceptance_mismatch", {
+        ...eventDetail(this.states, node), policyDecisionId: decision.policyDecisionId
+      });
+      return;
+    }
     if (retryAllowed) {
+      this.invocations.setNodeOutcome(node.nodeRunId, outcome, "completed");
       const work = this.invocations.createNode({
-        rootRunId: node.rootRunId, graphNodeInvocationId: node.graphNodeInvocationId!,
-        actionNodeInvocationId: node.actionNodeInvocationId!, graphNodeId: node.graphNodeId!, actionNodeId: node.actionNodeId!,
-        role: "work", nodeDefinitionId: action.workNode.id, attempt: node.attempt + 1
+        rootRunId: node.rootRunId,
+        graphNodeInvocationId: node.graphNodeInvocationId!,
+        actionNodeInvocationId: node.actionNodeInvocationId!,
+        graphNodeId: node.graphNodeId!,
+        actionNodeId: node.actionNodeId!,
+        role: "work",
+        nodeDefinitionId: action.workNode.id,
+        attempt: node.attempt + 1
       });
       this.events.append(node.rootRunId, "validation_fail_retry", {
         ...eventDetail(this.states, node), targetNodeRunId: work.nodeRunId
       });
       return;
     }
+    const ledgerBefore = this.policies.ledger(node.rootRunId);
+    if (outcome.statePatch) this.states.apply(node.rootRunId, node.nodeRunId, outcome.statePatch, outcome);
+    const ledgerAfter = this.policies.applyAcceptance(node.rootRunId, node.nodeRunId, outcome.acceptance);
+    this.invocations.setNodeOutcome(node.nodeRunId, outcome, "completed");
     this.invocations.completeAction(node.actionNodeInvocationId!);
-    if (outcome.decision === "PASS") {
-      this.events.append(node.rootRunId, "validation_pass", eventDetail(this.states, node));
-      const next = nextAction(graph, action.id);
-      if (next) { this.dispatchAction(node.rootRunId, node.graphNodeInvocationId!, graph, next); return; }
-    } else this.events.append(node.rootRunId, "validation_fail_escalate", eventDetail(this.states, node));
-    this.completeGraphNode(node, outcome);
-  }
-
-  private completeGraphNode(node: NodeRun, outcome: ValidationNodeOutcome): void {
-    const invocation = this.invocations.graphNode(node.graphNodeInvocationId!);
-    this.invocations.completeGraphNode(invocation.graphNodeInvocationId,
-      outcome.decision === "PASS" ? "completed" : "failed");
+    this.events.append(node.rootRunId, outcome.decision === "PASS" ? "validation_pass" : "validation_fail_escalate",
+      eventDetail(this.states, node));
+    const localResult = this.observeLocal(
+      node, outcome, graphNode, decision, row, branch, ledgerAfter
+    );
+    if (branch.target.kind === "state") {
+      this.decisions.decideLocal(
+        node.rootRunId,
+        node.graphNodeInvocationId!,
+        branch.target.stateId,
+        "continuation",
+        node.actionNodeInvocationId
+      );
+      return;
+    }
+    this.invocations.completeGraphNode(
+      graphNodeInvocation.graphNodeInvocationId,
+      branch.target.terminal === "success" ? "completed" : branch.target.terminal === "failure" ? "failed" : "blocked"
+    );
     const snapshot = this.snapshot(node.rootRunId);
     if (snapshot.rootKind === "graph_node") {
-      this.terminalize(node.rootRunId, outcome.decision === "PASS" ? "completed" : "failed", outcome, outcome.summary);
-      return;
-    }
-    this.observe(node.rootRunId, invocation.graphNodeInvocationId, outcome);
-    this.decide(node.rootRunId, {
-      epochKind: "continuation", previousActionId: invocation.graphNodeId,
-      previousActionResult: outcome.decision, previousOutcomeId: outcome.outcomeId,
-      previousActionInvocationId: invocation.graphNodeInvocationId
-    });
-  }
-
-  private decide(rootRunId: string, previous: DecisionInput): void {
-    const snapshot = this.snapshot(rootRunId);
-    const state = this.projectState(rootRunId, previous);
-    const definition = snapshot.graph.strategy.model.states.find(({ id }) => id === state.stateId)!;
-    if (definition.terminal) {
-      const latest = latestValidation(this.connection(), rootRunId);
-      this.terminalize(rootRunId, terminalStatus(definition.terminal), latest, latest?.summary);
-      return;
-    }
-    const graphNodeIds = snapshot.graph.graphNodes.map(({ id }) => id);
-    const admissible = resolveAdmissibleActions(snapshot.graph.strategy, state, graphNodeIds);
-    const compiled = snapshot.compiledPolicy.states.find(({ stateId }) => stateId === state.stateId);
-    const selectedActionId = compiled?.selectedActionId;
-    const valid = Boolean(selectedActionId && admissible.actionIds.includes(selectedActionId));
-    const decision = policyDecisionRecord(
-      this.connection(), snapshot, rootRunId, previous, state, admissible, valid ? compiled : undefined
-    );
-    this.policies.insertDecision(decision);
-    if (!valid || !selectedActionId) {
-      this.events.append(rootRunId, "policy_invalid", {
-        stateRevision: this.states.revision(rootRunId), policyDecisionId: decision.policyDecisionId
+      this.events.append(node.rootRunId, "policy_terminal", {
+        ...eventDetail(this.states, node), policyDecisionId: decision.policyDecisionId
       });
-      this.terminalize(rootRunId, "blocked", undefined, "Compiled policy selected no admissible action.");
+      this.terminalize(node.rootRunId, terminalStatus(branch.target.terminal), outcome, outcome.summary);
       return;
     }
-    this.events.append(rootRunId, "policy_decided", {
-      stateRevision: this.states.revision(rootRunId), policyDecisionId: decision.policyDecisionId
-    });
-    this.dispatchGraphNode(rootRunId, requireGraphNode(snapshot, selectedActionId), "policy", decision.policyDecisionId);
+    this.observeGlobal(
+      node.rootRunId,
+      graphNodeInvocation.graphNodeInvocationId,
+      localResult.emittedOutcomeId!,
+      outcome,
+      ledgerBefore,
+      ledgerAfter
+    );
   }
 
-  private dispatchGraphNode(
-    rootRunId: string, graphNode: ProjectGraphNode, source: "policy" | "root", policyDecisionId?: string
+  private observeLocal(
+    node: NodeRun,
+    outcome: ValidationNodeOutcome,
+    graphNode: ProjectGraphNode,
+    decision: PolicyDecisionRecordV5,
+    row: DecisionActionModelRowV4,
+    branch: DecisionTransitionV4,
+    ledgerAfter: AcceptanceLedgerSnapshotV1
+  ): { emittedOutcomeId?: string } {
+    const snapshot = this.snapshot(node.rootRunId);
+    this.policies.insertObservation(buildLocalObservation({
+      snapshot,
+      node,
+      graphNode,
+      decision,
+      outcome,
+      row,
+      branch,
+      ledgerAfter,
+      stateRevision: this.states.revision(node.rootRunId)
+    }));
+    this.events.append(node.rootRunId, "policy_observed", {
+      ...eventDetail(this.states, node), policyDecisionId: decision.policyDecisionId
+    });
+    return { emittedOutcomeId: branch.target.kind === "terminal" ? branch.target.emitOutcomeId : undefined };
+  }
+
+  private observeGlobal(
+    rootRunId: string,
+    graphNodeInvocationId: string,
+    emittedOutcomeId: string,
+    validationOutcome: ValidationNodeOutcome,
+    ledgerBefore: AcceptanceLedgerSnapshotV1,
+    ledgerAfter: AcceptanceLedgerSnapshotV1
   ): void {
-    if (!this.incrementTransition(rootRunId)) {
-      this.terminalize(rootRunId, "blocked", undefined,
-        `Root Run reached the ${maxControlFlowTransitions} Graph Node transition limit.`);
-      return;
-    }
-    const invocation = this.invocations.createGraphNode(rootRunId, graphNode, source, policyDecisionId);
-    this.events.append(rootRunId, "graph_node_dispatched", {
-      stateRevision: this.states.revision(rootRunId), graphNodeInvocationId: invocation.graphNodeInvocationId,
-      policyDecisionId
-    });
-    this.dispatchAction(rootRunId, invocation.graphNodeInvocationId, graphNode, graphNode.actionNodes[0]!);
-  }
-
-  private dispatchAction(rootRunId: string, graphInvocationId: string, graph: ProjectGraphNode, action: ProjectActionNode): void {
-    const invocation = this.invocations.createAction(rootRunId, graphInvocationId, graph, action);
-    const work = this.invocations.createNode({
-      rootRunId, graphNodeInvocationId: graphInvocationId, actionNodeInvocationId: invocation.actionNodeInvocationId,
-      graphNodeId: graph.id, actionNodeId: action.id, role: "work", nodeDefinitionId: action.workNode.id, attempt: 1
-    });
-    this.events.append(rootRunId, "action_node_dispatched", {
-      stateRevision: this.states.revision(rootRunId), graphNodeInvocationId: graphInvocationId,
-      actionNodeInvocationId: invocation.actionNodeInvocationId, targetNodeRunId: work.nodeRunId
-    });
-  }
-
-  private observe(rootRunId: string, graphInvocationId: string, outcome: ValidationNodeOutcome): void {
-    const invocation = this.invocations.graphNode(graphInvocationId);
-    const decision = this.policies.latestDecision(rootRunId);
-    if (!decision?.state || decision.policyDecisionId !== invocation.policyDecisionId) throw new Error("Policy observation lacks its decision.");
+    const invocation = this.invocations.graphNode(graphNodeInvocationId);
+    const decision = this.requireDecision(invocation.policyDecisionId!, "graph");
     const snapshot = this.snapshot(rootRunId);
-    const row = snapshot.graph.strategy.model.stateActions.find(({ stateId, actionId }) =>
-      stateId === decision.state!.stateId && actionId === invocation.graphNodeId)!;
-    const branch = row.successors.find(({ outcomeId }) => outcomeId === outcome.outcomeId);
-    if (!branch) throw new Error(`Outcome ${outcome.outcomeId} is outside the selected MDP action.`);
-    const actual = this.projectState(rootRunId, {
-      epochKind: "continuation", previousActionId: invocation.graphNodeId,
-      previousActionResult: outcome.decision, previousOutcomeId: outcome.outcomeId,
-      previousActionInvocationId: graphInvocationId
-    });
-    const currentDefinition = snapshot.graph.strategy.model.states.find(({ id }) => id === decision.state!.stateId)!;
-    const actualDefinition = snapshot.graph.strategy.model.states.find(({ id }) => id === actual.stateId)!;
-    const realizedRewardMicros = rewardBreakdown(
-      snapshot.graph.strategy.model, snapshot.graph.strategy.capabilityModel,
-      currentDefinition, actualDefinition, outcome.outcomeId
-    ).netRewardMicros;
-    this.policies.insertObservation(observationRecord(
-      snapshot, decision, invocation, outcome, row.successors, actual, realizedRewardMicros,
-      actual.stateId === branch.nextStateId ? "match" : "state_miss", this.policies.ledger(rootRunId)
-    ));
+    const row = requirePolicyRow(
+      snapshot.graph.strategy.model.stateActions,
+      decision.state.stateId,
+      invocation.graphNodeId
+    );
+    const branch = requirePolicyBranch(row, emittedOutcomeId);
+    const graphOutcome = invocation.snapshot.outcomes.find(({ outcomeId }) => outcomeId === emittedOutcomeId);
+    if (!graphOutcome) throw new Error(`Emitted outcome ${emittedOutcomeId} is outside Graph Node ${invocation.graphNodeId}.`);
+    this.policies.insertObservation(buildGlobalObservation({
+      snapshot,
+      graphNodeInvocationId,
+      decision,
+      row,
+      branch,
+      result: graphOutcome.result,
+      emittedOutcomeId,
+      validationOutcome,
+      ledgerBefore,
+      ledgerAfter,
+      stateRevision: this.states.revision(rootRunId)
+    }));
     this.events.append(rootRunId, "policy_observed", {
-      stateRevision: this.states.revision(rootRunId), graphNodeInvocationId: graphInvocationId,
+      stateRevision: this.states.revision(rootRunId),
+      graphNodeInvocationId,
       policyDecisionId: decision.policyDecisionId
     });
+    if (branch.target.kind === "state") {
+      this.decisions.decideGlobal(rootRunId, branch.target.stateId, "continuation", graphNodeInvocationId);
+      return;
+    }
+    this.events.append(rootRunId, "policy_terminal", {
+      stateRevision: this.states.revision(rootRunId),
+      graphNodeInvocationId,
+      policyDecisionId: decision.policyDecisionId
+    });
+    this.terminalize(rootRunId, terminalStatus(branch.target.terminal), validationOutcome, validationOutcome.summary);
   }
 
-  private projectState(rootRunId: string, previous: DecisionInput): DecisionStateV3 {
-    const snapshot = this.snapshot(rootRunId);
-    const context: DecisionProjectionContextV3 = {
-      epochKind: previous.epochKind,
-      previousActionId: previous.previousActionId,
-      previousActionResult: previous.previousActionResult,
-      previousOutcomeId: previous.previousOutcomeId,
-      actionInvocationCount: Number((this.connection().prepare(
-        "SELECT COUNT(*) AS count FROM graph_node_invocations WHERE root_run_id = ?"
-      ).get(rootRunId) as Row).count),
-      stateRevision: this.states.revision(rootRunId), projectState: this.states.current(rootRunId),
-      authorization: snapshot.authorization, acceptanceLedger: this.policies.ledger(rootRunId),
-      evidenceRefs: [snapshot.authorization.sha256, snapshot.acceptanceLedger.sha256]
-    };
-    return projectDecisionState(snapshot.graph.strategy.model, context);
+  private requireDecision(policyDecisionId: string, scope: "graph" | "graph_node"): PolicyDecisionRecordV5 {
+    const decision = this.policies.decision(policyDecisionId);
+    if (!decision || decision.scope !== scope) throw new Error(`Policy decision ${policyDecisionId} is outside ${scope} scope.`);
+    return decision;
   }
 
   private terminalize(rootRunId: string, status: string, outcome?: CanonicalNodeOutcome, message?: string): void {
-    const at = now();
-    this.connection().prepare(`
-      UPDATE root_runs SET status = ?, outcome_json = ?, error_code = ?, error_message = ?,
-        active_graph_node_invocation_id = NULL, active_node_run_id = NULL,
-        updated_at = ?, completed_at = ? WHERE root_run_id = ?
-    `).run(status, outcome ? JSON.stringify(outcome) : null, status === "failed" || status === "blocked" ? status : null,
-      status === "failed" || status === "blocked" ? message ?? null : null, at, at, rootRunId);
+    writeRootTerminal(this.connection(), rootRunId, status, outcome, message);
     this.events.append(rootRunId, "root_terminal", { stateRevision: this.states.revision(rootRunId) });
   }
 
-  private incrementTransition(rootRunId: string): boolean {
-    const result = this.connection().prepare(`
-      UPDATE root_runs SET transition_count = transition_count + 1, updated_at = ?
-      WHERE root_run_id = ? AND transition_count < ?
-    `).run(now(), rootRunId, maxControlFlowTransitions);
-    return result.changes === 1;
-  }
 }

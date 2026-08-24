@@ -122,6 +122,7 @@ export interface ActionNodeInvocation {
   graphNodeInvocationId: string;
   graphNodeId: string;
   actionNodeId: string;
+  policyDecisionId: string;
   workAttempt: number;
   status: InvocationStatus;
   stateRevisionBefore: number;

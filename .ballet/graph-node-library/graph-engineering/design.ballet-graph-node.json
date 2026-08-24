@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 6,
+  "version": 7,
   "manifest": {
     "id": "design",
     "title": "DESIGN",
@@ -818,6 +818,2142 @@
         "outcomeId": "failure",
         "result": "FAIL"
       }
-    ]
+    ],
+    "strategy": {
+      "kind": "reward_mdp_v4",
+      "id": "design-local-reward-mdp",
+      "description": "Selects design Action Nodes from the Graph Node-local Reward-MDP.",
+      "model": {
+        "version": 4,
+        "initialStateId": "01-introduction-and-goals",
+        "discountPpm": 990000,
+        "reward": {
+          "actionCostMicros": 1000000,
+          "terminalSuccessBonusMicros": 5000000,
+          "acceptanceProgressPotentialScaleMicros": 0,
+          "outcomePenaltyMicros": {
+            "none": 0,
+            "transient": 2000000,
+            "implementation_defect": 5000000,
+            "invalid_plan": 12000000,
+            "invalid_design": 25000000
+          }
+        },
+        "stateActions": [
+          {
+            "stateId": "01-introduction-and-goals",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "02-constraints",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "02-constraints",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "03-context-and-scope",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "03-context-and-scope",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "03-context-and-scope",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "04-solution-strategy",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "04-solution-strategy",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "04-solution-strategy",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "04-solution-strategy",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "05-building-block-view",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "05-building-block-view",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "05-building-block-view",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "05-building-block-view",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "05-building-block-view",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "06-runtime-view",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "06-runtime-view",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "06-runtime-view",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "06-runtime-view",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "06-runtime-view",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "06-runtime-view",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "07-deployment-view",
+            "actionId": "07-deployment-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "07-deployment-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "08-crosscutting-concepts",
+            "actionId": "08-crosscutting-concepts",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "07-deployment-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "08-crosscutting-concepts",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "09-architecture-decisions",
+            "actionId": "09-architecture-decisions",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "07-deployment-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "08-crosscutting-concepts",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "09-architecture-decisions",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "10-quality-requirements",
+            "actionId": "10-quality-requirements",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "07-deployment-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "08-crosscutting-concepts",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "09-architecture-decisions",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "10-quality-requirements",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "11-risks-and-technical-debt",
+            "actionId": "11-risks-and-technical-debt",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "01-introduction-and-goals",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "01-introduction-and-goals"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "02-constraints",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "02-constraints"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "03-context-and-scope",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "03-context-and-scope"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "04-solution-strategy",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "04-solution-strategy"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "05-building-block-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "05-building-block-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "06-runtime-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "06-runtime-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "07-deployment-view",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "07-deployment-view"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "08-crosscutting-concepts",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "08-crosscutting-concepts"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "09-architecture-decisions",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "09-architecture-decisions"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "10-quality-requirements",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "10-quality-requirements"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "11-risks-and-technical-debt",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "11-risks-and-technical-debt"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "12-glossary",
+            "actionId": "12-glossary",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "terminal",
+                  "terminal": "success",
+                  "emitOutcomeId": "success"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "12-glossary"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          }
+        ],
+        "solver": {
+          "algorithm": "discounted_value_iteration_v4",
+          "maxIterations": 10000,
+          "convergenceToleranceMicros": 1
+        }
+      }
+    }
   }
 }

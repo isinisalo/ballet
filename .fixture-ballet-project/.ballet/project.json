@@ -1,5 +1,5 @@
 {
-  "version": 18,
+  "version": 19,
   "executionProfiles": [
     {
       "id": "codex-gpt-5-6-luna-medium-network-off",
@@ -23,54 +23,28 @@
       "description": "Provider-neutral context shared by the fixture Graph.",
       "initial": {}
     },
+    "acceptance": {
+      "version": 1,
+      "obligations": [
+        {
+          "obligationId": "review-accepted",
+          "description": "The fixture review is accepted with evidence.",
+          "weight": 1
+        }
+      ]
+    },
     "strategy": {
-      "kind": "reward_mdp_v3",
+      "kind": "reward_mdp_v4",
       "id": "fixture-reward-mdp",
-      "description": "Select the fixture review through one immutable compiled policy.",
-      "capabilityModel": {
-        "version": 3,
-        "outcomes": [
-          {
-            "id": "failure",
-            "description": "The fixture review failed validation.",
-            "result": "FAIL",
-            "penaltyClass": "implementation_defect"
-          },
-          {
-            "id": "success",
-            "description": "The fixture review passed validation.",
-            "result": "PASS",
-            "penaltyClass": "none"
-          }
-        ],
-        "actions": [
-          {
-            "actionId": "clarify-node",
-            "guards": []
-          },
-          {
-            "actionId": "review-node",
-            "guards": []
-          }
-        ]
-      },
+      "description": "Select fixture Graph Nodes through one immutable global policy.",
       "model": {
-        "version": 3,
+        "version": 4,
+        "initialStateId": "clarify-node",
         "discountPpm": 990000,
-        "acceptance": {
-          "version": 1,
-          "obligations": [
-            {
-              "obligationId": "review-accepted",
-              "description": "The fixture review is accepted with evidence.",
-              "weight": 1
-            }
-          ]
-        },
         "reward": {
           "actionCostMicros": 1000000,
-          "completionBonusMicros": 25000000,
-          "progressPotentialScaleMicros": 100000000,
+          "terminalSuccessBonusMicros": 25000000,
+          "acceptanceProgressPotentialScaleMicros": 100000000,
           "outcomePenaltyMicros": {
             "none": 0,
             "transient": 2000000,
@@ -79,62 +53,37 @@
             "invalid_design": 25000000
           }
         },
-        "features": [],
-        "states": [
-          {
-            "id": "review-complete",
-            "values": {},
-            "verifiedObligationIds": ["review-accepted"],
-            "invalidatedObligationIds": [],
-            "terminal": "success"
-          },
-          {
-            "id": "review-pending",
-            "values": {},
-            "verifiedObligationIds": [],
-            "invalidatedObligationIds": []
-          }
-        ],
         "stateActions": [
           {
-            "stateId": "review-pending",
+            "stateId": "clarify-node",
             "actionId": "clarify-node",
+            "guards": [],
             "successors": [
-              {
-                "outcomeId": "failure",
-                "nextStateId": "review-pending",
-                "probabilityPpm": 500000,
-                "provenance": "default_prior"
-              },
-              {
-                "outcomeId": "success",
-                "nextStateId": "review-complete",
-                "probabilityPpm": 500000,
-                "provenance": "default_prior"
-              }
+              { "outcomeId": "success", "target": { "kind": "state", "stateId": "review-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
+              { "outcomeId": "failure", "target": { "kind": "state", "stateId": "clarify-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
             ]
           },
           {
-            "stateId": "review-pending",
-            "actionId": "review-node",
+            "stateId": "review-node",
+            "actionId": "clarify-node",
+            "guards": [],
             "successors": [
-              {
-                "outcomeId": "failure",
-                "nextStateId": "review-pending",
-                "probabilityPpm": 500000,
-                "provenance": "default_prior"
-              },
-              {
-                "outcomeId": "success",
-                "nextStateId": "review-complete",
-                "probabilityPpm": 500000,
-                "provenance": "default_prior"
-              }
+              { "outcomeId": "success", "target": { "kind": "state", "stateId": "review-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
+              { "outcomeId": "failure", "target": { "kind": "state", "stateId": "clarify-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
+            ]
+          },
+          {
+            "stateId": "review-node",
+            "actionId": "review-node",
+            "guards": [],
+            "successors": [
+              { "outcomeId": "success", "target": { "kind": "terminal", "terminal": "success" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
+              { "outcomeId": "failure", "target": { "kind": "state", "stateId": "review-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
             ]
           }
         ],
         "solver": {
-          "algorithm": "discounted_value_iteration_v3",
+          "algorithm": "discounted_value_iteration_v4",
           "maxIterations": 10000,
           "convergenceToleranceMicros": 1
         }
@@ -149,41 +98,48 @@
           "provides": ["fixture:requirements.clarified"]
         },
         "outcomes": [
-          { "outcomeId": "success", "result": "PASS" },
-          { "outcomeId": "failure", "result": "FAIL" }
+          { "outcomeId": "success", "result": "PASS", "acceptanceEffects": [] },
+          { "outcomeId": "failure", "result": "FAIL", "acceptanceEffects": [] }
         ],
-        "stateContract": {
-          "description": "Bounded fixture clarification references."
+        "stateContract": { "description": "Bounded fixture clarification references." },
+        "strategy": {
+          "kind": "reward_mdp_v4",
+          "id": "clarify-node-local-reward-mdp",
+          "description": "Select fixture clarification Action Nodes.",
+          "model": {
+            "version": 4,
+            "initialStateId": "clarify-action",
+            "discountPpm": 990000,
+            "reward": {
+              "actionCostMicros": 1000000,
+              "terminalSuccessBonusMicros": 5000000,
+              "acceptanceProgressPotentialScaleMicros": 0,
+              "outcomePenaltyMicros": { "none": 0, "transient": 2000000, "implementation_defect": 5000000, "invalid_plan": 12000000, "invalid_design": 25000000 }
+            },
+            "stateActions": [{
+              "stateId": "clarify-action",
+              "actionId": "clarify-action",
+              "guards": [],
+              "successors": [
+                { "outcomeId": "success", "target": { "kind": "terminal", "terminal": "success", "emitOutcomeId": "success" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
+                { "outcomeId": "failure", "target": { "kind": "state", "stateId": "clarify-action" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
+              ]
+            }],
+            "solver": { "algorithm": "discounted_value_iteration_v4", "maxIterations": 10000, "convergenceToleranceMicros": 1 }
+          }
         },
         "actionNodes": [
           {
             "id": "clarify-action",
             "description": "Clarify and validate the fixture request.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
+            "capabilities": { "accepts": [], "provides": [] },
             "outcomes": [
               { "outcomeId": "success", "result": "PASS" },
               { "outcomeId": "failure", "result": "FAIL" }
             ],
             "maxRetries": 1,
-            "workNode": {
-              "id": "clarify-work",
-              "type": "human",
-              "description": "Clarify the fixture request.",
-              "task": "Clarify the fixture request.",
-              "nodeStyle": "terra",
-              "nodeSize": "medium"
-            },
-            "validationNode": {
-              "id": "clarify-validation",
-              "type": "human",
-              "description": "Validate fixture clarification.",
-              "task": "Confirm that fixture clarification is actionable.",
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            }
+            "workNode": { "id": "clarify-work", "type": "human", "description": "Clarify the fixture request.", "task": "Clarify the fixture request.", "nodeStyle": "terra", "nodeSize": "medium" },
+            "validationNode": { "id": "clarify-validation", "type": "human", "description": "Validate fixture clarification.", "task": "Confirm that fixture clarification is actionable.", "nodeStyle": "luna", "nodeSize": "small" }
           }
         ]
       },
@@ -194,42 +150,50 @@
           "accepts": ["fixture:review.requested"],
           "provides": ["fixture:review.completed"]
         },
+        "acceptanceObligationId": "review-accepted",
         "outcomes": [
-          { "outcomeId": "success", "result": "PASS" },
-          { "outcomeId": "failure", "result": "FAIL" }
+          { "outcomeId": "success", "result": "PASS", "acceptanceEffects": [{ "obligationId": "review-accepted", "status": "verified" }] },
+          { "outcomeId": "failure", "result": "FAIL", "acceptanceEffects": [] }
         ],
-        "stateContract": {
-          "description": "Bounded fixture review references."
+        "stateContract": { "description": "Bounded fixture review references." },
+        "strategy": {
+          "kind": "reward_mdp_v4",
+          "id": "review-node-local-reward-mdp",
+          "description": "Select fixture review Action Nodes.",
+          "model": {
+            "version": 4,
+            "initialStateId": "review-action",
+            "discountPpm": 990000,
+            "reward": {
+              "actionCostMicros": 1000000,
+              "terminalSuccessBonusMicros": 5000000,
+              "acceptanceProgressPotentialScaleMicros": 0,
+              "outcomePenaltyMicros": { "none": 0, "transient": 2000000, "implementation_defect": 5000000, "invalid_plan": 12000000, "invalid_design": 25000000 }
+            },
+            "stateActions": [{
+              "stateId": "review-action",
+              "actionId": "review-action",
+              "guards": [],
+              "successors": [
+                { "outcomeId": "success", "target": { "kind": "terminal", "terminal": "success", "emitOutcomeId": "success" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
+                { "outcomeId": "failure", "target": { "kind": "state", "stateId": "review-action" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
+              ]
+            }],
+            "solver": { "algorithm": "discounted_value_iteration_v4", "maxIterations": 10000, "convergenceToleranceMicros": 1 }
+          }
         },
         "actionNodes": [
           {
             "id": "review-action",
             "description": "Run and validate the fixture review.",
-            "capabilities": {
-              "accepts": [],
-              "provides": []
-            },
+            "capabilities": { "accepts": [], "provides": [] },
             "outcomes": [
               { "outcomeId": "success", "result": "PASS" },
               { "outcomeId": "failure", "result": "FAIL" }
             ],
             "maxRetries": 3,
-            "workNode": {
-              "id": "review-work",
-              "type": "human",
-              "description": "Perform the fixture review.",
-              "task": "Review the fixture project and surface concrete risks.",
-              "nodeStyle": "terra",
-              "nodeSize": "medium"
-            },
-            "validationNode": {
-              "id": "review-validation",
-              "type": "human",
-              "description": "Validate the fixture review.",
-              "task": "Confirm that the fixture review is complete and actionable.",
-              "nodeStyle": "luna",
-              "nodeSize": "small"
-            }
+            "workNode": { "id": "review-work", "type": "human", "description": "Perform the fixture review.", "task": "Review the fixture project and surface concrete risks.", "nodeStyle": "terra", "nodeSize": "medium" },
+            "validationNode": { "id": "review-validation", "type": "human", "description": "Validate the fixture review.", "task": "Confirm that the fixture review is complete and actionable.", "nodeStyle": "luna", "nodeSize": "small" }
           }
         ]
       }

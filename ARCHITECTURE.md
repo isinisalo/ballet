@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 23
+version: 24
 tags:
   - architecture
   - arc42
@@ -19,21 +19,22 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Aktiivinen nykytila
 
-- `goal-020` ja `adr-031` omistavat Graph Engineerin yhden Graph-tason discounted Reward-MDP:n `(S,A,P,R,γ)`, `γ=0.99`.
-- GraphNode on MDP:n ajallisesti laajennettu action-optio. GraphNodella ei ole local solveria, orchestratoria tai Repair Nodea; sen aggregate Action Nodet suoritetaan array-järjestyksessä.
-- Validation päivittää evidenssipohjaista immutable-ID/paino acceptance-ledgeriä ja palauttaa semantic outcome-ID:n. Bounded FAIL on `retry | escalate`.
-- Reward on `completionBonus − actionCost − outcomePenalty + γΦ(s′) − Φ(s)`. Kaikki rewardit ovat integer-mikroyksikköjä ja probabilityt integer-ppm:iä.
+- `goal-021` ja `adr-033` omistavat hierarkkisen Reward-MDP:n: Graph-scope käyttää GraphNode-ID:itä ja jokainen GraphNode omia ActionNode-ID:itään sekä state- että action-joukkona.
+- Default Graph on 5×5 (15/25 authoroitua solua), PLAN 2×2 (3/4) ja DESIGN 12×12 (78/144). Terminalit ovat branch targetteja, eivät policy-stateja.
+- Validation palauttaa typed ActionNode-outcomen local policylle. Local terminal emittoi GraphNode-outcomen global policylle; bounded FAIL on `retry | escalate`, mutta kumpikaan ei ohita local branchia.
+- Acceptance-ledger kuuluu Graphille ja on erillinen evidenssiportti. Vain eksplisiittisesti sidotut obligaatiot vaikuttavat Graph-potentialiin; sitomaton node, Action-split tai duplicate verification antaa progress-rewardia nolla.
+- Reward on scopekohtainen `terminalSuccessBonus − actionCost − outcomePenalty`, Graphissa lisäksi `γΦ(target) − Φ(s)`. Kaikki rewardit ovat integer-mikroyksikköjä ja probabilityt integer-ppm:iä.
 - Transitionit mallintavat `P(outcome,s′|s,a)`:n. Authoroimattoman tiedon läpinäkyvä prior on exact-ppm symmetric Dirichlet(1), provenance `default_prior`; runtime ei opi siitä online.
-- Policy compileutuu kerran immutable Root Snapshotiin deterministic iteration boundilla, stable tie-breakillä ja absorption-checkillä. Runtime projisoi Staten, muodostaa hard `A(s)`:n ja tekee policy-lookupin.
+- Global ja reachable local policyt compileutuvat erikseen kerran immutable Root Snapshotiin deterministic iteration boundilla, stable tie-breakillä ja absorption-checkillä. Havaittu typed outcome valitsee branchin deterministisesti; runtime ei arvo seuraajaa.
 - Authorization tulee erillisestä immutable snapshotista. Unauthorized action ei kuulu `A(s)`:ään eikä project State voi antaa sille lupaa.
-- Aktiivinen strict cut on Project Config v18, Decision Model v3, Graph Node Module v6, Root Snapshot v11, Task Envelope/Outcome v9, composition v10, ExecutionSpec v11, policy observation v4 ja SQLite v14. Legacy-readeria, migraatiota, aliasia tai dual-writeä ei ole.
-- Repositoryn project-local default sisältää DESIGN/PLAN/BUILD/DEPLOY/VERIFY-GraphNodet, 17 ordered Action Nodea ja DONE-terminalin. Platform tuntee vain geneeriset primitivit.
-- UI säilyttää capability-first Graph/GraphNode-kortit ja ADR-025/027:n protected Action Node industrial flow'n. ADR-032:n Graph Decision Model näyttää projected state-, acceptance-, option-, transition-impact-, prior- ja Q/V-evidenssin visuaalisena dashboardina ihmisyksiköissä; exact micros/ppm säilyvät accessible detailissä ja sopimuksissa. Local Decision Model/Repair UI:ta ei ole.
+- Aktiivinen strict cut on Project Config v19, Decision Model v4, Graph Node Module v7, Root Snapshot v12, Task Envelope/Outcome v9, composition v10, ExecutionSpec v11, policy decision/observation v5 ja SQLite v15. Legacy-readeria, migraatiota, aliasia tai dual-writeä ei ole.
+- Repositoryn project-local default sisältää DESIGN/PLAN/BUILD/DEPLOY/VERIFY-GraphNodet ja 17 ActionNodea. Platform tuntee vain geneeriset primitivit.
+- UI säilyttää capability-first-kortit ja ADR-025/027:n protected Action Node flow'n. Graph ja GraphNode näyttävät semanttisen CSS-grid 5×5/N×N Q(s,a)-matriisin, vihreän `+reward`-, punertavan `−cost`- ja amber `≈estimate`-semantiikan sekä exact micros/ppm-detailin.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen.
 
 ## Supersession
 
-`goal-020` supersedoi goalit 016, 017 ja 019. `adr-031` supersedoi ADR:t 026, 028 ja 030 kokonaan, ADR-023:n scoped routing/orchestrator/Repair-osat sekä ADR-029:n local-policy/Repair-osat. `adr-032` supersedoi ADR-029:n Graph Decision Model -osion form/matrix/table-projektion muuttamatta capability-first-kortteja tai ADR-031:n runtime-semanttiikkaa. Vanhat tiedostot säilyvät historiallisena audit trailina, eivät aktiivisena nykytilana. ADR-025/027:n Action Node -flow ja ADR-029:n muut capability-first-osat säilyvät.
+`goal-021` supersedoi `goal-020`:n single-policy/ledger-state/array-order-osat. `adr-033` supersedoi vastaavat ADR-031:n osat ja ADR-032:n 62-state landscape/pulse/horizon -projektion. Vanhat tiedostot säilyvät audit trailina. ADR-031:n deterministic outcome-aware reward/authorization, ADR-032:n ihmisyksiköt/värisemantiikka ja ADR-025/027:n Action flow säilyvät.
 
 ## Kanoniset lähteet
 
@@ -45,7 +46,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - [Goal-yhteenveto](.ballet/goals/summary.md)
 - [ADR-indeksi](.ballet/arc42/09-architecture-decisions.md)
 - [UI-designjärjestelmä](DESIGN.md)
-- [Reward-MDP initiative](.ballet/arc42/initiatives/graph-reward-mdp/BRIEF.md)
+- [Hierarchical Reward-MDP initiative](.ballet/arc42/initiatives/hierarchical-reward-mdp/BRIEF.md)
 
 ## Omistajuus
 
@@ -58,7 +59,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Evidenssi ja avoin riski
 
-`npm run validate:arc42` tarkistaa dokumentti-, trace-, resource- ja strict-v18 Reward-MDP -sopimuksen. Testit, lint, build, module-smoket, platform boundary, `make latest` ja käynnistyssmoke muodostavat teknisen acceptance-portin. Tuotantokaltaista Reward-MDP Root Run -pilottia ei ole suoritettu; sitä ei saa päätellä hermetic testeistä.
+`npm run validate:arc42` tarkistaa dokumentti-, trace-, resource- ja strict-v19 hierarchical Reward-MDP -sopimuksen. Testit, lint, build, module-smoket, platform boundary, `make latest` ja käynnistyssmoke muodostavat teknisen acceptance-portin. Tuotantokaltaista Root Run -pilottia ei ole suoritettu; sitä ei saa päätellä hermetic testeistä.
 
 ## Seuraava katselmointiperuste
 

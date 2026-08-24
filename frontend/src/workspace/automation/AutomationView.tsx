@@ -3,7 +3,7 @@ import { Save, Settings2 } from "lucide-react";
 import {
   automationConfigSchema,
   type AppData,
-  type PolicyPreviewResultV3,
+  type PolicyPreviewResultV4,
   type ProjectAutomationConfig
 } from "@shared/api/workspace-contracts";
 import { api } from "@/api";
@@ -28,7 +28,7 @@ export function AutomationView({ data, level, section, graphNodeId, actionNodeId
   const actionNode = graphNode?.actionNodes.find((node) => node.id === actionNodeId);
   const [selection, setSelection] = useState<AutomationSelection>("none");
   const [dialog, setDialog] = useState<AutomationDialogState>();
-  const [policyResult, setPolicyResult] = useState<PolicyPreviewResultV3>();
+  const [policyResult, setPolicyResult] = useState<PolicyPreviewResultV4>();
   const [policyLoading, setPolicyLoading] = useState(false);
   useEffect(() => { setSelection("none"); setDialog(undefined); }, [level, graphNodeId, actionNodeId]);
   useWorkspaceNavigationBlocker(setNavigationBlocker, isDirty, "Discard unsaved Graph Engineering changes?");
@@ -38,22 +38,26 @@ export function AutomationView({ data, level, section, graphNodeId, actionNodeId
     (run.kind === "graph" && run.targetId === draft.graph.id) || (run.kind === "graph_node" && run.targetId === graphNode.id)));
   const locked = level === "graph" ? graphRunActive : graphNodeRunActive;
   useEffect(() => {
-    if (!parse.success || level !== "graph" || section !== "decision-model") {
+    if (!parse.success || level === "action_node" || section !== "decision-model" || (level === "graph_node" && !graphNodeId)) {
       setPolicyResult(undefined);
       setPolicyLoading(false);
       return;
     }
     let current = true; setPolicyLoading(true);
-    const timer = window.setTimeout(() => void api.previewPolicy({ config: draft })
+    const timer = window.setTimeout(() => void api.previewPolicy({
+      config: draft,
+      scope: level === "graph" ? "graph" : "graph_node",
+      ...(level === "graph_node" ? { graphNodeId } : {})
+    })
       .then((result) => { if (current) setPolicyResult(result); })
       .catch((cause) => {
         if (current) setPolicyResult({
-          issues: [{ path: "graph.strategy", message: cause instanceof Error ? cause.message : "Unable to compile policy." }]
+          issues: [{ path: level === "graph" ? "graph.strategy" : `${graphNodeId}.strategy`, message: cause instanceof Error ? cause.message : "Unable to compile policy." }]
         });
       })
       .finally(() => { if (current) setPolicyLoading(false); }), 250);
     return () => { current = false; window.clearTimeout(timer); };
-  }, [draft, level, parse.success, section]);
+  }, [draft, graphNodeId, level, parse.success, section]);
 
   const actions = <><Button type="button" size="sm" variant="outline" disabled={!isDirty || saving || !parse.success || locked} onClick={() => void saveDraft()}><Save /> {saving ? "Saving…" : "Save draft"}</Button>{level === "action_node" ? <Button type="button" size="sm" variant="outline" onClick={() => setSelection("settings")}><Settings2 /> Settings</Button> : null}</>;
   return <EngineeringShell level={level} section={section} graphNodeId={graphNode?.id} graphNodeTitle={graphNode?.description} actionNodeId={actionNode?.id} actionNodeTitle={actionNode?.description} actions={actions} navigate={navigate}>
@@ -74,8 +78,8 @@ export function AutomationView({ data, level, section, graphNodeId, actionNodeId
 function SectionTabs({ level, section, graphNodeId, navigate }: { level: EngineeringLevel; section?: EngineeringSection; graphNodeId?: string; navigate: WorkspaceNavigation["navigate"] }) {
   const entries = level === "graph"
     ? [["Capability Graph", "capabilities"], ["Decision Model", "decision-model"]] as const
-    : [["Ordered Actions", "actions"]] as const;
-  return <nav className="flex shrink-0 gap-1 border-b border-divider-strong bg-card px-3 pt-2" aria-label="Engineering sections">{entries.map(([label, value]) => <Button key={value} size="sm" variant={section === value || (!section && value === entries[0][1]) ? "secondary" : "ghost"} className="rounded-b-none" onClick={() => navigate(level === "graph" ? automationGraphPath(value as "capabilities" | "decision-model") : automationGraphNodePath(graphNodeId!))}>{label}</Button>)}</nav>;
+    : [["Action Nodes", "actions"], ["Decision Model", "decision-model"]] as const;
+  return <nav className="flex shrink-0 gap-1 border-b border-divider-strong bg-card px-3 pt-2" aria-label="Engineering sections">{entries.map(([label, value]) => <Button key={value} size="sm" variant={section === value || (!section && value === entries[0][1]) ? "secondary" : "ghost"} className="rounded-b-none" onClick={() => navigate(level === "graph" ? automationGraphPath(value as "capabilities" | "decision-model") : automationGraphNodePath(graphNodeId!, value as "actions" | "decision-model"))}>{label}</Button>)}</nav>;
 }
 
 function Notices({ error, parse, automationIssues }: { error?: string; parse: ReturnType<typeof automationConfigSchema.safeParse>; automationIssues: Array<{ message: string }> }) { return <>{error ? <Alert variant="destructive" className="m-3 mb-0"><AlertDescription>{error}</AlertDescription></Alert> : null}{!parse.success ? <Alert variant="destructive" className="m-3 mb-0"><AlertDescription>{parse.error.issues[0]?.message ?? "Graph configuration is structurally invalid."}</AlertDescription></Alert> : null}{automationIssues.length ? <Alert className="m-3 mb-0"><AlertDescription>Saved configuration: {automationIssues[0]?.message}</AlertDescription></Alert> : null}</>; }

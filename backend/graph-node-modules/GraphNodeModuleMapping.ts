@@ -6,14 +6,15 @@ import type {
   ProjectWorkNode
 } from "../../shared/domain/automation.js";
 import type {
-  GraphNodeModuleCompositionV6,
-  GraphNodeModuleGraphNodeV6,
+  GraphNodeModuleCompositionV7,
+  GraphNodeModuleGraphNodeV7,
   GraphNodeModuleIdRemapping,
-  GraphNodeModulePackageV6,
-  GraphNodeModuleResourceV6
+  GraphNodeModulePackageV7,
+  GraphNodeModuleResourceV7
 } from "../../shared/domain/graphNodeModules.js";
+import type { ProjectScopedRewardDecisionStrategyV4 } from "../../shared/domain/decisionModel.js";
 
-export function moduleRemapping(pkg: GraphNodeModulePackageV6): GraphNodeModuleIdRemapping {
+export function moduleRemapping(pkg: GraphNodeModulePackageV7): GraphNodeModuleIdRemapping {
   return {
     graphNode: { [pkg.graphNode.key]: pkg.manifest.id },
     nodes: Object.fromEntries(pkg.graphNode.actionNodes.flatMap((action) => [action, action.workNode, action.validationNode])
@@ -26,14 +27,15 @@ export function moduleRemapping(pkg: GraphNodeModulePackageV6): GraphNodeModuleI
 }
 
 export function materializeGraphNode(
-  value: GraphNodeModuleGraphNodeV6,
+  value: GraphNodeModuleGraphNodeV7,
   remap: GraphNodeModuleIdRemapping,
   profiles: Map<string, string>
 ): ProjectGraphNode {
   return {
     id: remap.graphNode[value.key], description: value.description,
     capabilities: structuredClone(value.capabilities), stateContract: { ...value.stateContract },
-    outcomes: structuredClone(value.outcomes),
+    outcomes: value.outcomes.map((outcome) => ({ ...outcome, acceptanceEffects: [] })),
+    strategy: remapStrategy(value.strategy, remap.nodes),
     actionNodes: value.actionNodes.map((action): ProjectActionNode => ({
       id: remap.nodes[action.key], description: action.description,
       capabilities: structuredClone(action.capabilities), maxRetries: action.maxRetries,
@@ -45,7 +47,7 @@ export function materializeGraphNode(
 }
 
 function materializeExecutable(
-  value: GraphNodeModuleGraphNodeV6["actionNodes"][number]["workNode"],
+  value: GraphNodeModuleGraphNodeV7["actionNodes"][number]["workNode"],
   remap: GraphNodeModuleIdRemapping,
   profiles: Map<string, string>
 ): ProjectWorkNode | ProjectValidationNode {
@@ -59,7 +61,7 @@ function materializeExecutable(
 }
 
 function materializeComposition(
-  value: GraphNodeModuleCompositionV6,
+  value: GraphNodeModuleCompositionV7,
   remap: GraphNodeModuleIdRemapping,
   profiles: Map<string, string>
 ): ProjectExecutionComposition {
@@ -73,11 +75,12 @@ function materializeComposition(
 export function dematerializeGraphNode(
   node: ProjectGraphNode,
   slots: Map<string, string>
-): GraphNodeModuleGraphNodeV6 {
+): GraphNodeModuleGraphNodeV7 {
   return {
     key: node.id, description: node.description,
     capabilities: structuredClone(node.capabilities), stateContract: { ...node.stateContract },
-    outcomes: structuredClone(node.outcomes),
+    outcomes: node.outcomes.map(({ outcomeId, result }) => ({ outcomeId, result })),
+    strategy: structuredClone(node.strategy),
     actionNodes: node.actionNodes.map((action) => ({
       key: action.id, description: action.description,
       capabilities: structuredClone(action.capabilities), maxRetries: action.maxRetries,
@@ -91,7 +94,7 @@ export function dematerializeGraphNode(
 function dematerializeExecutable(
   value: ProjectWorkNode | ProjectValidationNode,
   slots: Map<string, string>
-): GraphNodeModuleGraphNodeV6["actionNodes"][number]["workNode"] {
+): GraphNodeModuleGraphNodeV7["actionNodes"][number]["workNode"] {
   const base = {
     key: value.id, description: value.description, task: value.task,
     nodeStyle: value.nodeStyle, nodeSize: value.nodeSize
@@ -118,7 +121,7 @@ export function graphNodeCompositions(node: ProjectGraphNode): ProjectExecutionC
   ]);
 }
 
-export function renderResource(resourceId: string, resource: GraphNodeModuleResourceV6): string {
+export function renderResource(resourceId: string, resource: GraphNodeModuleResourceV7): string {
   const localId = resourceId.slice(8);
   const title = resource.kind === "instruction" ? resource.title : resource.name;
   const date = new Date().toISOString().slice(0, 10);
@@ -129,3 +132,28 @@ export function renderResource(resourceId: string, resource: GraphNodeModuleReso
 }
 
 export const localResourceKey = (resourceId: string) => resourceId.slice(8).replace(/^[^-]+-/, "");
+
+function remapStrategy(
+  strategy: ProjectScopedRewardDecisionStrategyV4,
+  nodeIds: Record<string, string>
+): ProjectScopedRewardDecisionStrategyV4 {
+  const remap = (id: string) => nodeIds[id] ?? id;
+  return {
+    ...structuredClone(strategy),
+    model: {
+      ...structuredClone(strategy.model),
+      initialStateId: remap(strategy.model.initialStateId),
+      stateActions: strategy.model.stateActions.map((row) => ({
+        ...structuredClone(row),
+        stateId: remap(row.stateId),
+        actionId: remap(row.actionId),
+        successors: row.successors.map((branch) => ({
+          ...structuredClone(branch),
+          target: branch.target.kind === "state"
+            ? { kind: "state", stateId: remap(branch.target.stateId) }
+            : { ...branch.target }
+        }))
+      }))
+    }
+  };
+}

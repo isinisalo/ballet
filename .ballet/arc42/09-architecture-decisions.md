@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-23'
-version: 24
+version: 25
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-031 omistaa aktiivisen yhden Graph Reward-MDP:n ja ADR-032 sen visuaalisen authoring-projektion. ADR-026/028/030 ovat superseded; ADR-023:n routing/orchestrator/Repair-, ADR-029:n local-policy/Repair- ja Graph Decision Model form/matrix/table -osat ovat superseded. ADR-025/027:n protected Action Node flow sekä ADR-029:n muut capability-first-osat säilyvät.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-033 omistaa aktiivisen hierarchical node-ID Reward-MDP:n ja 5×5/N×N-authoring-projektion. ADR-031:n single-policy/ledger-state/array-order ja ADR-032:n 62-state landscape/pulse/horizon ovat superseded. ADR-025/027:n protected Action Node flow sekä ADR-029:n capability-first-osat säilyvät.
 
 ## Päätösindeksi
 
@@ -55,8 +55,9 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-031 omistaa aktiivisen
 | adr-028 | superseded by adr-031 | Historical outcome-aware hierarchical scoped SSP/SMDP v2 | [Routing käyttää outcome-aware scoped finite SSP/SMDP v2 -policya](../adr/adr-028-outcome-aware-hierarchical-ssp-smdp.md) |
 | adr-029 | accepted; local-policy/Repair superseded by adr-031; Decision Model projection superseded by adr-032 | Capability-first Graph/GraphNode authoring and protected Action flow | [Graph ja GraphNode authoroidaan capability-first-korttinäkymissä](../adr/adr-029-capability-first-card-authoring.md) |
 | adr-030 | superseded by adr-031 | Historical offline policy calibration and promotion | [Policy-mallit kalibroidaan offline ja aktivoidaan hallitulla promootiolla](../adr/adr-030-governed-offline-calibration-and-promotion.md) |
-| adr-031 | accepted | Single Graph Reward-MDP, immutable acceptance/authorization and strict cut | [Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä](../adr/adr-031-single-graph-reward-mdp.md) |
-| adr-032 | accepted | Visual Reward-MDP impact dashboard and human-scale authoring projection | [Graph Decision Model käyttää visuaalista reward-impact-dashboardia](../adr/adr-032-visual-reward-impact-dashboard.md) |
+| adr-031 | superseded by adr-033 | Historical single Graph Reward-MDP | [Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä](../adr/adr-031-single-graph-reward-mdp.md) |
+| adr-032 | superseded by adr-033 | Historical 62-state reward-impact projection; human-unit semantics survive | [Graph Decision Model käyttää visuaalista reward-impact-dashboardia](../adr/adr-032-visual-reward-impact-dashboard.md) |
+| adr-033 | accepted | Hierarchical node-owned Reward-MDP, acceptance gate and 5×5/N×N projection | [Graph ja GraphNode käyttävät erillisiä node-omisteisia Reward-MDP-scopeja](../adr/adr-033-hierarchical-node-owned-reward-mdp.md) |
 
 ## Supersession-suhteet
 
@@ -134,6 +135,10 @@ adr-028:n Portti B:lle ennakoitu v17/v10/v13-versionumeroiden varaus
 adr-029:n Graph Decision Model form/matrix/table -projektio
         └── osittain superseded by ──▶ adr-032
             visual impact dashboard; capability-first-kortit, URL-omistajuus ja protected Action flow säilyvät
+
+adr-031:n single policy / ledger-state / array-order ja adr-032:n 62-state landscape
+        └── superseded by ──▶ adr-033
+            node-ID global/local policyt, erillinen acceptance-portti ja 5×5/N×N-matriisi
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -162,6 +167,7 @@ adr-029:n Graph Decision Model form/matrix/table -projektio
 | adr-023 ja adr-024, vain Graph/GraphNode upper-level planet/multi-ring-projektion osat | adr-029 | Graph/GraphNode authorointi käyttää capability-first-kortteja ja URL-omisteisia Decision Model -osioita. ADR-025/027:n Job industrial flow, Work/Validation-artwork ja runtime-invariantit säilyvät. |
 | adr-028, vain Portti B:lle ennakoitu Config v17 / Snapshot v10 / SQLite v13 -numerovaraus | adr-030 | Phase 2 käyttää v17/v10/v13 strict cutia option-cost-evidenssiin. Portti B:n calibrated-pilot- ja human approval -semantiikka säilyy, mutta sen exact version matrix päätetään myöhemmin. |
 | adr-029, vain Graph Decision Model form/matrix/table -projektio | adr-032 | Ensisijainen Decision Model käyttää projected-state-pulssia, policy-horisonttia, transition-impactia, state-heatmapia ja ihmisyksiköitä. Capability-first Graph/GraphNode-kortit, URL-omistajuus, exact sopimukset ja ADR-025/027:n Action flow säilyvät. |
+| adr-031, single-policy/ledger-state/ordered ActionNode -osat; adr-032, 62-state landscape/pulse/horizon | adr-033 | Graph ja GraphNode saavat erilliset node-ID-omisteiset policy-scopet, acceptance-ledger jää Graph-portiksi ja UI näyttää 5×5/N×N Q(s,a)-matriisin. Outcome-aware reward, hard authorization, exact detail ja reward/cost/estimate-värit säilyvät. |
 
 ## Päätösten käyttö
 

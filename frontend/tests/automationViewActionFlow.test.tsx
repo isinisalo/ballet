@@ -44,8 +44,9 @@ describe("Automation Action flow integration", () => {
       setNavigationBlocker={vi.fn()}
     />);
 
-    expect(screen.getByText("Ordered Action Nodes")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ordered Actions" })).toBeInTheDocument();
+    expect(screen.getByText("Action Nodes and local Reward-MDP")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Action Nodes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Decision Model" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add Action Node" })).toBeInTheDocument();
   });
 
@@ -113,10 +114,37 @@ const automation = (): ProjectAutomationConfig => {
   config.graph.id = "graph";
   config.graph.name = "Graph";
   config.graph.graphNodes = [{
-      id: "graph-node", description: "Graph Node", outcomes: [],
+      id: "graph-node", description: "Graph Node", outcomes: [
+        { outcomeId: "graph-node-complete", result: "PASS", acceptanceEffects: [] },
+        { outcomeId: "graph-node-failed", result: "FAIL", acceptanceEffects: [] }
+      ],
       capabilities: { accepts: [], provides: [] }, stateContract: { description: "Uses shared state." },
+      strategy: {
+        kind: "reward_mdp_v4", id: "graph-node-local", description: "Local policy",
+        model: {
+          version: 4, initialStateId: "job", discountPpm: 990_000,
+          reward: {
+            actionCostMicros: 1_000_000, terminalSuccessBonusMicros: 5_000_000,
+            acceptanceProgressPotentialScaleMicros: 0,
+            outcomePenaltyMicros: {
+              none: 0, transient: 2_000_000, implementation_defect: 5_000_000,
+              invalid_plan: 12_000_000, invalid_design: 25_000_000
+            }
+          },
+          stateActions: [{
+            stateId: "job", actionId: "job", guards: [], successors: [
+              { outcomeId: "job-complete", target: { kind: "terminal", terminal: "success", emitOutcomeId: "graph-node-complete" }, probabilityPpm: 800_000, provenance: "default_prior", penaltyClass: "none" },
+              { outcomeId: "job-failed", target: { kind: "terminal", terminal: "failure", emitOutcomeId: "graph-node-failed" }, probabilityPpm: 200_000, provenance: "default_prior", penaltyClass: "implementation_defect" }
+            ]
+          }],
+          solver: { algorithm: "discounted_value_iteration_v4", maxIterations: 10_000, convergenceToleranceMicros: 1 }
+        }
+      },
       actionNodes: [{
-        id: "job", description: "Action", outcomes: [],
+        id: "job", description: "Action", outcomes: [
+          { outcomeId: "job-complete", result: "PASS" },
+          { outcomeId: "job-failed", result: "FAIL" }
+        ],
         capabilities: { accepts: [], provides: [] }, maxRetries: 2,
         workNode: {
           id: "work", description: "Work", task: "Perform work.", type: "agent", nodeStyle: "sol", nodeSize: "large",

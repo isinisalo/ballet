@@ -1,5 +1,5 @@
 import type { ProjectAutomationConfig, ProjectExecutionComposition } from "../../shared/domain/automation.js";
-import type { PolicyPreviewRequestV3 } from "../../shared/api/workspace-contracts.js";
+import type { PolicyPreviewRequestV4 } from "../../shared/api/workspace-contracts.js";
 import type { ExecutionProfile } from "../../shared/domain/projectConfig.js";
 import {
   AutomationConflictError,
@@ -12,12 +12,16 @@ import {
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
 import type { RuntimeDatabaseProvider } from "./RuntimeDatabaseProvider.js";
-import type { DecisionStateV3, PolicyPreviewResultV3 } from "../../shared/domain/decisionModel.js";
-import { decisionModelSha256 } from "../policy/DecisionModelCanonical.js";
-import { compileRewardPolicy } from "../policy/RewardMdpCompiler.js";
-import { projectDecisionState } from "../policy/DecisionStateProjector.js";
+import type { PolicyPreviewResultV4 } from "../../shared/domain/decisionModel.js";
+import { decisionState } from "../policy/DecisionStateProjector.js";
 import { resolveAdmissibleActions } from "../policy/AdmissibleActionResolver.js";
 import { jsonSha256 } from "../runtime/state/CanonicalJson.js";
+import {
+  compilePolicyScope,
+  describePolicyScope,
+  policyGuardContext,
+  scopedDecisionModelSha256
+} from "../policy/PolicyScope.js";
 
 export class AutomationService {
   private readonly projectConfigurations = new ProjectConfigurationRepository();
@@ -41,54 +45,44 @@ export class AutomationService {
     return saveProjectAutomationConfig(this.root(), config);
   }
 
-  previewPolicy(input: PolicyPreviewRequestV3): PolicyPreviewResultV3 {
-    const { config } = input;
+  previewPolicy(input: PolicyPreviewRequestV4): PolicyPreviewResultV4 {
+    const { config, scope, graphNodeId } = input;
     const loaded = this.projectConfigurations.load(this.root());
     const allIssues = validateProjectAutomationConfig(config, loaded.config?.executionProfiles ?? []);
-    const issues = allIssues.filter(({ path }) => path.startsWith("graph.strategy"));
+    const scopePath = scope === "graph" ? "graph.strategy"
+      : `graph.graphNodes.${config.graph.graphNodes.findIndex(({ id }) => id === graphNodeId)}.strategy`;
+    const issues = allIssues.filter(({ path }) => path.startsWith(scopePath));
     if (issues.length) return { issues };
-    const strategy = config.graph.strategy;
-    const actionIds = config.graph.graphNodes.map(({ id }) => id);
-    const modelSha256 = decisionModelSha256(strategy.model);
-    const entries = strategy.model.acceptance.obligations.map(({ obligationId, weight }) => ({
+    if (scope === "graph_node" && !config.graph.graphNodes.some(({ id }) => id === graphNodeId)) return {
+      issues: [{ path: "graphNodeId", message: `Graph Node ${graphNodeId ?? "<missing>"} was not found.` }]
+    };
+    const entries = config.graph.acceptance.obligations.map(({ obligationId, weight }) => ({
       obligationId, weight, status: "pending" as const, evidenceRefs: []
     })).sort((left, right) => left.obligationId.localeCompare(right.obligationId));
     const acceptanceLedger = { version: 1 as const, entries, sha256: jsonSha256(entries) };
     const authorizationFacts = { localExecutionAuthorized: true, externalWritesAuthorized: false };
     const authorization = { version: 1 as const, facts: authorizationFacts, sha256: jsonSha256(authorizationFacts) };
-    let state;
-    try {
-      state = projectDecisionState(strategy.model, {
-        epochKind: "start",
-        actionInvocationCount: 0,
-        stateRevision: 0,
-        projectState: config.graph.state.initial,
-        authorization,
-        acceptanceLedger,
-        evidenceRefs: ["configure:draft-unsnapshotted"]
-      });
-    } catch (error) {
-      return { issues: [{ path: "graph.strategy.model.states", message: error instanceof Error ? error.message : String(error) }] };
-    }
-    const projected = new Map(strategy.model.states.map((definition) => [definition.id, {
-      ...state,
-      stateId: definition.id,
-      features: { ...definition.values }
-    } satisfies DecisionStateV3]));
-    const admissibleActionsByState = Object.fromEntries(strategy.model.states.map((definition) => [
-      definition.id,
-      definition.terminal ? [] : resolveAdmissibleActions(strategy, projected.get(definition.id)!, actionIds).actionIds
-    ]));
-    const compiled = compileRewardPolicy({
-      model: strategy.model, capabilityModel: strategy.capabilityModel, admissibleActionsByState, modelSha256
+    const guardContext = policyGuardContext({
+      graphState: config.graph.state.initial, stateRevision: 0, authorization, acceptanceLedger
     });
-    const admissible = resolveAdmissibleActions(strategy, state, actionIds);
+    const descriptor = describePolicyScope(config.graph, scope, graphNodeId);
+    const modelSha256 = scopedDecisionModelSha256(descriptor);
+    const compiled = compilePolicyScope(config.graph, scope, guardContext, graphNodeId);
+    const state = decisionState({
+      scope, graphNodeId, stateId: descriptor.strategy.model.initialStateId, graph: config.graph,
+      sourceStateRevision: 0, evidenceRefs: ["configure:draft-unsnapshotted"]
+    });
+    const admissible = resolveAdmissibleActions(
+      descriptor.strategy, state.stateId, descriptor.actionIds, guardContext
+    );
     const current = compiled.states.find(({ stateId }) => stateId === state.stateId);
     return {
       issues: [],
       preview: {
         derived: true,
         persisted: false,
+        scope,
+        ...(graphNodeId ? { graphNodeId } : {}),
         state,
         admissibleActionIds: admissible.actionIds,
         excludedActions: admissible.excludedActions,
@@ -96,7 +90,7 @@ export class AutomationService {
         actionValues: current?.actionValues ?? [],
         expectedReturnMicros: current?.valueMicros,
         solverStatus: compiled.status,
-        modelVersion: 3,
+        modelVersion: 4,
         modelSha256,
         policySha256: compiled.policySha256,
         compiledPolicy: compiled,

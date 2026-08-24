@@ -155,26 +155,26 @@ spacing:
 
 ## Brand & Style
 
-Ballet is a local orchestration command center for project documents, ExecutionProfiles, instructions, skills, runtimes, Graphs, GraphNodes, aggregate Action Nodes, Work and Validation roles, a Graph-level Reward-MDP, and Runs. The interface is dense, structured, technical, and calm under pressure.
+Ballet is a local orchestration command center for project documents, ExecutionProfiles, instructions, skills, runtimes, Graphs, GraphNodes, aggregate Action Nodes, Work and Validation roles, hierarchical Graph/GraphNode Reward-MDPs, and Runs. The interface is dense, structured, technical, and calm under pressure.
 
 The visual system combines Modern Minimalism with Technical Industrialism. Dark tonal layers support long sessions; high-vibrancy signals identify current role, validation result, retry attention and blocking failure. UI decoration never creates runtime state.
 
 ## Implementation Status Boundary
 
-The active implementation baseline is strict project config v18, Decision Model v3, Graph Node Module v6, Root Snapshot v11, policy observation v4, Task Envelope and role outcome v9, composition v10, ExecutionSpec v11 and SQLite v14. One Graph-level `reward_mdp_v3` policy is compiled once into the immutable snapshot. The execution inspector presents exact reward breakdown, discount, PPM branches, prior provenance, acceptance progress and read-only Q/V evidence. There are no local Decision Models, scoped Orchestrators, Repair Nodes, legacy readers, route aliases, dual writes, schedule UI or standalone Action Node Run.
+The active implementation baseline is strict project config v19, Decision Model v4, Graph Node Module v7, Root Snapshot v12, policy decision/observation v5, Task Envelope and role outcome v9, composition v10, ExecutionSpec v11 and SQLite v15. The Graph policy and required GraphNode-local policies are compiled separately once into the immutable snapshot. The execution inspector presents scope, exact reward, PPM branches, prior provenance, acceptance evidence and read-only Q/V facts. There are no free policy-state catalogs, scoped LLM Orchestrators, Repair Nodes, legacy readers, route aliases, dual writes, schedule UI or standalone Action Node Run.
 
 Authoring has exactly three canonical URL-owned levels:
 
 - `/automation/graph?section=capabilities|decision-model` — Graph Engineering.
-- `/automation/graph/nodes/:graphNodeId?section=actions` — Graph Node.
+- `/automation/graph/nodes/:graphNodeId?section=actions|decision-model` — Graph Node.
 - `/automation/graph/nodes/:graphNodeId/actions/:actionNodeId` — Action Node.
 
 Run has Graph and GraphNode routes only. URL state owns the active level and IDs. Inspector selection remains ephemeral and never mutates topology.
 
 ## MDP Terminology
 
-- `Action` is the MDP choice `a ∈ A(s)`: an option available to the orchestrator in the current decision state. Policy, Q/V and guard surfaces use this term directly.
-- `Action Node` is the strict-v18 aggregate `ProjectActionNode`. It owns one Work and one Validation role plus bounded retry; it is the executable projection of a selected action.
+- `Action` is the node-ID MDP choice `a ∈ A(s)`: a GraphNode in the Graph scope or an ActionNode in a GraphNode scope. Policy, Q/V and guard surfaces use this term directly.
+- `Action Node` is the strict-v19 aggregate `ProjectActionNode`. It owns one Work and one Validation role plus bounded retry; it is the executable projection of a local-policy selection.
 - `actionNodes`, `actionNodeId` and `action_node_invocations` are the only active schema, API and persistence identifiers. No `JobNode` alias or compatibility path exists.
 
 ## Colors
@@ -215,22 +215,25 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 ### Graph Engineering
 
 - `Capability Graph` shows responsive GraphNode cards with exact ID, description, accepts/provides, intrinsic outcome contracts, readiness and adjacent open/edit/rename/delete actions.
-- `Decision Model` is the Graph-level Reward-MDP visual impact dashboard. Lead with `Decision pulse`: draft-projected state, factual acceptance classification, selected GraphNode option, human-scale `V(s)` and visible prior provenance. Explicitly label the projection as authoring preview rather than live Run state.
-- `Policy horizon` preserves project-config GraphNode order for 1–20 options, highlights the compiled selection and distinguishes state-admissible, elsewhere-modeled and `needs transition model` options. It may scroll only inside its panel and must state that option order is not persisted runtime flow.
-- `Transition impact` projects the selected `(state, action)` branches without a traditional table. Probability controls a bounded bar/width cue; positive immediate reward uses Secondary plus `+`/`reward`, negative impact uses Error plus `−`/`cost`, and zero uses Tertiary plus `neutral`. Outcome, next-state and provenance text remain exact. Color is never the only signal.
-- `Policy landscape` renders the bounded compiled state catalog as a selectable relative-`V(s)` heatmap. Tile selection is ephemeral inspection only and reveals exact acceptance status plus Q-values without mutating topology, draft or runtime. Distinguish selected inspection state from the current projected state.
+- `Decision Model` is one semantic CSS-grid Q(s,a) matrix. Rows are current GraphNode states; columns are selectable GraphNodes. The default projection is exactly 5×5 with 15 modeled lower-triangle cells. Terminal branches never add rows.
+- Sticky row/column headers and panel-internal scrolling keep the page width stable. Above 20 rows, virtualize body rows with deterministic height and overscan; preserve `aria-rowcount`/`aria-colcount` for the full 40×40 fixture.
+- Distinguish current state, compiled policy selection, ephemeral inspector selection and unavailable cell through explicit text/markers/border state. A missing cell is dashed/unavailable and keeps Run visibly blocked; it is never an implicit array transition.
+- GraphNode column headers are focusable zoom actions into that node's local Decision Model. A selected cell opens one compact branch inspector with outcome, approximate percentage, guard, state/terminal target, penalty and provenance.
+- Positive Q/reward uses Secondary plus `+`/`reward`; negative Q/cost uses Error plus `−`/`cost`; a value derived without compiled Q uses Tertiary plus `≈`/`estimate`; unavailable is neutral/dashed. Color is never the only signal.
 - Primary reward values use `micros / 1,000,000` reward units and probabilities use `ppm / 10,000` percentages. Preserve exact integer micros/ppm in accessible title/detail, API, project config and immutable snapshot. Relative heatmap color must be labeled relative; it does not assert positive absolute reward.
 - Reward authoring uses compact ±1 reward-unit steppers and a neutral→amber→error penalty spectrum instead of raw-number fields. Active Run locking remains visible and disables every mutation.
-- Do not place traditional form layouts, transition tables or Q/V tables on the primary Decision Model surface. Bounded action, state and Q collections scroll inside their own panels; the page itself never overflows horizontally.
+- Acceptance is a separate horizontal gate rail. Only explicit GraphNode→obligation bindings appear as progress-bearing; an unbound node says `+0 progress`. Ledger obligations never become matrix rows or columns.
+- Do not place traditional form layouts, HTML tables, redundant policy horizons, pulse panels or a separate state landscape on the primary Decision Model surface. The matrix owns Q/V overview; exact branches live in its inspector.
 - State/catalog, action guards, absorption status and deterministic solver bounds remain inspectable without becoming runtime control state.
 - `default_prior` branches are visibly distinguished from `authored_evidence`; the UI never presents the default as calibrated evidence.
 - A draft may be saved; Run readiness is a separate visible state.
 
 ### Graph Node
 
-- `Actions` shows only the selected GraphNode's Action Node cards with intrinsic outcomes, capability contracts, readiness and full CRUD.
-- GraphNode has no local policy, local solver, orchestrator or Repair surface. Its Action Nodes execute in configured array order.
-- Action Node rename and deletion update only owned structural references; there are no local policy references to maintain.
+- `Action Nodes` shows only the selected GraphNode's Action Node cards with intrinsic outcomes, capability contracts, readiness and full CRUD.
+- `Decision Model` reuses the same Q(s,a) component with `S=A=ActionNodeId`. PLAN is 2×2 with 3 modeled cells, DESIGN 12×12 with 78, and a one-ActionNode capability 1×1. The 64×64 fixture uses the same virtualization contract.
+- ActionNode rename updates local state/action/initial/state-target references atomically. Deletion is disabled while any such reference remains. Adding an ActionNode adds a row/column but no implicit cells.
+- Local reward has action costs, outcome penalties and one terminal-success bonus; it never displays or edits acceptance progress. A local terminal's emitted GraphNode outcome is shown in the branch target.
 - Upper-level appearance, artwork and multi-ring data do not belong to GraphNode or Action Node aggregate contracts.
 
 ### Action Node
@@ -240,7 +243,7 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 - Show structurally incomplete Work/Validation definitions as dashed ghost cards that remain selectable for completion.
 - `Pass?` and `Retry?` show only their question text and share a horizontal level. A dashed, non-interactive `Retry count X` ghost marker floats to the left of `Retry?`, where `X` is the configured Action Node `maxRetries` value shown in Action Node settings; it does not represent persisted runtime state.
 - Normal flow and the enabled `Yes` retry return use the 1.5px mint flow token; the retry return remains dashed and exhausted FAIL is Error semantic. Escalate returns a typed semantic outcome to the Graph Reward-MDP and is not rendered as a button.
-- Show Start, Continue and Escalate as fixed non-interactive circular semantic markers; Continue and Escalate share a horizontal level. Continue advances to the next ordered Action Node; Escalate terminates the GraphNode option with its typed FAIL outcome.
+- Show Start, Continue and Escalate as fixed non-interactive circular semantic markers; Continue and Escalate share a horizontal level. Continue returns the typed outcome to the local policy. Escalate also returns through the local policy and reaches the Graph policy only through an authored local-terminal branch.
 - Route the dashed retry edge directly from Retry? to Work, outside the Retry count ghost marker.
 - `maxRetries = 0` omits the active retry-return link. No Human gate, freeform edge authoring or runtime action belongs to this canvas.
 - Work and Validation selection open their settings/instructions. Action Node aggregate settings open from the compact header command; narrow viewports use the same inspector content in a Sheet.
@@ -251,12 +254,12 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 - Acceptance is zero card overlap, zero page-level horizontal overflow and zero clipped core action at 1440×900 and 390×844.
 - Card actions and Action flow Work/Validation are keyboard focusable with exact accessible names. Action flow's fixed semantic markers are not focus targets.
 - Breadcrumbs navigate to the parent and Graph Engineering. Browser back/forward must reproduce URL-owned scope.
-- Do not add decorative graph geometry, freeform topology, Bézier routes or hybrid level controls. Action flow does not render a parent-scope reference or a Next action target; ordered execution and Graph policy remain runtime-owned.
+- Do not add decorative graph geometry, freeform topology, Bézier routes or hybrid level controls. Action flow does not render a parent-scope reference or a Next action target; local/global policies remain runtime-owned.
 - Active Run locks authoring mutations but keeps inspection and navigation available.
 
 ## Inspectors & Authoring
 
-- Graph Reward-MDP authoring is inline only in Graph Engineering. GraphNode exposes ordered Action Nodes and no local strategy editor.
+- Reward-MDP authoring is inline in each scope's Decision Model tab. Graph owns only peer-GraphNode transitions; GraphNode owns only its local ActionNode transitions.
 - Authorization, acceptance-ledger and compiled policy are immutable runtime evidence; inspectors never edit an active snapshot.
 - Work inspector exposes agent/human type, task, appearance, explicit profile/instruction/skills and capability/State contract.
 - Validation inspector exposes criteria, appearance, explicit composition and PASS/FAIL contract. FAIL selects `retry | escalate` and carries no routing target ID.
@@ -266,7 +269,7 @@ Graph Engineering and Graph Node use the same compact cyber-industrial card lang
 
 ## Graph Node Modules
 
-Graph Node Module v6 UI supports inspect, plan, install, export and remove for exactly one GraphNode plus its ordered aggregate Action Nodes, intrinsic outcomes and resource closure. It exports no local strategy, Repair, probability, reward, project-specific transition data or upper-level appearance. Show package hash, provenance, conflicts and explicit profile/instruction mapping. Peer-GraphNode targets remain project-global Reward-MDP data.
+Graph Node Module v7 UI supports inspect, plan, install, export and remove for exactly one GraphNode plus its Action Nodes, intrinsic outcomes, complete local strategy/reward/initial state and resource closure. It exports no Repair, peer-GraphNode transition, acceptance binding/effect or upper-level appearance. Show package hash, provenance, conflicts and explicit profile/instruction mapping. Installing a module may leave the global matrix visibly incomplete until required peer cells are authored.
 
 ## Run Control Surface
 
@@ -288,10 +291,10 @@ Human Work returns a Work outcome. Human Validation returns `PASS | FAIL`; FAIL 
 - Do prefer dense, scannable, work-focused surfaces.
 - Do use exact entity IDs, scope, status, target enum and timestamps.
 - Do distinguish readiness, prior provenance, retry/escalate and outcome semantics with exact text/status plus existing tokens, not a new palette.
-- Do pair Decision Model reward/cost color with an explicit sign and `reward | cost | neutral` text.
+- Do pair Decision Model reward/cost/estimate color with an explicit `+ | − | ≈` sign and `reward | cost | estimate` text.
 - Don't introduce one-off colors, ornamental backgrounds, decorative gradients or shape language beyond standard cards and the protected Action Node industrial-flow contract.
 - Don't use signal colors as passive decoration.
 - Don't hide operational state behind vague labels.
-- Don't expose raw micros or ppm as the primary Decision Model value, and don't restore dense form/table inventory as its main interaction.
+- Don't expose raw micros or ppm as the primary Decision Model value, and don't restore dense form/HTML-table inventory, policy horizon or 62-state landscape as its main interaction.
 - Don't combine Graph, GraphNode and Action Node authoring scopes in one section.
 - Don't present configured transition predictions as factual execution or actual state.

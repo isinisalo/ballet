@@ -1,10 +1,10 @@
 ---
 id: adr-031
 title: Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä
-status: accepted
+status: superseded
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 2
+version: 3
 tags:
   - arkkitehtuuripaatos
   - reward-mdp
@@ -12,6 +12,8 @@ tags:
 ---
 
 # Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä
+
+> **Supersession notice (2026-08-23):** `adr-033` korvaa single-policy-, ledger-state- ja ordered ActionNode -osat. Tämä tiedosto säilyttää alkuperäisen päätöksen audit trailina.
 
 ## Konteksti
 

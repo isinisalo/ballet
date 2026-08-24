@@ -5,9 +5,10 @@ import {
   maxGraphNodeModuleResourceBodyBytes,
   maxGraphNodeModuleResources,
   maxGraphNodeModuleStringLength,
-  type GraphNodeModulePackageV6
+  type GraphNodeModulePackageV7
 } from "../domain/graphNodeModules.js";
 import { nodeCapabilitySchema } from "./workspace-schemas.js";
+import { rewardDecisionStrategySchema } from "./decision-model-schemas.js";
 
 const localKey = z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const stateKey = z.string().min(1).max(100).regex(/^[A-Za-z][A-Za-z0-9_-]*$/);
@@ -54,8 +55,8 @@ const resource = z.discriminatedUnion("kind", [
   }).strict()
 ]);
 
-export const graphNodeModulePackageV6Schema = z.object({
-  format: z.literal("ballet-graph-node-module"), version: z.literal(6),
+export const graphNodeModulePackageV7Schema = z.object({
+  format: z.literal("ballet-graph-node-module"), version: z.literal(7),
   manifest: z.object({
     id: localKey, title: shortText, description: shortText, version: semver,
     category: localKey.optional(), tags: z.array(localKey).max(20).refine(unique)
@@ -79,6 +80,7 @@ export const graphNodeModulePackageV6Schema = z.object({
   graphNode: z.object({
     key: localKey, description: shortText, capabilities, outcomes,
     stateContract: z.object({ description: shortText }).strict(),
+    strategy: rewardDecisionStrategySchema,
     actionNodes: z.array(z.object({
       key: localKey, description: shortText, capabilities, outcomes,
       maxRetries: z.number().int().min(0).max(maxActionRetriesLimit), workNode, validationNode
@@ -102,7 +104,24 @@ export const graphNodeModulePackageV6Schema = z.object({
       });
     });
   });
-}) as z.ZodType<GraphNodeModulePackageV6>;
+  const actionKeys = new Set(pkg.graphNode.actionNodes.map(({ key }) => key));
+  if (!actionKeys.has(pkg.graphNode.strategy.model.initialStateId)) context.addIssue({
+    code: "custom", path: ["graphNode", "strategy", "model", "initialStateId"],
+    message: "Local policy initial state must be an Action Node key."
+  });
+  pkg.graphNode.strategy.model.stateActions.forEach((row, index) => {
+    if (!actionKeys.has(row.stateId) || !actionKeys.has(row.actionId)) context.addIssue({
+      code: "custom", path: ["graphNode", "strategy", "model", "stateActions", index],
+      message: "Local policy state/action ids must be Action Node keys."
+    });
+    row.successors.forEach((branch, branchIndex) => {
+      if (branch.target.kind === "state" && !actionKeys.has(branch.target.stateId)) context.addIssue({
+        code: "custom", path: ["graphNode", "strategy", "model", "stateActions", index, "successors", branchIndex, "target"],
+        message: "Local policy target state must be an Action Node key."
+      });
+    });
+  });
+}) as z.ZodType<GraphNodeModulePackageV7>;
 
 export const graphNodeModuleInspectRequestSchema = z.object({
   package: z.unknown(), source: z.string().trim().min(1).max(500).default("local-import")

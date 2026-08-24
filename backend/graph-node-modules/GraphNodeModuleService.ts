@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { graphNodeModulePackageV6Schema } from "../../shared/api/graph-node-module-schemas.js";
+import { graphNodeModulePackageV7Schema } from "../../shared/api/graph-node-module-schemas.js";
 import type {
   GraphNodeModuleExportResult,
   GraphNodeModuleInspection,
   GraphNodeModuleInstallPlan,
   GraphNodeModuleIssue,
   GraphNodeModuleLibraryEntry,
-  GraphNodeModulePackageV6,
+  GraphNodeModulePackageV7,
   InstalledGraphNodeModuleStatus,
-  InstalledGraphNodeModulesFileV6
+  InstalledGraphNodeModulesFileV7
 } from "../../shared/domain/graphNodeModules.js";
 import { loadProjectResources } from "../documents/projectResourceCatalog.js";
 import { ProjectConfigurationRepository } from "../project-config/ProjectConfigurationRepository.js";
@@ -26,6 +26,7 @@ import {
   installedModuleRecord,
   installedModulesPath,
   installModuleGraphNode,
+  graphNodeRemovalReferences,
   invalidModuleInspection,
   moduleContentHash,
   moduleExportResources,
@@ -56,10 +57,10 @@ export class GraphNodeModuleService {
     if (Buffer.byteLength(raw, "utf8") > 524_288) return invalidModuleInspection(
       source, raw, "PACKAGE_TOO_LARGE", "Package exceeds 524288 bytes."
     );
-    if (isRecord(value) && (value.format !== "ballet-graph-node-module" || value.version !== 6)) {
-      return invalidModuleInspection(source, raw, "SCHEMA_DOWNGRADE", "Only Graph Node Module v6 packages are accepted.");
+    if (isRecord(value) && (value.format !== "ballet-graph-node-module" || value.version !== 7)) {
+      return invalidModuleInspection(source, raw, "SCHEMA_DOWNGRADE", "Only Graph Node Module v7 packages are accepted.");
     }
-    const parsed = graphNodeModulePackageV6Schema.safeParse(value);
+    const parsed = graphNodeModulePackageV7Schema.safeParse(value);
     if (!parsed.success) return {
       valid: false, source, sizeBytes: Buffer.byteLength(raw, "utf8"),
       issues: parsed.error.issues.map((issue) => ({
@@ -122,7 +123,7 @@ export class GraphNodeModuleService {
         written.push(filename);
       }
       const next = installModuleGraphNode(loaded.config, plan.graphNode);
-      this.projects.putAutomation(this.root(), { version: 18, graph: next.graph });
+      this.projects.putAutomation(this.root(), { version: 19, graph: next.graph });
       const persisted = this.projects.load(this.root()).config?.graph.graphNodes.find(({ id }) => id === plan.graphNode.id);
       if (!persisted) throw new GraphNodeModuleError("Installed Graph Node was not persisted.", []);
       const record = installedModuleRecord(pkg, inspection.sha256!, input.source, plan, persisted);
@@ -169,9 +170,13 @@ export class GraphNodeModuleService {
     }]);
     const loaded = this.projects.load(this.root());
     if (!loaded.config) throw new GraphNodeModuleError("Project configuration is invalid.", []);
+    const references = graphNodeRemovalReferences(loaded.config, graphNodeId);
+    if (references.length) throw new GraphNodeModuleError("Graph Node is still referenced by the global policy.", references.map((path) => ({
+      code: "ID_CONFLICT", path, message: graphNodeId
+    })));
     const graph = removeModuleGraphNode(loaded.config, graphNodeId);
     if (!graph) throw new GraphNodeModuleError("A project must retain a Graph Node.", []);
-    this.projects.putAutomation(this.root(), { version: 18, graph });
+    this.projects.putAutomation(this.root(), { version: 19, graph });
     for (const resource of record.ownedResources) await unlink(path.join(this.root(), resource.relativePath)).catch(() => undefined);
     installed.installed = installed.installed.filter((candidate) => candidate.graphNodeId !== graphNodeId);
     await this.writeInstalled(installed);
@@ -198,8 +203,8 @@ export class GraphNodeModuleService {
     const slotByProfile = new Map(profileIds.map((profileId, index) => [profileId, profileSlots[index]!.key]));
     const resources = moduleExportResources(compositions, catalog);
     if (!resources) throw new GraphNodeModuleError("Referenced resource is missing.", []);
-    const pkg: GraphNodeModulePackageV6 = {
-      format: "ballet-graph-node-module", version: 6,
+    const pkg: GraphNodeModulePackageV7 = {
+      format: "ballet-graph-node-module", version: 7,
       manifest: {
         id: graphNode.id, title: input.title ?? graphNode.description,
         description: input.description ?? graphNode.description, version: input.version ?? "1.0.0",
@@ -218,24 +223,24 @@ export class GraphNodeModuleService {
       resources,
       graphNode: dematerializeGraphNode(graphNode, slotByProfile)
     };
-    const parsed = graphNodeModulePackageV6Schema.parse(pkg);
+    const parsed = graphNodeModulePackageV7Schema.parse(pkg);
     const canonicalJson = canonicalModuleJson(parsed);
     return { package: parsed, canonicalJson, sha256: moduleSha256(canonicalJson), filename: `${graphNode.id}.ballet-graph-node.json` };
   }
 
-  private async readInstalled(): Promise<InstalledGraphNodeModulesFileV6> {
+  private async readInstalled(): Promise<InstalledGraphNodeModulesFileV7> {
     const source = await readFile(installedModulesPath(this.root()), "utf8").catch(() => undefined);
-    if (!source) return { version: 6, installed: [] };
-    const value = JSON.parse(source) as InstalledGraphNodeModulesFileV6;
-    if (value.version !== 6 || !Array.isArray(value.installed)) throw new GraphNodeModuleError(
+    if (!source) return { version: 7, installed: [] };
+    const value = JSON.parse(source) as InstalledGraphNodeModulesFileV7;
+    if (value.version !== 7 || !Array.isArray(value.installed)) throw new GraphNodeModuleError(
       "Installed module registry is invalid.", [{
-        code: "INVALID_SCHEMA", path: ".ballet/graph-node-modules.json", message: "Expected version 6."
+        code: "INVALID_SCHEMA", path: ".ballet/graph-node-modules.json", message: "Expected version 7."
       }]
     );
     return value;
   }
 
-  private async writeInstalled(value: InstalledGraphNodeModulesFileV6): Promise<void> {
+  private async writeInstalled(value: InstalledGraphNodeModulesFileV7): Promise<void> {
     const filename = installedModulesPath(this.root());
     await mkdir(path.dirname(filename), { recursive: true });
     const temporary = `${filename}.${process.pid}.${randomUUID()}.tmp`;

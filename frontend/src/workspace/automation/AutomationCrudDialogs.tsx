@@ -1,4 +1,4 @@
-import type { AppData, ProjectAutomationConfig } from "@shared/api/workspace-contracts";
+import type { AppData, ProjectAutomationConfig, ProjectIntrinsicOutcome } from "@shared/api/workspace-contracts";
 import { DeleteConfirmDialog } from "@/components/shared/DeleteConfirmDialog";
 import { automationGraphNodePath, automationGraphPath } from "../routing";
 import type { EngineeringLevel } from "../types";
@@ -116,7 +116,7 @@ function saveContract(
   level: EngineeringLevel,
   graphNode: GraphNode | undefined,
   entity: Entity | undefined,
-  patch: { description: string; capabilities: Entity["capabilities"]; outcomes: Entity["outcomes"]; stateDescription?: string }
+  patch: { description: string; capabilities: Entity["capabilities"]; outcomes: ProjectIntrinsicOutcome[]; stateDescription?: string }
 ) {
   if (!entity) return;
   if (level === "graph") {
@@ -126,7 +126,10 @@ function saveContract(
         ...config.graph,
         graphNodes: config.graph.graphNodes.map((node) => node.id === entity.id ? {
           ...node, description: patch.description, capabilities: patch.capabilities,
-          outcomes: patch.outcomes, stateContract: { description: patch.stateDescription ?? node.stateContract.description }
+          outcomes: patch.outcomes.map((outcome) => ({
+            ...outcome,
+            acceptanceEffects: node.outcomes.find(({ outcomeId }) => outcomeId === outcome.outcomeId)?.acceptanceEffects ?? []
+          })), stateContract: { description: patch.stateDescription ?? node.stateContract.description }
         } : node)
       }
     }));

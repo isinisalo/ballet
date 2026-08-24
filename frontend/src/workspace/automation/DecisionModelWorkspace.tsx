@@ -1,194 +1,301 @@
-import { useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, Target } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  CircleDot,
+  LockKeyhole,
+  Minus,
+  Plus,
+  Route,
+  Sparkles,
+  Target
+} from "lucide-react";
 import type {
-  PolicyPreviewResultV3,
-  ProjectRewardDecisionStrategyV3,
-  RewardModelV3
+  AcceptanceLedgerDefinitionV1,
+  DecisionActionModelRowV4,
+  PolicyPreviewResultV4,
+  ProjectScopedRewardDecisionStrategyV4
 } from "@shared/api/workspace-contracts";
-import { OperationalStatus } from "@/components/shared/workspace-ui";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  acceptanceStatus,
   exactMicros,
   exactPpm,
+  expectedImmediateReward,
+  formatProbabilityPpm,
   formatRewardMicros,
-  resolveDecisionModelView,
-  type AcceptanceStatus,
-  type DecisionCompiledState,
-  type DecisionStateDefinition
+  rewardTone,
+  rewardUnitMicros,
+  transitionImpact,
+  type ImpactTone
 } from "./decisionModelPresentation";
-import { PolicyLandscape, RewardTuning, TransitionImpactPanel } from "./DecisionModelPanels";
+import {
+  decisionCellToneClass,
+  PolicyMatrix,
+  policyCellKey,
+  shortDecisionId,
+  type CompiledPolicy,
+  type ScopeNode,
+  type SelectedCell
+} from "./DecisionPolicyMatrix";
 
-export function DecisionModelWorkspace({ strategy, actionOrder, issues, preview, loading, locked, onStrategyChange }: {
-  strategy: ProjectRewardDecisionStrategyV3;
-  actionOrder?: string[];
-  issues: Array<{ path: string; message: string }>;
-  preview?: PolicyPreviewResultV3;
-  loading: boolean;
-  locked: boolean;
-  onStrategyChange: (strategy: ProjectRewardDecisionStrategyV3) => void;
-}) {
-  const [exploredStateId, setExploredStateId] = useState<string>();
-  const view = resolveDecisionModelView(strategy, preview, exploredStateId);
-  const ready = view.compiled?.status === "compiled" && issues.length === 0;
-  const setReward = (key: keyof Omit<RewardModelV3, "outcomePenaltyMicros">, value: number) =>
-    onStrategyChange({ ...strategy, model: { ...strategy.model, reward: { ...strategy.model.reward, [key]: value } } });
+export function DecisionModelWorkspace({
+  scope,
+  strategy,
+  nodes,
+  acceptance,
+  issues,
+  preview,
+  loading,
+  locked,
+  onStrategyChange,
+  onZoomNode
+}: DecisionModelWorkspaceProps) {
+  const view = useDecisionWorkspaceState({ scope, strategy, nodes, acceptance, preview, loading });
+  const scopeName = scope === "graph" ? "Graph" : "Graph Node";
+  const nodeName = scope === "graph" ? "Graph Node" : "Action Node";
 
-  return <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-4">
-    <div className="mx-auto grid min-w-0 max-w-[96rem] gap-3 sm:gap-4">
-      {locked ? <Alert><AlertDescription>The immutable Run snapshot locks this model.</AlertDescription></Alert> : null}
-      {issues.length ? <Alert variant="destructive"><AlertDescription>{issues[0]!.message}</AlertDescription></Alert> : null}
-      <DecisionPulse
-        strategy={strategy}
-        currentDefinition={view.currentDefinition}
-        currentPolicyState={view.compiled?.states.find(({ stateId }) => stateId === view.currentStateId)}
-        selectedActionId={view.selectedActionId}
-        expectedReturnMicros={view.expectedReturnMicros}
-        ready={ready}
-        loading={loading}
-      />
-      <PolicyHorizon strategy={strategy} actionOrder={actionOrder} state={view.selectedPolicyState} selectedStateId={view.selectedStateId} />
-      <TransitionImpactPanel
-        strategy={strategy}
-        state={view.selectedDefinition}
-        policyState={view.selectedPolicyState}
-        row={view.selectedRow}
-        current={view.selectedStateId === view.currentStateId}
-      />
-      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(28rem,0.95fr)]">
-        <PolicyLandscape
-          strategy={strategy}
+  return <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background p-3 sm:p-4" aria-label={`${scopeName} Decision Model`}>
+    <div className="mx-auto grid w-full min-w-0 max-w-[112rem] grid-cols-[minmax(0,1fr)] gap-3">
+      <header className="grid gap-3 rounded-lg border border-divider-strong bg-card p-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="font-mono text-[0.625rem] uppercase">{scope === "graph" ? "Global policy" : "Local policy"}</Badge>
+            <span className={cn("inline-flex items-center gap-1.5 font-mono text-[0.6875rem]", view.compiled?.status === "compiled" ? "text-secondary" : "text-tertiary")}>
+              {view.compiled?.status === "compiled" ? <Check className="size-3.5" /> : <AlertTriangle className="size-3.5" />}{view.status}
+            </span>
+            {locked ? <span className="inline-flex items-center gap-1 font-mono text-[0.6875rem] text-tertiary"><LockKeyhole className="size-3.5" /> Run active</span> : null}
+          </div>
+          <h2 className="mt-2 font-heading text-lg font-medium">{nodes.length} states × {nodes.length} actions</h2>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            Rows are the current {nodeName} state. Columns are the next selectable node. Terminal outcomes end the scope and never add matrix rows.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 self-start text-center">
+          <Metric label="Modeled" value={`${view.modeledCells}/${view.totalCells}`} tone="primary" />
+          <Metric label="Current" value={shortDecisionId(view.currentStateId)} tone="secondary" />
+          <Metric label="Initial" value={shortDecisionId(strategy.model.initialStateId)} tone="tertiary" />
+        </div>
+      </header>
+
+      <PolicyIssues issues={issues} />
+      {scope === "graph" && acceptance ? <AcceptanceRail nodes={nodes} acceptance={acceptance} /> : null}
+
+      <section className="min-w-0 overflow-hidden rounded-lg border border-divider-strong bg-card" aria-labelledby="q-matrix-title">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider-strong px-4 py-3">
+          <div><h3 id="q-matrix-title" className="flex items-center gap-2 font-heading text-sm font-medium"><Route className="size-4 text-primary" /> Q(s,a) policy matrix</h3><p className="mt-1 text-xs text-muted-foreground">Select a cell to inspect its typed outcomes. Column headers zoom into local policies.</p></div>
+          <div className="flex flex-wrap gap-3 font-mono text-[0.625rem] text-muted-foreground">
+            <Legend tone="rewarding" label="+/reward" /><Legend tone="costly" label="−/cost" />
+            <Legend tone="estimated" label="≈ estimate" /><Legend tone="neutral" label="unavailable" dashed />
+          </div>
+        </div>
+        <PolicyMatrix
+          nodes={nodes}
+          rows={view.rows}
           compiled={view.compiled}
           currentStateId={view.currentStateId}
-          selectedStateId={view.selectedStateId}
-          onSelect={setExploredStateId}
+          selected={view.selected}
+          progressByState={view.progressByState}
+          strategy={strategy}
+          onSelect={view.setSelected}
+          onZoomNode={onZoomNode}
         />
-        <RewardTuning strategy={strategy} locked={locked} onChange={setReward} />
+      </section>
+
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.45fr)_minmax(19rem,0.55fr)]">
+        <TransitionInspector
+          strategy={strategy}
+          row={view.selectedRow}
+          compiled={view.compiled}
+          progressByState={view.progressByState}
+        />
+        <RewardProfile strategy={strategy} scope={scope} locked={locked} onChange={onStrategyChange} />
       </div>
     </div>
-  </div>;
+  </main>;
 }
 
-function DecisionPulse({ strategy, currentDefinition, currentPolicyState, selectedActionId, expectedReturnMicros, ready, loading }: {
-  strategy: ProjectRewardDecisionStrategyV3;
-  currentDefinition?: DecisionStateDefinition;
-  currentPolicyState?: DecisionCompiledState;
-  selectedActionId?: string;
-  expectedReturnMicros?: number;
-  ready: boolean;
+type DecisionModelWorkspaceProps = {
+  scope: "graph" | "graph_node";
+  strategy: ProjectScopedRewardDecisionStrategyV4;
+  nodes: ScopeNode[];
+  acceptance?: AcceptanceLedgerDefinitionV1;
+  issues: Array<{ path: string; message: string }>;
+  preview?: PolicyPreviewResultV4;
   loading: boolean;
-}) {
-  const statuses = strategy.model.acceptance.obligations.map(({ obligationId }) =>
-    acceptanceStatus(currentDefinition, obligationId));
-  const verified = statuses.filter((status) => status === "verified").length;
-  const allBranches = strategy.model.stateActions.flatMap(({ successors }) => successors);
-  const defaultPriorCount = allBranches.filter(({ provenance }) => provenance === "default_prior").length;
-  const decision = selectedActionId ?? currentPolicyState?.selectedActionId ?? "unavailable";
-  const score = expectedReturnMicros ?? currentPolicyState?.valueMicros;
+  locked: boolean;
+  onStrategyChange: (strategy: ProjectScopedRewardDecisionStrategyV4) => void;
+  onZoomNode?: (nodeId: string) => void;
+};
 
-  return <section aria-labelledby="decision-pulse-title" className="overflow-hidden rounded-lg border border-divider-strong bg-card">
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider-strong bg-panel-header px-4 py-3">
-      <div className="min-w-0">
-        <h2 id="decision-pulse-title" className="font-heading text-base font-medium">Decision pulse</h2>
-        <p className="mt-0.5 break-words text-xs text-muted-foreground">{strategy.description}</p>
+function useDecisionWorkspaceState({
+  scope,
+  strategy,
+  nodes,
+  acceptance,
+  preview,
+  loading
+}: Pick<DecisionModelWorkspaceProps, "scope" | "strategy" | "nodes" | "acceptance" | "preview" | "loading">) {
+  const compiled = preview?.preview?.compiledPolicy;
+  const currentStateId = preview?.preview?.state.stateId ?? strategy.model.initialStateId;
+  const rows = useMemo(() => new Map(strategy.model.stateActions.map((row) => [policyCellKey(row.stateId, row.actionId), row])), [strategy]);
+  const currentCompiled = compiled?.states.find(({ stateId }) => stateId === currentStateId);
+  const [selected, setSelected] = useState<SelectedCell>();
+  useEffect(() => {
+    const actionId = currentCompiled?.selectedActionId ?? nodes.find(({ id }) => rows.has(policyCellKey(currentStateId, id)))?.id;
+    if (actionId) setSelected((value) => value && rows.has(policyCellKey(value.stateId, value.actionId))
+      ? value : { stateId: currentStateId, actionId });
+  }, [currentCompiled?.selectedActionId, currentStateId, nodes, rows]);
+  const progressByState = useMemo(() => progressCatalog(scope, nodes, acceptance), [acceptance, nodes, scope]);
+  const selectedRow = selected ? rows.get(policyCellKey(selected.stateId, selected.actionId)) : undefined;
+  const modeledCells = strategy.model.stateActions.length;
+  const totalCells = nodes.length * nodes.length;
+  const status = loading ? "Compiling" : compiled?.status === "compiled" ? "Run ready" : "Run blocked";
+  return {
+    compiled,
+    currentStateId,
+    rows,
+    selected,
+    setSelected,
+    progressByState,
+    selectedRow,
+    modeledCells,
+    totalCells,
+    status
+  };
+}
+
+function PolicyIssues({ issues }: Pick<DecisionModelWorkspaceProps, "issues">) {
+  if (issues.length === 0) return null;
+  return <Alert variant="destructive"><AlertTriangle /><AlertDescription>
+    <span className="font-medium">Policy is incomplete.</span> {issues[0]!.message}
+    {issues.length > 1 ? <span className="ml-1 text-xs opacity-80">+ {issues.length - 1} more</span> : null}
+  </AlertDescription></Alert>;
+}
+
+function TransitionInspector({ strategy, row, compiled, progressByState }: {
+  strategy: ProjectScopedRewardDecisionStrategyV4;
+  row?: DecisionActionModelRowV4;
+  compiled?: CompiledPolicy;
+  progressByState: Readonly<Record<string, number>>;
+}) {
+  if (!row) return <section className="grid min-h-64 place-content-center rounded-lg border border-dashed border-divider-strong bg-card p-6 text-center text-sm text-muted-foreground"><Target className="mx-auto mb-2 size-5" />Select a modeled cell to inspect its branches.</section>;
+  const compiledState = compiled?.states.find(({ stateId }) => stateId === row.stateId);
+  const qMicros = compiledState?.actionValues.find(({ actionId }) => actionId === row.actionId)?.qMicros;
+  const estimate = expectedImmediateReward(strategy, row, progressByState);
+  return <section className="min-w-0 rounded-lg border border-divider-strong bg-card p-4" aria-labelledby="transition-inspector-title">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0"><div className="font-mono text-[0.625rem] uppercase text-muted-foreground">Selected transition</div><h3 id="transition-inspector-title" className="mt-1 flex min-w-0 items-center gap-2 font-mono text-sm"><span className="truncate text-primary">{row.stateId}</span><ChevronRight className="size-4 shrink-0 text-muted-foreground" /><span className="truncate text-foreground">{row.actionId}</span></h3></div>
+      <div className={cn("rounded-md border px-3 py-2 text-right", decisionCellToneClass(rewardTone(qMicros ?? estimate, qMicros === undefined)))}>
+        <div className="font-mono text-[0.55rem] uppercase">{qMicros === undefined ? "Immediate estimate" : "Long-run Q(s,a)"}</div>
+        <div className="mt-0.5 font-mono text-lg font-semibold" title={exactMicros(qMicros ?? estimate)}>{qMicros === undefined ? "≈ " : ""}{formatRewardMicros(qMicros ?? estimate, true)}</div>
       </div>
-      <OperationalStatus label={ready ? "Policy compiled" : loading ? "Compiling" : "Run blocked"} tone={ready ? "healthy" : loading ? "attention" : "danger"} />
     </div>
-    <div className="grid divide-y divide-divider-strong sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-[1.05fr_0.8fr_1fr_0.9fr_1.15fr]">
-      <PulseMetric label="Projected state" className="sm:col-span-2 xl:col-span-1">
-        <div className="truncate font-mono text-lg text-primary" title={currentDefinition?.id}>{currentDefinition?.id ?? "unavailable"}</div>
-        <div className="mt-1 font-mono text-[0.625rem] text-muted-foreground">draft preview · not a live Run</div>
-      </PulseMetric>
-      <PulseMetric label="Acceptance">
-        <div className="flex items-center gap-3">
-          <AcceptanceRing statuses={statuses} />
-          <div><div className="font-mono text-lg">{verified} / {statuses.length}</div><div className="text-[0.65rem] text-muted-foreground">verified</div></div>
-        </div>
-      </PulseMetric>
-      <PulseMetric label="Next decision">
-        <div className="flex items-center gap-2 text-secondary"><Target className="size-5" /><span className="truncate font-mono text-xl font-medium uppercase" title={decision}>{decision}</span></div>
-        <div className="mt-1 text-[0.65rem] text-muted-foreground">highest admissible Q-value</div>
-      </PulseMetric>
-      <PulseMetric label="Long-run score">
-        <div className={cn("font-mono text-xl", score !== undefined && score >= 0 ? "text-secondary" : "text-destructive")} title={score === undefined ? undefined : exactMicros(score)}>
-          {score === undefined ? "—" : formatRewardMicros(score, true)}
-        </div>
-        <div className="mt-1 text-[0.65rem] text-muted-foreground">reward units · V(s)</div>
-      </PulseMetric>
-      <PulseMetric label="Model confidence" className="sm:col-span-2 xl:col-span-1">
-        {defaultPriorCount ? <div className="flex items-start gap-2 text-tertiary"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><div><div className="font-mono text-xs uppercase">Default prior</div><div className="mt-1 text-[0.65rem] text-muted-foreground">{defaultPriorCount} uncalibrated branches</div></div></div>
-          : <div className="flex items-center gap-2 text-secondary"><CheckCircle2 className="size-4" /><span className="font-mono text-xs uppercase">Authored evidence</span></div>}
-      </PulseMetric>
+    {row.guards.length ? <div className="mt-3 flex flex-wrap gap-1.5">{row.guards.map((guard, index) => <Badge key={`${guard.source.kind}-${guard.source.pointer}-${index}`} variant="outline" className="font-mono text-[0.6rem]">guard · {guard.source.kind}:{guard.source.pointer || "/"}</Badge>)}</div> : <p className="mt-3 font-mono text-[0.625rem] text-muted-foreground">No guard · always admissible when the cell is modeled</p>}
+    <div className="mt-3 grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
+      {row.successors.map((branch) => {
+        const impact = transitionImpact(strategy, row, branch, progressByState);
+        return <article key={branch.outcomeId} className={cn("min-w-0 rounded-md border p-3", branchSurface(impact.netRewardMicros))}>
+          <div className="flex min-w-0 items-center justify-between gap-2"><span className="truncate font-mono text-xs font-medium" title={branch.outcomeId}>{branch.outcomeId}</span><span className="shrink-0 rounded bg-tertiary/10 px-1.5 py-0.5 font-mono text-[0.6rem] text-tertiary" title={exactPpm(branch.probabilityPpm)}>≈ {formatProbabilityPpm(branch.probabilityPpm)}</span></div>
+          <div className="mt-3 flex items-center gap-2"><CircleDot className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate text-xs" title={targetLabel(branch)}>{targetLabel(branch)}</span><span className="font-mono text-sm font-semibold" title={exactMicros(impact.netRewardMicros)}>{formatRewardMicros(impact.netRewardMicros, true)}</span></div>
+          <div className="mt-2 flex flex-wrap gap-1 font-mono text-[0.55rem] uppercase opacity-75"><span>{branch.penaltyClass.replaceAll("_", " ")}</span><span>·</span><span>{branch.provenance === "authored_evidence" ? "evidence" : "prior estimate"}</span></div>
+        </article>;
+      })}
     </div>
-    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-divider-strong px-4 py-2 font-mono text-[0.625rem] text-muted-foreground">
-      <span>{strategy.id}</span><span>Reward-MDP v3</span><span title={exactPpm(strategy.model.discountPpm)}>γ {(strategy.model.discountPpm / 1_000_000).toFixed(2)}</span>
+    <details className="mt-3 rounded border border-divider-strong bg-background/50 px-3 py-2 text-xs text-muted-foreground">
+      <summary className="cursor-pointer font-mono text-[0.625rem] uppercase">Exact model detail</summary>
+      <div className="mt-2 grid gap-1 font-mono text-[0.625rem]">
+        <span>action cost: {exactMicros(strategy.model.reward.actionCostMicros)}</span>
+        <span>discount: {exactPpm(strategy.model.discountPpm)}</span>
+        <span>probability total: {exactPpm(row.successors.reduce((sum, branch) => sum + branch.probabilityPpm, 0))}</span>
+      </div>
+    </details>
+  </section>;
+}
+
+function RewardProfile({ strategy, scope, locked, onChange }: {
+  strategy: ProjectScopedRewardDecisionStrategyV4;
+  scope: "graph" | "graph_node";
+  locked: boolean;
+  onChange: (strategy: ProjectScopedRewardDecisionStrategyV4) => void;
+}) {
+  const controls = [
+    { key: "actionCostMicros" as const, label: "Action cost", sign: -1 },
+    { key: "terminalSuccessBonusMicros" as const, label: "Success", sign: 1 },
+    ...(scope === "graph" ? [{ key: "acceptanceProgressPotentialScaleMicros" as const, label: "Progress", sign: 1 }] : [])
+  ];
+  const update = (key: typeof controls[number]["key"], delta: number) => onChange({
+    ...strategy,
+    model: {
+      ...strategy.model,
+      reward: { ...strategy.model.reward, [key]: Math.max(0, strategy.model.reward[key] + delta) }
+    }
+  });
+  return <section className="min-w-0 rounded-lg border border-divider-strong bg-card p-4" aria-labelledby="reward-profile-title">
+    <div className="flex items-center gap-2"><Sparkles className="size-4 text-secondary" /><h3 id="reward-profile-title" className="font-heading text-sm font-medium">Reward profile</h3></div>
+    <p className="mt-1 text-xs text-muted-foreground">Human-scale units; exact micros stay available in details.</p>
+    <div className="mt-3 grid gap-2">
+      {controls.map((control) => {
+        const value = strategy.model.reward[control.key];
+        const shown = value * control.sign;
+        return <article key={control.key} className={cn("grid grid-cols-[1fr_auto] items-center gap-3 rounded-md border p-3", control.sign > 0 ? "border-secondary/35 bg-secondary/5" : "border-destructive/35 bg-destructive/5")}>
+          <div><div className="font-mono text-[0.6rem] uppercase text-muted-foreground">{control.label}</div><div className={cn("mt-1 font-mono text-xl", control.sign > 0 ? "text-secondary" : "text-destructive")} title={exactMicros(value)}>{formatRewardMicros(shown, true)}</div></div>
+          <div className="grid grid-cols-2 gap-1"><Button type="button" size="icon-sm" variant="outline" disabled={locked || value === 0} aria-label={`Decrease ${control.label}`} onClick={() => update(control.key, -rewardUnitMicros)}><Minus /></Button><Button type="button" size="icon-sm" variant="outline" disabled={locked} aria-label={`Increase ${control.label}`} onClick={() => update(control.key, rewardUnitMicros)}><Plus /></Button></div>
+        </article>;
+      })}
+    </div>
+    <div className="mt-4"><div className="mb-2 font-mono text-[0.6rem] uppercase text-muted-foreground">Outcome cost spectrum</div><div className="flex h-2 overflow-hidden rounded-full border border-divider-strong" aria-label="Outcome cost spectrum">{Object.entries(strategy.model.reward.outcomePenaltyMicros).map(([key, value]) => <span key={key} title={`${key}: ${exactMicros(value)}`} className={cn("flex-1", value === 0 ? "bg-secondary" : value <= 2_000_000 ? "bg-tertiary" : "bg-destructive", value > 10_000_000 && "opacity-90")} />)}</div></div>
+  </section>;
+}
+
+function AcceptanceRail({ nodes, acceptance }: { nodes: ScopeNode[]; acceptance: AcceptanceLedgerDefinitionV1 }) {
+  const obligations = new Map(acceptance.obligations.map((item) => [item.obligationId, item]));
+  return <section className="rounded-lg border border-divider-strong bg-card p-4" aria-labelledby="acceptance-rail-title">
+    <div className="flex flex-wrap items-baseline justify-between gap-2"><div><h3 id="acceptance-rail-title" className="font-heading text-sm font-medium">Acceptance is a gate, not a policy state</h3><p className="mt-1 text-xs text-muted-foreground">Only explicit bindings contribute Graph progress. Adding a node does not create a ledger obligation.</p></div><span className="font-mono text-[0.625rem] text-muted-foreground">{acceptance.obligations.length} ledger obligations</span></div>
+    <div className="mt-3 flex min-w-0 items-stretch overflow-x-auto pb-1">
+      {nodes.map((node, index) => {
+        const obligation = node.acceptanceObligationId ? obligations.get(node.acceptanceObligationId) : undefined;
+        return <div key={node.id} className="flex min-w-[9rem] flex-1 items-center">
+          <div className={cn("grid min-h-20 min-w-0 flex-1 content-center rounded-md border px-3", obligation ? "border-secondary/40 bg-secondary/5" : "border-dashed border-divider-strong bg-background/50")}>
+            <span className="truncate font-mono text-xs text-foreground">{shortDecisionId(node.id)}</span><span className={cn("mt-1 truncate font-mono text-[0.58rem]", obligation ? "text-secondary" : "text-muted-foreground")} title={obligation?.description}>{obligation ? `${obligation.obligationId} · w${obligation.weight}` : "unbound · +0 progress"}</span>
+          </div>
+          {index < nodes.length - 1 ? <ChevronRight className="mx-1 size-4 shrink-0 text-divider-strong" /> : null}
+        </div>;
+      })}
     </div>
   </section>;
 }
 
-function PulseMetric({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
-  return <div className={cn("min-w-0 px-4 py-3", className)}>
-    <div className="mb-2 font-mono text-[0.625rem] uppercase tracking-wide text-muted-foreground">{label}</div>
-    {children}
-  </div>;
+function Metric({ label, value, tone }: { label: string; value: string; tone: "primary" | "secondary" | "tertiary" }) {
+  return <div className={cn("min-w-24 rounded-md border px-3 py-2", tone === "primary" ? "border-primary/35 bg-primary/5" : tone === "secondary" ? "border-secondary/35 bg-secondary/5" : "border-tertiary/35 bg-tertiary/5")}><div className="font-mono text-[0.55rem] uppercase text-muted-foreground">{label}</div><div className={cn("mt-1 truncate font-mono text-sm", tone === "primary" ? "text-primary" : tone === "secondary" ? "text-secondary" : "text-tertiary")} title={value}>{value}</div></div>;
 }
 
-function AcceptanceRing({ statuses }: { statuses: AcceptanceStatus[] }) {
-  const segment = statuses.length ? Math.max(2, 100 / statuses.length - 2.5) : 0;
-  return <svg viewBox="0 0 48 48" className="size-11 shrink-0 -rotate-90" role="img" aria-label={`${statuses.filter((status) => status === "verified").length} of ${statuses.length} acceptance obligations verified`}>
-    <circle cx="24" cy="24" r="18" pathLength="100" fill="none" stroke="var(--divider-strong)" strokeWidth="6" opacity="0.55" />
-    {statuses.map((status, index) => <circle
-      key={`${status}:${index}`}
-      cx="24" cy="24" r="18" pathLength="100" fill="none" strokeWidth="6" strokeLinecap="butt"
-      stroke={status === "verified" ? "var(--secondary)" : status === "invalidated" ? "var(--destructive)" : "var(--outline)"}
-      strokeDasharray={`${segment} ${100 - segment}`}
-      strokeDashoffset={-(index * 100 / Math.max(statuses.length, 1))}
-    />)}
-  </svg>;
+function Legend({ tone, label, dashed = false }: { tone: ImpactTone; label: string; dashed?: boolean }) {
+  return <span className="inline-flex items-center gap-1.5"><span className={cn("size-3 rounded-sm border", dashed ? "border-dashed border-divider-strong bg-background" : decisionCellToneClass(tone))} />{label}</span>;
 }
 
-function PolicyHorizon({ strategy, actionOrder, state, selectedStateId }: {
-  strategy: ProjectRewardDecisionStrategyV3;
-  actionOrder?: string[];
-  state?: DecisionCompiledState;
-  selectedStateId?: string;
-}) {
-  const qValues = new Map(state?.actionValues.map(({ actionId, qMicros }) => [actionId, qMicros]));
-  const globallyModeled = new Set(strategy.model.stateActions.map(({ actionId }) => actionId));
-  const capabilityIds = strategy.capabilityModel.actions.map(({ actionId }) => actionId);
-  const capabilitySet = new Set(capabilityIds);
-  const orderedActionIds = [...(actionOrder ?? []).filter((actionId) => capabilitySet.has(actionId)),
-    ...capabilityIds.filter((actionId) => !actionOrder?.includes(actionId))];
-  return <section aria-labelledby="policy-horizon-title" className="min-w-0 rounded-lg border border-divider-strong bg-card p-4">
-    <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <div><h2 id="policy-horizon-title" className="font-heading text-sm font-medium">Policy horizon</h2><p className="mt-1 text-xs text-muted-foreground">Configured GraphNode options. The policy may jump or return when evidence changes.</p></div>
-      <div className="font-mono text-[0.625rem] text-muted-foreground">exploring {selectedStateId ?? "unavailable"}</div>
-    </div>
-    <div className="mt-3 overflow-x-auto pb-1">
-      <div className="flex min-w-max items-stretch">
-        {orderedActionIds.map((actionId, index) => {
-          const qMicros = qValues.get(actionId);
-          const selected = state?.selectedActionId === actionId;
-          const modeled = globallyModeled.has(actionId);
-          return <div key={actionId} className="flex items-center">
-            <article className={cn(
-              "grid min-h-28 w-40 content-between rounded-md border p-3",
-              selected ? "border-secondary bg-secondary/10" : qMicros !== undefined ? "border-primary/50 bg-primary/5" : modeled ? "border-divider-strong bg-background/45" : "border-dashed border-tertiary/60 bg-tertiary/5"
-            )}>
-              <div className="flex min-w-0 items-start justify-between gap-2">
-                <div className="font-mono text-[0.625rem] text-muted-foreground">{String(index + 1).padStart(2, "0")}</div>
-                {selected ? <span className="font-mono text-[0.6rem] uppercase text-secondary">next</span> : null}
-              </div>
-              <div className={cn("truncate font-mono text-sm uppercase", selected ? "text-secondary" : "text-foreground")} title={actionId}>{actionId}</div>
-              <div className="font-mono text-[0.625rem] text-muted-foreground" title={qMicros === undefined ? undefined : exactMicros(qMicros)}>
-                {qMicros !== undefined ? `Q ${formatRewardMicros(qMicros, true)}` : modeled ? "available in another state" : "needs transition model"}
-              </div>
-            </article>
-            {index < orderedActionIds.length - 1 ? <ArrowRight className="mx-1.5 size-4 text-divider-strong" aria-hidden="true" /> : null}
-          </div>;
-        })}
-      </div>
-    </div>
-  </section>;
+function progressCatalog(scope: "graph" | "graph_node", nodes: ScopeNode[], acceptance?: AcceptanceLedgerDefinitionV1) {
+  if (scope === "graph_node" || !acceptance) return Object.fromEntries(nodes.map(({ id }) => [id, 0]));
+  const weights = new Map(acceptance.obligations.map(({ obligationId, weight }) => [obligationId, weight]));
+  const bound = nodes.map(({ acceptanceObligationId }) => acceptanceObligationId ? weights.get(acceptanceObligationId) ?? 0 : 0);
+  const total = bound.reduce((sum, value) => sum + value, 0);
+  let completed = 0;
+  return Object.fromEntries(nodes.map((node, index) => {
+    const value = total === 0 ? 0 : Math.round(completed * 1_000_000 / total);
+    completed += bound[index] ?? 0;
+    return [node.id, value];
+  }));
+}
+
+function branchSurface(value: number): string {
+  return value > 0 ? "border-secondary/40 bg-secondary/5 text-secondary"
+    : value < 0 ? "border-destructive/40 bg-destructive/5 text-destructive"
+      : "border-divider-strong bg-background/60 text-muted-foreground";
+}
+function targetLabel(branch: DecisionActionModelRowV4["successors"][number]): string {
+  return branch.target.kind === "state" ? `state · ${branch.target.stateId}`
+    : `${branch.target.terminal}${branch.target.emitOutcomeId ? ` · emit ${branch.target.emitOutcomeId}` : ""}`;
 }

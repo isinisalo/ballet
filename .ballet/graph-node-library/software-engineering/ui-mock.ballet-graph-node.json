@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 6,
+  "version": 7,
   "manifest": {
     "category": "software-engineering",
     "description": "Create one bounded UI mock. Done when the requested user flow, key states and responsive intent are visible and validated without claiming production behavior.",
@@ -132,6 +132,63 @@
         "outcomeId": "failure",
         "result": "FAIL"
       }
-    ]
+    ],
+    "strategy": {
+      "kind": "reward_mdp_v4",
+      "id": "ui-mock-local-reward-mdp",
+      "description": "Selects ui-mock Action Nodes from the Graph Node-local Reward-MDP.",
+      "model": {
+        "version": 4,
+        "initialStateId": "task",
+        "discountPpm": 990000,
+        "reward": {
+          "actionCostMicros": 1000000,
+          "terminalSuccessBonusMicros": 5000000,
+          "acceptanceProgressPotentialScaleMicros": 0,
+          "outcomePenaltyMicros": {
+            "none": 0,
+            "transient": 2000000,
+            "implementation_defect": 5000000,
+            "invalid_plan": 12000000,
+            "invalid_design": 25000000
+          }
+        },
+        "stateActions": [
+          {
+            "stateId": "task",
+            "actionId": "task",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "terminal",
+                  "terminal": "success",
+                  "emitOutcomeId": "success"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "task"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          }
+        ],
+        "solver": {
+          "algorithm": "discounted_value_iteration_v4",
+          "maxIterations": 10000,
+          "convergenceToleranceMicros": 1
+        }
+      }
+    }
   }
 }

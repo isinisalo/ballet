@@ -135,23 +135,31 @@ const acceptanceLedgerSchema = z.object({
   sha256: z.string()
 }).strict();
 const decisionStateSchema = z.object({
-  stateId: z.string(), features: z.record(z.string(), z.string()), verifiedProgressPpm: z.number().int(),
-  featureVectorSha256: z.string(), sourceStateRevision: z.number().int().min(0), evidenceRefs: z.array(z.string())
+  scope: z.enum(["graph", "graph_node"]), graphNodeId: z.string().optional(), stateId: z.string(),
+  acceptanceProgressPpm: z.number().int(), sourceStateRevision: z.number().int().min(0), evidenceRefs: z.array(z.string())
 }).strict();
 const excludedDecisionActionSchema = z.object({
   actionId: z.string(), reasonCode: z.enum([
-    "outside_snapshot", "outside_capability_model", "outside_state_model", "authorization_denied", "guard_denied"
+    "outside_snapshot", "outside_state_model", "authorization_denied", "guard_denied"
   ])
 }).strict();
 const policyActionValueSchema = z.object({ actionId: z.string(), qMicros: z.number().int().safe() }).strict();
 const transitionSchema = z.object({
-  outcomeId: z.string(), nextStateId: z.string(), probabilityPpm: z.number().int().min(1).max(1_000_000),
-  provenance: z.enum(["default_prior", "authored_evidence"])
+  outcomeId: z.string(), target: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("state"), stateId: z.string() }).strict(),
+    z.object({
+      kind: z.literal("terminal"), terminal: z.enum(["success", "failure", "blocked"]),
+      emitOutcomeId: z.string().optional()
+    }).strict()
+  ]), probabilityPpm: z.number().int().min(1).max(1_000_000),
+  provenance: z.enum(["default_prior", "authored_evidence"]),
+  penaltyClass: z.enum(["none", "transient", "implementation_defect", "invalid_plan", "invalid_design"])
 }).strict();
 export const policyDecisionRecordSchema = z.object({
-  version: z.literal(3), policyDecisionId: z.string(), rootRunId: z.string(), epoch: z.number().int().min(1),
-  epochKind: z.enum(["start", "continuation"]), previousActionInvocationId: z.string().optional(),
-  state: decisionStateSchema.optional(), admissibleActionIds: z.array(z.string()),
+  version: z.literal(5), policyDecisionId: z.string(), rootRunId: z.string(), epoch: z.number().int().min(1),
+  epochKind: z.enum(["start", "continuation"]), scope: z.enum(["graph", "graph_node"]),
+  graphNodeId: z.string().optional(), graphNodeInvocationId: z.string().optional(),
+  previousActionInvocationId: z.string().optional(), state: decisionStateSchema, admissibleActionIds: z.array(z.string()),
   excludedActions: z.array(excludedDecisionActionSchema), selectedActionId: z.string().optional(),
   actionValues: z.array(policyActionValueSchema), stateValueMicros: z.number().int().safe().optional(),
   solverStatus: z.enum([
@@ -179,17 +187,21 @@ const policyOptionCostObservationSchema = z.object({
   }).strict()
 }).strict();
 export const policyOptionObservationSchema = z.object({
-  version: z.literal(4), policyObservationId: z.string(), rootRunId: z.string(), policyDecisionId: z.string(),
-  actionInvocationId: z.string(), graphNodeInvocationId: z.string(), stateBefore: decisionStateSchema,
+  version: z.literal(5), policyObservationId: z.string(), rootRunId: z.string(), policyDecisionId: z.string(),
+  scope: z.enum(["graph", "graph_node"]), graphNodeId: z.string().optional(),
+  graphNodeInvocationId: z.string().optional(), actionInvocationId: z.string(), stateBefore: decisionStateSchema,
   actionId: z.string(), expectedOutcomeDistribution: z.array(transitionSchema), observedCost: policyOptionCostObservationSchema,
-  observedOutcomeId: z.string(), verifiedResult: z.enum(["PASS", "FAIL"]), actualState: decisionStateSchema.optional(),
+  observedOutcomeId: z.string(), emittedOutcomeId: z.string().optional(), verifiedResult: z.enum(["PASS", "FAIL"]),
+  actualState: decisionStateSchema.optional(), terminal: z.enum(["success", "failure", "blocked"]).optional(),
   acceptanceLedgerAfter: acceptanceLedgerSchema, realizedRewardMicros: z.number().int().safe(),
-  modelMatch: z.enum(["match", "outcome_miss", "state_miss", "outside_support"]),
+  modelMatch: z.enum(["match", "outcome_miss", "state_miss", "outside_support", "acceptance_mismatch"]),
   modelSha256: z.string(), snapshotSha256: z.string(), createdAt: timestamp
 }).strict();
 const compiledPolicySchema = z.object({
-  version: z.literal(3), algorithm: z.literal("discounted_value_iteration_v3"),
+  version: z.literal(4), scope: z.enum(["graph", "graph_node"]), graphNodeId: z.string().optional(),
+  algorithm: z.literal("discounted_value_iteration_v4"),
   status: z.enum(["compiled", "policy_model_invalid", "policy_goal_unreachable", "policy_no_proper_policy", "policy_not_converged"]),
+  initialStateId: z.string(), stateIds: z.array(z.string()), actionIds: z.array(z.string()),
   states: z.array(z.object({
     stateId: z.string(), selectedActionId: z.string(), valueMicros: z.number().int().safe(),
     actionValues: z.array(policyActionValueSchema)
@@ -198,11 +210,15 @@ const compiledPolicySchema = z.object({
 }).strict();
 export const rootRunOrchestrationProjectionSchema = z.object({
   policyDecisions: z.array(policyDecisionRecordSchema), policyObservations: z.array(policyOptionObservationSchema),
-  compiledPolicy: compiledPolicySchema, acceptanceLedger: acceptanceLedgerSchema
+  compiledPolicies: z.object({
+    global: compiledPolicySchema.optional(),
+    graphNodes: z.record(z.string(), compiledPolicySchema)
+  }).strict(), acceptanceLedger: acceptanceLedgerSchema
 }).strict();
 export const controlFlowEventSchema = z.object({
   id: z.number().int(), rootRunId: z.string(), sequence: z.number().int(),
   kind: z.enum(["policy_decided", "policy_invalid", "policy_observed", "graph_node_dispatched",
+    "policy_terminal", "acceptance_mismatch",
     "action_node_dispatched", "work_completed", "validation_pass", "validation_fail_retry",
     "validation_fail_escalate", "root_needs_input", "root_cancelled", "root_terminal", "execution_interrupted"]),
   stateRevision: z.number().int().min(0), graphNodeInvocationId: z.string().optional(),

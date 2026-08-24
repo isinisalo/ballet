@@ -1,26 +1,26 @@
-import type { JsonValue, NodeResult } from "./automation.js";
+import type { JsonPrimitive, JsonValue, NodeResult } from "./automation.js";
 
-export const decisionModelVersion = 3 as const;
+export const decisionModelVersion = 4 as const;
 export const probabilityScalePpm = 1_000_000 as const;
 export const rewardUnitMicros = 1_000_000 as const;
 export const defaultDiscountPpm = 990_000 as const;
-export const maxDecisionStates = 1_024;
+export const maxDecisionStates = 64;
 export const maxDecisionActionsPerState = 64;
 export const maxDecisionTransitions = 40_960;
 
+export type DecisionPolicyScope = "graph" | "graph_node";
 export type DecisionTerminalKind = "success" | "failure" | "blocked";
 export type DecisionEpochKind = "start" | "continuation";
-export type DecisionRuntimeFact = "epoch_kind" | "previous_action_id" | "previous_action_result"
-  | "previous_outcome_id" | "action_invocation_count";
-export type DecisionFeatureSourceV3 =
-  | { kind: "runtime"; fact: DecisionRuntimeFact }
+export type OutcomePenaltyClass = "none" | "transient" | "implementation_defect" | "invalid_plan" | "invalid_design";
+export type TransitionProbabilityProvenance = "default_prior" | "authored_evidence";
+
+export type DecisionGuardSourceV4 =
   | { kind: "project_state"; pointer: string }
   | { kind: "authorization"; pointer: string };
-export interface DecisionFeatureDefinitionV3 {
-  id: string;
-  domain: string[];
-  missingValue: string;
-  source: DecisionFeatureSourceV3;
+export interface DecisionActionGuardV4 {
+  source: DecisionGuardSourceV4;
+  allowedValues: JsonPrimitive[];
+  missingValue?: JsonPrimitive;
 }
 
 export type AcceptanceObligationStatus = "pending" | "verified" | "invalidated";
@@ -51,73 +51,49 @@ export interface AuthorizationSnapshotV1 {
   sha256: string;
 }
 
-export interface DecisionStateDefinitionV3 {
-  id: string;
-  values: Record<string, string>;
-  verifiedObligationIds: string[];
-  invalidatedObligationIds: string[];
-  terminal?: DecisionTerminalKind;
-}
-export interface DecisionActionGuardV3 { featureId: string; allowedValues: string[]; }
-export type OutcomePenaltyClass = "none" | "transient" | "implementation_defect" | "invalid_plan" | "invalid_design";
-export interface CapabilityOutcomeDefinitionV3 {
-  id: string;
-  description: string;
-  result: NodeResult;
-  penaltyClass: OutcomePenaltyClass;
-}
-export interface CapabilityActionV3 { actionId: string; guards: DecisionActionGuardV3[]; }
-export interface ProjectCapabilityModelV3 {
-  version: typeof decisionModelVersion;
-  outcomes: CapabilityOutcomeDefinitionV3[];
-  actions: CapabilityActionV3[];
-}
-export type TransitionProbabilityProvenance = "default_prior" | "authored_evidence";
-export interface DecisionTransitionV3 {
+export type DecisionBranchTargetV4 =
+  | { kind: "state"; stateId: string }
+  | { kind: "terminal"; terminal: DecisionTerminalKind; emitOutcomeId?: string };
+export interface DecisionTransitionV4 {
   outcomeId: string;
-  nextStateId: string;
+  target: DecisionBranchTargetV4;
   probabilityPpm: number;
   provenance: TransitionProbabilityProvenance;
+  penaltyClass: OutcomePenaltyClass;
 }
-export interface DecisionActionModelRowV3 {
+export interface DecisionActionModelRowV4 {
   stateId: string;
   actionId: string;
-  successors: DecisionTransitionV3[];
+  guards: DecisionActionGuardV4[];
+  successors: DecisionTransitionV4[];
 }
-export interface RewardModelV3 {
+export interface ScopeRewardModelV4 {
   actionCostMicros: number;
-  completionBonusMicros: number;
-  progressPotentialScaleMicros: number;
+  terminalSuccessBonusMicros: number;
+  acceptanceProgressPotentialScaleMicros: number;
   outcomePenaltyMicros: Record<OutcomePenaltyClass, number>;
 }
-export interface DiscountedValueIterationConfigV3 {
-  algorithm: "discounted_value_iteration_v3";
+export interface DiscountedValueIterationConfigV4 {
+  algorithm: "discounted_value_iteration_v4";
   maxIterations: number;
   convergenceToleranceMicros: number;
 }
-export interface ProjectRewardDecisionModelV3 {
+export interface ProjectScopedRewardDecisionModelV4 {
   version: typeof decisionModelVersion;
+  initialStateId: string;
   discountPpm: number;
-  acceptance: AcceptanceLedgerDefinitionV1;
-  reward: RewardModelV3;
-  features: DecisionFeatureDefinitionV3[];
-  states: DecisionStateDefinitionV3[];
-  stateActions: DecisionActionModelRowV3[];
-  solver: DiscountedValueIterationConfigV3;
+  reward: ScopeRewardModelV4;
+  stateActions: DecisionActionModelRowV4[];
+  solver: DiscountedValueIterationConfigV4;
 }
-export interface ProjectRewardDecisionStrategyV3 {
-  kind: "reward_mdp_v3";
+export interface ProjectScopedRewardDecisionStrategyV4 {
+  kind: "reward_mdp_v4";
   id: string;
   description: string;
-  capabilityModel: ProjectCapabilityModelV3;
-  model: ProjectRewardDecisionModelV3;
+  model: ProjectScopedRewardDecisionModelV4;
 }
-export interface DecisionProjectionContextV3 {
-  epochKind: DecisionEpochKind;
-  previousActionId?: string;
-  previousActionResult?: NodeResult;
-  previousOutcomeId?: string;
-  actionInvocationCount: number;
+
+export interface DecisionGuardContextV4 {
   stateRevision: number;
   projectState: JsonValue;
   authorization: AuthorizationSnapshotV1;
@@ -125,10 +101,10 @@ export interface DecisionProjectionContextV3 {
   evidenceRefs: string[];
 }
 
-export const defaultRewardModel = (): RewardModelV3 => ({
+export const defaultRewardModel = (scope: DecisionPolicyScope): ScopeRewardModelV4 => ({
   actionCostMicros: rewardUnitMicros,
-  completionBonusMicros: 25 * rewardUnitMicros,
-  progressPotentialScaleMicros: 100 * rewardUnitMicros,
+  terminalSuccessBonusMicros: 25 * rewardUnitMicros,
+  acceptanceProgressPotentialScaleMicros: scope === "graph" ? 100 * rewardUnitMicros : 0,
   outcomePenaltyMicros: {
     none: 0,
     transient: 2 * rewardUnitMicros,
@@ -137,3 +113,29 @@ export const defaultRewardModel = (): RewardModelV3 => ({
     invalid_design: 25 * rewardUnitMicros
   }
 });
+
+export const defaultScopedRewardDecisionStrategy = (
+  scope: DecisionPolicyScope,
+  initialStateId = "unconfigured"
+): ProjectScopedRewardDecisionStrategyV4 => ({
+  kind: "reward_mdp_v4",
+  id: `${scope === "graph" ? "graph" : "graph-node"}-reward-mdp`,
+  description: scope === "graph"
+    ? "Selects Graph Nodes from the project-scoped Reward-MDP."
+    : "Selects Action Nodes from the Graph Node-scoped Reward-MDP.",
+  model: {
+    version: decisionModelVersion,
+    initialStateId,
+    discountPpm: defaultDiscountPpm,
+    reward: defaultRewardModel(scope),
+    stateActions: [],
+    solver: {
+      algorithm: "discounted_value_iteration_v4",
+      maxIterations: 10_000,
+      convergenceToleranceMicros: 1
+    }
+  }
+});
+
+export const nodeResultForTerminal = (terminal: DecisionTerminalKind): NodeResult =>
+  terminal === "success" ? "PASS" : "FAIL";

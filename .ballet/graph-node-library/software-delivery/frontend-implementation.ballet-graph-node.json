@@ -1,6 +1,6 @@
 {
   "format": "ballet-graph-node-module",
-  "version": 6,
+  "version": 7,
   "manifest": {
     "category": "software-delivery",
     "description": "Implement one bounded frontend change. Done when the requested user flow, API contract, design-system use, accessibility, responsive behavior, tests and concrete check evidence are independently validated.",
@@ -235,6 +235,198 @@
         "outcomeId": "failure",
         "result": "FAIL"
       }
-    ]
+    ],
+    "strategy": {
+      "kind": "reward_mdp_v4",
+      "id": "frontend-implementation-local-reward-mdp",
+      "description": "Selects frontend-implementation Action Nodes from the Graph Node-local Reward-MDP.",
+      "model": {
+        "version": 4,
+        "initialStateId": "analyze-frontend-change",
+        "discountPpm": 990000,
+        "reward": {
+          "actionCostMicros": 1000000,
+          "terminalSuccessBonusMicros": 5000000,
+          "acceptanceProgressPotentialScaleMicros": 0,
+          "outcomePenaltyMicros": {
+            "none": 0,
+            "transient": 2000000,
+            "implementation_defect": 5000000,
+            "invalid_plan": 12000000,
+            "invalid_design": 25000000
+          }
+        },
+        "stateActions": [
+          {
+            "stateId": "analyze-frontend-change",
+            "actionId": "analyze-frontend-change",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "implement-frontend-change"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "analyze-frontend-change"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "implement-frontend-change",
+            "actionId": "analyze-frontend-change",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "implement-frontend-change"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "analyze-frontend-change"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "implement-frontend-change",
+            "actionId": "implement-frontend-change",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "validate-frontend-change"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "implement-frontend-change"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "validate-frontend-change",
+            "actionId": "analyze-frontend-change",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "validate-frontend-change"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "analyze-frontend-change"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "validate-frontend-change",
+            "actionId": "implement-frontend-change",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "state",
+                  "stateId": "validate-frontend-change"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "implement-frontend-change"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          },
+          {
+            "stateId": "validate-frontend-change",
+            "actionId": "validate-frontend-change",
+            "guards": [],
+            "successors": [
+              {
+                "outcomeId": "success",
+                "target": {
+                  "kind": "terminal",
+                  "terminal": "success",
+                  "emitOutcomeId": "success"
+                },
+                "probabilityPpm": 700000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              },
+              {
+                "outcomeId": "failure",
+                "target": {
+                  "kind": "state",
+                  "stateId": "validate-frontend-change"
+                },
+                "probabilityPpm": 300000,
+                "provenance": "default_prior",
+                "penaltyClass": "none"
+              }
+            ]
+          }
+        ],
+        "solver": {
+          "algorithm": "discounted_value_iteration_v4",
+          "maxIterations": 10000,
+          "convergenceToleranceMicros": 1
+        }
+      }
+    }
   }
 }

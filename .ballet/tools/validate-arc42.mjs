@@ -26,7 +26,8 @@ const required = [
   ".ballet/arc42/migration/CONTENT-MAP.md", ".ballet/arc42/migration/DECISIONS.md",
   ...["BRIEF.md", "PLAN.md", "EVIDENCE.md", "REVIEW.md"].flatMap((name) => [
     `.ballet/arc42/initiatives/TEMPLATE/${name}`,
-    `.ballet/arc42/initiatives/graph-reward-mdp/${name}`
+    `.ballet/arc42/initiatives/graph-reward-mdp/${name}`,
+    `.ballet/arc42/initiatives/hierarchical-reward-mdp/${name}`
   ]),
   ...sections.map((name) => `.ballet/arc42/${name}`)
 ];
@@ -38,9 +39,8 @@ const expectedDesignJobs = [
   "design-10-quality-requirements", "design-11-risks-and-technical-debt", "design-12-glossary"
 ];
 const expectedVersions = {
-  project: 18,
-  decisionModel: 3,
-  capabilityModel: 3
+  project: 19,
+  decisionModel: 4
 };
 
 const addIssue = (message) => issues.push(message);
@@ -185,7 +185,7 @@ if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
 } else {
   config = parsed.data;
-  const automation = { version: 18, graph: config.graph };
+  const automation = { version: 19, graph: config.graph };
   validateProjectAutomationConfig(automation, config.executionProfiles)
     .forEach((issue) => addIssue(`Automation ${issue.path}: ${issue.message}`));
   const resources = await loadProjectResources(root);
@@ -194,9 +194,8 @@ if (!parsed.success) {
     .forEach((issue) => addIssue(`Resource reference ${issue.path}: ${issue.message}`));
 
   if (config.version !== expectedVersions.project) addIssue(`Project Config must be v${expectedVersions.project}.`);
-  if (config.graph.strategy.kind !== "reward_mdp_v3") addIssue("Default Graph must use reward_mdp_v3.");
-  if (config.graph.strategy.model.version !== expectedVersions.decisionModel) addIssue("Decision Model must be v3.");
-  if (config.graph.strategy.capabilityModel.version !== expectedVersions.capabilityModel) addIssue("Capability Model must be v3.");
+  if (config.graph.strategy.kind !== "reward_mdp_v4") addIssue("Default Graph must use reward_mdp_v4.");
+  if (config.graph.strategy.model.version !== expectedVersions.decisionModel) addIssue("Decision Model must be v4.");
   const graphNodeIds = config.graph.graphNodes.map(({ id }) => id);
   if (JSON.stringify(graphNodeIds) !== JSON.stringify(expectedGraphNodeIds)) addIssue(`Default GraphNode order mismatch: ${graphNodeIds.join(", ")}`);
   const designJobs = config.graph.graphNodes.find(({ id }) => id === "design")?.actionNodes.map(({ id }) => id) ?? [];
@@ -206,26 +205,48 @@ if (!parsed.success) {
   if (model.discountPpm !== 990_000) addIssue("Reward-MDP discount must be 990000 ppm.");
   const reward = model.reward;
   const expectedReward = [
-    reward.actionCostMicros === 1_000_000, reward.completionBonusMicros === 25_000_000,
-    reward.progressPotentialScaleMicros === 100_000_000,
+    reward.actionCostMicros === 1_000_000, reward.terminalSuccessBonusMicros === 25_000_000,
+    reward.acceptanceProgressPotentialScaleMicros === 100_000_000,
     reward.outcomePenaltyMicros.transient === 2_000_000,
     reward.outcomePenaltyMicros.implementation_defect === 5_000_000,
     reward.outcomePenaltyMicros.invalid_plan === 12_000_000,
     reward.outcomePenaltyMicros.invalid_design === 25_000_000
   ];
-  if (expectedReward.some((valid) => !valid)) addIssue("Reward-MDP default reward constants do not match adr-031.");
-  for (const row of model.stateActions) {
-    if (row.successors.reduce((sum, branch) => sum + branch.probabilityPpm, 0) !== 1_000_000) {
-      addIssue(`PPM does not sum to 1000000 for ${row.stateId}/${row.actionId}.`);
+  if (expectedReward.some((valid) => !valid)) addIssue("Reward-MDP default reward constants do not match adr-033.");
+  const scopes = [
+    { label: "graph", ids: graphNodeIds, strategy: config.graph.strategy, expectedRows: 15 },
+    ...config.graph.graphNodes.map((node) => ({
+      label: `graph_node:${node.id}`,
+      ids: node.actionNodes.map(({ id }) => id),
+      strategy: node.strategy,
+      expectedRows: node.id === "design" ? 78 : node.id === "plan" ? 3 : 1
+    }))
+  ];
+  for (const scope of scopes) {
+    const scopeModel = scope.strategy.model;
+    if (scope.strategy.kind !== "reward_mdp_v4" || scopeModel.version !== 4) addIssue(`${scope.label} must use Decision Model v4.`);
+    if (!scope.ids.includes(scopeModel.initialStateId)) addIssue(`${scope.label} initial state is not owned by the scope.`);
+    if (scopeModel.stateActions.length !== scope.expectedRows) addIssue(`${scope.label} must contain ${scope.expectedRows} modeled cells.`);
+    if (scope.label !== "graph" && scopeModel.reward.acceptanceProgressPotentialScaleMicros !== 0) {
+      addIssue(`${scope.label} local reward cannot shape acceptance progress.`);
     }
-    if (row.successors.some(({ provenance }) => provenance !== "default_prior" && provenance !== "authored_evidence")) {
-      addIssue(`Invalid prior provenance for ${row.stateId}/${row.actionId}.`);
+    for (const row of scopeModel.stateActions) {
+      if (!scope.ids.includes(row.stateId) || !scope.ids.includes(row.actionId)) addIssue(`${scope.label} contains a free-floating state/action ID.`);
+      if (row.successors.reduce((sum, branch) => sum + branch.probabilityPpm, 0) !== 1_000_000) {
+        addIssue(`PPM does not sum to 1000000 for ${scope.label}/${row.stateId}/${row.actionId}.`);
+      }
+      if (new Set(row.successors.map(({ outcomeId }) => outcomeId)).size !== row.successors.length) {
+        addIssue(`Outcome IDs are not unique for ${scope.label}/${row.stateId}/${row.actionId}.`);
+      }
+      if (row.successors.some(({ provenance }) => provenance !== "default_prior" && provenance !== "authored_evidence")) {
+        addIssue(`Invalid prior provenance for ${scope.label}/${row.stateId}/${row.actionId}.`);
+      }
+    }
+    if (!scopeModel.stateActions.some(({ successors }) => successors.some(({ target }) => target.kind === "terminal" && target.terminal === "success"))) {
+      addIssue(`${scope.label} has no success terminal branch.`);
     }
   }
-  const actionCounts = new Map();
-  for (const row of model.stateActions) actionCounts.set(row.stateId, (actionCounts.get(row.stateId) ?? 0) + 1);
-  if (![...actionCounts.values()].some((count) => count >= 2)) addIssue("Default Reward-MDP has no state with at least two actions.");
-  if (!model.states.some(({ terminal }) => terminal === "success")) addIssue("Default Reward-MDP has no success terminal.");
+  if (config.graph.acceptance.obligations.length !== 5) addIssue("Default Graph acceptance-ledger must contain five obligations.");
 
   const profiles = new Map(config.executionProfiles.map((profile) => [profile.id, profile]));
   for (const graphNode of config.graph.graphNodes) for (const action of graphNode.actionNodes) {
@@ -284,6 +305,7 @@ if (issues.length) {
 } else {
   const graphNodes = config?.graph.graphNodes.length ?? 0;
   const actions = config?.graph.graphNodes.reduce((total, node) => total + node.actionNodes.length, 0) ?? 0;
-  const mdpRows = config?.graph.strategy.model.stateActions.length ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, ${graphNodes} GraphNodes, ${actions} ordered Action Nodes, ${mdpRows} Reward-MDP rows.\n`);
+  const globalCells = config?.graph.strategy.model.stateActions.length ?? 0;
+  const localCells = config?.graph.graphNodes.reduce((total, node) => total + node.strategy.model.stateActions.length, 0) ?? 0;
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, ${graphNodes} GraphNodes, ${actions} Action Nodes, ${globalCells} global and ${localCells} local Reward-MDP cells.\n`);
 }

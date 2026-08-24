@@ -3,8 +3,8 @@ id: arc42-state-contract-v1
 title: GraphEngineeringStateV1-sopimus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-22'
-version: 7
+updatedAt: '2026-08-23'
+version: 8
 tags:
   - arc42
   - state
@@ -72,7 +72,7 @@ DESIGN päivittää omat 12 kanonista arc42-osiotaan eikä kopioi niitä Stateen
 
 ## Runtime- ja tracker-raja
 
-SQLite v14 omistaa runtime-, policy decision/observation-, acceptance-ledger- ja outbox-totuuden. `DecisionStateV3` johdetaan jokaisessa Graph decision epochissa canonical runtime-faktoista, current State revisionista sekä erillisistä acceptance- ja authorization-snapshoteista. `.tickets/orchestration` ja `.tickets/work` omistavat ticketit. `GraphEngineeringStateV1` säilyttää näihin vain bounded references -viitteet.
+SQLite v15 omistaa runtime-, scope-tagged policy decision/observation-, acceptance-ledger- ja outbox-totuuden. `DecisionStateV4` johdetaan jokaisessa global/local decision epochissa immutable scope-node-ID:stä, canonical runtime-faktoista, current State revisionista sekä erillisistä acceptance- ja authorization-snapshoteista. Acceptance-ledger ei kuulu Decision Stateen eikä GraphEngineeringStateen. `.tickets/orchestration` ja `.tickets/work` omistavat ticketit; State säilyttää niihin vain bounded references -viitteet.
 
 ## Kanoniset lähteet
 

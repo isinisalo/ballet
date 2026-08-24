@@ -1,10 +1,10 @@
 ---
 id: adr-032
 title: Graph Decision Model käyttää visuaalista reward-impact-dashboardia
-status: accepted
+status: superseded
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 1
+version: 2
 tags:
   - arkkitehtuuripaatos
   - ui
@@ -13,6 +13,8 @@ tags:
 ---
 
 # Graph Decision Model käyttää visuaalista reward-impact-dashboardia
+
+> **Supersession notice (2026-08-23):** `adr-033` korvaa 62-state landscape-, pulse- ja horizon-projektion 5×5/N×N Q(s,a)-matriisilla. Ihmisyksiköt sekä reward/cost/estimate-semanttiikka säilyvät.
 
 ## Konteksti
 

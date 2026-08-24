@@ -42,16 +42,22 @@ export class RuntimeInvocationStore {
     `).run(status, this.rootRevision(invocation.rootRunId), at, at, id);
   }
 
-  createAction(rootRunId: string, graphInvocationId: string, graphNode: ProjectGraphNode, action: ProjectActionNode) {
+  createAction(
+    rootRunId: string,
+    graphInvocationId: string,
+    graphNode: ProjectGraphNode,
+    action: ProjectActionNode,
+    policyDecisionId: string
+  ) {
     const id = randomUUID();
     const at = now();
     const revision = this.rootRevision(rootRunId);
     this.connection().prepare(`
       INSERT INTO action_node_invocations (
         action_node_invocation_id, root_run_id, graph_node_invocation_id, graph_node_id, action_node_id,
-        work_attempt, status, state_revision_before, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 0, 'running', ?, ?, ?)
-    `).run(id, rootRunId, graphInvocationId, graphNode.id, action.id, revision, at, at);
+        policy_decision_id, work_attempt, status, state_revision_before, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'running', ?, ?, ?)
+    `).run(id, rootRunId, graphInvocationId, graphNode.id, action.id, policyDecisionId, revision, at, at);
     return this.action(id);
   }
 
@@ -217,7 +223,8 @@ function mapJob(row: Row): ActionNodeInvocation {
   return {
     actionNodeInvocationId: String(row.action_node_invocation_id), rootRunId: String(row.root_run_id),
     graphNodeInvocationId: String(row.graph_node_invocation_id), graphNodeId: String(row.graph_node_id),
-    actionNodeId: String(row.action_node_id), workAttempt: Number(row.work_attempt),
+    actionNodeId: String(row.action_node_id), policyDecisionId: String(row.policy_decision_id),
+    workAttempt: Number(row.work_attempt),
     status: String(row.status) as ActionNodeInvocation["status"], stateRevisionBefore: Number(row.state_revision_before),
     stateRevisionAfter: nullableNumber(row.state_revision_after), activeNodeRunId: optional(row.active_node_run_id),
     createdAt: String(row.created_at), updatedAt: String(row.updated_at), completedAt: optional(row.completed_at)

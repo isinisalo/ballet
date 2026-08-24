@@ -2,7 +2,7 @@ import type {
   ProjectAutomationConfig,
   ProjectGraphNode,
   ProjectActionNode,
-  ProjectRewardDecisionStrategyV3
+  ProjectScopedRewardDecisionStrategyV4
 } from "@shared/api/workspace-contracts";
 
 type NodeInput = {
@@ -45,41 +45,78 @@ export const createGenericActionNode = (input: NodeInput): ProjectActionNode => 
   }
 });
 
-export const createGenericGraphNode = (input: NodeInput): ProjectGraphNode => ({
-  id: input.id,
-  description: input.description,
-  capabilities: { accepts: [], provides: [] },
-  outcomes: [
-    { outcomeId: `${input.id}-complete`, result: "PASS" },
-    { outcomeId: `${input.id}-failed`, result: "FAIL" }
-  ],
-  stateContract: { description: "Uses the bounded Graph State and acceptance-ledger contracts." },
-  actionNodes: [createGenericActionNode({
+export const createGenericGraphNode = (input: NodeInput): ProjectGraphNode => {
+  const action = createGenericActionNode({
     ...input,
     id: `${input.id}-action`,
-    description: `Ordered action for ${input.id}.`
-  })]
-});
+    description: `Action for ${input.id}.`
+  });
+  const passOutcomeId = `${input.id}-complete`;
+  const failOutcomeId = `${input.id}-failed`;
+  return {
+    id: input.id,
+    description: input.description,
+    capabilities: { accepts: [], provides: [] },
+    outcomes: [
+      { outcomeId: passOutcomeId, result: "PASS", acceptanceEffects: [] },
+      { outcomeId: failOutcomeId, result: "FAIL", acceptanceEffects: [] }
+    ],
+    stateContract: { description: "Uses the bounded Graph State and acceptance-ledger contracts." },
+    strategy: {
+      kind: "reward_mdp_v4",
+      id: `${input.id}-local-reward-mdp`,
+      description: `Selects ${input.id} Action Nodes from its local Reward-MDP.`,
+      model: {
+        version: 4,
+        initialStateId: action.id,
+        discountPpm: 990_000,
+        reward: {
+          actionCostMicros: 1_000_000,
+          terminalSuccessBonusMicros: 5_000_000,
+          acceptanceProgressPotentialScaleMicros: 0,
+          outcomePenaltyMicros: {
+            none: 0,
+            transient: 2_000_000,
+            implementation_defect: 5_000_000,
+            invalid_plan: 12_000_000,
+            invalid_design: 25_000_000
+          }
+        },
+        stateActions: [{
+          stateId: action.id,
+          actionId: action.id,
+          guards: [],
+          successors: [
+            {
+              outcomeId: action.outcomes[0]!.outcomeId,
+              target: { kind: "terminal", terminal: "success", emitOutcomeId: passOutcomeId },
+              probabilityPpm: 800_000,
+              provenance: "default_prior",
+              penaltyClass: "none"
+            },
+            {
+              outcomeId: action.outcomes[1]!.outcomeId,
+              target: { kind: "terminal", terminal: "failure", emitOutcomeId: failOutcomeId },
+              probabilityPpm: 200_000,
+              provenance: "default_prior",
+              penaltyClass: "implementation_defect"
+            }
+          ]
+        }],
+        solver: {
+          algorithm: "discounted_value_iteration_v4",
+          maxIterations: 10_000,
+          convergenceToleranceMicros: 1
+        }
+      }
+    },
+    actionNodes: [action]
+  };
+};
 
 export const addGraphNode = (config: ProjectAutomationConfig, node: ProjectGraphNode): ProjectAutomationConfig => ({
   ...config,
-  graph: {
-    ...config.graph,
-    graphNodes: [...config.graph.graphNodes, node],
-    strategy: {
-      ...config.graph.strategy,
-      capabilityModel: {
-        ...config.graph.strategy.capabilityModel,
-        actions: [...config.graph.strategy.capabilityModel.actions, { actionId: node.id, guards: [] }],
-        outcomes: [...config.graph.strategy.capabilityModel.outcomes, ...node.outcomes.map((outcome) => ({
-          id: outcome.outcomeId,
-          description: `${node.description}: ${outcome.outcomeId}`,
-          result: outcome.result,
-          penaltyClass: outcome.result === "PASS" ? "none" as const : "implementation_defect" as const
-        }))]
-      }
-    }
-  }
+  graph: { ...config.graph, graphNodes: [...config.graph.graphNodes, node] }
 });
 
 export const renameGraphNode = (
@@ -91,33 +128,15 @@ export const renameGraphNode = (
   graph: {
     ...config.graph,
     graphNodes: config.graph.graphNodes.map((node) => node.id === from ? { ...node, id: to } : node),
-    strategy: renameGraphAction(config.graph.strategy, from, to)
+    strategy: renameScopeNode(config.graph.strategy, from, to)
   }
 });
 
-export const removeGraphNode = (config: ProjectAutomationConfig, id: string): ProjectAutomationConfig => {
-  const node = config.graph.graphNodes.find((candidate) => candidate.id === id);
-  const removedOutcomeIds = new Set(node?.outcomes.map(({ outcomeId }) => outcomeId) ?? []);
-  return {
+export const removeGraphNode = (config: ProjectAutomationConfig, id: string): ProjectAutomationConfig =>
+  graphNodeReferences(config, id).length ? config : ({
     ...config,
-    graph: {
-      ...config.graph,
-      graphNodes: config.graph.graphNodes.filter((candidate) => candidate.id !== id),
-      strategy: {
-        ...config.graph.strategy,
-        capabilityModel: {
-          ...config.graph.strategy.capabilityModel,
-          actions: config.graph.strategy.capabilityModel.actions.filter(({ actionId }) => actionId !== id),
-          outcomes: config.graph.strategy.capabilityModel.outcomes.filter(({ id: outcomeId }) => !removedOutcomeIds.has(outcomeId))
-        },
-        model: {
-          ...config.graph.strategy.model,
-          stateActions: config.graph.strategy.model.stateActions.filter(({ actionId }) => actionId !== id)
-        }
-      }
-    }
-  };
-};
+    graph: { ...config.graph, graphNodes: config.graph.graphNodes.filter((candidate) => candidate.id !== id) }
+  });
 
 export const addActionNode = (config: ProjectAutomationConfig, graphNodeId: string, action: ProjectActionNode) =>
   updateGraphNode(config, graphNodeId, (node) => ({ ...node, actionNodes: [...node.actionNodes, action] }));
@@ -129,20 +148,21 @@ export const renameActionNode = (
   to: string
 ) => updateGraphNode(config, graphNodeId, (node) => ({
   ...node,
-  actionNodes: node.actionNodes.map((action) => action.id === from ? { ...action, id: to } : action)
+  actionNodes: node.actionNodes.map((action) => action.id === from ? { ...action, id: to } : action),
+  strategy: renameScopeNode(node.strategy, from, to)
 }));
 
 export const removeActionNode = (config: ProjectAutomationConfig, graphNodeId: string, id: string) =>
-  updateGraphNode(config, graphNodeId, (node) => ({
+  updateGraphNode(config, graphNodeId, (node) => actionNodeReferences(node, id).length ? node : ({
     ...node,
     actionNodes: node.actionNodes.filter((action) => action.id !== id)
   }));
 
-export const actionNodeReferences = (node: ProjectGraphNode, actionNodeId: string): string[] => {
-  void node;
-  void actionNodeId;
-  return [];
-};
+export const graphNodeReferences = (config: ProjectAutomationConfig, graphNodeId: string): string[] =>
+  policyReferences(config.graph.strategy, graphNodeId, "graph.strategy");
+
+export const actionNodeReferences = (node: ProjectGraphNode, actionNodeId: string): string[] =>
+  policyReferences(node.strategy, actionNodeId, `${node.id}.strategy`);
 
 const updateGraphNode = (
   config: ProjectAutomationConfig,
@@ -156,22 +176,42 @@ const updateGraphNode = (
   }
 });
 
-const renameGraphAction = (
-  strategy: ProjectRewardDecisionStrategyV3,
+const renameScopeNode = (
+  strategy: ProjectScopedRewardDecisionStrategyV4,
   from: string,
   to: string
-): ProjectRewardDecisionStrategyV3 => ({
+): ProjectScopedRewardDecisionStrategyV4 => ({
   ...strategy,
-  capabilityModel: {
-    ...strategy.capabilityModel,
-    actions: strategy.capabilityModel.actions.map((action) => ({
-      ...action,
-      actionId: action.actionId === from ? to : action.actionId
-    }))
-  },
   model: {
     ...strategy.model,
-    stateActions: strategy.model.stateActions.map((row) =>
-      row.actionId === from ? { ...row, actionId: to } : row)
+    initialStateId: strategy.model.initialStateId === from ? to : strategy.model.initialStateId,
+    stateActions: strategy.model.stateActions.map((row) => ({
+      ...row,
+      stateId: row.stateId === from ? to : row.stateId,
+      actionId: row.actionId === from ? to : row.actionId,
+      successors: row.successors.map((branch) => ({
+        ...branch,
+        target: branch.target.kind === "state" && branch.target.stateId === from
+          ? { kind: "state", stateId: to } : branch.target
+      }))
+    }))
   }
 });
+
+const policyReferences = (
+  strategy: ProjectScopedRewardDecisionStrategyV4,
+  nodeId: string,
+  prefix: string
+): string[] => {
+  const references = strategy.model.initialStateId === nodeId ? [`${prefix}.model.initialStateId`] : [];
+  strategy.model.stateActions.forEach((row, rowIndex) => {
+    if (row.stateId === nodeId) references.push(`${prefix}.model.stateActions.${rowIndex}.stateId`);
+    if (row.actionId === nodeId) references.push(`${prefix}.model.stateActions.${rowIndex}.actionId`);
+    row.successors.forEach((branch, branchIndex) => {
+      if (branch.target.kind === "state" && branch.target.stateId === nodeId) {
+        references.push(`${prefix}.model.stateActions.${rowIndex}.successors.${branchIndex}.target.stateId`);
+      }
+    });
+  });
+  return references;
+};

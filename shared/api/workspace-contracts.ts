@@ -57,7 +57,11 @@ type ServerManagedEntityField = "relativePath" | "slug" | "errors" | "projectId"
 export type SkillSaveRequest = Omit<Partial<Skill>, ServerManagedEntityField>;
 export type ExecutionProfileSaveRequest = Omit<ExecutionProfile, "id">;
 export type WorkspaceAutomationResponseDto = { config: ProjectAutomationConfig; issues: ProjectAutomationIssue[] };
-export type PolicyPreviewRequestV3 = { config: ProjectAutomationConfig };
+export type PolicyPreviewRequestV4 = {
+  config: ProjectAutomationConfig;
+  scope: "graph" | "graph_node";
+  graphNodeId?: string;
+};
 export type GraphNodeModuleInspectRequest = { package: unknown; source?: string };
 export type GraphNodeModuleInstallPlanRequest = {
   package: unknown;
@@ -121,7 +125,7 @@ export {
   projectValidationNodeSchema,
   projectWorkNodeSchema
 } from "./workspace-schemas.js";
-export { graphNodeModulePackageV6Schema } from "./graph-node-module-schemas.js";
+export { graphNodeModulePackageV7Schema } from "./graph-node-module-schemas.js";
 
 export type * from "../domain/automation.js";
 export type * from "../domain/canvasTheme.js";

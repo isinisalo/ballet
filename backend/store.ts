@@ -11,8 +11,8 @@ import { WorkspaceDataService } from "./services/WorkspaceDataService.js";
 import type { WorkspaceContentData } from "./documents/markdownAppDataLoader.js";
 import type { CanvasTheme } from "../shared/domain/canvasTheme.js";
 import type { ExecutionProfile } from "../shared/domain/projectConfig.js";
-import type { PolicyPreviewResultV3 } from "../shared/domain/decisionModel.js";
-import type { PolicyPreviewRequestV3 } from "../shared/api/workspace-contracts.js";
+import type { PolicyPreviewResultV4 } from "../shared/domain/decisionModel.js";
+import type { PolicyPreviewRequestV4 } from "../shared/api/workspace-contracts.js";
 import { CanvasThemeRepository } from "./canvas-themes/CanvasThemeRepository.js";
 import { CanvasThemeService } from "./services/CanvasThemeService.js";
 import type {
@@ -84,7 +84,7 @@ export class MarkdownStore {
     return this.runProjectConfigMutation(() => this.automationService.save(config));
   }
 
-  previewPolicy(input: PolicyPreviewRequestV3): PolicyPreviewResultV3 {
+  previewPolicy(input: PolicyPreviewRequestV4): PolicyPreviewResultV4 {
     return this.automationService.previewPolicy(input);
   }
 

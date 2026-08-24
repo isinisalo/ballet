@@ -1,164 +1,226 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
-  PolicyPreviewResultV3,
-  ProjectRewardDecisionStrategyV3
+  PolicyPreviewResultV4,
+  ProjectScopedRewardDecisionStrategyV4
 } from "@shared/api/workspace-contracts";
 import { DecisionModelWorkspace } from "../src/workspace/automation/DecisionModelWorkspace";
 
-describe("Reward-MDP Decision Model workspace", () => {
-  it("shows a visual policy pulse, transition impact and inspectable Q/V evidence", () => {
+describe("hierarchical Reward-MDP Decision Model workspace", () => {
+  it("renders one semantic 5×5 Q(s,a) grid with human-scale reward tones", () => {
+    const nodes = scopeNodes(5);
+    const strategy = strategyFor(nodes.map(({ id }) => id));
     const rendered = render(<DecisionModelWorkspace
-      strategy={strategy()}
+      scope="graph"
+      strategy={strategy}
+      nodes={nodes.map((node, index) => ({ ...node, acceptanceObligationId: `obligation-${index + 1}` }))}
+      acceptance={{ version: 1, obligations: nodes.map((_, index) => ({
+        obligationId: `obligation-${index + 1}`, description: `Gate ${index + 1}`, weight: 1
+      })) }}
       issues={[]}
-      preview={preview()}
+      preview={previewFor(strategy, 42_000_000)}
       loading={false}
       locked={false}
       onStrategyChange={vi.fn()}
     />);
-    expect(screen.getByText(/Reward-MDP v3/)).toBeInTheDocument();
-    expect(screen.getByText("Decision pulse")).toBeInTheDocument();
-    expect(screen.getByText("Policy horizon")).toBeInTheDocument();
-    expect(screen.getByText("Transition impact")).toBeInTheDocument();
-    expect(screen.getByText(/Policy landscape/)).toBeInTheDocument();
-    expect(screen.getByText("Reward tuning")).toBeInTheDocument();
-    expect(screen.getAllByText("50%")).toHaveLength(2);
-    expect(screen.getAllByText(/default prior/i).length).toBeGreaterThan(0);
+
+    expect(screen.getByRole("heading", { name: "5 states × 5 actions" })).toBeInTheDocument();
+    const grid = screen.getByRole("grid");
+    expect(grid).toHaveAttribute("aria-rowcount", "6");
+    expect(grid).toHaveAttribute("aria-colcount", "6");
+    expect(screen.getByText("15/25")).toBeInTheDocument();
+    expect(screen.getByText("Acceptance is a gate, not a policy state")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /reward units/ })).toHaveLength(15);
+    expect(screen.getAllByLabelText(/unavailable/)).toHaveLength(10);
     expect(screen.getAllByTitle("42,000,000 micros").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/design-valid, 50%, \+124 reward units/)).toHaveClass("text-secondary");
-    expect(screen.getByLabelText(/design-invalid, 50%, −25 reward units/)).toHaveClass("text-destructive");
     expect(rendered.container.querySelector("table")).not.toBeInTheDocument();
-    expect(screen.queryByText("25000000")).not.toBeInTheDocument();
+    expect(screen.queryByText("42000000")).not.toBeInTheDocument();
+    const workspace = screen.getByRole("main", { name: "Graph Decision Model" });
+    expect(workspace).toHaveClass("overflow-x-hidden");
+    expect(workspace.firstElementChild).toHaveClass("grid-cols-[minmax(0,1fr)]");
   });
 
-  it("keeps added GraphNodes visible until their transition model exists", () => {
-    const model = strategy();
-    model.capabilityModel.actions.push({ actionId: "review", guards: [] });
+  it.each([[2, 3], [12, 78]])("renders a %i×%i local matrix with %i sparse cells", (size, modeled) => {
+    const nodes = scopeNodes(size);
+    const strategy = strategyFor(nodes.map(({ id }) => id));
     render(<DecisionModelWorkspace
-      strategy={model}
-      actionOrder={["review", "design"]}
+      scope="graph_node"
+      strategy={strategy}
+      nodes={nodes}
       issues={[]}
-      preview={preview()}
+      preview={previewFor(strategy, -4_000_000)}
       loading={false}
       locked={false}
       onStrategyChange={vi.fn()}
     />);
-
-    const options = screen.getAllByRole("article").filter((article) =>
-      article.textContent?.includes("transition model") || article.textContent?.includes("Q +42"));
-    expect(options[0]).toHaveTextContent("review");
-    expect(options[0]).toHaveTextContent("needs transition model");
-    expect(options[1]).toHaveTextContent("design");
+    expect(screen.getByRole("heading", { name: `${size} states × ${size} actions` })).toBeInTheDocument();
+    expect(screen.getByText(`${modeled}/${size * size}`)).toBeInTheDocument();
+    expect(screen.getByRole("grid")).toHaveAttribute("aria-rowcount", String(size + 1));
+    expect(screen.getAllByRole("button", { name: /reward units/ })).toHaveLength(modeled);
   });
 
-  it("tunes human reward units and locks an immutable Run snapshot", async () => {
-    const onStrategyChange = vi.fn();
-    const rendered = render(<DecisionModelWorkspace
-      strategy={strategy()}
+  it.each([
+    ["graph", 40],
+    ["graph_node", 17],
+    ["graph_node", 64]
+  ] as const)("keeps the %s %i×%i fixture inside its scrollable matrix viewport", (scope, size) => {
+    const nodes = scopeNodes(size);
+    const strategy = strategyFor(nodes.map(({ id }) => id));
+    render(<DecisionModelWorkspace
+      scope={scope}
+      strategy={strategy}
+      nodes={nodes}
+      acceptance={scope === "graph" ? { version: 1, obligations: [] } : undefined}
       issues={[]}
-      preview={preview()}
+      preview={previewFor(strategy, 1_000_000)}
       loading={false}
       locked={false}
+      onStrategyChange={vi.fn()}
+    />);
+    const grid = screen.getByRole("grid");
+    expect(grid).toHaveAttribute("aria-rowcount", String(size + 1));
+    expect(grid).toHaveAttribute("aria-colcount", String(size + 1));
+    expect(grid.parentElement).toHaveClass("overflow-auto");
+    if (size > 20) expect(screen.getAllByRole("row").length).toBeLessThan(size + 1);
+  });
+});
+
+describe("hierarchical Reward-MDP Decision Model interaction", () => {
+  it("zooms from a Graph column and supports arrow-key cell navigation", async () => {
+    const onZoomNode = vi.fn();
+    const nodes = scopeNodes(2);
+    const strategy = strategyFor(nodes.map(({ id }) => id));
+    render(<DecisionModelWorkspace
+      scope="graph"
+      strategy={strategy}
+      nodes={nodes}
+      acceptance={{ version: 1, obligations: [] }}
+      issues={[]}
+      preview={previewFor(strategy, 1_000_000)}
+      loading={false}
+      locked={false}
+      onStrategyChange={vi.fn()}
+      onZoomNode={onZoomNode}
+    />);
+    fireEvent.click(screen.getByTitle("Open Node 2 local Decision Model"));
+    expect(onZoomNode).toHaveBeenCalledWith("node-2");
+    const first = screen.getByRole("button", { name: /node-1 to node-1/ });
+    fireEvent.keyDown(first, { key: "ArrowDown" });
+    const next = screen.getByRole("button", { name: /node-2 to node-1/ });
+    expect(next).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(next).toHaveFocus());
+  });
+
+  it("keeps keyboard focus when navigation renders the next virtualized row", async () => {
+    const nodes = scopeNodes(40);
+    const strategy = strategyFor(nodes.map(({ id }) => id));
+    render(<DecisionModelWorkspace
+      scope="graph"
+      strategy={strategy}
+      nodes={nodes}
+      acceptance={{ version: 1, obligations: [] }}
+      issues={[]}
+      preview={previewFor(strategy, 1_000_000)}
+      loading={false}
+      locked={false}
+      onStrategyChange={vi.fn()}
+    />);
+    const edge = screen.getByRole("button", { name: /node-20 to node-1:/ });
+    edge.focus();
+    fireEvent.keyDown(edge, { key: "ArrowDown" });
+    const next = screen.getByRole("button", { name: /node-21 to node-1:/ });
+    expect(next).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(next).toHaveFocus());
+  });
+
+  it("changes rewards in one-unit steps and locks controls during a Run", () => {
+    const onStrategyChange = vi.fn();
+    const nodes = scopeNodes(1);
+    const strategy = strategyFor(["node-1"]);
+    const rendered = render(<DecisionModelWorkspace
+      scope="graph_node" strategy={strategy} nodes={nodes} issues={[]}
+      preview={previewFor(strategy, 1_000_000)} loading={false} locked={false}
       onStrategyChange={onStrategyChange}
     />);
-    fireEvent.click(screen.getByRole("button", { name: "Increase action cost by 1 reward unit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase Action cost" }));
     expect(onStrategyChange.mock.calls.at(-1)?.[0].model.reward.actionCostMicros).toBe(2_000_000);
 
     rendered.rerender(<DecisionModelWorkspace
-      strategy={strategy()}
-      issues={[]}
-      preview={preview()}
-      loading={false}
-      locked
+      scope="graph_node" strategy={strategy} nodes={nodes} issues={[]}
+      preview={previewFor(strategy, 1_000_000)} loading={false} locked
       onStrategyChange={onStrategyChange}
     />);
-    expect(screen.getByText("The immutable Run snapshot locks this model.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Increase action cost by 1 reward unit" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Decrease action cost by 1 reward unit" })).toBeDisabled();
+    expect(screen.getByText("Run active")).toBeInTheDocument();
+    const profile = screen.getByRole("heading", { name: "Reward profile" }).closest("section")!;
+    expect(within(profile).getByRole("button", { name: "Increase Action cost" })).toBeDisabled();
+    expect(within(profile).getByRole("button", { name: "Decrease Action cost" })).toBeDisabled();
   });
 });
 
-const strategy = (): ProjectRewardDecisionStrategyV3 => ({
-  kind: "reward_mdp_v3",
+const scopeNodes = (count: number) => Array.from({ length: count }, (_, index) => ({
+  id: `node-${index + 1}`,
+  description: `Node ${index + 1}`
+}));
+
+const strategyFor = (ids: string[]): ProjectScopedRewardDecisionStrategyV4 => ({
+  kind: "reward_mdp_v4",
   id: "reward-policy",
-  description: "Reward policy",
-  capabilityModel: {
-    version: 3,
-    outcomes: [
-      { id: "design-valid", description: "Valid design", result: "PASS", penaltyClass: "none" },
-      { id: "design-invalid", description: "Invalid design", result: "FAIL", penaltyClass: "invalid_design" }
-    ],
-    actions: [{ actionId: "design", guards: [] }]
-  },
+  description: "Scoped reward policy",
   model: {
-    version: 3,
+    version: 4,
+    initialStateId: ids[0]!,
     discountPpm: 990_000,
-    acceptance: { version: 1, obligations: [{ obligationId: "design", description: "Accepted design", weight: 1 }] },
     reward: {
       actionCostMicros: 1_000_000,
-      completionBonusMicros: 25_000_000,
-      progressPotentialScaleMicros: 100_000_000,
+      terminalSuccessBonusMicros: 5_000_000,
+      acceptanceProgressPotentialScaleMicros: 0,
       outcomePenaltyMicros: {
-        none: 0,
-        transient: 2_000_000,
-        implementation_defect: 5_000_000,
-        invalid_plan: 12_000_000,
-        invalid_design: 25_000_000
+        none: 0, transient: 2_000_000, implementation_defect: 5_000_000,
+        invalid_plan: 12_000_000, invalid_design: 25_000_000
       }
     },
-    features: [],
-    states: [
-      { id: "open", values: {}, verifiedObligationIds: [], invalidatedObligationIds: [] },
-      { id: "done", values: {}, verifiedObligationIds: ["design"], invalidatedObligationIds: [], terminal: "success" }
-    ],
-    stateActions: [{
-      stateId: "open",
-      actionId: "design",
-      successors: [
-        { outcomeId: "design-valid", nextStateId: "done", probabilityPpm: 500_000, provenance: "default_prior" },
-        { outcomeId: "design-invalid", nextStateId: "open", probabilityPpm: 500_000, provenance: "default_prior" }
-      ]
-    }],
-    solver: { algorithm: "discounted_value_iteration_v3", maxIterations: 1_000, convergenceToleranceMicros: 1 }
+    stateActions: ids.flatMap((stateId, stateIndex) => ids.slice(0, stateIndex + 1).map((actionId) => ({
+      stateId,
+      actionId,
+      guards: [],
+      successors: [{
+        outcomeId: `${actionId}-pass`,
+        target: stateIndex === ids.length - 1 && actionId === stateId
+          ? { kind: "terminal" as const, terminal: "success" as const, emitOutcomeId: "complete" }
+          : { kind: "state" as const, stateId: ids[Math.min(ids.length - 1, stateIndex + 1)]! },
+        probabilityPpm: 1_000_000,
+        provenance: "default_prior" as const,
+        penaltyClass: "none" as const
+      }]
+    }))),
+    solver: { algorithm: "discounted_value_iteration_v4", maxIterations: 10_000, convergenceToleranceMicros: 1 }
   }
 });
 
-const preview = (): PolicyPreviewResultV3 => ({
-  issues: [],
-  preview: {
+const previewFor = (strategy: ProjectScopedRewardDecisionStrategyV4, qMicros: number): PolicyPreviewResultV4 => {
+  const ids = [...new Set(strategy.model.stateActions.map(({ stateId }) => stateId))];
+  const states = ids.map((stateId) => {
+    const actions = strategy.model.stateActions.filter((row) => row.stateId === stateId).map(({ actionId }) => ({ actionId, qMicros }));
+    return { stateId, selectedActionId: actions.at(-1)!.actionId, valueMicros: qMicros, actionValues: actions };
+  });
+  return { issues: [], preview: {
     derived: true,
     persisted: false,
-    state: {
-      stateId: "open",
-      features: {},
-      verifiedProgressPpm: 0,
-      featureVectorSha256: "vector",
-      sourceStateRevision: 0,
-      evidenceRefs: []
-    },
-    admissibleActionIds: ["design"],
+    scope: "graph_node",
+    state: { scope: "graph_node", stateId: strategy.model.initialStateId, acceptanceProgressPpm: 0, sourceStateRevision: 0, evidenceRefs: [] },
+    admissibleActionIds: states[0]!.actionValues.map(({ actionId }) => actionId),
     excludedActions: [],
-    selectedActionId: "design",
-    actionValues: [{ actionId: "design", qMicros: 42_000_000 }],
-    expectedReturnMicros: 42_000_000,
+    selectedActionId: states[0]!.selectedActionId,
+    actionValues: states[0]!.actionValues,
+    expectedReturnMicros: qMicros,
     solverStatus: "compiled",
-    modelVersion: 3,
+    modelVersion: 4,
     modelSha256: "model",
     policySha256: "policy",
     compiledPolicy: {
-      version: 3,
-      algorithm: "discounted_value_iteration_v3",
-      status: "compiled",
-      states: [{
-        stateId: "open",
-        selectedActionId: "design",
-        valueMicros: 42_000_000,
-        actionValues: [{ actionId: "design", qMicros: 42_000_000 }]
-      }],
-      iterations: 3,
-      residualMicros: 1,
-      modelSha256: "model",
-      policySha256: "policy"
+      version: 4, scope: "graph_node", graphNodeId: "fixture", algorithm: "discounted_value_iteration_v4",
+      status: "compiled", initialStateId: strategy.model.initialStateId, stateIds: ids,
+      actionIds: ids, states, iterations: 3, residualMicros: 1, modelSha256: "model", policySha256: "policy"
     }
-  }
-});
+  } };
+};

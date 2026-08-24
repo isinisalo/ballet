@@ -1,10 +1,10 @@
 ---
 id: goal-020
 title: Graph Engineer toimii yhtenä aitona Reward-MDP-agenttina
-status: accepted
+status: superseded
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
-version: 1
+version: 2
 tags:
   - tavoite
   - reward-mdp
@@ -12,6 +12,8 @@ tags:
 ---
 
 # Graph Engineer toimii yhtenä aitona Reward-MDP-agenttina
+
+> **Supersession notice (2026-08-23):** `goal-021` korvaa yhden policy-scopen hierarkkisella Graph/GraphNode-mallilla. Tämä tiedosto säilyttää alkuperäisen tavoitteen audit trailina.
 
 ## Tavoite
 

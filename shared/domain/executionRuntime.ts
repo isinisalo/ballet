@@ -6,7 +6,7 @@ import type { CanonicalNodeOutcome, NodeRunRole } from "./runtime.js";
 import type {
   AcceptanceLedgerSnapshotV1,
   AuthorizationSnapshotV1,
-  CompiledRewardPolicyV3
+  CompiledRewardPolicyV4
 } from "./decisionModel.js";
 
 export type {
@@ -45,18 +45,24 @@ export interface ExecutionResourceSnapshot {
 export interface ExecutionRuntimeBinding { executionProfileId: string; runtime: ExecutionRuntimeSnapshot; }
 
 export interface RootExecutionSnapshot {
-  version: 11;
-  policyObservationContractVersion: 4;
+  version: 12;
+  policyObservationContractVersion: 5;
   rootKind: "graph" | "graph_node";
   rootGraphNodeId?: string;
   project: ExecutionProjectSnapshot;
   issueTracker: ProjectIssueTrackerConfig;
   graph: ProjectGraph;
-  decisionModel: {
-    strategyKind: "reward_mdp_v3";
-    modelVersion: 3;
-    modelSha256: string;
-    capabilityModelSha256: string;
+  decisionModels: {
+    global?: {
+      strategyKind: "reward_mdp_v4";
+      modelVersion: 4;
+      modelSha256: string;
+    };
+    graphNodes: Record<string, {
+      strategyKind: "reward_mdp_v4";
+      modelVersion: 4;
+      modelSha256: string;
+    }>;
   };
   theme: CanvasTheme;
   executionProfiles: ExecutionProfile[];
@@ -64,7 +70,10 @@ export interface RootExecutionSnapshot {
   resources: ExecutionResourceSnapshot[];
   authorization: AuthorizationSnapshotV1;
   acceptanceLedger: AcceptanceLedgerSnapshotV1;
-  compiledPolicy: CompiledRewardPolicyV3;
+  compiledPolicies: {
+    global?: CompiledRewardPolicyV4;
+    graphNodes: Record<string, CompiledRewardPolicyV4>;
+  };
   createdAt: string;
 }
 
