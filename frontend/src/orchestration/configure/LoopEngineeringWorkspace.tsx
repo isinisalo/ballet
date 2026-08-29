@@ -14,7 +14,7 @@ export function LoopEngineeringWorkspace({ environment, selectedStateId, selecte
   children: ReactNode;
 }) {
   return <div className="grid min-w-0 items-stretch xl:grid-cols-2">
-    <div className="min-w-0 p-4 md:p-6 xl:pr-3">
+    <div className="min-w-0">
       {canvasMode === "flow" && action
         ? <ActionFlow action={action} />
         : <LoopEngineeringCanvas environment={environment} selectedStateId={selectedStateId} selectedActionId={selectedActionId} navigate={navigate} onActionFlowOpen={onActionFlowOpen} />}

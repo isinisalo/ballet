@@ -60,12 +60,9 @@ export function projectLoopEngineering(
   const edges: LoopEngineeringEdge[] = [];
   let cursor = TOP;
   let previousState: LoopEngineeringStateNode | undefined;
-  const baseHeight = states.reduce((total, state) => total + (state.id === selectedStateId ? EXPANDED_ROW_HEIGHT : COMPACT_ROW_HEIGHT), 0);
-  const extraPerState = states.length ? Math.max(0, surface.height - TOP - 40 - baseHeight) / states.length : 0;
-
   states.forEach((state) => {
     const selected = state.id === selectedStateId;
-    const rowHeight = (selected ? EXPANDED_ROW_HEIGHT : COMPACT_ROW_HEIGHT) + extraPerState;
+    const rowHeight = selected ? EXPANDED_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
     const y = cursor + rowHeight / 2;
     const stateNode: LoopEngineeringStateNode = {
       kind: "state", id: state.id, name: state.name, order: state.order, x: STATE_X, y, selected,

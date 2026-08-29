@@ -56,6 +56,14 @@ describe("Loop Engineering space canvas", () => {
     });
   });
 
+  it("keeps State rows compact instead of stretching them into available height", () => {
+    const environment = environmentWithActions(2);
+    const compact = projectLoopEngineering(environment, "state-1", undefined, { width: 900, height: 760 });
+    const baseline = projectLoopEngineering(environment, "state-1");
+    expect(compact.states.map(({ y }) => y)).toEqual(baseline.states.map(({ y }) => y));
+    expect(compact.height).toBe(760);
+  });
+
   it("opens States and Actions with keyboard-activatable canonical controls", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
