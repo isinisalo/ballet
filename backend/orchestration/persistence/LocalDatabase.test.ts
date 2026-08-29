@@ -15,8 +15,8 @@ afterEach(() => {
   directories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true }));
 });
 
-describe("strict SQLite v16 open behavior", () => {
-  it("creates the exact v16 inventory in an empty database", () => {
+describe("strict SQLite v17 open behavior", () => {
+  it("creates the exact v17 inventory in an empty database", () => {
     const database = track();
     const names = database.connection.prepare(`
       SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name
@@ -27,7 +27,7 @@ describe("strict SQLite v16 open behavior", () => {
     expect(names.join(" ")).not.toMatch(/graph|policy|acceptance/);
   });
 
-  it("reopens v16 without recreating persisted data", () => {
+  it("reopens v17 without recreating persisted data", () => {
     const database = track();
     new EnvironmentRunStore(() => database.connection).create(environmentSeed());
     database.manager.close();
@@ -56,7 +56,7 @@ describe("strict SQLite v16 open behavior", () => {
   });
 });
 
-describe("v16 relational constraints", () => {
+describe("v17 relational constraints", () => {
   it("enforces foreign keys, role/phase checks, and ordered uniqueness", () => {
     const database = track();
     const store = new EnvironmentRunStore(() => database.connection);

@@ -382,7 +382,10 @@ describe("orchestration HTTP integration", () => {
 
     response = await request("/refinement/proposals"); expect(response.status).toBe(200); scenarios += 1;
     response = await request("/does-not-exist"); expect(response.status).toBe(404); scenarios += 1;
-    response = await request("/events?after=0"); const invalidations = await response.text();
+    const eventAbort = new AbortController();
+    response = await request("/events?after=0", { signal: eventAbort.signal });
+    const eventChunk = await response.body!.getReader().read(); eventAbort.abort();
+    const invalidations = new TextDecoder().decode(eventChunk.value);
     expect(invalidations).toContain("project_changed"); expect(invalidations).not.toContain("prompt"); scenarios += 1;
 
     response = await fetch(`${fixture.base}/project`, { method: "PUT", headers: {

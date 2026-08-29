@@ -15,4 +15,4 @@ Ballet needs local project content.
 
 ## Decision
 
-Use strict Project Config v20 plus Markdown instructions, Direction documents and a repository-local Skill as the fixture source of project truth. Runtime state remains machine-local.
+Use strict Project Config v21 plus Markdown Agent definitions, instructions, Direction documents and a repository-local Skill as the fixture source of project truth. Runtime state and Agent execution bindings remain machine-local.

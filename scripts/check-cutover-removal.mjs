@@ -46,6 +46,7 @@ const replacedContractTerms = [
   "Local" + "RuntimeService",
   "Local" + "ProviderAdapter"
 ];
+const daemonOnlyCliFlags = ["--codex-command", "--copilot-command"];
 const self = path.resolve(import.meta.filename);
 
 const files = (await Promise.all(scanRoots.map((entry) => collect(path.join(repositoryRoot, entry))))).flat();
@@ -65,6 +66,11 @@ for (const filename of files) {
       failures.push(`${relative}: replaced contract term ${JSON.stringify(term)}`);
     }
   }
+  for (const term of daemonOnlyCliFlags) {
+    if (source.includes(term) && !allowedDaemonCliFlag(relative)) {
+      failures.push(`${relative}: daemon-only CLI flag ${JSON.stringify(term)} leaked outside daemon setup`);
+    }
+  }
   if (source.toLocaleLowerCase().includes(transitionMarker)
     && !allowedHistoricalMatch(relative, source, transitionMarker)) {
     failures.push(`${relative}: transition namespace marker remains`);
@@ -79,6 +85,15 @@ function allowedReplacementHistory(relative) {
     || relative.startsWith(".ballet/goals/")
     || relative.startsWith(".ballet/arc42/")
     || relative === "frontend/tests/orchestrationRouting.test.ts";
+}
+
+function allowedDaemonCliFlag(relative) {
+  return [
+    "backend/cli/BalletCli.ts",
+    "backend/cli/DaemonCliService.ts",
+    "backend/cli/tests/cli.test.ts",
+    "README.md"
+  ].includes(relative);
 }
 
 if (failures.length > 0) {

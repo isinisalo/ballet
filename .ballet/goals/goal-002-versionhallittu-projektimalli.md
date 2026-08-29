@@ -20,7 +20,7 @@ Ihminen pystyy ymmärtämään WHAT/WHY:n, suoritusrakenteen ja agenttien valitu
 
 ## Mitattavat success criteria
 
-1. Strict Project Config v20, kaikki viitatut Direction-dokumentit, instructionit ja Skills latautuvat yhdestä repository-closuresta ilman puuttuvia tai orpoja runtime-resursseja.
+1. Strict Project Config v21, kaikki viitatut Direction-, Agent-, instruction- ja Skill-dokumentit latautuvat yhdestä repository-closuresta ilman puuttuvia tai orpoja runtime-resursseja.
 2. Runtime completion-, attempt-, approval- ja schedule-faktoja tallennetaan projektikonfiguraatioon 0 kertaa.
 3. Balletin oma viiden Staten Environment käyttää samoja geneerisiä platform-primitivejä kuin compact fixture; platform source sisältää 0 Ballet-workflow-ID-haaraa.
 

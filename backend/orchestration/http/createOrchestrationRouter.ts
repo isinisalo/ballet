@@ -32,13 +32,20 @@ export const createOrchestrationRouter = ({ controller, actor }: OrchestrationRo
   router.get("/events", (req, res, next) => {
     try {
       const { after } = parseUnknown(eventQuerySchema, req.query); const events = controller.invalidationEvents(after);
-      res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "close" });
-      for (const event of events) res.write(`id: ${String(Reflect.get(event as object, "sequence"))}\nevent: invalidation\ndata: ${JSON.stringify(event)}\n\n`);
-      res.end();
+      res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" });
+      res.write("retry: 1000\n\n");
+      for (const event of events) writeInvalidation(res, event);
+      const unsubscribe = controller.subscribeInvalidations((event) => writeInvalidation(res, event));
+      const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15_000);
+      req.on("close", () => { clearInterval(heartbeat); unsubscribe(); });
     } catch (error) { next(error); }
   });
   router.use((_req, res) => res.status(404).json({ error: "Unknown orchestration API route." }));
   return router;
+};
+
+const writeInvalidation = (response: express.Response, event: ReturnType<ApiController["invalidationEvents"]>[number]): void => {
+  response.write(`id: ${event.sequence}\nevent: invalidation\ndata: ${JSON.stringify(event)}\n\n`);
 };
 
 const registerDocumentRoutes = (

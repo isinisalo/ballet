@@ -25,7 +25,7 @@ import { RunEvidenceStore } from "../persistence/RunEvidenceStore.js";
 import type {
   InvalidationBroadcaster
 } from "./InvalidationBroadcaster.js";
-import type { InvalidationKind } from "../../../shared/orchestration/httpContracts.js";
+import type { InvalidationEvent, InvalidationKind } from "../../../shared/orchestration/httpContracts.js";
 
 export interface OrchestrationWorkspacePort {
   prepare(runId: string, expectedBaseCommit?: string): Promise<{ worktreePath: string; branch: string }>;
@@ -487,7 +487,10 @@ export class ApiController {
     this.changed("refinement_changed", id); return { status };
   }
 
-  invalidationEvents(after: number): unknown[] { return this.dependencies.invalidations?.list(after) ?? []; }
+  invalidationEvents(after: number): InvalidationEvent[] { return this.dependencies.invalidations?.list(after) ?? []; }
+  subscribeInvalidations(listener: (event: InvalidationEvent) => void): () => void {
+    return this.dependencies.invalidations?.subscribe(listener) ?? (() => undefined);
+  }
 
   private requireConfigHash(expectedConfigHash: string): ReturnType<ProjectDefinitionService["projects"]["load"]> {
     const loaded = this.dependencies.project.projects.load();

@@ -42,6 +42,7 @@ export function DeleteAction({ deleteLabel, deleteType, resourceName, disabled =
       <Button
         type="button"
         size="icon-sm"
+        className="min-h-10 min-w-10"
         variant="destructive"
         disabled={disabled}
         aria-label={deleteLabel}
@@ -104,6 +105,7 @@ export function EditorActions({
       <Button
         type={formId ? "submit" : "button"}
         size="icon-sm"
+        className="min-h-10 min-w-10"
         form={formId}
         disabled={saveDisabled}
         aria-label={pending ? `${saveLabel} in progress` : saveLabel}
