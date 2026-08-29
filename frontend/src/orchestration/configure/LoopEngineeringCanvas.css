@@ -1,5 +1,8 @@
 .loop-engineering-canvas {
+  display: flex;
   min-width: 0;
+  min-height: 100svh;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--divider-strong);
   border-radius: .375rem;
@@ -25,6 +28,8 @@
 
 .loop-engineering-scroll {
   max-width: 100%;
+  min-height: 0;
+  flex: 1;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -32,6 +37,7 @@
 .loop-engineering-stage {
   position: relative;
   min-width: 100%;
+  min-height: 100%;
   background-color: var(--background);
   background-image:
     linear-gradient(color-mix(in srgb, var(--border) 52%, transparent) 1px, transparent 1px),
@@ -81,14 +87,10 @@
 .loop-engineering-state-artwork circle { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .loop-engineering-state[data-selected="true"] .loop-engineering-state-icon { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
 
-.loop-engineering-state-label,
-.loop-engineering-action-label { display: grid; min-width: 0; font-family: var(--font-mono); }
-.loop-engineering-state-label small,
-.loop-engineering-action-label small { color: var(--muted-foreground); font-size: .55rem; letter-spacing: .05em; }
-.loop-engineering-state-label strong,
-.loop-engineering-action-label strong { overflow: hidden; color: var(--tertiary); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
-.loop-engineering-state-label code,
-.loop-engineering-action-label code { overflow: hidden; color: var(--muted-foreground); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+.loop-engineering-state-label { display: grid; min-width: 0; font-family: var(--font-mono); }
+.loop-engineering-state-label small { color: var(--muted-foreground); font-size: .55rem; letter-spacing: .05em; }
+.loop-engineering-state-label strong { overflow: hidden; color: var(--tertiary); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.loop-engineering-state-label code { overflow: hidden; color: var(--muted-foreground); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
 
 .loop-engineering-action {
   display: grid;
@@ -119,16 +121,22 @@
   box-shadow: 0 0 16px color-mix(in srgb, var(--secondary) 26%, transparent), inset -9px -10px 16px color-mix(in srgb, var(--background) 54%, transparent);
 }
 
-.loop-engineering-planet--station { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tertiary) 35%, transparent)); }
-.loop-engineering-planet--station svg { width: 100%; height: 100%; overflow: visible; }
-.loop-engineering-planet--station svg > circle:first-child { fill: color-mix(in srgb, var(--ballet-surface-highest) 82%, var(--tertiary)); stroke: var(--ballet-outline-variant); stroke-width: 1; }
-.loop-engineering-planet--station svg path:nth-of-type(1) { fill: none; stroke: color-mix(in srgb, var(--background) 66%, var(--ballet-outline-variant)); stroke-width: .85; }
-.loop-engineering-planet--station svg path:nth-of-type(2) { fill: color-mix(in srgb, var(--background) 76%, var(--primary)); stroke: var(--tertiary); stroke-width: .9; }
-.loop-engineering-planet--station svg circle:last-child { fill: var(--secondary); }
+.loop-engineering-planet--luna {
+  border: 1px solid color-mix(in srgb, var(--muted-foreground) 58%, var(--border));
+  background:
+    radial-gradient(circle at 70% 70%, color-mix(in srgb, var(--background) 28%, transparent) 0 5%, transparent 13%),
+    radial-gradient(circle at 28% 64%, color-mix(in srgb, var(--border) 28%, transparent) 0 4%, transparent 12%),
+    radial-gradient(circle at 62% 30%, color-mix(in srgb, var(--foreground) 10%, transparent) 0 3%, transparent 11%),
+    radial-gradient(circle at 36% 28%, color-mix(in srgb, var(--muted-foreground) 54%, var(--accent)) 0, color-mix(in srgb, var(--border) 62%, var(--accent)) 58%, color-mix(in srgb, var(--background) 46%, var(--accent)) 100%);
+  box-shadow:
+    inset 1px 1px 2px color-mix(in srgb, var(--foreground) 44%, transparent),
+    inset -4px -5px 7px color-mix(in srgb, var(--background) 52%, transparent),
+    inset 0 0 2px color-mix(in srgb, var(--foreground) 34%, transparent),
+    0 0 6px color-mix(in srgb, var(--primary) 28%, transparent);
+}
 
-.loop-engineering-action-label { width: 150px; margin-top: .5rem; text-align: center; }
+.loop-engineering-action-label { display: block; width: 150px; margin-top: .5rem; overflow: hidden; color: var(--muted-foreground); font-family: var(--font-mono); font-size: .58rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .loop-engineering-action[data-selected="true"] .loop-engineering-planet { box-shadow: 0 0 0 3px var(--primary), 0 0 18px color-mix(in srgb, var(--primary) 42%, transparent); }
-.loop-engineering-action[data-selected="true"] .loop-engineering-planet--station { filter: drop-shadow(0 0 3px var(--primary)) drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 48%, transparent)); }
 .loop-engineering-state:focus-visible,
 .loop-engineering-action:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: var(--radius-sm); }
 .loop-engineering-state:hover .loop-engineering-state-icon,

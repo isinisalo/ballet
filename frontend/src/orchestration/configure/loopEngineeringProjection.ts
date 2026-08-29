@@ -1,7 +1,7 @@
 import type { EnvironmentDefinition } from "@shared/orchestration/environment";
 import { orderedActions, orderedStates } from "@shared/orchestration/gates";
 
-export type ActionArtwork = "sol" | "terra" | "station";
+export type ActionArtwork = "sol" | "terra" | "luna";
 
 export interface LoopEngineeringStateNode {
   kind: "state";
@@ -103,9 +103,9 @@ export function projectLoopEngineering(
 function stateEdge(source: LoopEngineeringStateNode, target: LoopEngineeringStateNode): LoopEngineeringEdge {
   return {
     id: `state:${source.id}:to:${target.id}`,
-    path: `M${source.x} ${source.y + 22} L${target.x} ${target.y - 22}`,
+    path: `M${source.x} ${source.y} L${target.x} ${target.y}`,
     tone: "state",
-    points: [{ x: source.x, y: source.y + 22 }, { x: target.x, y: target.y - 22 }],
+    points: [{ x: source.x, y: source.y }, { x: target.x, y: target.y }],
   };
 }
 
@@ -114,19 +114,19 @@ function actionEdges(state: LoopEngineeringStateNode, actions: LoopEngineeringAc
   const first = actions[0]!;
   const result: LoopEngineeringEdge[] = [{
     id: `state:${state.id}:actions`,
-    path: `M${state.x + 22} ${state.y} L${first.x - first.size / 2 - 10} ${first.y}`,
+    path: `M${state.x} ${state.y} L${first.x} ${first.y}`,
     tone: "action",
-    points: [{ x: state.x + 22, y: state.y }, { x: first.x - first.size / 2 - 10, y: first.y }],
+    points: [{ x: state.x, y: state.y }, { x: first.x, y: first.y }],
   }];
   actions.slice(1).forEach((target, index) => {
     const source = actions[index]!;
     result.push({
       id: `action:${source.id}:to:${target.id}`,
-      path: `M${source.x + source.size / 2 + 10} ${source.y} L${target.x - target.size / 2 - 10} ${target.y}`,
+      path: `M${source.x} ${source.y} L${target.x} ${target.y}`,
       tone: "action",
       points: [
-        { x: source.x + source.size / 2 + 10, y: source.y },
-        { x: target.x - target.size / 2 - 10, y: target.y },
+        { x: source.x, y: source.y },
+        { x: target.x, y: target.y },
       ],
     });
   });
@@ -134,7 +134,7 @@ function actionEdges(state: LoopEngineeringStateNode, actions: LoopEngineeringAc
 }
 
 function actionAppearance(index: number, count: number): { artwork: ActionArtwork; size: number } {
-  if (index === 0 || count === 1) return { artwork: "sol", size: 84 };
-  if (index === count - 1) return { artwork: "station", size: 48 };
-  return { artwork: "terra", size: 64 };
+  if (index === 0 || count === 1) return { artwork: "sol", size: 72 };
+  if (index === count - 1) return { artwork: "luna", size: 44 };
+  return { artwork: "terra", size: 56 };
 }

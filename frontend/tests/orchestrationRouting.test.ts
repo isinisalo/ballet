@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeFromPath, orchestrationActionPath, orchestrationRunPath, orchestrationStatePath } from "../src/workspace/routing";
+import { routeFromPath, orchestrationActionFlowPath, orchestrationActionPath, orchestrationRunPath, orchestrationStatePath } from "../src/workspace/routing";
 
 describe("orchestration URL-owned routing", () => {
   it.each([
@@ -10,6 +10,12 @@ describe("orchestration URL-owned routing", () => {
     ["/reviews/critic", "critic-reviews"]
   ])("parses %s", (path, view) => expect(routeFromPath(path)).toMatchObject({ view: "orchestration", workspaceView: view }));
   it("roundtrips encoded State and Action IDs", () => expect(routeFromPath(orchestrationActionPath("state a", "action/b"))).toMatchObject({ stateId: "state a", actionId: "action/b" }));
+  it("roundtrips the URL-owned Action flow canvas", () => {
+    const path = orchestrationActionFlowPath("state a", "action/b");
+    expect(path).toBe("/automation/loops/states/state%20a/actions/action%2Fb?canvas=flow");
+    expect(routeFromPath(path)).toMatchObject({ workspaceView: "action", stateId: "state a", actionId: "action/b", canvasMode: "flow" });
+    expect(routeFromPath(`${orchestrationActionPath("state a", "action/b")}?canvas=unknown`).canvasMode).toBeUndefined();
+  });
   it("builds deep links without aliases", () => { expect(orchestrationStatePath("state-1")).toBe("/automation/loops/states/state-1"); expect(orchestrationRunPath("run-1")).toBe("/run/run-1"); });
   it("projects unknown orchestration paths as invalid", () => expect(routeFromPath("/not-real")).toMatchObject({ view: "orchestration", workspaceView: "invalid" }));
   it.each([

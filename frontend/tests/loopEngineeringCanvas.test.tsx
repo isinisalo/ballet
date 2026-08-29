@@ -21,9 +21,13 @@ describe("Loop Engineering space canvas", () => {
       ["action-1", 1], ["action-2", 2], ["action-3", 3], ["action-4", 4],
     ]);
     expect(first.actions.map(({ artwork, size }) => [artwork, size])).toEqual([
-      ["sol", 84], ["terra", 64], ["terra", 64], ["station", 48],
+      ["sol", 72], ["terra", 56], ["terra", 56], ["luna", 44],
     ]);
     expect(first.actions.find(({ id }) => id === "action-3")?.selected).toBe(true);
+    expect(first.edges.find(({ id }) => id === "action:action-1:to:action-2")).toMatchObject({
+      path: `M${first.actions[0]!.x} ${first.actions[0]!.y} L${first.actions[1]!.x} ${first.actions[1]!.y}`,
+      points: [{ x: first.actions[0]!.x, y: first.actions[0]!.y }, { x: first.actions[1]!.x, y: first.actions[1]!.y }],
+    });
   });
 
   it("keeps large Action sets separated inside a wider internal stage", () => {
@@ -38,7 +42,8 @@ describe("Loop Engineering space canvas", () => {
   it("opens States and Actions with keyboard-activatable canonical controls", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
-    render(<LoopEngineeringCanvas environment={environmentWithActions(3)} selectedStateId="state-1" selectedActionId="action-2" navigate={navigate} />);
+    const openFlow = vi.fn();
+    render(<LoopEngineeringCanvas environment={environmentWithActions(3)} selectedStateId="state-1" selectedActionId="action-2" navigate={navigate} onActionFlowOpen={openFlow} />);
 
     const state = screen.getByRole("button", { name: "Open State state-2: Verify" });
     const action = screen.getByRole("button", { name: "Open Action action-2: Action 2" });
@@ -49,6 +54,11 @@ describe("Loop Engineering space canvas", () => {
     await user.keyboard(" ");
     expect(navigate).toHaveBeenNthCalledWith(1, "/automation/loops/states/state-2");
     expect(navigate).toHaveBeenNthCalledWith(2, "/automation/loops/states/state-1/actions/action-2");
+    expect(action).toHaveTextContent("action-2");
+    expect(action).not.toHaveTextContent("PRIORITY");
+    expect(action).not.toHaveTextContent("Action 2");
+    await user.dblClick(action);
+    expect(openFlow).toHaveBeenCalledWith("state-1", "action-2");
   });
 });
 

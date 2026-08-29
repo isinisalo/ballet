@@ -39,7 +39,12 @@ export const routeFromPath = (path: string): RouteState => {
   for (const [pattern, workspaceView] of patterns) {
     const match = url.pathname.match(pattern);
     if (!match) continue;
-    if (workspaceView === "action") { const stateId = decode(match, 1); const actionId = decode(match, 2); return stateId && actionId ? { view: "orchestration", workspaceView, stateId, actionId } : { view: "orchestration", workspaceView: "invalid" }; }
+    if (workspaceView === "action") {
+      const stateId = decode(match, 1); const actionId = decode(match, 2);
+      return stateId && actionId
+        ? { view: "orchestration", workspaceView, stateId, actionId, canvasMode: url.searchParams.get("canvas") === "flow" ? "flow" : undefined }
+        : { view: "orchestration", workspaceView: "invalid" };
+    }
     if (workspaceView === "run-action") { const entityId = decode(match, 1); const stateId = decode(match, 2); const actionId = decode(match, 3); return entityId && stateId && actionId ? { view: "orchestration", workspaceView, entityId, stateId, actionId } : { view: "orchestration", workspaceView: "invalid" }; }
     if (workspaceView === "run-state") { const entityId = decode(match, 1); const stateId = decode(match, 2); return entityId && stateId ? { view: "orchestration", workspaceView, entityId, stateId } : { view: "orchestration", workspaceView: "invalid" }; }
     const id = decode(match, 1);
@@ -54,4 +59,5 @@ export const routeFromPath = (path: string): RouteState => {
 export const orchestrationEntityPath = (base: string, id?: string) => `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
 export const orchestrationStatePath = (stateId: string) => `/automation/loops/states/${encodeURIComponent(stateId)}`;
 export const orchestrationActionPath = (stateId: string, actionId: string) => `${orchestrationStatePath(stateId)}/actions/${encodeURIComponent(actionId)}`;
+export const orchestrationActionFlowPath = (stateId: string, actionId: string) => `${orchestrationActionPath(stateId, actionId)}?canvas=flow`;
 export const orchestrationRunPath = (runId?: string) => runId ? `/run/${encodeURIComponent(runId)}` : "/run";

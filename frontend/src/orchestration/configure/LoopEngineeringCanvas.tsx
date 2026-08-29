@@ -4,11 +4,12 @@ import { ActionPlanetArtwork, StateRouteArtwork } from "./LoopEngineeringArtwork
 import { projectLoopEngineering } from "./loopEngineeringProjection";
 import "./LoopEngineeringCanvas.css";
 
-export function LoopEngineeringCanvas({ environment, selectedStateId, selectedActionId, navigate }: {
+export function LoopEngineeringCanvas({ environment, selectedStateId, selectedActionId, navigate, onActionFlowOpen }: {
   environment: EnvironmentDefinition;
   selectedStateId?: string;
   selectedActionId?: string;
   navigate(path: string): void;
+  onActionFlowOpen?(stateId: string, actionId: string): void;
 }) {
   const projection = projectLoopEngineering(environment, selectedStateId, selectedActionId);
   return <section className="loop-engineering-canvas" aria-label={`Loop Engineering canvas for Environment ${environment.id}`}>
@@ -25,9 +26,9 @@ export function LoopEngineeringCanvas({ environment, selectedStateId, selectedAc
           <span className="loop-engineering-state-icon"><StateRouteArtwork /></span>
           <span className="loop-engineering-state-label"><small>STATE {state.order}</small><strong>{state.name}</strong><code>{state.id}</code></span>
         </button>)}
-        {projection.actions.map((action) => <button key={action.id} type="button" className="loop-engineering-action" data-selected={action.selected ? "true" : "false"} aria-pressed={action.selected} aria-label={`Open Action ${action.id}: ${action.name}`} style={{ left: action.x, top: action.y }} onClick={() => selectedStateId && navigate(orchestrationActionPath(selectedStateId, action.id))}>
+        {projection.actions.map((action) => <button key={action.id} type="button" className="loop-engineering-action" data-selected={action.selected ? "true" : "false"} aria-pressed={action.selected} aria-label={`Open Action ${action.id}: ${action.name}`} style={{ left: action.x, top: action.y }} onClick={() => selectedStateId && navigate(orchestrationActionPath(selectedStateId, action.id))} onDoubleClick={() => selectedStateId && onActionFlowOpen?.(selectedStateId, action.id)}>
           <ActionPlanetArtwork artwork={action.artwork} size={action.size} />
-          <span className="loop-engineering-action-label"><small>PRIORITY {action.priority}</small><strong>{action.name}</strong><code>{action.id}</code></span>
+          <code className="loop-engineering-action-label">{action.id}</code>
         </button>)}
       </div>
     </div>

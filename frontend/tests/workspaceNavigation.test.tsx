@@ -51,6 +51,21 @@ describe("canonical workspace navigation blocker", () => {
     expect(result.current.route).toMatchObject({ workspaceView: "state", stateId: "build" });
   });
 
+  it("restores the Action canvas mode through browser history", async () => {
+    const { result } = renderHook(() => useWorkspaceNavigation());
+    act(() => result.current.navigate("/automation/loops/states/build/actions/test"));
+    act(() => result.current.navigate("/automation/loops/states/build/actions/test?canvas=flow"));
+    expect(result.current.route).toMatchObject({ workspaceView: "action", canvasMode: "flow" });
+
+    await act(async () => {
+      const traversed = waitForPopStates(1);
+      window.history.back();
+      await traversed;
+    });
+    expect(result.current.route).toMatchObject({ workspaceView: "action", actionId: "test" });
+    expect(result.current.route.canvasMode).toBeUndefined();
+  });
+
   it("restores a cancelled history traversal without losing the stack", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
