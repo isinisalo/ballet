@@ -51,7 +51,7 @@ export const criticTaskEnvelopeSchema = z.object({
   phase: z.literal("proposal"),
   criticRunId: idSchema,
   scheduleId: idSchema,
-  productSnapshotIds: idListSchema
+  runEvidenceIds: idListSchema
 }).strict();
 
 export const refinementTaskEnvelopeSchema = z.object({
@@ -64,7 +64,7 @@ export const refinementTaskEnvelopeSchema = z.object({
   preimageHashes: z.record(z.string(), sha256Schema)
 }).strict();
 
-export const taskEnvelopeV10Schema = z.union([
+export const taskEnvelopeV11Schema = z.union([
   validationPrecheckTaskEnvelopeSchema,
   workTaskEnvelopeSchema,
   validationPostworkTaskEnvelopeSchema,

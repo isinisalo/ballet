@@ -4,20 +4,19 @@ import { PROJECT_CONFIG_VERSION } from "./versions.js";
 
 export type RuntimeProvider = "codex" | "copilot";
 
-export interface ExecutionProfile {
+export interface AgentDefinition {
   id: string;
   name: string;
-  provider: RuntimeProvider;
-  model: string;
-  reasoningEffort: string;
-  networkAccess: boolean;
+  description: string;
+  enabled: boolean;
+  instructionResource: string;
+  skillResources: string[];
 }
 
 export interface AgentComposition {
-  executionProfileId: string;
+  agentId: string;
   instructionResource: string;
   skillResources: string[];
-  toolPolicy: "read_only" | "workspace_write";
 }
 
 export interface ActionDefinition {
@@ -49,7 +48,7 @@ export interface EnvironmentDefinition {
 }
 
 export interface CriticConfiguration {
-  version: 1;
+  version: 2;
   enabled: boolean;
   schedules: CriticScheduleDefinition[];
   agent: AgentComposition;
@@ -65,16 +64,16 @@ export type CriticScheduleDefinition = {
 );
 
 export interface RefinementConfiguration {
-  version: 1;
+  version: 2;
   enabled: boolean;
   agent: AgentComposition;
-  allowedRoots: [".ballet/instructions", ".agents/skills"];
+  allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"];
 }
 
-export interface ProjectConfigurationV20 {
+export interface ProjectConfigurationV21 {
   version: typeof PROJECT_CONFIG_VERSION;
   direction: Direction;
-  executionProfiles: ExecutionProfile[];
+  agents: AgentDefinition[];
   environment: EnvironmentDefinition;
   critic: CriticConfiguration;
   refinement: RefinementConfiguration;

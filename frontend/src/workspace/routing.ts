@@ -7,34 +7,34 @@ const decode = (match: RegExpMatchArray, index: number): string | undefined => {
 export const routeFromPath = (path: string): RouteState => {
   const url = new URL(path, "http://localhost");
   const exact: Record<string, WorkspaceView> = {
-    "/": "direction",
-    "/configure/direction": "direction",
-    "/configure/use-cases": "use-cases",
-    "/configure/environment": "environment",
-    "/configure/resources/instructions": "instructions",
-    "/configure/resources/skills": "skills",
-    "/configure/execution-profiles": "execution-profiles",
-    "/configure/critic": "critic",
+    "/": "environment",
+    "/automation/loops": "environment",
+    "/agents": "agents",
+    "/skills": "skills",
+    "/runtimes": "runtimes",
+    "/project/goals": "goals",
+    "/project/adrs": "adrs",
+    "/project/constraints": "constraints",
+    "/project/use-cases": "use-cases",
+    "/project/instructions": "instructions",
     "/run": "run-list",
     "/feedback": "feedback-list",
     "/reviews/critic": "critic-reviews",
-    "/reviews/refinement": "refinement-reviews",
-    "/products": "products"
+    "/reviews/refinement": "refinement-reviews"
   };
   if (exact[url.pathname]) {
     return { view: "orchestration", workspaceView: exact[url.pathname], entityId: url.searchParams.get("id") ?? undefined };
   }
 
   const patterns: Array<[RegExp, WorkspaceView]> = [
-    [/^\/configure\/environment\/states\/([^/]+)\/actions\/([^/]+)\/?$/, "action"],
-    [/^\/configure\/environment\/states\/([^/]+)\/?$/, "state"],
+    [/^\/automation\/loops\/states\/([^/]+)\/actions\/([^/]+)\/?$/, "action"],
+    [/^\/automation\/loops\/states\/([^/]+)\/?$/, "state"],
     [/^\/run\/([^/]+)\/states\/([^/]+)\/actions\/([^/]+)\/?$/, "run-action"],
     [/^\/run\/([^/]+)\/states\/([^/]+)\/?$/, "run-state"],
     [/^\/run\/([^/]+)\/?$/, "run-detail"],
     [/^\/feedback\/([^/]+)\/?$/, "feedback-detail"],
     [/^\/reviews\/critic\/([^/]+)\/?$/, "critic-proposal"],
-    [/^\/reviews\/refinement\/([^/]+)\/?$/, "refinement-proposal"],
-    [/^\/products\/([^/]+)\/?$/, "product-detail"]
+    [/^\/reviews\/refinement\/([^/]+)\/?$/, "refinement-proposal"]
   ];
   for (const [pattern, workspaceView] of patterns) {
     const match = url.pathname.match(pattern);
@@ -52,6 +52,6 @@ export const routeFromPath = (path: string): RouteState => {
 };
 
 export const orchestrationEntityPath = (base: string, id?: string) => `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
-export const orchestrationStatePath = (stateId: string) => `/configure/environment/states/${encodeURIComponent(stateId)}`;
+export const orchestrationStatePath = (stateId: string) => `/automation/loops/states/${encodeURIComponent(stateId)}`;
 export const orchestrationActionPath = (stateId: string, actionId: string) => `${orchestrationStatePath(stateId)}/actions/${encodeURIComponent(actionId)}`;
 export const orchestrationRunPath = (runId?: string) => runId ? `/run/${encodeURIComponent(runId)}` : "/run";

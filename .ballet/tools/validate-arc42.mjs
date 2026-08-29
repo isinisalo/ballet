@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Canonical validation stays in one executable inventory for deterministic repository checks. */
 import { readFile, readdir, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -5,7 +6,7 @@ import process from "node:process";
 import YAML from "yaml";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
-import { projectConfigurationV20Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
+import { projectConfigurationV21Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.ts";
 
 const root = process.cwd();
@@ -152,7 +153,7 @@ for (const line of traceLines.slice(2)) for (const id of line.match(
 ) ?? []) if (!stableDefinitions.has(id)) addIssue(`TRACEABILITY references undefined ID ${id}.`);
 
 const rawConfig = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8"));
-const parsed = projectConfigurationV20Schema.safeParse(rawConfig);
+const parsed = projectConfigurationV21Schema.safeParse(rawConfig);
 let config;
 if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
@@ -190,13 +191,18 @@ if (!parsed.success) {
   const expectedUseCases = new Set(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
   for (const id of expectedUseCases) if (!config.direction.useCases.some((useCase) => useCase.id === id)) addIssue(`Missing canonical Use Case ${id}.`);
   if (config.environment.states.length !== 5) addIssue(`Default project must contain five canonical States; found ${config.environment.states.length}.`);
-  for (const profile of config.executionProfiles) {
-    if (profile.provider !== "codex" || profile.model !== "gpt-5.6-sol"
-      || !["high", "xhigh"].includes(profile.reasoningEffort) || profile.networkAccess) {
-      addIssue(`Default Execution Profile ${profile.id} must use Codex gpt-5.6-sol high/xhigh with network off.`);
+  const agentDocuments = await indexedMarkdownDocuments(path.join(root, ".ballet/agents"));
+  if (config.agents.length < 4) addIssue("Default project needs explicit Validation, Work, Critic and Refinement Agents.");
+  for (const agent of config.agents) {
+    const document = agentDocuments.get(agent.id);
+    if (!document) { addIssue(`Agent ${agent.id} has no canonical Markdown document.`); continue; }
+    const expected = { id: agent.id, title: agent.name, description: agent.description, enabled: agent.enabled,
+      instructionResource: agent.instructionResource, skillResources: agent.skillResources };
+    for (const [field, value] of Object.entries(expected)) if (JSON.stringify(document.frontmatter?.[field]) !== JSON.stringify(value)) {
+      addIssue(`Agent ${agent.id} ${field} differs between config and Markdown.`);
     }
   }
-  if (config.executionProfiles.length < 4) addIssue("Default project needs explicit Validation, Work, Critic and Refinement Execution Profiles.");
+  for (const id of agentDocuments.keys()) if (!config.agents.some((agent) => agent.id === id)) addIssue(`Orphan Agent document ${id}.`);
   if (config.critic.enabled) addIssue("Default Critic schedule must be disabled.");
   if (config.critic.schedules.length === 0) addIssue("Default Critic needs a disabled example schedule with a valid IANA timezone.");
 
@@ -236,7 +242,7 @@ if (!diagramSource) addIssue("Missing editable root ballet.drawio.");
 else {
   const parsedXml = spawnSync("xmllint", ["--noout", diagramPath], { encoding: "utf8" });
   if (parsedXml.status !== 0) addIssue(`ballet.drawio is not well-formed XML: ${parsedXml.stderr.trim()}`);
-  for (const label of ["Human direction", "Goals / ADRs / Constraints", "Approved Use Cases", "Environment", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Human approval", "Continuation Run", "Product Snapshot"]) {
+  for (const label of ["Human direction", "Goals / ADRs / Constraints", "Approved Use Cases", "Environment", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Human approval", "Continuation Run", "Run Evidence"]) {
     if (!diagramSource.includes(label)) addIssue(`ballet.drawio is missing required label ${label}.`);
   }
   for (const removed of ["RewardMDP", "reward_mdp", "Reward-MDP", "GraphNode", "ActionNode", "acceptance_ledger", "policy_decision"]) {
@@ -266,7 +272,7 @@ if (issues.length) {
 } else {
   const states = config?.environment.states.length ?? 0;
   const actions = config?.environment.states.reduce((total, state) => total + state.actions.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v20, ${states} States and ${actions} Actions.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v21, ${states} States and ${actions} Actions.\n`);
 }
 
 async function indexedMarkdown(directory) {
@@ -288,7 +294,7 @@ async function indexedMarkdownDocuments(directory) {
 async function validateFixtureProject() {
   const fixtureRoot = path.join(root, ".fixture-ballet-project");
   const raw = JSON.parse(await readFile(path.join(fixtureRoot, ".ballet/project.json"), "utf8"));
-  const parsedFixture = projectConfigurationV20Schema.safeParse(raw);
+  const parsedFixture = projectConfigurationV21Schema.safeParse(raw);
   if (!parsedFixture.success) { parsedFixture.error.issues.forEach((issue) => addIssue(
     `Fixture Project Config:${issue.path.join(".")}: ${issue.message}`)); return; }
   const fixture = parsedFixture.data;
@@ -296,6 +302,8 @@ async function validateFixtureProject() {
   if (fixture.environment.states.length < 2) addIssue("Fixture needs at least two States.");
   if (fixture.environment.states.reduce((count, state) => count + state.actions.length, 0) < 3) addIssue("Fixture needs multiple Actions across two States.");
   if (fixture.critic.enabled || fixture.critic.schedules.length === 0) addIssue("Fixture Critic must be disabled with a valid example schedule.");
+  const fixtureAgents = await indexedMarkdownDocuments(path.join(fixtureRoot, ".ballet/agents"));
+  for (const agent of fixture.agents) if (!fixtureAgents.has(agent.id)) addIssue(`Fixture missing Agent Markdown ${agent.id}.`);
   for (const agent of allAgents(fixture)) {
     const instruction = path.join(fixtureRoot, ".ballet/instructions", `${agent.instructionResource}.md`);
     if (!(await exists(instruction))) addIssue(`Fixture missing instruction ${agent.instructionResource}.`);

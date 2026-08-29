@@ -3,7 +3,6 @@ import { lstat, readFile, rm, symlink } from "node:fs/promises";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import type { ProjectContext } from "../project/ProjectContext.js";
-import type { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
 import { runGit } from "../execution/git/gitProcess.js";
 import { CriticSchedulerService } from "./governance/CriticSchedulerService.js";
 import { FeedbackBoxService } from "./governance/FeedbackBoxService.js";
@@ -22,16 +21,21 @@ import { planContinuationSeed } from "./runtime/ContinuationSeedPlanner.js";
 import { EnvironmentRunPlanner } from "./runtime/EnvironmentRunPlanner.js";
 import { EnvironmentRuntimeService } from "./runtime/EnvironmentRuntimeService.js";
 import { DeterministicExecutionQueue } from "./runtime/ExecutionQueueBoundary.js";
-import { LocalProviderAdapter } from "./runtime/LocalProviderAdapter.js";
 import { EnvironmentWorkspaceManager } from "./runtime/EnvironmentWorkspaceManager.js";
 import { isAllowedRefinementPath } from "../../shared/orchestration/refinement.js";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.js";
+import type { OrchestrationRuntimeProvider } from "./runtime/RuntimeProvider.js";
+import type { OrchestrationProviderPreflightPort } from "./runtime/EnvironmentRunPlanner.js";
+import type { OrchestrationWorkspacePort } from "./http/ApiController.js";
+import type { RunEvidenceFinalizationPort } from "./runtime/EnvironmentRuntimeService.js";
 
 export interface CompositionOptions {
   context: ProjectContext;
-  runtime: LocalRuntimeService;
   schedulerIntervalMs?: number;
   workerIntervalMs?: number;
+  provider: OrchestrationRuntimeProvider & OrchestrationProviderPreflightPort;
+  environmentWorkspace: OrchestrationWorkspacePort;
+  environmentFinalizer: RunEvidenceFinalizationPort;
 }
 
 export const createCompositionRoot = async (options: CompositionOptions) => {
@@ -43,13 +47,13 @@ export const createCompositionRoot = async (options: CompositionOptions) => {
   projects.load();
   const documents = new ProjectDocumentRepository(dataRoot, database);
   const project = new ProjectDefinitionService(options.context.root, projects, documents);
-  const provider = new LocalProviderAdapter(options.runtime);
+  const provider = options.provider;
   const planner = new EnvironmentRunPlanner(project, provider, now);
   const environmentQueue = new DeterministicExecutionQueue();
   const governanceQueue = new DeterministicExecutionQueue();
   const nextId = (kind: string) => `${kind}:${randomUUID()}`;
   const worktrees = new EnvironmentWorkspaceManager(options.context.root, path.join(options.context.worktreesRoot, "environment"), nextId);
-  const environment = new EnvironmentRuntimeService(database, environmentQueue, provider, worktrees, nextId, now);
+  const environment = new EnvironmentRuntimeService(database, environmentQueue, provider, options.environmentFinalizer, nextId, now);
   const feedback = new FeedbackBoxService(database);
   const scheduler = new CriticSchedulerService(database, { now }, nextId);
   const governance = new GovernanceExecutionService(
@@ -91,7 +95,7 @@ export const createCompositionRoot = async (options: CompositionOptions) => {
   );
   const invalidations = new InvalidationBroadcaster();
   const controller = new ApiController({ connection: database, project, planner, runtime: environment,
-    workspace: worktrees, feedback, scheduler, governance, refinementApply, invalidations, nextId, now });
+    workspace: options.environmentWorkspace, feedback, scheduler, governance, refinementApply, invalidations, nextId, now });
   const router = createOrchestrationRouter({ controller, actor: localActor });
 
   await environment.reconcile();

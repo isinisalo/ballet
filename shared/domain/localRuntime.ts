@@ -61,23 +61,3 @@ export interface LocalRuntime {
   activeRunCount: number;
   logsPath: string;
 }
-
-export interface ExecutionPolicy {
-  network: boolean;
-  readOnlyRoots: string[];
-}
-
-export interface ResolvedExecutionProfile {
-  executionProfileId: string;
-  provider: RuntimeProvider;
-  model: string;
-  reasoning: string;
-  policy: ExecutionPolicy;
-}
-
-export interface RuntimeConfigurationIssue {
-  code: "invalid_json" | "invalid_schema" | "provider_unavailable" | "legacy_local_settings";
-  path: string;
-  message: string;
-  executionProfileId?: string;
-}

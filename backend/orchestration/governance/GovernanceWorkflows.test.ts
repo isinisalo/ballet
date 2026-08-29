@@ -10,8 +10,8 @@ import { ActionOutcomeCoordinator } from "../persistence/ActionOutcomeCoordinato
 import { FeedbackStore } from "../persistence/FeedbackStore.js";
 import { FlowCoordinator } from "../persistence/FlowCoordinator.js";
 import {
-  HASH_A, TEST_AT, VALID_INSTRUCTION, agentRunInput, environmentSeed, feedbackSeed, hash,
-  openTestDatabase, productSnapshotSeed, validationOutcome, type TestDatabase
+  HASH_A, TEST_AT, TEST_SHA, VALID_INSTRUCTION, agentRunInput, environmentSeed, feedbackSeed, hash,
+  openTestDatabase, runEvidenceSeed, validationOutcome, type TestDatabase
 } from "../persistence/PersistenceTestFixtures.js";
 import { ReviewCoordinator } from "../persistence/ReviewCoordinator.js";
 import { refinementChangeListHash } from "../persistence/ReviewStore.js";
@@ -59,7 +59,7 @@ describe("durable Critic schedules", () => {
     expect(scheduler.tick()).toHaveLength(1);
     expect(scheduler.tick()).toEqual([]);
     expect(db.connection.prepare("SELECT status, skip_reason FROM critic_runs").all())
-      .toEqual([{ status: "skipped", skip_reason: "no_product_snapshot" }]);
+      .toEqual([{ status: "skipped", skip_reason: "no_run_evidence" }]);
   });
 
   test("disables schedules removed from the current valid configuration", () => {
@@ -94,26 +94,22 @@ describe("Feedback Box trust and lifecycle", () => {
     const context = completedDb();
     const service = new FeedbackBoxService(() => context.db.connection);
     service.createHuman({
-      feedbackEntryId: "human-feedback", environmentRunId: "run-1", category: "documentation",
-      targetType: "resource", targetId: ".ballet/instructions/test.md", title: "Clarify",
-      description: "Instruction is ambiguous", correctiveActions: ["Clarify wording"], evidenceRefs: ["evidence-1"],
-      createdAt: TEST_AT,
+      feedbackEntryId: "human-feedback", category: "documentation",
+      comment: "Instruction is ambiguous", sourceCommit: TEST_SHA, createdAt: TEST_AT,
       ...({ source: "approved_critic_proposal" } as object)
     }, actor);
     expect(service.list({ environmentRunId: "run-1" })[0]).toMatchObject({ source: "human", created_by: "human-1" });
     expect(() => service.createHuman({
-      feedbackEntryId: "bad", environmentRunId: "run-1", category: "code", targetType: "resource",
-      targetId: "../secret", title: "Bad", description: "Bad path", correctiveActions: ["Fix"], createdAt: TEST_AT
-    }, actor)).toThrow(/does not exist/);
+      feedbackEntryId: "bad", category: "code", comment: "", sourceCommit: TEST_SHA, createdAt: TEST_AT
+    }, actor)).toThrow(/comment is required/);
   });
 
   test("only a trusted human terminal transition resolves or dismisses", () => {
     const context = completedDb();
     const service = new FeedbackBoxService(() => context.db.connection);
     service.createHuman({
-      feedbackEntryId: "human-feedback", environmentRunId: "run-1", category: "product",
-      targetType: "environment_run", targetId: "run-1", title: "Finding", description: "Description",
-      correctiveActions: ["Correct"], createdAt: TEST_AT
+      feedbackEntryId: "human-feedback", category: "system", comment: "Description",
+      sourceCommit: TEST_SHA, createdAt: TEST_AT
     }, actor);
     service.transitionHuman("human-feedback", "open", "dismissed", TEST_AT, actor);
     expect(new FeedbackStore(() => context.db.connection).require("human-feedback").status).toBe("dismissed");
@@ -130,19 +126,19 @@ describe("read-only governance proposal execution", () => {
     });
     context.reviews.createCriticDue({
       criticRunId: "critic-run", criticScheduleId: "daily", dueAt: TEST_AT, dueKey: "daily:due",
-      productSnapshotId: "snapshot-run-1", createdAt: TEST_AT
+      runEvidenceId: "snapshot-run-1", createdAt: TEST_AT
     });
     const queue = new DeterministicExecutionQueue();
     const execution = new GovernanceExecutionService(() => context.db.connection, queue, ids("governance"), () => TEST_AT);
     const taskId = await execution.queueCritic("critic-run");
     const proposal = {
       proposalId: "critic-proposal", title: "Finding", finding: "Instruction can be clearer", evidenceRefs: ["snapshot-run-1"],
-      category: "documentation", targetType: "product_snapshot", targetId: "snapshot-run-1",
+      category: "documentation", targetType: "run_evidence", targetId: "snapshot-run-1",
       severity: "medium", priority: 2, recommendedCorrectiveActions: ["Clarify instruction"],
       rationale: "Validation evidence", confidence: 0.9
     };
     expect(execution.applyProviderOutput(taskId, "critic-terminal", JSON.stringify({
-      version: 10, role: "critic", summary: "Reviewed",
+      version: 11, role: "critic", summary: "Reviewed",
       checks: [{ name: "fixture", status: "passed", evidenceRefs: ["test:fixture"] }], proposal
     }))).toBe("proposal");
     expect(context.reviews.reviews.requireCriticProposal("critic-proposal").status).toBe("pending_human_review");
@@ -156,14 +152,14 @@ describe("read-only governance proposal execution", () => {
     context.reviews.reviews.createSchedule({ criticScheduleId: "daily", configHash: HASH_A, config,
       nextDueAt: TEST_AT, enabled: true, createdAt: TEST_AT });
     context.reviews.createCriticDue({ criticRunId: "critic-run", criticScheduleId: "daily", dueAt: TEST_AT,
-      dueKey: "daily:due", productSnapshotId: "snapshot-run-1", createdAt: TEST_AT });
+      dueKey: "daily:due", runEvidenceId: "snapshot-run-1", createdAt: TEST_AT });
     const content = { finding: "No change" };
     context.reviews.createCriticProposal({ criticProposalId: "critic-proposal", criticRunId: "critic-run",
-      content, contentHash: sha256(JSON.stringify(content)), targetType: "product_snapshot",
-      targetId: "snapshot-run-1", category: "product", createdAt: TEST_AT });
+      content, contentHash: sha256(JSON.stringify(content)), targetType: "run_evidence",
+      targetId: "snapshot-run-1", category: "system", createdAt: TEST_AT });
     const storedHash = String(context.reviews.reviews.requireCriticProposal("critic-proposal").content_hash);
     context.reviews.decideCritic("critic-proposal", {
-      decision: "rejected", expectedContentHash: storedHash, expectedVersion: 1, decidedAt: TEST_AT
+      decision: "rejected", expectedContentHash: storedHash, expectedVersion: 2, decidedAt: TEST_AT
     }, actor);
     expect(new FeedbackStore(() => context.db.connection).list("run-1")).toEqual([]);
     const permission = mapProviderPermissions({ provider: "codex", role: "refinement", toolPolicy: "read_only",
@@ -244,11 +240,11 @@ describe("exact Refinement approval and managed apply", () => {
     expect(context.db.connection.prepare("SELECT COUNT(*) AS count FROM refinement_applies").get()).toEqual({ count: 1 });
   });
 
-  test("applies from the approved immutable product commit without rewinding a newer checkout", async () => {
+  test("applies from the approved immutable evidence commit without rewinding a newer checkout", async () => {
     const repository = gitRepository();
     const context = completedDb(repository.head);
     const proposal = createApprovedRefinement(context, repository.head, VALID_INSTRUCTION,
-      `${VALID_INSTRUCTION}\n\nRefined from product commit.`, ["instruction_contract"]);
+      `${VALID_INSTRUCTION}\n\nRefined from evidence commit.`, ["instruction_contract"]);
     writeFileSync(path.join(repository.root, "README.md"), "newer checkout\n");
     git(repository.root, ["add", "README.md"]);
     git(repository.root, ["-c", "user.name=Test", "-c", "user.email=test@localhost", "commit", "-m", "newer checkout"]);
@@ -262,9 +258,9 @@ describe("exact Refinement approval and managed apply", () => {
         return { ...continuation, continuationLinkId: "continuation-1", continuationSnapshotHash: continuation.executionSnapshotHash };
       }, () => TEST_AT
     );
-    expect(await service.apply(proposal.refinementProposalId, "apply-product-base")).toBe("applied");
+    expect(await service.apply(proposal.refinementProposalId, "apply-evidence-base")).toBe("applied");
     expect(git(repository.root, ["rev-parse", "HEAD"])).toBe(newerHead);
-    expect(git(path.join(repository.worktrees, "apply-product-base"), ["merge-base", "HEAD", repository.head]))
+    expect(git(path.join(repository.worktrees, "apply-evidence-base"), ["merge-base", "HEAD", repository.head]))
       .toBe(repository.head);
   });
 
@@ -347,7 +343,7 @@ const completedDb = (baseCommit?: string) => {
   });
   const state = flow.runs.states("run-1")[0]!;
   flow.completeState(state.stateExecutionId, state.revision, TEST_AT);
-  flow.completeEnvironment({ ...productSnapshotSeed(), baseCommit: baseCommit ?? productSnapshotSeed().baseCommit }, flow.runs.require("run-1").revision);
+  flow.completeEnvironment({ ...runEvidenceSeed(), baseCommit: baseCommit ?? runEvidenceSeed().baseCommit }, flow.runs.require("run-1").revision);
   return { db, flow, reviews: new ReviewCoordinator(() => db.connection) };
 };
 
@@ -384,7 +380,7 @@ const createApprovedRefinement = (
   return proposal;
 };
 const decisionFor = (proposal: ReturnType<typeof createRefinement>) => ({
-  decision: "approved" as const, expectedContentHash: proposal.changeListHash, expectedVersion: 1 as const,
+  decision: "approved" as const, expectedContentHash: proposal.changeListHash, expectedVersion: 2 as const,
   expectedChangeHashes: proposal.files.map(({ proposedContentHash }) => proposedContentHash),
   expectedImpactActionIds: ["action-1"], acknowledgeLocalCommitAndContinuation: true, decidedAt: TEST_AT
 });
@@ -400,7 +396,7 @@ const completeContinuation = (context: ReturnType<typeof completedDb>, runId: st
   context.flow.completeState(state.stateExecutionId, state.revision, TEST_AT);
   const run = context.flow.runs.require(runId);
   context.flow.completeEnvironment({
-    ...productSnapshotSeed(runId), branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit
+    ...runEvidenceSeed(runId), branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit
   }, run.revision);
 };
 

@@ -50,8 +50,8 @@ const criticProposalSchema = z.object({
   title: nonEmptyTextSchema,
   finding: nonEmptyTextSchema,
   evidenceRefs: idListSchema,
-  category: z.enum(["product", "system", "architecture", "code", "design", "documentation"]),
-  targetType: z.enum(["product_snapshot", "environment_definition", "environment_run", "state_definition",
+  category: z.enum(["system", "architecture", "code", "design", "documentation"]),
+  targetType: z.enum(["run_evidence", "environment_definition", "environment_run", "state_definition",
     "state_execution", "action_definition", "action_execution", "resource"]),
   targetId: idSchema,
   severity: z.enum(["low", "medium", "high", "critical"]),
@@ -112,7 +112,7 @@ export const refinementOutcomeSchema = z.object({
   }
 });
 
-export const roleOutcomeV10Schema = z.union([
+export const roleOutcomeV11Schema = z.union([
   validationOutcomeSchema,
   workOutcomeSchema,
   criticOutcomeSchema,

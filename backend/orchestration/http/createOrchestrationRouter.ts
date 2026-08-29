@@ -4,9 +4,9 @@ import { HttpValidationError, parseBody, parseParams, parseUnknown } from "../..
 import type { ProjectDocumentKind } from "../project/ProjectReferenceIndex.js";
 import type { ApiController } from "./ApiController.js";
 import {
-  actionParamsSchema, createFeedbackSchema, createRefinementSchema, criticDecisionSchema,
+  actionParamsSchema, createFeedbackSchema, criticDecisionSchema,
   directionDecisionSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
-  idParamsSchema, putActionSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
+  idParamsSchema, putActionSchema, putAgentSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
   putResourceSchema, putStateSchema, refinementDecisionSchema, removeDirectionSchema,
   removeResourceSchema, reorderSchema, runParamsSchema, startRunSchema, stateParamsSchema,
   workInputResponseSchema,
@@ -64,6 +64,18 @@ const registerDocumentRoutes = (
         expectedDocumentHash: input.expectedHash }));
     }));
   }
+  router.get("/agents", route(async (_req, res) => res.json(controller.documents("agent"))));
+  router.post("/agents", route(async (req, res) => {
+    const input = parseBody(putAgentSchema, req); res.status(201).json(controller.createAgent({ id: input.value.id, ...input }));
+  }));
+  router.get("/agents/:id", route(async (req, res) => res.json(controller.document("agent", parseParams(idParamsSchema, req).id))));
+  router.put("/agents/:id", route(async (req, res) => {
+    const { id } = parseParams(idParamsSchema, req); res.json(controller.updateAgent({ id, ...parseBody(putAgentSchema, req) }));
+  }));
+  router.delete("/agents/:id", route(async (req, res) => {
+    const { id } = parseParams(idParamsSchema, req); const input = parseBody(removeDirectionSchema, req);
+    res.json(controller.removeAgent({ id, expectedConfigHash: input.expectedConfigHash, expectedDocumentHash: input.expectedHash }));
+  }));
   for (const [collection, kind] of [["instructions", "instruction"], ["skills", "skill"]] as const) {
     router.get(`/${collection}`, route(async (_req, res) => res.json(controller.documents(kind))));
     router.post(`/${collection}`, route(async (req, res) => {
@@ -152,8 +164,8 @@ const registerRunRoutes = (
     const input = parseBody(workInputResponseSchema, req);
     res.json(controller.answerWorkInput(parseParams(runParamsSchema, req).runId, input, actor()));
   }));
-  router.get("/environment-runs/:runId/product", route(async (req, res) =>
-    res.json(controller.product(parseParams(runParamsSchema, req).runId))));
+  router.get("/environment-runs/:runId/evidence", route(async (req, res) =>
+    res.json(controller.evidence(parseParams(runParamsSchema, req).runId))));
   router.get("/environment-runs/:runId/events", (req, res, next) => {
     try {
       const { runId } = parseParams(runParamsSchema, req); const { after } = parseUnknown(eventQuerySchema, req.query);
@@ -169,11 +181,15 @@ const registerFeedbackRoutes = (
   router: express.Router, controller: ApiController, actor: () => TrustedHumanActor
 ): void => {
   router.get("/feedback", route(async (req, res) => res.json(controller.listFeedback(parseUnknown(feedbackQuerySchema, req.query)))));
-  router.post("/feedback", route(async (req, res) => res.status(201).json(controller.createFeedback(parseBody(createFeedbackSchema, req), actor()))));
+  router.post("/feedback", route(async (req, res) => res.status(201).json(await controller.createFeedback(parseBody(createFeedbackSchema, req), actor()))));
   router.get("/feedback/:id", route(async (req, res) => res.json(controller.feedback(parseParams(idParamsSchema, req).id))));
   router.post("/feedback/:id/decision", route(async (req, res) => {
     const { id } = parseParams(idParamsSchema, req); const input = parseBody(feedbackDecisionSchema, req);
     controller.decideFeedback(id, input.from, input.decision, actor()); res.status(204).end();
+  }));
+  router.post("/feedback/:id/refinement", route(async (req, res) => {
+    const { id } = parseParams(idParamsSchema, req); parseBody(emptySchema, req);
+    res.status(201).json(await controller.createRefinementForFeedback(id));
   }));
 };
 
@@ -192,10 +208,6 @@ const registerReviewRoutes = (
   router.get("/refinement/runs", route(async (_req, res) => res.json(controller.listRefinement("runs"))));
   router.get("/refinement/proposals", route(async (_req, res) => res.json(controller.listRefinement("proposals"))));
   router.get("/refinement/proposals/:id", route(async (req, res) => res.json(controller.refinementProposal(parseParams(idParamsSchema, req).id))));
-  router.post("/refinement/runs", route(async (req, res) => {
-    const input = parseBody(createRefinementSchema, req);
-    res.status(201).json(await controller.createRefinement(input.sourceEnvironmentRunId, input.feedbackEntryIds));
-  }));
   router.post("/refinement/proposals/:id/decision", route(async (req, res) => {
     const { id } = parseParams(idParamsSchema, req); controller.decideRefinement(id, parseBody(refinementDecisionSchema, req), actor()); res.status(204).end();
   }));

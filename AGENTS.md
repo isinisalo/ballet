@@ -5,7 +5,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 ## Kanoninen domain
 
 - Balletin aktiivinen domain on `Environment -> State -> Action` päätöksen `adr-034` mukaisesti.
-- Project Config on strict v20. Environmentin Stateilla on positiivinen, yksikäsitteinen ja nouseva `order`; Staten Actioneilla vastaava `priority`.
+- Project Config on strict v21. Environmentin Stateilla on positiivinen, yksikäsitteinen ja nouseva `order`; Staten Actioneilla vastaava `priority`.
 - Seuraavaa Statea ei dispatchata ennen kuin edellisen kaikki Actionit ovat runtime-statuksessa `done`.
 - Runtime status on totuus. `done` ja `blocked` ovat siitä johdettuja eivätkä project configiin tallennettavia lippuja.
 - Validation on controller: precheck palauttaa vain `done | delegate | blocked`, Work on alisteinen toteutusrooli ja postwork palauttaa vain `done | retry | blocked`.
@@ -22,9 +22,9 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 ## Strict cut
 
-- Aktiiviset versiot ovat Project Config v20, Root Snapshot v13, Task Envelope ja role outcome v10, prompt composition v11, ExecutionSpec v12, SQLite v16 sekä Feedback/Critic/Refinement v1.
+- Aktiiviset versiot ovat Project Config v21, Root Snapshot v14, Task Envelope ja role outcome v11, prompt composition v12, ExecutionSpec v13, SQLite v17 sekä Feedback/Critic/Refinement v2. Agent/daemon binding ja Run Evidence ovat v1.
 - Vanhasta datasta ei tehdä migraatiota, readeria, route-aliasta tai dual-write-polkuja. Epäyhteensopiva machine-local SQLite arkistoidaan tai poistetaan ennen käynnistystä.
-- Canonical URLit ovat `/configure/*`, `/run/*`, `/feedback/*`, `/reviews/critic/*`, `/reviews/refinement/*` ja `/products/*`; API on `/api/*`.
+- Canonical URLit ovat `/automation/loops`, `/agents`, `/skills`, `/runtimes`, `/project/goals`, `/project/adrs`, `/project/constraints`, `/project/use-cases`, `/project/instructions`, `/run`, `/feedback`, `/reviews/critic` ja `/reviews/refinement`; Run Evidence näkyy omistavan Runin sisällä. API on `/api/*`.
 
 ## Platformin ja projektin raja
 

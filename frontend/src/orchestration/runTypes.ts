@@ -16,12 +16,12 @@ export interface StateProjection {
   createdAt: string; updatedAt: string; completedAt?: string; done: boolean; blocked: boolean; actions: ActionProjection[];
 }
 export interface RunDetail extends RunSummary {
-  executionSnapshotHash?: string; activeAgent?: JsonRow; states: StateProjection[]; events: Array<JsonRow>; product?: JsonRow;
+  executionSnapshotHash?: string; activeAgent?: JsonRow; states: StateProjection[]; events: Array<JsonRow>; evidence?: JsonRow;
 }
 
 export interface GovernanceData {
   runs: RunSummary[]; feedback: JsonRow[]; criticRuns: JsonRow[]; criticProposals: JsonRow[];
-  refinementRuns: JsonRow[]; refinementProposals: JsonRow[]; products: JsonRow[];
+  refinementRuns: JsonRow[]; refinementProposals: JsonRow[];
   selectedRun?: RunDetail; selectedFeedback?: JsonRow; selectedCritic?: JsonRow; selectedRefinement?: JsonRow;
-  selectedProduct?: JsonRow; applyStatus?: JsonRow; continuation?: JsonRow;
+  applyStatus?: JsonRow; continuation?: JsonRow;
 }

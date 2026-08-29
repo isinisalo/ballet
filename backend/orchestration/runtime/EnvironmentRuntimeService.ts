@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One lifecycle service owns durable dispatch, recovery, cancellation, and finalization ordering. */
 import type Database from "better-sqlite3";
-import type { CreateEnvironmentRunInput, FeedbackSeed, ProductSnapshotSeed } from "../../../shared/orchestration/persistence.js";
+import type { CreateEnvironmentRunInput, FeedbackSeed, RunEvidenceSeed } from "../../../shared/orchestration/persistence.js";
 import type { ValidationOutcome, WorkOutcome } from "../../../shared/orchestration/outcomes.js";
 import type { StoredActionExecution, StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -15,8 +15,8 @@ import type { OrchestrationRuntimeProvider } from "./RuntimeProvider.js";
 import { parseOrchestrationStructuredOutput } from "./StructuredOutputValidator.js";
 import { ConflictError } from "../persistence/PersistenceErrors.js";
 
-export interface ProductFinalizationPort {
-  finalize(run: StoredEnvironmentRun, at: string): Promise<ProductSnapshotSeed>;
+export interface RunEvidenceFinalizationPort {
+  finalize(run: StoredEnvironmentRun, at: string): Promise<RunEvidenceSeed>;
   cleanup?(run: StoredEnvironmentRun): Promise<void>;
 }
 
@@ -33,7 +33,7 @@ export class EnvironmentRuntimeService {
     private readonly connection: () => Database.Database,
     private readonly queue: ExecutionQueueBoundary,
     private readonly provider: OrchestrationRuntimeProvider,
-    private readonly finalizer: ProductFinalizationPort,
+    private readonly finalizer: RunEvidenceFinalizationPort,
     nextId: (kind: string) => string,
     private readonly now: () => string
   ) {
@@ -303,7 +303,7 @@ export class EnvironmentRuntimeService {
     this.queue.enqueue(dispatch.task.spec.taskId);
   }
 
-  private withRuntimeEvidence(seed: ProductSnapshotSeed, run: StoredEnvironmentRun): ProductSnapshotSeed {
+  private withRuntimeEvidence(seed: RunEvidenceSeed, run: StoredEnvironmentRun): RunEvidenceSeed {
     const states = this.runs.states(run.environmentRunId).map((state) => ({
       id: state.stateDefinitionId, order: state.order, status: state.status,
       actions: this.runs.actions(state.stateExecutionId).map((action) => ({
@@ -337,11 +337,10 @@ export class EnvironmentRuntimeService {
 const feedbackFor = (
   action: StoredActionExecution, agentRunId: string, source: FeedbackSeed["source"], description: string, at: string
 ): FeedbackSeed => ({
-  feedbackEntryId: `feedback:${agentRunId}`, source, category: source === "system_invalid_output" ? "system" : "product",
+  feedbackEntryId: `feedback:${agentRunId}`, source, category: source === "validation_blocked" ? "code" : "system",
   targetType: "action_execution", targetId: action.actionExecutionId,
-  title: source === "retry_exhaustion" ? "Retry budget exhausted"
-    : source === "provider_failure" ? "Provider execution failed" : "Action blocked",
-  description, correctiveActions: ["Review the recorded evidence and correct the Action input or resources."],
+  comment: `${source === "retry_exhaustion" ? "Retry budget exhausted"
+    : source === "provider_failure" ? "Provider execution failed" : "Action blocked"}: ${description}`,
   environmentRunId: action.environmentRunId, stateExecutionId: action.stateExecutionId,
   actionExecutionId: action.actionExecutionId, agentRunId,
   provenance: { source, agentRunId }, createdAt: at

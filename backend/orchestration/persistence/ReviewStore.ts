@@ -23,7 +23,7 @@ export class ReviewStore extends CriticScheduleStore {
           critic_proposal_id, critic_run_id, content_json, content_hash,
           target_type, target_id, category, status, created_at, updated_at
           ,version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_human_review', ?, ?, 1)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_human_review', ?, ?, 2)
       `).run(input.criticProposalId, input.criticRunId, canonical(input.content), input.contentHash,
         input.targetType, input.targetId, input.category, input.createdAt, input.createdAt);
       this.connection().prepare(`
@@ -101,7 +101,7 @@ export class ReviewStore extends CriticScheduleStore {
           refinement_proposal_id, refinement_run_id, target_action_id, expected_base_commit,
           impact_scope_json, change_list_hash, expected_behavioral_improvement, risks_json,
           validation_plan_json, rollback, version, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'pending_human_review', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2, 'pending_human_review', ?, ?)
       `).run(input.refinementProposalId, input.refinementRunId, input.targetActionId,
         input.expectedBaseCommit, canonical(input.impactScope), input.changeListHash,
         input.expectedBehavioralImprovement, canonical(input.risks), canonical(input.validationPlan),

@@ -22,15 +22,11 @@ const tones = { done: "healthy", completed: "healthy", applied: "healthy", valid
 export const statusPresentation = (status: string) => ({ label: status.replaceAll("_", " "), tone: tones[status as keyof typeof tones] ?? "neutral" as const });
 
 export const criticDecisionRequest = (proposal: JsonRow, decision: "approved" | "rejected") => {
-  const content = parseJson(proposal.content_json); const id = String(proposal.critic_proposal_id);
-  return { decision, expectedContentHash: String(proposal.content_hash), expectedVersion: 1 as const,
-    ...(decision === "approved" ? { feedback: { feedbackEntryId: `feedback-${id}`,
-      title: String(content.title ?? "Critic finding"), description: String(content.finding ?? "Critic finding"),
-      correctiveActions: strings(content.recommendedCorrectiveActions), evidenceRefs: strings(content.evidenceRefs) } } : {}) };
+  return { decision, expectedContentHash: String(proposal.content_hash), expectedVersion: 2 as const };
 };
 
 export const refinementDecisionRequest = (proposal: JsonRow, decision: "approved" | "rejected") => ({
-  decision, expectedContentHash: String(proposal.change_list_hash), expectedVersion: 1 as const,
+  decision, expectedContentHash: String(proposal.change_list_hash), expectedVersion: 2 as const,
   expectedChangeHashes: (proposal.files as JsonRow[] ?? []).map((file) => String(file.proposed_content_hash)).sort(),
   expectedImpactActionIds: strings(parseJson(proposal.impact_scope_json).actionIds).sort(),
   acknowledgeLocalCommitAndContinuation: decision === "approved"

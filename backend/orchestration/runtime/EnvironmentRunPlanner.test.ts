@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { approveUseCase, type UseCase } from "../../../shared/orchestration/direction.js";
-import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import { EnvironmentRunPlanner, type ProjectDefinition } from "./EnvironmentRunPlanner.js";
@@ -13,7 +13,7 @@ describe("EnvironmentRunPlanner immutable closure", () => {
       inspect: async () => capability()
     }, () => "2026-08-29T10:00:00.000Z");
     const result = await planner.plan();
-    expect(result.snapshot).toMatchObject({ version: 13, projectHeadSha: "a".repeat(40) });
+    expect(result.snapshot).toMatchObject({ version: 14, projectHeadSha: "a".repeat(40) });
     expect(result.snapshot.approvedUseCases).toHaveLength(1);
     expect(result.snapshot.resources.map(({ kind }) => kind)).toEqual(["instruction", "skill"]);
     expect(result.snapshot.permissions.find(({ role }) => role === "validation")?.toolPolicy).toBe("read_only");
@@ -28,12 +28,10 @@ describe("EnvironmentRunPlanner immutable closure", () => {
     await expect(planner.plan()).rejects.toThrow(/Missing skill/);
   });
 
-  test("fails closed on Copilot capability mismatch", async () => {
+  test("fails closed on model capability mismatch", async () => {
     const project = definition();
-    project.config.executionProfiles[0] = { ...project.config.executionProfiles[0]!, provider: "copilot" };
-    project.configSha256 = contentHash(project.config);
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
-      inspect: async () => ({ ...capability(), provider: "copilot", supportedModels: ["different-model"] })
+      inspect: async () => ({ ...capability(), supportedModels: ["different-model"] })
     }, () => new Date().toISOString());
     await expect(planner.plan()).rejects.toThrow(/not supported/);
   });
@@ -42,7 +40,7 @@ describe("EnvironmentRunPlanner immutable closure", () => {
 describe("strict orchestration provider output", () => {
   test("rejects markdown wrappers, unknown fields, invalid enum and phase mismatch", () => {
     const valid = JSON.stringify({
-      version: 10, role: "validation", summary: "done",
+      version: 11, role: "validation", summary: "done",
       checks: [{ name: "fixture", status: "passed", evidenceRefs: ["test:fixture"] }],
       result: { phase: "precheck", decision: "done", evidence: {} }
     });
@@ -61,30 +59,30 @@ const definition = (): ProjectDefinition => {
     goalIds: ["goal-1"], adrIds: ["adr-1"], constraintIds: ["constraint-1"]
   };
   const useCase = approveUseCase(draft, { approvedBy: "human-1", approvedAt: "2026-08-29T09:00:00.000Z", revision: 1 });
-  const agent = (toolPolicy: "read_only" | "workspace_write") => ({
-    executionProfileId: "profile-1", instructionResource: "action-instruction", skillResources: ["skill-1"], toolPolicy
-  });
-  const config: ProjectConfigurationV20 = {
-    version: 20,
+  const agent = () => ({ agentId: "profile-1", instructionResource: "action-instruction", skillResources: ["skill-1"] });
+  const config: ProjectConfigurationV21 = {
+    version: 21,
     direction: {
       goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
       adrs: [{ id: "adr-1", name: "ADR", status: "accepted" }],
       constraints: [{ id: "constraint-1", name: "Constraint", status: "accepted", kind: "required", description: "Safe", rationale: "Required" }],
       useCases: [useCase]
     },
-    executionProfiles: [{
-      id: "profile-1", name: "Profile", provider: "codex", model: "gpt-test", reasoningEffort: "high", networkAccess: false
+    agents: [{
+      id: "profile-1", name: "Agent", description: "Test Agent", enabled: true,
+      instructionResource: "action-instruction", skillResources: ["skill-1"]
     }],
     environment: {
       id: "environment-1", name: "Environment", description: "Ordered environment", states: [{
         id: "state-1", name: "State", description: "First State", order: 1, useCaseIds: ["UC-1"], actions: [{
           id: "action-1", name: "Action", description: "First Action", priority: 1, useCaseIds: ["UC-1"], maxRetries: 1,
-          validation: agent("read_only"), work: agent("workspace_write")
+          validation: agent(), work: agent()
         }]
       }]
     },
-    critic: { version: 1, enabled: false, schedules: [], agent: agent("read_only") },
-    refinement: { version: 1, enabled: false, agent: agent("read_only"), allowedRoots: [".ballet/instructions", ".agents/skills"] }
+    critic: { version: 2, enabled: false, schedules: [], agent: agent() },
+    refinement: { version: 2, enabled: false, agent: agent(),
+      allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"] }
   };
   return {
     config, configSha256: contentHash(config), baseCommit: "a".repeat(40), checkoutRoot: "/tmp/worktree",
@@ -92,6 +90,7 @@ const definition = (): ProjectDefinition => {
       goals: { "goal-1": "1".repeat(64) }, adrs: { "adr-1": "2".repeat(64) },
       constraints: { "constraint-1": "3".repeat(64) }
     },
+    agentDocumentHashes: { "profile-1": "4".repeat(64) },
     resources: [
       { kind: "instruction", id: "action-instruction", relativePath: ".ballet/instructions/action.md", content: instruction() },
       { kind: "skill", id: "skill-1", relativePath: ".agents/skills/test/SKILL.md", content: "# Test Skill\nUse evidence." }
@@ -100,7 +99,9 @@ const definition = (): ProjectDefinition => {
 };
 const capability = (): RuntimeCapabilitySnapshot => {
   const value = {
-    executionProfileId: "profile-1", provider: "codex" as const, cliVersion: "1.0.0", supportedModels: ["gpt-test"],
+    agentId: "profile-1", deviceId: "device-1", runtimeBackendId: "backend-1",
+    provider: "codex" as const, model: "gpt-test", reasoningEffort: "high", networkAccess: false,
+    readOnlyRoots: [], cliVersion: "1.0.0", supportedModels: ["gpt-test"],
     supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true
   };
   return { ...value, capabilitySha256: contentHash(value) };

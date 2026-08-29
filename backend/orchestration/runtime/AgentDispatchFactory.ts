@@ -1,12 +1,12 @@
 import type { ActionDefinition, AgentComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV12 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV13 } from "../../../shared/orchestration/execution.js";
 import type { CreateAgentRunInput, ExecutionTaskSeed } from "../../../shared/orchestration/persistence.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import type { WorkOutcome } from "../../../shared/orchestration/outcomes.js";
 import type { StoredActionExecution, StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
-import type { TaskEnvelopeV10 } from "../../../shared/orchestration/taskEnvelopes.js";
-import { taskEnvelopeV10Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
+import type { TaskEnvelopeV11 } from "../../../shared/orchestration/taskEnvelopes.js";
+import { taskEnvelopeV11Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
 import { buildBoundedTaskContext } from "./TaskContextBuilder.js";
 import { composeOrchestrationPrompt } from "./PromptComposer.js";
 import { mapProviderPermissions, type ProviderPermissionSpec } from "./ProviderPermissions.js";
@@ -34,13 +34,13 @@ export class AgentDispatchFactory {
   }): PreparedAgentDispatch {
     const { state, action } = findDefinitions(input.run, input.action.actionDefinitionId);
     const composition = input.role === "work" ? action.work : action.validation;
-    const profile = input.run.executionSnapshot.executionProfiles.find(({ id }) => id === composition.executionProfileId)!;
+    const agentDefinition = input.run.executionSnapshot.agents.find(({ id }) => id === composition.agentId)!;
     const capability = input.run.executionSnapshot.runtimeCapabilities.find(
-      ({ executionProfileId }) => executionProfileId === composition.executionProfileId
+      ({ agentId }) => agentId === composition.agentId
     )!;
     const agentRunId = this.nextId(`${input.role}-${input.phase}`);
     const taskId = this.nextId("task");
-    const outputSchemaId = `${input.role}-outcome-v10`;
+    const outputSchemaId = `${input.role}-outcome-v11`;
     const context = buildBoundedTaskContext({
       snapshot: input.run.executionSnapshot, state, action, composition,
       actionStatus: input.action.status, workAttempt: input.action.workAttempt,
@@ -50,12 +50,12 @@ export class AgentDispatchFactory {
     });
     const instruction = requireInstruction(input.run, composition);
     const base = {
-      version: 10 as const, taskId, environmentRunId: input.run.environmentRunId,
+      version: 11 as const, taskId, environmentRunId: input.run.environmentRunId,
       snapshotSha256: input.run.executionSnapshotHash, instruction, context,
       stateExecutionId: input.action.stateExecutionId, actionExecutionId: input.action.actionExecutionId,
       actionId: input.action.actionDefinitionId
     };
-    const envelope: TaskEnvelopeV10 = input.phase === "precheck" ? {
+    const envelope: TaskEnvelopeV11 = input.phase === "precheck" ? {
       ...base, role: "validation", phase: "precheck", workAttempts: input.action.workAttempt,
       maxRetries: input.action.maxRetries
     } : input.phase === "work" ? {
@@ -67,14 +67,15 @@ export class AgentDispatchFactory {
       retriesRemaining: Math.max(0, input.action.maxRetries - Math.max(0, input.attempt - 1)),
       workOutcome: requiredOutcome(input.workOutcome) as unknown as JsonValue
     };
-    const parsedEnvelope = taskEnvelopeV10Schema.parse(envelope);
+    const parsedEnvelope = taskEnvelopeV11Schema.parse(envelope);
     const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition });
-    const spec: ExecutionSpecV12 = {
-      version: 12, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
+    const spec: ExecutionSpecV13 = {
+      version: 13, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
-        provider: profile.provider, cliVersion: capability.cliVersion, model: profile.model,
-        reasoningEffort: profile.reasoningEffort, networkAccess: profile.networkAccess,
+        agentId: agentDefinition.id, deviceId: capability.deviceId, runtimeBackendId: capability.runtimeBackendId,
+        provider: capability.provider, cliVersion: capability.cliVersion, model: capability.model,
+        reasoningEffort: capability.reasoningEffort, networkAccess: capability.networkAccess,
         capabilityHash: capability.capabilitySha256
       },
       project: {
@@ -93,8 +94,9 @@ export class AgentDispatchFactory {
       },
       task: { spec, specHash: sha256(canonicalJson(spec as unknown as JsonValue)) },
       permissions: mapProviderPermissions({
-        provider: profile.provider, role: input.role, toolPolicy: composition.toolPolicy,
-        networkAccess: profile.networkAccess, worktreePath: input.run.worktreePath
+        provider: capability.provider, role: input.role,
+        toolPolicy: input.role === "work" ? "workspace_write" : "read_only",
+        networkAccess: capability.networkAccess, worktreePath: input.run.worktreePath
       })
     };
   }

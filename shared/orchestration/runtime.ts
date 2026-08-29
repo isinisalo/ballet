@@ -1,5 +1,5 @@
 import type { JsonValue } from "./primitives.js";
-import type { AgentComposition, EnvironmentDefinition, ExecutionProfile, RuntimeProvider } from "./environment.js";
+import type { AgentComposition, AgentDefinition, EnvironmentDefinition, RuntimeProvider } from "./environment.js";
 import type { Constraint, DirectionReference, UseCase } from "./direction.js";
 import { ROOT_SNAPSHOT_VERSION } from "./versions.js";
 
@@ -10,7 +10,7 @@ export type AgentRunRole = "validation" | "work" | "critic" | "refinement";
 export type AgentRunPhase = "precheck" | "work" | "postwork" | "proposal";
 export type AgentRunStatus = "queued" | "running" | "waiting_for_input" | "completed" | "failed" | "cancelled" | "interrupted";
 
-export interface RootSnapshotV13 {
+export interface RootSnapshotV14 {
   version: typeof ROOT_SNAPSHOT_VERSION;
   projectHeadSha: string;
   projectConfigSha256: string;
@@ -24,7 +24,7 @@ export interface RootSnapshotV13 {
     adrs: Array<DirectionReference & { contentSha256: string }>;
     constraints: Array<Constraint & { contentSha256: string }>;
   };
-  executionProfiles: ExecutionProfile[];
+  agents: Array<AgentDefinition & { contentSha256: string }>;
   runtimeCapabilities: RuntimeCapabilitySnapshot[];
   resources: RuntimeResourceSnapshot[];
   permissions: RuntimePermissionSnapshot[];
@@ -39,8 +39,14 @@ export interface RootSnapshotV13 {
 }
 
 export interface RuntimeCapabilitySnapshot {
-  executionProfileId: string;
+  agentId: string;
+  deviceId: string;
+  runtimeBackendId: string;
   provider: RuntimeProvider;
+  model: string;
+  reasoningEffort: string;
+  networkAccess: boolean;
+  readOnlyRoots: string[];
   cliVersion: string;
   supportedModels: string[];
   supportedReasoningEfforts: string[];
@@ -69,7 +75,7 @@ export interface EnvironmentRun {
   id: string;
   environmentId: string;
   status: EnvironmentRunStatus;
-  snapshot: RootSnapshotV13;
+  snapshot: RootSnapshotV14;
   continuationOfRunId?: string;
   createdAt: string;
   updatedAt: string;
@@ -112,12 +118,15 @@ export interface AgentRun {
   updatedAt: string;
 }
 
-export interface ProductSnapshot {
+export interface RunEvidence {
+  version: 1;
   id: string;
   environmentRunId: string;
   commitSha: string;
+  changedFiles: string[];
   artifactRefs: string[];
-  evidenceRefs: string[];
+  validationEvidenceRefs: string[];
+  lineage: { sourceRunId?: string; continuationRunId?: string };
   createdAt: string;
 }
 

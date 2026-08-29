@@ -4,7 +4,7 @@ import { useWorkspaceNavigation } from "../src/workspace/useWorkspaceNavigation"
 
 describe("canonical workspace navigation blocker", () => {
   beforeEach(() => {
-    window.history.replaceState({}, "", "/configure/environment");
+    window.history.replaceState({}, "", "/automation/loops");
   });
 
   it("confirms and blocks internal navigation while authoring is dirty", () => {
@@ -13,7 +13,7 @@ describe("canonical workspace navigation blocker", () => {
     act(() => result.current.setNavigationBlocker({ isDirty: true, message: "Discard Environment changes?" }));
     act(() => result.current.navigate("/run"));
     expect(confirm).toHaveBeenCalledWith("Discard Environment changes?");
-    expect(window.location.pathname).toBe("/configure/environment");
+    expect(window.location.pathname).toBe("/automation/loops");
     expect(result.current.route).toMatchObject({ workspaceView: "environment" });
 
     confirm.mockReturnValue(true);
@@ -33,7 +33,7 @@ describe("canonical workspace navigation blocker", () => {
 
   it("restores canonical deep links through browser back and forward", async () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
-    act(() => result.current.navigate("/configure/environment/states/build"));
+    act(() => result.current.navigate("/automation/loops/states/build"));
     expect(result.current.route).toMatchObject({ workspaceView: "state", stateId: "build" });
 
     await act(async () => {
@@ -55,7 +55,7 @@ describe("canonical workspace navigation blocker", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
     act(() => result.current.navigate("/feedback"));
-    act(() => result.current.navigate("/products"));
+    act(() => result.current.navigate("/run"));
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
 
     await act(async () => {
@@ -63,8 +63,8 @@ describe("canonical workspace navigation blocker", () => {
       window.history.back();
       await restored;
     });
-    expect(window.location.pathname).toBe("/products");
-    expect(result.current.route).toMatchObject({ workspaceView: "products" });
+    expect(window.location.pathname).toBe("/run");
+    expect(result.current.route).toMatchObject({ workspaceView: "run-list" });
 
     confirm.mockReturnValue(true);
     await act(async () => {

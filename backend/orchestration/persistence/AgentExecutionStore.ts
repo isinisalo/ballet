@@ -1,11 +1,11 @@
 import type Database from "better-sqlite3";
 import type {
-  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV12, ExecutionTaskSeed, JsonValue, StoredAgentRun
+  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV13, ExecutionTaskSeed, JsonValue, StoredAgentRun
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import { executionSpecV12Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
-import { roleOutcomeV10Schema } from "../../../shared/orchestration/schemas/outcomeSchemas.js";
-import { taskEnvelopeV10Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
+import { executionSpecV13Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
+import { roleOutcomeV11Schema } from "../../../shared/orchestration/schemas/outcomeSchemas.js";
+import { taskEnvelopeV11Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
 import { toAgentRun } from "./RowMappers.js";
 import { ConflictError, NotFoundError } from "./PersistenceErrors.js";
 
@@ -22,14 +22,14 @@ export interface StoredExecutionTask {
   outcome?: unknown;
   errorCode?: string;
   errorMessage?: string;
-  spec: ExecutionSpecV12;
+  spec: ExecutionSpecV13;
 }
 
 export class AgentExecutionStore {
   constructor(private readonly connection: () => Database.Database) {}
 
   createAgent(input: CreateAgentRunInput): StoredAgentRun {
-    const envelope = taskEnvelopeV10Schema.parse(input.taskEnvelope);
+    const envelope = taskEnvelopeV11Schema.parse(input.taskEnvelope);
     if (envelope.environmentRunId !== input.environmentRunId || envelope.role !== input.role || envelope.phase !== input.phase) {
       throw new ConflictError("Agent Run identity differs from its Task Envelope.");
     }
@@ -39,7 +39,7 @@ export class AgentExecutionStore {
         agent_run_id, environment_run_id, action_execution_id, parent_agent_run_id, critic_run_id, refinement_run_id,
         role, phase, status, attempt, task_envelope_version, task_envelope_json, task_envelope_hash,
         input_json, context_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, 10, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, 11, ?, ?, ?, ?, ?, ?)
     `).run(input.agentRunId, input.environmentRunId, input.actionExecutionId ?? null, input.parentAgentRunId ?? null,
       input.criticRunId ?? null, input.refinementRunId ?? null, input.role, input.phase, input.attempt, canonical(envelope),
       input.taskEnvelopeHash, json(input.input), json(input.context), input.createdAt, input.createdAt);
@@ -58,13 +58,13 @@ export class AgentExecutionStore {
       if (existing.providerOutcomeKey !== providerOutcomeKey) {
         throw new ConflictError(`Agent Run ${agentRunId} already has a different terminal outcome.`);
       }
-      const duplicate = roleOutcomeV10Schema.parse(outcome);
+      const duplicate = roleOutcomeV11Schema.parse(outcome);
       if (canonical(duplicate) !== canonical(existing.outcome)) {
         throw new ConflictError(`Agent Run ${agentRunId} idempotency key was reused with different content.`);
       }
       return { agent: existing, applied: false };
     }
-    const parsed = roleOutcomeV10Schema.parse(outcome);
+    const parsed = roleOutcomeV11Schema.parse(outcome);
     if (parsed.role !== existing.role) throw new ConflictError("Agent role differs from provider outcome.");
     if (parsed.role === "validation" && parsed.result.phase !== existing.phase) {
       throw new ConflictError("Validation outcome phase differs from its Agent Run.");
@@ -94,7 +94,7 @@ export class AgentExecutionStore {
   }
 
   createTask(input: ExecutionTaskSeed): void {
-    const spec = executionSpecV12Schema.parse(input.spec);
+    const spec = executionSpecV13Schema.parse(input.spec);
     assertHash(spec, input.specHash, "ExecutionSpec");
     const agent = this.requireAgent(spec.agentRunId);
     if (agent.environmentRunId !== spec.environmentRunId || agent.role !== spec.evidence.role) {
@@ -105,7 +105,7 @@ export class AgentExecutionStore {
         INSERT INTO execution_tasks (
           execution_task_id, environment_run_id, agent_run_id, provider, role, kind, status,
           spec_version, spec_json, spec_hash, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'agent_execution', 'queued', 12, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, 'agent_execution', 'queued', 13, ?, ?, ?, ?)
       `).run(spec.taskId, spec.environmentRunId, spec.agentRunId, spec.runtime.provider,
         spec.evidence.role, canonical(spec), input.specHash, spec.createdAt, spec.createdAt);
       const attached = this.connection().prepare(`
@@ -127,10 +127,10 @@ export class AgentExecutionStore {
       taskId: String(row.execution_task_id), agentRunId: String(row.agent_run_id),
       status: row.status as StoredExecutionTask["status"],
       providerOutcomeKey: row.provider_outcome_key === null ? undefined : String(row.provider_outcome_key),
-      outcome: row.outcome_json === null ? undefined : roleOutcomeV10Schema.parse(JSON.parse(String(row.outcome_json))),
+      outcome: row.outcome_json === null ? undefined : roleOutcomeV11Schema.parse(JSON.parse(String(row.outcome_json))),
       errorCode: row.error_code === null ? undefined : String(row.error_code),
       errorMessage: row.error_message === null ? undefined : String(row.error_message),
-      spec: executionSpecV12Schema.parse(JSON.parse(String(row.spec_json)))
+      spec: executionSpecV13Schema.parse(JSON.parse(String(row.spec_json)))
     };
   }
 
@@ -217,7 +217,7 @@ export class AgentExecutionStore {
     }
     let outcomeJson: string | null = null;
     if (status === "succeeded") {
-      const outcome = roleOutcomeV10Schema.parse(detail.outcome);
+      const outcome = roleOutcomeV11Schema.parse(detail.outcome);
       if (outcome.role !== row.role) throw new ConflictError("Execution task role differs from its outcome.");
       outcomeJson = canonical(outcome);
     }
@@ -232,7 +232,7 @@ export class AgentExecutionStore {
   }
 
   waitForInput(executionTaskId: string, providerOutcomeKey: string, outcome: unknown, at: string): boolean {
-    const parsed = roleOutcomeV10Schema.parse(outcome);
+    const parsed = roleOutcomeV11Schema.parse(outcome);
     if (parsed.role !== "work" || parsed.state !== "needs_input") {
       throw new ConflictError("Only a Work needs_input outcome can enter the human waiting boundary.");
     }

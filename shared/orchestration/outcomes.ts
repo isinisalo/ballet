@@ -37,8 +37,8 @@ export interface CriticProposal {
   title: string;
   finding: string;
   evidenceRefs: string[];
-  category: "product" | "system" | "architecture" | "code" | "design" | "documentation";
-  targetType: "product_snapshot" | "environment_definition" | "environment_run" | "state_definition"
+  category: "system" | "architecture" | "code" | "design" | "documentation";
+  targetType: "run_evidence" | "environment_definition" | "environment_run" | "state_definition"
     | "state_execution" | "action_definition" | "action_execution" | "resource";
   targetId: string;
   severity: "low" | "medium" | "high" | "critical";

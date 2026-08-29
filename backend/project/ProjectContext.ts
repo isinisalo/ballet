@@ -8,7 +8,6 @@ export interface ProjectContext {
   readonly gitDir: string;
   readonly stateRoot: string;
   readonly databasePath: string;
-  readonly settingsPath: string;
   readonly worktreesRoot: string;
   readonly logsPath: string;
   readonly headSha: string;
@@ -47,7 +46,6 @@ export const resolveProjectContext = async (options: ResolveProjectContextOption
     gitDir,
     stateRoot,
     databasePath: path.join(stateRoot, "state.sqlite"),
-    settingsPath: path.join(stateRoot, "settings.json"),
     worktreesRoot: path.join(stateRoot, "worktrees"),
     logsPath: path.join(stateRoot, "logs", "ballet.log"),
     headSha,

@@ -77,8 +77,8 @@ describe("v16 relational constraints", () => {
       UPDATE state_executions SET state_order = 1 WHERE state_execution_id = 'state-execution-2'
     `).run()).toThrow(/UNIQUE constraint/);
     expect(() => database.connection.prepare(`
-      INSERT INTO product_snapshots (
-        product_snapshot_id, environment_run_id, branch, worktree_path, base_commit, result_commit,
+      INSERT INTO run_evidences (
+        run_evidence_id, environment_run_id, branch, worktree_path, base_commit, result_commit,
         changed_files_json, artifact_refs_json, resource_hashes_json, definition_hashes_json,
         validation_summary_json, created_at, updated_at
       ) VALUES ('early', 'run-1', 'branch', '/tmp', 'base', 'result', '[]', '[]', '{}', '{}', '{}', 'now', 'now')

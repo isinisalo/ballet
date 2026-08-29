@@ -1,6 +1,6 @@
 export const reviewSchema = `
-  CREATE TABLE product_snapshots (
-    product_snapshot_id TEXT PRIMARY KEY,
+  CREATE TABLE run_evidences (
+    run_evidence_id TEXT PRIMARY KEY,
     environment_run_id TEXT NOT NULL UNIQUE REFERENCES environment_runs(environment_run_id) ON DELETE CASCADE,
     branch TEXT NOT NULL,
     worktree_path TEXT NOT NULL,
@@ -15,29 +15,27 @@ export const reviewSchema = `
     updated_at TEXT NOT NULL
   );
 
-  CREATE TRIGGER product_snapshot_requires_completed_environment
-  BEFORE INSERT ON product_snapshots
+  CREATE TRIGGER run_evidence_requires_completed_environment
+  BEFORE INSERT ON run_evidences
   WHEN (SELECT status FROM environment_runs WHERE environment_run_id = NEW.environment_run_id) <> 'completed'
   BEGIN
-    SELECT RAISE(ABORT, 'Product Snapshot requires completed Environment');
+    SELECT RAISE(ABORT, 'Run Evidence requires completed Environment');
   END;
 
   CREATE TABLE feedback_entries (
     feedback_entry_id TEXT PRIMARY KEY,
     source TEXT NOT NULL CHECK (source IN ('validation_blocked','retry_exhaustion','provider_failure','system_invalid_output','approved_critic_proposal','human')),
-    category TEXT NOT NULL CHECK (category IN ('product','system','architecture','code','design','documentation')),
+    category TEXT NOT NULL CHECK (category IN ('system','architecture','code','design','documentation')),
     target_type TEXT NOT NULL CHECK (target_type IN (
-      'product_snapshot','environment_definition','environment_run','state_definition',
+      'run_evidence','environment_definition','environment_run','state_definition',
       'state_execution','action_definition','action_execution','resource'
     )),
     target_id TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('open','in_refinement','resolved','dismissed')),
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    corrective_actions_json TEXT NOT NULL,
+    comment TEXT NOT NULL,
     evidence_refs_json TEXT NOT NULL,
     created_by TEXT,
-    environment_run_id TEXT NOT NULL REFERENCES environment_runs(environment_run_id) ON DELETE CASCADE,
+    environment_run_id TEXT REFERENCES environment_runs(environment_run_id) ON DELETE CASCADE,
     state_execution_id TEXT REFERENCES state_executions(state_execution_id) ON DELETE SET NULL,
     action_execution_id TEXT REFERENCES action_executions(action_execution_id) ON DELETE SET NULL,
     agent_run_id TEXT REFERENCES agent_runs(agent_run_id) ON DELETE SET NULL,
@@ -82,13 +80,13 @@ export const reviewSchema = `
     critic_schedule_id TEXT NOT NULL REFERENCES critic_schedules(critic_schedule_id) ON DELETE CASCADE,
     due_at TEXT NOT NULL,
     due_key TEXT NOT NULL,
-    product_snapshot_id TEXT REFERENCES product_snapshots(product_snapshot_id) ON DELETE CASCADE,
+    run_evidence_id TEXT REFERENCES run_evidences(run_evidence_id) ON DELETE CASCADE,
     status TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled','skipped')),
     agent_run_id TEXT REFERENCES agent_runs(agent_run_id) ON DELETE SET NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     completed_at TEXT,
-    skip_reason TEXT CHECK (skip_reason IN ('no_product_snapshot')),
+    skip_reason TEXT CHECK (skip_reason IN ('no_run_evidence')),
     UNIQUE (critic_schedule_id, due_at),
     UNIQUE (critic_schedule_id, due_key)
   );
@@ -99,12 +97,12 @@ export const reviewSchema = `
     content_json TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     target_type TEXT NOT NULL CHECK (target_type IN (
-      'product_snapshot','environment_definition','environment_run','state_definition',
+      'run_evidence','environment_definition','environment_run','state_definition',
       'state_execution','action_definition','action_execution','resource'
     )),
     target_id TEXT NOT NULL,
-    category TEXT NOT NULL CHECK (category IN ('product','system','architecture','code','design','documentation')),
-    version INTEGER NOT NULL CHECK (version = 1),
+    category TEXT NOT NULL CHECK (category IN ('system','architecture','code','design','documentation')),
+    version INTEGER NOT NULL CHECK (version = 2),
     status TEXT NOT NULL CHECK (status IN ('pending_human_review','approved','rejected')),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -114,7 +112,7 @@ export const reviewSchema = `
     critic_proposal_id TEXT PRIMARY KEY REFERENCES critic_proposals(critic_proposal_id) ON DELETE CASCADE,
     decision TEXT NOT NULL CHECK (decision IN ('approved','rejected')),
     expected_content_hash TEXT NOT NULL,
-    expected_version INTEGER NOT NULL CHECK (expected_version = 1),
+    expected_version INTEGER NOT NULL CHECK (expected_version = 2),
     decided_by TEXT NOT NULL,
     decided_at TEXT NOT NULL,
     rationale TEXT
@@ -147,7 +145,7 @@ export const reviewSchema = `
     risks_json TEXT NOT NULL,
     validation_plan_json TEXT NOT NULL,
     rollback TEXT NOT NULL,
-    version INTEGER NOT NULL CHECK (version = 1),
+    version INTEGER NOT NULL CHECK (version = 2),
     status TEXT NOT NULL CHECK (status IN ('pending_human_review','applying','rejected','applied','stale','apply_failed')),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -169,7 +167,7 @@ export const reviewSchema = `
     refinement_proposal_id TEXT PRIMARY KEY REFERENCES refinement_proposals(refinement_proposal_id) ON DELETE CASCADE,
     decision TEXT NOT NULL CHECK (decision IN ('approved','rejected')),
     expected_change_list_hash TEXT NOT NULL,
-    expected_version INTEGER NOT NULL CHECK (expected_version = 1),
+    expected_version INTEGER NOT NULL CHECK (expected_version = 2),
     expected_change_hashes_json TEXT NOT NULL,
     expected_impact_action_ids_json TEXT NOT NULL,
     acknowledged_local_commit_and_continuation INTEGER NOT NULL CHECK (

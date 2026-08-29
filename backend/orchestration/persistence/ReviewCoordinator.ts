@@ -27,10 +27,10 @@ export class ReviewCoordinator {
   createCriticProposal(input: CriticProposalSeed): void {
     const owner = this.connection().prepare(`
       SELECT ps.environment_run_id FROM critic_runs cr
-      JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+      JOIN run_evidences ps ON ps.run_evidence_id = cr.run_evidence_id
       WHERE cr.critic_run_id = ?
     `).get(input.criticRunId) as { environment_run_id: string } | undefined;
-    if (!owner) throw new ConflictError("Critic Proposal has no immutable Product Snapshot owner.");
+    if (!owner) throw new ConflictError("Critic Proposal has no immutable Run Evidence owner.");
     validateFeedbackTarget(this.connection(), owner.environment_run_id, input.targetType, input.targetId);
     this.reviews.createCriticProposal(input);
   }
@@ -54,11 +54,11 @@ export class ReviewCoordinator {
       const owner = this.connection().prepare(`
         SELECT ps.environment_run_id FROM critic_proposals cp
         JOIN critic_runs cr ON cr.critic_run_id = cp.critic_run_id
-        JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+        JOIN run_evidences ps ON ps.run_evidence_id = cr.run_evidence_id
         WHERE cp.critic_proposal_id = ?
       `).get(criticProposalId) as { environment_run_id: string } | undefined;
       if (!owner || owner.environment_run_id !== feedback.environmentRunId) {
-        throw new ConflictError("Critic Feedback must belong to the Proposal Product Snapshot Run.");
+        throw new ConflictError("Critic Feedback must belong to the Proposal Run Evidence Run.");
       }
       validateFeedbackTarget(this.connection(), feedback.environmentRunId, feedback.targetType, feedback.targetId);
       this.feedback.create({

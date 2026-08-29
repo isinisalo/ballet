@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
-import { LocalSettingsRepository, type LocalSettings } from "../execution/LocalSettingsRepository.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
-
-export type { LocalSettings } from "../execution/LocalSettingsRepository.js";
 
 export interface ServiceState {
   version: 1;
@@ -17,7 +14,6 @@ export interface ServiceState {
 }
 
 export const serviceStatePath = (project: ProjectContext): string => path.join(project.stateRoot, "service.json");
-export const settingsPath = (project: ProjectContext): string => project.settingsPath;
 export const applicationLogPath = (project: ProjectContext): string => project.logsPath;
 
 export const loadOrCreateServiceState = async (project: ProjectContext): Promise<ServiceState> => {
@@ -43,23 +39,6 @@ export const loadServiceState = async (project: ProjectContext): Promise<Service
 export const saveServiceState = async (project: ProjectContext, state: ServiceState): Promise<void> => {
   parseServiceState(state, project);
   await writeJsonAtomic(serviceStatePath(project), state);
-};
-
-export const loadLocalSettings = async (project: ProjectContext): Promise<LocalSettings> => {
-  return new LocalSettingsRepository(settingsPath(project)).load();
-};
-
-export const updateProviderCommands = async (
-  project: ProjectContext,
-  commands: { codexCommand?: string; copilotCommand?: string }
-): Promise<LocalSettings> => {
-  const repository = new LocalSettingsRepository(settingsPath(project));
-  const settings = await repository.load();
-  const next: LocalSettings = { ...settings, version: 1 };
-  if (commands.codexCommand !== undefined) next.codexCommand = commands.codexCommand;
-  if (commands.copilotCommand !== undefined) next.copilotCommand = commands.copilotCommand;
-  await repository.write(next);
-  return next;
 };
 
 export const isLoopbackPortAvailable = (port: number): Promise<boolean> => new Promise((resolve, reject) => {

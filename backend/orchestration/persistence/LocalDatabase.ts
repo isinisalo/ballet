@@ -46,7 +46,7 @@ export class LocalDatabase {
     if (version !== DATABASE_SCHEMA_VERSION) throw versionError(this.databasePath, version);
     const missing = RuntimeTableNames.filter((tableName) => !tableNames.has(tableName));
     if (missing.length > 0) {
-      throw new RuntimeSchemaVersionError(`Ballet state schema 16 is incomplete; missing tables: ${missing.join(", ")}. Persisted data was left unchanged.`);
+      throw new RuntimeSchemaVersionError(`Ballet state schema ${DATABASE_SCHEMA_VERSION} is incomplete; missing tables: ${missing.join(", ")}. Persisted data was left unchanged.`);
     }
   }
 }
@@ -73,7 +73,7 @@ const readSchemaVersion = (database: Database.Database): number | undefined => {
 
 const versionError = (databasePath: string, version: number | undefined): RuntimeSchemaVersionError => (
   new RuntimeSchemaVersionError([
-    `Unsupported Ballet state schema ${version ?? "unknown"}; expected 16.`,
+    `Unsupported Ballet state schema ${version ?? "unknown"}; expected ${DATABASE_SCHEMA_VERSION}.`,
     `Runtime state at ${databasePath} was left unchanged.`,
     "No migration is available: archive or remove .git/ballet/state.sqlite and its -wal/-shm companions before opening Ballet again."
   ].join(" "))

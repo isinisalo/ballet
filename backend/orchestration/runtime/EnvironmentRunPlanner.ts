@@ -1,10 +1,10 @@
-import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
-import { projectConfigurationV20Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
+import { projectConfigurationV21Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../../shared/orchestration/gates.js";
 import type {
-  RootSnapshotV13, RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
+  RootSnapshotV14, RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/orchestration/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
 import { mapProviderPermissions } from "./ProviderPermissions.js";
@@ -12,7 +12,7 @@ import { resolveOrchestrationResources, type ProjectResourceInput } from "./Reso
 import { ConflictError } from "../persistence/PersistenceErrors.js";
 
 export interface ProjectDefinition {
-  config: ProjectConfigurationV20;
+  config: ProjectConfigurationV21;
   configSha256: string;
   baseCommit: string;
   checkoutRoot: string;
@@ -22,6 +22,7 @@ export interface ProjectDefinition {
     adrs: Record<string, string>;
     constraints: Record<string, string>;
   };
+  agentDocumentHashes: Record<string, string>;
 }
 
 export interface ProjectDefinitionPort {
@@ -29,11 +30,14 @@ export interface ProjectDefinitionPort {
 }
 
 export interface OrchestrationProviderPreflightPort {
-  inspect(profile: ProjectConfigurationV20["executionProfiles"][number]): Promise<RuntimeCapabilitySnapshot>;
+  inspect(
+    profile: ProjectConfigurationV21["agents"][number],
+    project: { headSha: string; configHash: string }
+  ): Promise<RuntimeCapabilitySnapshot>;
 }
 
 export interface PlannedEnvironmentRun {
-  snapshot: RootSnapshotV13;
+  snapshot: RootSnapshotV14;
   snapshotSha256: string;
   createInput(input: {
     environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
@@ -49,20 +53,24 @@ export class EnvironmentRunPlanner {
 
   async plan(): Promise<PlannedEnvironmentRun> {
     const loaded = await this.projects.load();
-    const config = projectConfigurationV20Schema.parse(loaded.config);
+    const config = projectConfigurationV21Schema.parse(loaded.config);
     const readinessIssues = validateRunnableEnvironment(config.environment, config.direction);
     if (readinessIssues.length > 0) {
       throw new ConflictError(`Environment is not runnable: ${readinessIssues.map(({ code, path }) => `${code}@${path}`).join(", ")}.`);
     }
     if (sha256(canonicalJson(config)) !== loaded.configSha256) throw new Error("Project Config hash differs from explicit input.");
     const resources = resolveOrchestrationResources(config, loaded.resources);
-    const profiles = [...config.executionProfiles].sort((left, right) => left.id.localeCompare(right.id));
+    const agents = [...config.agents].sort((left, right) => left.id.localeCompare(right.id)).map((agent) => ({
+      ...agent, contentSha256: requireDirectionHash("Agent", agent.id, loaded.agentDocumentHashes)
+    }));
     const capabilities: RuntimeCapabilitySnapshot[] = [];
-    for (const profile of profiles) {
-      const capability = await this.providers.inspect(profile);
-      assertCapability(profile, capability);
+    for (const agent of agents) {
+      const capability = await this.providers.inspect(agent, { headSha: loaded.baseCommit, configHash: loaded.configSha256 });
+      assertCapability(agent, capability);
       capabilities.push(capability);
     }
+    const devices = new Set(capabilities.map(({ deviceId }) => deviceId));
+    if (devices.size !== 1) throw new ConflictError("Every Agent in an Environment Run must use the same Computer.");
     const permissions = permissionSnapshot(config, capabilities, loaded.checkoutRoot);
     const referencedUseCaseIds = new Set(config.environment.states.flatMap((state) => [
       ...state.useCaseIds, ...state.actions.flatMap((action) => action.useCaseIds)
@@ -81,8 +89,8 @@ export class EnvironmentRunPlanner {
         ...value, contentSha256: requireDirectionHash("Constraint", value.id, loaded.directionDocumentHashes.constraints)
       }))
     };
-    const snapshot: RootSnapshotV13 = {
-      version: 13,
+    const snapshot: RootSnapshotV14 = {
+      version: 14,
       projectHeadSha: loaded.baseCommit,
       projectConfigSha256: loaded.configSha256,
       directionSha256: contentHash(config.direction),
@@ -91,7 +99,7 @@ export class EnvironmentRunPlanner {
       environment: config.environment,
       approvedUseCases,
       direction,
-      executionProfiles: profiles,
+      agents,
       runtimeCapabilities: capabilities,
       resources,
       permissions,
@@ -119,48 +127,49 @@ export class EnvironmentRunPlanner {
 }
 
 const assertCapability = (
-  profile: ProjectConfigurationV20["executionProfiles"][number], capability: RuntimeCapabilitySnapshot
+  agent: ProjectConfigurationV21["agents"][number], capability: RuntimeCapabilitySnapshot
 ): void => {
-  if (capability.executionProfileId !== profile.id || capability.provider !== profile.provider
-    || !capability.supportedModels.includes(profile.model)
-    || !capability.supportedReasoningEfforts.includes(profile.reasoningEffort)
+  if (capability.agentId !== agent.id
+    || !capability.supportedModels.includes(capability.model)
+    || !capability.supportedReasoningEfforts.includes(capability.reasoningEffort)
     || !capability.supportsReadOnly) {
-    throw new Error(`Execution Profile ${profile.id} is not supported by provider preflight.`);
+    throw new Error(`Agent ${agent.id} binding is not supported by provider preflight.`);
   }
   const expectedHash = contentHash({
-    executionProfileId: capability.executionProfileId, provider: capability.provider,
+    agentId: capability.agentId, deviceId: capability.deviceId, runtimeBackendId: capability.runtimeBackendId,
+    provider: capability.provider, model: capability.model, reasoningEffort: capability.reasoningEffort,
+    networkAccess: capability.networkAccess, readOnlyRoots: capability.readOnlyRoots,
     cliVersion: capability.cliVersion, supportedModels: capability.supportedModels,
     supportedReasoningEfforts: capability.supportedReasoningEfforts,
     supportsReadOnly: capability.supportsReadOnly, supportsWorkspaceWrite: capability.supportsWorkspaceWrite
   });
-  if (capability.capabilitySha256 !== expectedHash) throw new Error(`Capability hash for ${profile.id} differs.`);
+  if (capability.capabilitySha256 !== expectedHash) throw new Error(`Capability hash for ${agent.id} differs.`);
 };
 
 const permissionSnapshot = (
-  config: ProjectConfigurationV20, capabilities: RuntimeCapabilitySnapshot[], worktreePath: string
+  config: ProjectConfigurationV21, capabilities: RuntimeCapabilitySnapshot[], worktreePath: string
 ): RuntimePermissionSnapshot[] => {
-  const profile = (id: string) => config.executionProfiles.find((candidate) => candidate.id === id)!;
   const rows: RuntimePermissionSnapshot[] = [];
   for (const state of config.environment.states) for (const action of state.actions) {
     for (const [role, composition] of [["validation", action.validation], ["work", action.work]] as const) {
-      const selectedProfile = profile(composition.executionProfileId);
-      const capability = capabilities.find(({ executionProfileId }) => executionProfileId === selectedProfile.id)!;
-      if (composition.toolPolicy === "workspace_write" && !capability.supportsWorkspaceWrite) {
-        throw new Error(`Execution Profile ${selectedProfile.id} cannot provide workspace-write.`);
+      const capability = capabilities.find(({ agentId }) => agentId === composition.agentId)!;
+      const toolPolicy = role === "work" ? "workspace_write" : "read_only";
+      if (toolPolicy === "workspace_write" && !capability.supportsWorkspaceWrite) {
+        throw new Error(`Agent ${composition.agentId} binding cannot provide workspace-write.`);
       }
       const mapped = mapProviderPermissions({
-        provider: selectedProfile.provider, role, toolPolicy: composition.toolPolicy,
-        networkAccess: selectedProfile.networkAccess, worktreePath
+        provider: capability.provider, role, toolPolicy,
+        networkAccess: capability.networkAccess, worktreePath
       });
-      rows.push({ role, actionId: action.id, toolPolicy: composition.toolPolicy,
+      rows.push({ role, actionId: action.id, toolPolicy,
         networkAccess: mapped.networkAccess, approvalPolicy: mapped.approvalPolicy });
     }
   }
   for (const [role, composition] of [["critic", config.critic.agent], ["refinement", config.refinement.agent]] as const) {
-    const selectedProfile = profile(composition.executionProfileId);
-    const mapped = mapProviderPermissions({ provider: selectedProfile.provider, role,
-      toolPolicy: composition.toolPolicy, networkAccess: selectedProfile.networkAccess, worktreePath });
-    rows.push({ role, toolPolicy: composition.toolPolicy, networkAccess: mapped.networkAccess, approvalPolicy: "never" });
+    const capability = capabilities.find(({ agentId }) => agentId === composition.agentId)!;
+    const mapped = mapProviderPermissions({ provider: capability.provider, role,
+      toolPolicy: "read_only", networkAccess: capability.networkAccess, worktreePath });
+    rows.push({ role, toolPolicy: "read_only", networkAccess: mapped.networkAccess, approvalPolicy: "never" });
   }
   return rows;
 };
@@ -171,6 +180,6 @@ const requireDirectionHash = (label: string, id: string, hashes: Record<string, 
   if (!value || !/^[0-9a-f]{64}$/.test(value)) throw new Error(`${label} ${id} has no source content hash.`);
   return value;
 };
-const transitionLimit = (config: ProjectConfigurationV20): number => 16 + config.environment.states.reduce(
+const transitionLimit = (config: ProjectConfigurationV21): number => 16 + config.environment.states.reduce(
   (total, state) => total + state.actions.reduce((count, action) => count + 4 + action.maxRetries * 3, 0), 0
 );

@@ -46,15 +46,15 @@ export class CriticSchedulerService {
         this.reviews.updateScheduleNextDue(scheduleId, nextDueAt, at);
         continue;
       }
-      const product = this.connection().prepare(`
-        SELECT product_snapshot_id FROM product_snapshots WHERE created_at <= ? ORDER BY created_at DESC, rowid DESC LIMIT 1
-      `).get(at) as { product_snapshot_id: string } | undefined;
+      const evidence = this.connection().prepare(`
+        SELECT run_evidence_id FROM run_evidences WHERE created_at <= ? ORDER BY created_at DESC, rowid DESC LIMIT 1
+      `).get(at) as { run_evidence_id: string } | undefined;
       const criticRunId = this.nextId("critic-run");
       this.reviews.createCriticDue({
         criticRunId, criticScheduleId: scheduleId, dueAt: scheduledDue,
         dueKey: `${scheduleId}:${scheduledDue}`,
-        productSnapshotId: product?.product_snapshot_id,
-        skipReason: product ? undefined : "no_product_snapshot",
+        runEvidenceId: evidence?.run_evidence_id,
+        skipReason: evidence ? undefined : "no_run_evidence",
         createdAt: at
       });
       this.reviews.updateScheduleNextDue(scheduleId, nextDueAt, at);

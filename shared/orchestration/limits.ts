@@ -6,7 +6,7 @@ export const CONTRACT_LIMITS = {
   actionsPerState: 128,
   actionsTotal: 4_096,
   referencesPerItem: 64,
-  executionProfiles: 64,
+  agents: 64,
   skillsPerAgent: 64,
   maxRetries: 20,
   text: 20_000,

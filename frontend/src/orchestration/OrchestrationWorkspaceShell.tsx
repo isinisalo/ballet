@@ -19,7 +19,7 @@ export function OrchestrationWorkspaceShell({ route, navigate, setNavigationBloc
   const streamStatus = useOrchestrationInvalidations(refresh);
   const clearDirty = useCallback(() => setDirty(false), []);
   const mutation = useOrchestrationMutation(refresh, clearDirty);
-  useEffect(() => { if (window.location.pathname === "/") navigate("/configure/direction", { bypassBlocker: true, replace: true }); }, [navigate]);
+  useEffect(() => { if (window.location.pathname === "/") navigate("/automation/loops", { bypassBlocker: true, replace: true }); }, [navigate]);
   useEffect(() => { setNavigationBlocker({ isDirty: dirty, message: "Discard unsaved orchestration changes?" }); return () => setNavigationBlocker(null); }, [dirty, setNavigationBlocker]);
   let content = <Alert className="m-4"><AlertDescription>Loading canonical Ballet workspace…</AlertDescription></Alert>;
   const error = configure.error ?? (isGovernanceView(route.workspaceView) ? governance.error : undefined);

@@ -5,7 +5,7 @@ import { FeedbackStore } from "./FeedbackStore.js";
 import { FlowCoordinator } from "./FlowCoordinator.js";
 import {
   HASH_A, TEST_AT, TEST_SHA, agentRunInput, environmentSeed, feedbackSeed, hash,
-  openTestDatabase, productSnapshotSeed, validationOutcome, type TestDatabase
+  openTestDatabase, runEvidenceSeed, validationOutcome, type TestDatabase
 } from "./PersistenceTestFixtures.js";
 import { ReviewCoordinator } from "./ReviewCoordinator.js";
 import { refinementChangeListHash } from "./ReviewStore.js";
@@ -24,7 +24,7 @@ describe("Critic schedule and human approval", () => {
     });
     const due = {
       criticRunId: "critic-run-1", criticScheduleId: "schedule-1", dueAt: TEST_AT,
-      dueKey: "schedule-1:2026-08-29T10", productSnapshotId: "snapshot-run-1", createdAt: TEST_AT
+      dueKey: "schedule-1:2026-08-29T10", runEvidenceId: "snapshot-run-1", createdAt: TEST_AT
     };
     expect(context.reviews.createCriticDue(due)).toBe("critic-run-1");
     expect(context.reviews.createCriticDue({ ...due, criticRunId: "critic-run-duplicate" })).toBe("critic-run-1");
@@ -37,7 +37,7 @@ describe("Critic schedule and human approval", () => {
     });
     expect(new FeedbackStore(() => context.database.connection).list("run-1")).toEqual([]);
     const decision = {
-      decision: "approved" as const, expectedContentHash: hash(content), expectedVersion: 1 as const,
+      decision: "approved" as const, expectedContentHash: hash(content), expectedVersion: 2 as const,
       decidedAt: TEST_AT
     };
     const feedback = feedbackSeed("critic-feedback", "approved_critic_proposal", {
@@ -55,7 +55,7 @@ describe("Critic schedule and human approval", () => {
     const context = completedContext();
     createCriticProposal(context);
     expect(() => context.reviews.decideCritic("critic-proposal-1", {
-      decision: "rejected", expectedContentHash: "f".repeat(64), expectedVersion: 1, decidedAt: TEST_AT
+      decision: "rejected", expectedContentHash: "f".repeat(64), expectedVersion: 2, decidedAt: TEST_AT
     }, actor)).toThrow(/stale/);
     expect(context.database.connection.prepare("SELECT COUNT(*) AS count FROM critic_proposal_decisions").get())
       .toEqual({ count: 0 });
@@ -151,7 +151,7 @@ const completedContext = () => {
     outcome: validationOutcome({ phase: "precheck", decision: "done", evidence: {} }), completedAt: TEST_AT
   });
   flow.completeState("state-execution-1", 1, TEST_AT);
-  flow.completeEnvironment(productSnapshotSeed(), flow.runs.require("run-1").revision);
+  flow.completeEnvironment(runEvidenceSeed(), flow.runs.require("run-1").revision);
   return { database, flow, reviews: new ReviewCoordinator(() => database.connection) };
 };
 
@@ -162,7 +162,7 @@ const createCriticProposal = (context: ReturnType<typeof completedContext>) => {
   });
   context.reviews.createCriticDue({
     criticRunId: "critic-run-1", criticScheduleId: "schedule-1", dueAt: TEST_AT,
-    dueKey: "due-1", productSnapshotId: "snapshot-run-1", createdAt: TEST_AT
+    dueKey: "due-1", runEvidenceId: "snapshot-run-1", createdAt: TEST_AT
   });
   const content = { proposedText: "Improve" };
   context.reviews.createCriticProposal({
@@ -202,7 +202,7 @@ const proposalInput = (refinementRunId: string, refinementProposalId: string, re
 });
 
 const refinementDecision = (proposal: ReturnType<typeof proposalInput>) => ({
-  decision: "approved" as const, expectedContentHash: proposal.changeListHash, expectedVersion: 1 as const,
+  decision: "approved" as const, expectedContentHash: proposal.changeListHash, expectedVersion: 2 as const,
   expectedChangeHashes: proposal.files.map(({ proposedContentHash }) => proposedContentHash),
   expectedImpactActionIds: ["action-1"], acknowledgeLocalCommitAndContinuation: true,
   decidedAt: TEST_AT

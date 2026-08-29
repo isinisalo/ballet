@@ -4,7 +4,7 @@ title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 22
+version: 23
 tags: [arc42, glossary]
 arc42Section: 12
 ---
@@ -23,6 +23,6 @@ arc42Section: 12
 | Critic proposal | Read-only arvio, joka ei ole Feedback ennen human approvalia. |
 | Refinement proposal | Exact paths/diff/preimage/impact-hasheihin sidottu read-only muutosehdotus. |
 | Continuation run | Uusi immutable Environment Run hyväksytyn refinement-commitin päältä. |
-| Product Snapshot | Terminal runin commit-, artifact-, evidence- ja lineage-projektio. |
+| Run Evidence | Terminal Runin immutable commit-, artifact-, validation- ja lineage-projektio, joka näkyy omistavan Runin sisällä. |
 | Project truth | Versionhallittu direction/config/resource-data. |
-| Runtime truth | SQLite v16:n statukset, eventit, päätökset ja lineage. |
+| Runtime truth | SQLite v17:n statukset, eventit, päätökset, Agent-bindingit ja lineage. |

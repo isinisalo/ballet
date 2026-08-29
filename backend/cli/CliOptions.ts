@@ -1,6 +1,4 @@
 export interface StartOptions {
-  codexCommand?: string;
-  copilotCommand?: string;
   openBrowser: boolean;
 }
 
@@ -10,12 +8,8 @@ export interface LogOptions {
 }
 
 export const parseStartOptions = (args: readonly string[]): StartOptions => {
-  const options = parseCliOptions(args, new Set(["codex-command", "copilot-command"]), new Set(["no-open"]));
-  return {
-    codexCommand: optionalValue(options, "codex-command"),
-    copilotCommand: optionalValue(options, "copilot-command"),
-    openBrowser: !options.has("no-open")
-  };
+  const options = parseCliOptions(args, new Set(), new Set(["no-open"]));
+  return { openBrowser: !options.has("no-open") };
 };
 
 export const parseLogOptions = (args: readonly string[]): LogOptions => {
@@ -55,13 +49,4 @@ export const parseCliOptions = (
     options.set(key, optionValue);
   }
   return options;
-};
-
-const optionalValue = (options: Map<string, string>, key: string): string | undefined => {
-  const value = options.get(key)?.trim();
-  if (!value) return undefined;
-  if (value.includes("/") && !value.startsWith("/")) {
-    throw new Error(`--${key} must be a command name or an absolute path.`);
-  }
-  return value;
 };

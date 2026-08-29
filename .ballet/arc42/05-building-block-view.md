@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 27
+version: 28
 tags: [arc42, building-blocks]
 arc42Section: 5
 ---
@@ -21,10 +21,10 @@ BB-015 jakautuu seuraaviin selkeisiin rajoihin:
 - Shared contracts: schema, versiot, route inventory ja pure status/order -säännöt.
 - Project services: config ja Markdown-resource closure.
 - Runtime: planner, prompt composition, queue, provider dispatch ja continuation seed.
-- Persistence: SQLite v16 schema/stores ja transaction coordinatorit.
+- Persistence: SQLite v17 schema/stores ja transaction coordinatorit.
 - Governance: Feedback, Critic schedule/proposals, human decisions ja Refinement apply.
 - HTTP/SSE: loopback security, request validation, mutation commands ja invalidation eventit.
-- UI: Configure, Run Gate, Feedback, Critic, Refinement ja Product Snapshot.
-- Generic execution infrastructure: provider adapters, ExecutionProfiles, worktrees and local runtime lifecycle.
+- UI: Loop Engineering, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback, Critic, Refinement ja Run Evidence.
+- Generic execution infrastructure: paired daemon, Agent bindings, provider adapters, worktrees and lease/fencing lifecycle.
 
 Riippuvuussuunta on UI/HTTP -> application/runtime -> domain contracts; adapterit ja persistence toteuttavat sisäiset portit. Project-local workflow-data ei kuulu platform-koodiin.

@@ -3,7 +3,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { Constraint, DirectionReference, UseCase } from "../../../shared/orchestration/direction.js";
 import { approveUseCase, invalidateUseCaseApproval, useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
-import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
+import type { AgentDefinition, ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDefinition, ProjectDefinitionPort } from "../runtime/EnvironmentRunPlanner.js";
@@ -41,6 +41,32 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
       this.projects.save(loaded.config, saved.configHash);
       throw error;
     }
+  }
+
+  putAgent(input: {
+    id: string; value: AgentDefinition; markdown: string;
+    expectedConfigHash: string; expectedDocumentHash: string | "absent";
+  }): { configHash: string; documentHash: string } {
+    if (input.id !== input.value.id) throw new ConflictError("Agent path id differs from Markdown value id.");
+    const loaded = this.projects.load();
+    if (loaded.configHash !== input.expectedConfigHash) throw new ConflictError("Project Config optimistic hash is stale.");
+    const config = { ...loaded.config, agents: replace(loaded.config.agents, input.value) };
+    const saved = this.projects.save(config, input.expectedConfigHash);
+    try {
+      const document = this.documents.put("agent", input.id, input.markdown, input.expectedDocumentHash);
+      return { configHash: saved.configHash, documentHash: document.contentHash };
+    } catch (error) { this.projects.save(loaded.config, saved.configHash); throw error; }
+  }
+
+  removeAgent(input: { id: string; expectedConfigHash: string; expectedDocumentHash: string }): string {
+    const loaded = this.projects.load();
+    if (loaded.configHash !== input.expectedConfigHash) throw new ConflictError("Project Config optimistic hash is stale.");
+    const blockers = new ProjectReferenceIndex(loaded.config).for("agent", input.id);
+    if (blockers.length > 0) throw new ConflictError(`Agent ${input.id} has reference blockers.`);
+    const saved = this.projects.save({ ...loaded.config, agents: loaded.config.agents.filter(({ id }) => id !== input.id) }, input.expectedConfigHash);
+    try { this.documents.remove("agent", input.id, input.expectedDocumentHash, []); }
+    catch (error) { this.projects.save(loaded.config, saved.configHash); throw error; }
+    return saved.configHash;
   }
 
   removeDirection(input: {
@@ -102,16 +128,17 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
     return {
       config: loaded.config, configSha256: loaded.configHash,
       baseCommit: result.stdout.trim(), checkoutRoot: this.root, resources,
-      directionDocumentHashes: { goals: hashes("goal"), adrs: hashes("adr"), constraints: hashes("constraint") }
+      directionDocumentHashes: { goals: hashes("goal"), adrs: hashes("adr"), constraints: hashes("constraint") },
+      agentDocumentHashes: Object.fromEntries(this.documents.list("agent").map(({ id, contentHash }) => [id, contentHash]))
     };
   }
 }
 
 const replaceDirectionValue = (
-  config: ProjectConfigurationV20,
+  config: ProjectConfigurationV21,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   input: DirectionValue
-): ProjectConfigurationV20 => {
+): ProjectConfigurationV21 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = replace(direction.goals, input as DirectionReference);
   else if (kind === "adr") direction.adrs = replace(direction.adrs, input as DirectionReference);
@@ -133,10 +160,10 @@ const replaceDirectionValue = (
   return { ...config, direction };
 };
 const removeDirectionValue = (
-  config: ProjectConfigurationV20,
+  config: ProjectConfigurationV21,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   id: string
-): ProjectConfigurationV20 => {
+): ProjectConfigurationV21 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = direction.goals.filter((value) => value.id !== id);
   else if (kind === "adr") direction.adrs = direction.adrs.filter((value) => value.id !== id);
@@ -146,6 +173,6 @@ const removeDirectionValue = (
 };
 const replace = <T extends { id: string }>(values: T[], value: T): T[] =>
   [...values.filter((candidate) => candidate.id !== value.id), value].sort((left, right) => left.id.localeCompare(right.id));
-const replaceUseCase = (config: ProjectConfigurationV20, useCase: UseCase): ProjectConfigurationV20 => ({
+const replaceUseCase = (config: ProjectConfigurationV21, useCase: UseCase): ProjectConfigurationV21 => ({
   ...config, direction: { ...config.direction, useCases: replace(config.direction.useCases, useCase) }
 });

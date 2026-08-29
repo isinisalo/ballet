@@ -4,20 +4,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { z } from "zod";
-import { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
-import { LocalSettingsRepository } from "../execution/LocalSettingsRepository.js";
 import { sendKnownHttpError } from "../http/errors.js";
 import { parseBody } from "../http/validation/httpValidation.js";
 import { createCompositionRoot } from "../orchestration/CompositionRoot.js";
 import { resolveProjectContext, type ProjectContext } from "../project/ProjectContext.js";
 import { RotatingFileLogger } from "./RotatingFileLogger.js";
+import { createControlPlane } from "../control-plane/createControlPlane.js";
+import { runGit } from "../execution/git/gitProcess.js";
+import { DaemonOrchestrationProvider } from "../orchestration/runtime/DaemonOrchestrationProvider.js";
+import { DaemonEnvironmentWorkspace } from "../orchestration/runtime/DaemonEnvironmentWorkspace.js";
 
 export interface CreateBalletServerOptions {
   root: string;
   port: number;
   stateRoot?: string;
-  codexCommand?: string;
-  copilotCommand?: string;
   webDist?: string;
   onShutdown?(): void;
 }
@@ -27,27 +27,57 @@ const emptyBodySchema = z.object({}).strict();
 export const createBalletServer = async (options: CreateBalletServerOptions) => {
   const context = await resolveProjectContext({ root: options.root, stateRoot: options.stateRoot });
   const logger = new RotatingFileLogger(context.logsPath);
-  const settings = new LocalSettingsRepository(context.settingsPath);
-  const savedSettings = await settings.load();
-  const runtime = new LocalRuntimeService({
-    context,
-    settings,
-    codexCommand: options.codexCommand ?? savedSettings.codexCommand,
-    copilotCommand: options.copilotCommand ?? savedSettings.copilotCommand
+  const startedAt = new Date().toISOString();
+  const repositoryUrl = await resolveRepositoryUrl(context.root);
+  type Composition = Awaited<ReturnType<typeof createCompositionRoot>>;
+  const compositionRef: { current?: Composition } = {};
+  const currentComposition = (): Composition => {
+    if (!compositionRef.current) throw new Error("Ballet composition is not initialized.");
+    return compositionRef.current;
+  };
+  const controlPlane = createControlPlane({
+    dbPath: path.join(context.stateRoot, "control-plane.sqlite"),
+    project: { id: context.instanceId, repositoryUrl, checkoutPath: context.root },
+    trustedLocalUi: true,
+    freshCheckoutBeforeRun: true,
+    listAgentIds: () => currentComposition().project.projects.load().config.agents.map(({ id }) => id),
+    resolveAgentSnapshot: (agentId) => {
+      const composition = currentComposition();
+      const loaded = composition.project.projects.load();
+      const agent = loaded.config.agents.find(({ id }) => id === agentId);
+      if (!agent) throw new Error(`Agent ${agentId} was not found.`);
+      const agentDocument = composition.project.documents.require("agent", agentId);
+      const instruction = composition.project.documents.require("instruction", agent.instructionResource);
+      return {
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        instructions: `${agentDocument.content.trim()}\n\n${instruction.content.trim()}`,
+        skillIds: [...agent.skillResources],
+        configHash: loaded.configHash
+      };
+    },
+    installCommand: ({ request, pairing }) => {
+      const serverUrl = `${request.protocol}://${request.get("host") ?? `127.0.0.1:${options.port}`}`;
+      return ["ballet", "daemon", "setup", "--server", serverUrl, "--device-code", pairing.deviceCode,
+        "--repo", repositoryUrl, "--project", context.instanceId].map(shellArgument).join(" ");
+    }
   });
-  // Provider discovery can involve local authenticated CLIs and must not gate the
-  // loopback control plane or persisted-run recovery. Run preflight still reads
-  // the fail-closed provider status until discovery completes.
-  void runtime.start().catch((error) => {
-    logger.error("Local provider discovery failed during startup.", error instanceof Error ? { message: error.message } : error);
+  const provider = new DaemonOrchestrationProvider(controlPlane.service, context.instanceId);
+  const environmentWorkspace = new DaemonEnvironmentWorkspace(context.root, context.instanceId, controlPlane.service);
+  const composition = await createCompositionRoot({
+    context, provider,
+    environmentWorkspace,
+    environmentFinalizer: environmentWorkspace
   });
-  const composition = await createCompositionRoot({ context, runtime });
+  compositionRef.current = composition;
 
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", "loopback");
   app.use(loopbackSecurity(options.port));
   app.use(express.json({ limit: "1mb" }));
-  app.get("/api/health", (_req, res) => res.json(health(context, options.port, runtime)));
+  app.get("/api/health", (_req, res) => res.json(health(context, options.port, startedAt)));
   let shuttingDown = false;
   let resolveClosed!: () => void;
   const closed = new Promise<void>((resolve) => { resolveClosed = resolve; });
@@ -56,6 +86,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(202).json({ accepted: true });
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
+  app.use("/api", controlPlane.router);
   app.use("/api", composition.router);
 
   const clientDist = resolveClientDist(options.webDist);
@@ -68,12 +99,14 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error." });
   });
   const server = createServer(app);
+  controlPlane.attachWebSocket(server);
 
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return closed;
     shuttingDown = true;
     logger.info("Ballet shutdown started.");
     await composition.shutdown();
+    controlPlane.close();
     const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await serverClosed;
@@ -84,15 +117,18 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   };
 
   logger.info("Ballet server initialized.", { root: context.root, instanceId: context.instanceId, port: options.port });
-  return { app, server, context, runtime, composition, shutdown, logger };
+  return { app, server, context, composition, controlPlane, shutdown, logger };
 };
 
 export const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {
   const host = (req.get("host") ?? "").toLowerCase();
   const hostname = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
-  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname)) {
+  const loopback = ["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname);
+  const remoteDaemon = req.path.startsWith("/api/daemon/") && req.secure;
+  if (!loopback && !remoteDaemon) {
     res.status(403).json({ error: "Ballet accepts loopback requests only." }); return;
   }
+  if (remoteDaemon) { next(); return; }
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const origin = req.get("origin");
     const fetchSite = req.get("sec-fetch-site");
@@ -104,9 +140,18 @@ export const loopbackSecurity = (port: number): express.RequestHandler => (req, 
   next();
 };
 
-const health = (context: ProjectContext, port: number, runtime: LocalRuntimeService) => ({
+const resolveRepositoryUrl = async (root: string): Promise<string> => {
+  try {
+    const result = await runGit(["remote", "get-url", "origin"], { cwd: root });
+    return result.stdout.trim() || root;
+  } catch { return root; }
+};
+
+const shellArgument = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
+
+const health = (context: ProjectContext, port: number, startedAt: string) => ({
   ok: true, instanceId: context.instanceId, checkoutRoot: context.root, port,
-  version: process.env.BALLET_VERSION ?? "0.1.0", startedAt: runtime.startedAtIso
+  version: process.env.BALLET_VERSION ?? "0.1.0", startedAt
 });
 
 const resolveClientDist = (configured?: string): string => {

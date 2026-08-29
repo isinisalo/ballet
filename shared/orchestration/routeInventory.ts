@@ -7,7 +7,7 @@ const documentRoutes = (collection: string) => [
 export const OrchestrationRouteInventory = [
   "GET /api/project", "PUT /api/project", "GET /api/events",
   ...documentRoutes("goals"), ...documentRoutes("adrs"), ...documentRoutes("constraints"),
-  ...documentRoutes("use-cases"), ...documentRoutes("instructions"), ...documentRoutes("skills"),
+  ...documentRoutes("use-cases"), ...documentRoutes("agents"), ...documentRoutes("instructions"), ...documentRoutes("skills"),
   "POST /api/use-cases/:id/approve", "POST /api/use-cases/:id/return-to-draft",
   "GET /api/reference-index", "GET /api/environment", "PUT /api/environment",
   "POST /api/environment/states", "GET /api/environment/states/:stateId",
@@ -21,22 +21,22 @@ export const OrchestrationRouteInventory = [
   "POST /api/environment-runs", "GET /api/environment-runs",
   "GET /api/environment-runs/:runId", "POST /api/environment-runs/:runId/cancel",
   "POST /api/environment-runs/:runId/work-input",
-  "GET /api/environment-runs/:runId/events", "GET /api/environment-runs/:runId/product",
+  "GET /api/environment-runs/:runId/events", "GET /api/environment-runs/:runId/evidence",
   "GET /api/feedback", "POST /api/feedback", "GET /api/feedback/:id",
-  "POST /api/feedback/:id/decision",
+  "POST /api/feedback/:id/decision", "POST /api/feedback/:id/refinement",
   "GET /api/critic/schedules", "GET /api/critic/runs", "POST /api/critic/runs",
   "GET /api/critic/proposals", "GET /api/critic/proposals/:id",
   "POST /api/critic/reconcile", "POST /api/critic/proposals/:id/decision",
-  "GET /api/refinement/runs", "POST /api/refinement/runs",
+  "GET /api/refinement/runs",
   "GET /api/refinement/proposals", "GET /api/refinement/proposals/:id",
   "POST /api/refinement/proposals/:id/decision", "POST /api/refinement/proposals/:id/apply",
   "GET /api/refinement/proposals/:id/apply", "GET /api/refinement/proposals/:id/continuation"
 ] as const;
 
 export const RuntimeSchemaInventory = Object.freeze({
-  projectConfig: 20, rootSnapshot: 13, taskEnvelope: 10, roleOutcome: 10,
-  promptComposition: 11, executionSpec: 12, sqlite: 16,
-  feedback: 1, critic: 1, refinement: 1
+  projectConfig: 21, rootSnapshot: 14, taskEnvelope: 11, roleOutcome: 11,
+  promptComposition: 12, executionSpec: 13, sqlite: 17,
+  feedback: 2, critic: 2, refinement: 2, agentDaemonBinding: 1, runEvidence: 1
 });
 
 export const OrchestrationProhibitedRoutes = [

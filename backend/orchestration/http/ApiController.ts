@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
-import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
 import type { FeedbackCategory, FeedbackTargetType } from "../../../shared/orchestration/reviews.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -21,7 +21,7 @@ import type { RefinementApplyService } from "../governance/RefinementApplyServic
 import type { ProjectDefinitionService, DirectionValue } from "../project/ProjectDefinitionService.js";
 import type { ProjectDocumentKind } from "../project/ProjectReferenceIndex.js";
 import { ProjectReferenceIndex } from "../project/ProjectReferenceIndex.js";
-import { ProductSnapshotStore } from "../persistence/ProductSnapshotStore.js";
+import { RunEvidenceStore } from "../persistence/RunEvidenceStore.js";
 import type {
   InvalidationBroadcaster
 } from "./InvalidationBroadcaster.js";
@@ -53,7 +53,7 @@ export class ApiController {
   private readonly reviews: ReviewCoordinator;
   private readonly reviewStore: ReviewStore;
   private readonly feedbackStore: FeedbackStore;
-  private readonly products: ProductSnapshotStore;
+  private readonly runEvidences: RunEvidenceStore;
 
   constructor(private readonly dependencies: OrchestrationControllerDependencies) {
     this.runs = new EnvironmentRunStore(dependencies.connection);
@@ -61,17 +61,20 @@ export class ApiController {
     this.reviews = new ReviewCoordinator(dependencies.connection);
     this.reviewStore = new ReviewStore(dependencies.connection);
     this.feedbackStore = new FeedbackStore(dependencies.connection);
-    this.products = new ProductSnapshotStore(dependencies.connection);
+    this.runEvidences = new RunEvidenceStore(dependencies.connection);
   }
 
   project(): unknown { return this.dependencies.project.projects.load(); }
-  putProject(config: ProjectConfigurationV20, expectedHash: string | "absent"): unknown {
+  putProject(config: ProjectConfigurationV21, expectedHash: string | "absent"): unknown {
     const current = this.dependencies.project.projects.loadOptional();
     if (current && canonical(current.config.direction) !== canonical(config.direction)) {
       throw new ConflictError("Direction and Use Case mutations require their dedicated document commands.");
     }
     if (!current && config.direction.useCases.some(({ status }) => status === "approved")) {
       throw new ConflictError("Initial Use Cases must be draft and use the dedicated human approval command.");
+    }
+    if (current && canonical(current.config.agents) !== canonical(config.agents)) {
+      throw new ConflictError("Agent mutations require their dedicated Markdown document commands.");
     }
     const saved = this.dependencies.project.projects.save(config, expectedHash);
     this.changed("project_changed");
@@ -83,14 +86,29 @@ export class ApiController {
     const document = this.dependencies.project.documents.require(kind, id);
     if (kind === "instruction" || kind === "skill") return document;
     const config = this.dependencies.project.projects.load().config;
+    if (kind === "agent") return { ...document, value: config.agents.find((value) => value.id === id) };
     return { ...document, value: directionValues(config, kind).find((value) => value.id === id) };
+  }
+  createAgent(input: Parameters<ProjectDefinitionService["putAgent"]>[0]): unknown {
+    if (input.expectedDocumentHash !== "absent" || this.dependencies.project.documents.list("agent").some(({ id }) => id === input.id)) {
+      throw new ConflictError(`Agent ${input.id} already exists.`);
+    }
+    const saved = this.dependencies.project.putAgent(input); this.changed("project_changed", input.id); return saved;
+  }
+  updateAgent(input: Parameters<ProjectDefinitionService["putAgent"]>[0]): unknown {
+    if (input.expectedDocumentHash === "absent") throw new NotFoundError(`Agent ${input.id} was not found.`);
+    this.dependencies.project.documents.require("agent", input.id);
+    const saved = this.dependencies.project.putAgent(input); this.changed("project_changed", input.id); return saved;
+  }
+  removeAgent(input: Parameters<ProjectDefinitionService["removeAgent"]>[0]): unknown {
+    const hash = this.dependencies.project.removeAgent(input); this.changed("project_changed", input.id); return { configHash: hash };
   }
   referenceIndex(): unknown {
     const config = this.dependencies.project.projects.load().config;
     const activeRunIds = (this.dependencies.connection().prepare(
       "SELECT environment_run_id FROM environment_runs WHERE status IN ('pending','running') ORDER BY environment_run_id"
     ).all() as Array<{ environment_run_id: string }>).map(({ environment_run_id }) => environment_run_id);
-    const runReferences = (["goal", "adr", "constraint", "use-case", "instruction", "skill"] as const)
+    const runReferences = (["goal", "adr", "constraint", "use-case", "agent", "instruction", "skill"] as const)
       .flatMap((kind) => this.dependencies.project.documents.list(kind).flatMap(({ id }) => {
         const runIds = this.dependencies.project.documents.runReferences(kind, id);
         return runIds.length > 0 ? [{ kind, id, runIds }] : [];
@@ -284,8 +302,8 @@ export class ApiController {
       outcome: Reflect.get(activeAgentRow as object, "outcome_json")
         ? JSON.parse(String(Reflect.get(activeAgentRow as object, "outcome_json"))) : undefined,
       outcome_json: undefined } : undefined;
-    const product = run.status === "completed" ? this.products.requireByRun(id) : undefined;
-    return { ...publicRun(run), activeAgent, states, events: this.eventFacts(id, 0), product };
+    const evidence = run.status === "completed" ? this.runEvidences.requireByRun(id) : undefined;
+    return { ...publicRun(run), activeAgent, states, events: this.eventFacts(id, 0), evidence };
   }
   listRuns(): unknown[] {
     const rows = this.dependencies.connection().prepare(
@@ -302,7 +320,7 @@ export class ApiController {
     const run = this.dependencies.runtime.answerWorkInput({ environmentRunId: id, ...input, actorId: actor.id });
     this.changed("run_changed", id); return publicRun(run);
   }
-  product(id: string): unknown { this.runs.require(id); return this.products.requireByRun(id); }
+  evidence(id: string): unknown { this.runs.require(id); return this.runEvidences.requireByRun(id); }
   eventFacts(id: string, after: number): unknown[] {
     this.runs.require(id);
     return this.events.list(id).filter((row) => Number(row.sequence) > after).slice(0, 500).map((row) => ({
@@ -314,12 +332,11 @@ export class ApiController {
   listFeedback(input: { environmentRunId?: string; status?: string; category?: FeedbackCategory }): unknown {
     return this.dependencies.feedback.list(input);
   }
-  createFeedback(input: {
-    environmentRunId: string; category: FeedbackCategory; targetType: FeedbackTargetType; targetId: string;
-    title: string; description: string; correctiveActions: string[]; evidenceRefs?: string[];
-  }, actor: TrustedHumanActor): unknown {
+  async createFeedback(input: { category: FeedbackCategory; comment: string }, actor: TrustedHumanActor): Promise<unknown> {
     const id = this.dependencies.nextId("feedback");
-    this.dependencies.feedback.createHuman({ ...input, feedbackEntryId: id, createdAt: this.dependencies.now() }, actor);
+    const project = await this.dependencies.project.load();
+    this.dependencies.feedback.createHuman({ ...input, sourceCommit: project.baseCommit,
+      feedbackEntryId: id, createdAt: this.dependencies.now() }, actor);
     this.changed("feedback_changed", id);
     return this.feedbackStore.require(id);
   }
@@ -328,6 +345,14 @@ export class ApiController {
     this.changed("feedback_changed", id);
   }
   feedback(id: string): unknown { return this.feedbackStore.require(id); }
+
+  async createRefinementForFeedback(id: string): Promise<unknown> {
+    const feedback = this.feedbackStore.require(id);
+    if (typeof feedback.environment_run_id !== "string") {
+      throw new ConflictError("Project-level Feedback needs a completed Environment Run before Refinement can start.");
+    }
+    return this.createRefinement(feedback.environment_run_id, [id]);
+  }
 
   async reconcileCritic(): Promise<unknown> {
     const config = this.dependencies.project.projects.load().config.critic;
@@ -349,38 +374,44 @@ export class ApiController {
   }
   criticProposal(id: string): unknown { return this.reviewStore.requireCriticProposal(id); }
   async manualCritic(): Promise<unknown> {
-    const product = this.dependencies.connection().prepare(
-      "SELECT product_snapshot_id FROM product_snapshots ORDER BY created_at DESC, rowid DESC LIMIT 1"
-    ).get() as { product_snapshot_id: string } | undefined;
-    if (!product) throw new ConflictError("Manual Critic requires a Product Snapshot.");
+    const evidence = this.dependencies.connection().prepare(
+      "SELECT run_evidence_id FROM run_evidences ORDER BY created_at DESC, rowid DESC LIMIT 1"
+    ).get() as { run_evidence_id: string } | undefined;
+    if (!evidence) throw new ConflictError("Manual Critic requires a Run Evidence.");
     const at = this.dependencies.now(); const scheduleId = "manual";
     this.reviewStore.upsertSchedule({ criticScheduleId: scheduleId, configHash: sha256("manual"),
       config: { id: scheduleId, kind: "daily", timeZone: "UTC", localTimes: ["00:00"] },
       nextDueAt: at, enabled: true, createdAt: at });
     const criticRunId = this.dependencies.nextId("critic-run");
     this.reviews.createCriticDue({ criticRunId, criticScheduleId: scheduleId, dueAt: at,
-      dueKey: `${scheduleId}:${criticRunId}`, productSnapshotId: product.product_snapshot_id, createdAt: at });
+      dueKey: `${scheduleId}:${criticRunId}`, runEvidenceId: evidence.run_evidence_id, createdAt: at });
     const taskId = await this.dependencies.governance.queueCritic(criticRunId);
     this.changed("critic_changed", criticRunId); return { criticRunId, taskId };
   }
   decideCritic(id: string, input: {
-    decision: "approved" | "rejected"; expectedContentHash: string; expectedVersion: 1; rationale?: string;
-    feedback?: { feedbackEntryId: string; title: string; description: string; correctiveActions: string[]; evidenceRefs?: string[] };
+    decision: "approved" | "rejected"; expectedContentHash: string; expectedVersion: 2; rationale?: string;
   }, actor: TrustedHumanActor): void {
     const proposal = this.reviewStore.requireCriticProposal(id);
     const owner = this.dependencies.connection().prepare(`
       SELECT ps.environment_run_id FROM critic_proposals cp
       JOIN critic_runs cr ON cr.critic_run_id = cp.critic_run_id
-      JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+      JOIN run_evidences ps ON ps.run_evidence_id = cr.run_evidence_id
       WHERE cp.critic_proposal_id = ?
     `).get(id) as { environment_run_id: string } | undefined;
     if (input.decision === "approved" && !owner) {
-      throw new ConflictError("Critic proposal has no immutable Product Snapshot owner.");
+      throw new ConflictError("Critic proposal has no immutable Run Evidence owner.");
     }
-    const feedback = input.decision === "approved" && input.feedback ? {
-      ...input.feedback, environmentRunId: owner!.environment_run_id, source: "approved_critic_proposal" as const,
+    const content = JSON.parse(String(proposal.content_json)) as Record<string, unknown>;
+    const recommendations = Array.isArray(content.recommendedCorrectiveActions)
+      ? content.recommendedCorrectiveActions.filter((value): value is string => typeof value === "string") : [];
+    const evidenceRefs = Array.isArray(content.evidenceRefs)
+      ? content.evidenceRefs.filter((value): value is string => typeof value === "string") : [];
+    const feedback = input.decision === "approved" ? {
+      feedbackEntryId: this.dependencies.nextId("feedback"), environmentRunId: owner!.environment_run_id,
+      source: "approved_critic_proposal" as const,
       category: proposal.category as FeedbackCategory, targetType: proposal.target_type as FeedbackTargetType,
       targetId: String(proposal.target_id), criticProposalId: id,
+      comment: [String(content.finding ?? "Critic finding"), ...recommendations].join("\n\n"), evidenceRefs,
       provenance: { proposalContentHash: input.expectedContentHash }, createdAt: this.dependencies.now()
     } : undefined;
     this.reviews.decideCritic(id, { decision: input.decision, expectedContentHash: input.expectedContentHash,
@@ -489,7 +520,7 @@ const assertExactOrder = (received: string[], current: string[], label: string):
   }
 };
 const directionValues = (
-  config: ProjectConfigurationV20, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
+  config: ProjectConfigurationV21, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
 ) => kind === "goal" ? config.direction.goals : kind === "adr" ? config.direction.adrs
   : kind === "constraint" ? config.direction.constraints : config.direction.useCases;
 

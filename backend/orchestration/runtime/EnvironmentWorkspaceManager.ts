@@ -1,15 +1,15 @@
 import { lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
-import type { ProductSnapshotSeed } from "../../../shared/orchestration/persistence.js";
+import type { RunEvidenceSeed } from "../../../shared/orchestration/persistence.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import { changedFiles } from "../../execution/git/gitChanges.js";
 import { runGit } from "../../execution/git/gitProcess.js";
 import type { OrchestrationWorkspacePort } from "../http/ApiController.js";
 import type { GovernanceWorkspaceBoundary } from "../governance/GovernanceExecutionService.js";
-import type { ProductFinalizationPort } from "./EnvironmentRuntimeService.js";
+import type { RunEvidenceFinalizationPort } from "./EnvironmentRuntimeService.js";
 
-export class EnvironmentWorkspaceManager implements OrchestrationWorkspacePort, ProductFinalizationPort, GovernanceWorkspaceBoundary {
+export class EnvironmentWorkspaceManager implements OrchestrationWorkspacePort, RunEvidenceFinalizationPort, GovernanceWorkspaceBoundary {
   constructor(
     private readonly root: string,
     private readonly worktreesRoot: string,
@@ -65,7 +65,7 @@ export class EnvironmentWorkspaceManager implements OrchestrationWorkspacePort, 
     }).catch(() => undefined);
   }
 
-  async finalize(run: StoredEnvironmentRun, at: string): Promise<ProductSnapshotSeed> {
+  async finalize(run: StoredEnvironmentRun, at: string): Promise<RunEvidenceSeed> {
     const paths = (await changedFiles(run.worktreePath, run.baseCommit)).sort();
     await runGit(["add", "-A"], { cwd: run.worktreePath });
     const staged = await runGit(["diff", "--cached", "--quiet"], { cwd: run.worktreePath, allowedExitCodes: [1] });
@@ -75,7 +75,7 @@ export class EnvironmentWorkspaceManager implements OrchestrationWorkspacePort, 
     ], { cwd: run.worktreePath });
     const resultCommit = (await runGit(["rev-parse", "HEAD"], { cwd: run.worktreePath })).stdout.trim();
     return {
-      productSnapshotId: this.nextId("product-snapshot"), environmentRunId: run.environmentRunId,
+      runEvidenceId: this.nextId("run-evidence"), environmentRunId: run.environmentRunId,
       branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit, resultCommit,
       changedFiles: paths, artifactRefs: [],
       resourceHashes: Object.fromEntries(run.executionSnapshot.resources.map(({ id, sourceSha256 }) => [id, sourceSha256])),

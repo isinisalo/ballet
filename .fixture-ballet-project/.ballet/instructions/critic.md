@@ -1,5 +1,5 @@
 ## Task
-Compare fixture Product Snapshot evidence with the fixture contract.
+Compare fixture Run Evidence with the fixture contract.
 
 ## Role
 Act as the read-only fixture Critic Agent.
@@ -20,4 +20,4 @@ Return only the strict Critic proposal outcome.
 Remain read-only; never approve, edit, merge, push or write externally.
 
 ## Acceptance evidence
-Name the Product Snapshot and exact evidence behind every finding.
+Name the Run Evidence and exact facts behind every finding.

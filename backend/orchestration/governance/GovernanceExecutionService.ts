@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
 import type { AgentComposition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV12 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV13 } from "../../../shared/orchestration/execution.js";
 import type { CriticOutcome, RefinementOutcome } from "../../../shared/orchestration/outcomes.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
-import type { TaskEnvelopeV10 } from "../../../shared/orchestration/taskEnvelopes.js";
+import type { TaskEnvelopeV11 } from "../../../shared/orchestration/taskEnvelopes.js";
 import { EnvironmentRunStore } from "../persistence/EnvironmentRunStore.js";
 import { ReviewCoordinator } from "../persistence/ReviewCoordinator.js";
 import { refinementChangeListHash } from "../persistence/ReviewStore.js";
@@ -39,8 +39,8 @@ export class GovernanceExecutionService {
 
   async queueCritic(criticRunId: string): Promise<string> {
     const row = this.connection().prepare(`
-      SELECT cr.product_snapshot_id, ps.environment_run_id, ps.result_commit FROM critic_runs cr
-      JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+      SELECT cr.run_evidence_id, ps.environment_run_id, ps.result_commit FROM critic_runs cr
+      JOIN run_evidences ps ON ps.run_evidence_id = cr.run_evidence_id
       WHERE cr.critic_run_id = ? AND cr.status = 'queued'
     `).get(criticRunId) as { environment_run_id: string; result_commit: string } | undefined;
     if (!row) throw new Error(`Critic Run ${criticRunId} is not queueable.`);
@@ -114,7 +114,8 @@ export class GovernanceExecutionService {
     try {
       const terminal = await provider.execute(task.spec, mapProviderPermissions({
         provider: task.spec.runtime.provider, role: task.spec.evidence.role,
-        toolPolicy: "read_only", networkAccess: task.spec.runtime.networkAccess,
+        toolPolicy: "read_only",
+        networkAccess: task.spec.runtime.networkAccess,
         worktreePath: task.spec.project.checkoutRoot
       }));
       if (this.stopping) return true;
@@ -189,20 +190,22 @@ export class GovernanceExecutionService {
   private persistGovernanceDispatch(
     run: StoredEnvironmentRun,
     composition: AgentComposition,
-    envelope: TaskEnvelopeV10,
+    envelope: TaskEnvelopeV11,
     owner: { criticRunId?: string; refinementRunId?: string },
     checkoutRoot: string
   ): string {
-    if (composition.toolPolicy !== "read_only") throw new Error("Governance proposal Agent must be read-only.");
-    const profile = run.executionSnapshot.executionProfiles.find(({ id }) => id === composition.executionProfileId)!;
-    const capability = run.executionSnapshot.runtimeCapabilities.find(({ executionProfileId }) => executionProfileId === profile.id)!;
+    const agentDefinition = run.executionSnapshot.agents.find(({ id }) => id === composition.agentId)!;
+    const capability = run.executionSnapshot.runtimeCapabilities.find(({ agentId }) => agentId === agentDefinition.id)!;
     const agentRunId = this.nextId(`${envelope.role}-agent`);
     const evidence = composeOrchestrationPrompt({ snapshot: run.executionSnapshot, envelope, composition });
-    const spec: ExecutionSpecV12 = {
-      version: 12, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
+    const spec: ExecutionSpecV13 = {
+      version: 13, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
       agentRunId, evidence,
-      runtime: { provider: profile.provider, cliVersion: capability.cliVersion, model: profile.model,
-        reasoningEffort: profile.reasoningEffort, networkAccess: profile.networkAccess, capabilityHash: capability.capabilitySha256 },
+      runtime: { agentId: agentDefinition.id, deviceId: capability.deviceId,
+        runtimeBackendId: capability.runtimeBackendId, provider: capability.provider,
+        cliVersion: capability.cliVersion, model: capability.model,
+        reasoningEffort: capability.reasoningEffort, networkAccess: capability.networkAccess,
+        capabilityHash: capability.capabilitySha256 },
       project: { checkoutRoot, headSha: run.resultCommit ?? run.baseCommit,
         configHash: run.executionSnapshot.projectConfigSha256, snapshotHash: run.executionSnapshotHash },
       createdAt: this.now()

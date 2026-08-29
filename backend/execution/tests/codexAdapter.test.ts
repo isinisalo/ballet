@@ -2,7 +2,7 @@ import { access, chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { CodexAppServerAdapter } from "../providers/codex/CodexAppServerAdapter.js";
+import { CodexAppServerAdapter } from "../../daemon/providers/codex/CodexAppServerAdapter.js";
 
 const roots: string[] = [];
 
@@ -80,6 +80,7 @@ describe("CodexAppServerAdapter", () => {
       workingDirectory: context.root,
       model: "provider-default",
       reasoning: "provider-default",
+      workspaceAccess: "workspace-write",
       policy: { network: false, readOnlyRoots: [] },
       outputSchema: {
         type: "object",
@@ -145,6 +146,7 @@ describe("CodexAppServerAdapter", () => {
         workingDirectory: context.root,
         model: "provider-default",
         reasoning: "provider-default",
+        workspaceAccess: "workspace-write",
         policy: { network: false, readOnlyRoots: [] }
       })) { void event; }
     };
@@ -164,6 +166,7 @@ describe("CodexAppServerAdapter", () => {
         workingDirectory: context.root,
         model: "provider-default",
         reasoning: "provider-default",
+        workspaceAccess: "workspace-write",
         policy: { network: false, readOnlyRoots: [] },
         signal: controller.signal
       })) { void event; }

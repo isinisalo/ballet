@@ -1,8 +1,16 @@
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
-import type { ActionDefinition, EnvironmentDefinition, ProjectConfigurationV20, StateDefinition } from "@shared/orchestration/environment";
+import type { ActionDefinition, AgentDefinition, EnvironmentDefinition, ProjectConfigurationV21, StateDefinition } from "@shared/orchestration/environment";
 import type { ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
+import type { AgentExecutionBinding, ExecutionPolicy, PairingSession, RuntimeDevice } from "@shared/domain/runtime";
+
+export interface PairingSessionView extends PairingSession {
+  claimedDevice?: RuntimeDevice;
+  verificationUri: string;
+  interval: number;
+  installCommand?: string;
+}
 
 const base = "/api";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -12,9 +20,9 @@ const remove = (value: unknown): RequestInit => ({ method: "DELETE", body: JSON.
 export const orchestrationApi = {
   project: () => request<ProjectRecord>(`${base}/project`),
   references: () => request<ReferenceIndexResponse>(`${base}/reference-index`),
-  resources: (collection: "goals" | "adrs" | "constraints" | "use-cases" | "instructions" | "skills") => request<ResourceDocument[]>(`${base}/${collection}`),
+  resources: (collection: "goals" | "adrs" | "constraints" | "use-cases" | "agents" | "instructions" | "skills") => request<ResourceDocument[]>(`${base}/${collection}`),
   schedules: () => request<Array<Record<string, unknown>>>(`${base}/critic/schedules`),
-  putProject: (config: ProjectConfigurationV20, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
+  putProject: (config: ProjectConfigurationV21, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
   saveDirection: (collection: "goals" | "adrs" | "constraints" | "use-cases", value: DirectionReference | Constraint | UseCase,
     markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {
@@ -22,6 +30,22 @@ export const orchestrationApi = {
     }),
   deleteDirection: (collection: string, id: string, expectedConfigHash: string, expectedHash: string) =>
     request(`${base}/${collection}/${encodeURIComponent(id)}`, remove({ expectedConfigHash, expectedHash })),
+  saveAgent: (value: AgentDefinition, markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
+    request(`${base}/agents${creating ? "" : `/${encodeURIComponent(value.id)}`}`, creating
+      ? body({ value, markdown, expectedConfigHash, expectedDocumentHash })
+      : put({ value, markdown, expectedConfigHash, expectedDocumentHash })),
+  deleteAgent: (id: string, expectedConfigHash: string, expectedHash: string) =>
+    request(`${base}/agents/${encodeURIComponent(id)}`, remove({ expectedConfigHash, expectedHash })),
+  runtimeDevices: () => request<RuntimeDevice[]>(`${base}/runtimes/devices`),
+  createPairing: (displayName?: string) => request<PairingSessionView>(`${base}/pairing/sessions`, body(displayName ? { displayName } : {})),
+  pairing: (id: string) => request<PairingSessionView>(`${base}/pairing/sessions/${encodeURIComponent(id)}`),
+  approvePairing: (id: string) => request<PairingSessionView>(`${base}/pairing/sessions/${encodeURIComponent(id)}/approve`, body({})),
+  refreshRuntime: (id: string) => request<RuntimeDevice>(`${base}/runtimes/devices/${encodeURIComponent(id)}/refresh`, body({})),
+  restartRuntime: (id: string) => request<RuntimeDevice>(`${base}/runtimes/devices/${encodeURIComponent(id)}/restart`, body({})),
+  revokeRuntime: (id: string) => request<void>(`${base}/runtimes/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  agentBinding: (id: string) => request<AgentExecutionBinding | null>(`${base}/agents/${encodeURIComponent(id)}/execution`),
+  saveAgentBinding: (id: string, input: { runtimeBackendId: string; model: string; reasoning: string; policy: ExecutionPolicy }) =>
+    request<AgentExecutionBinding>(`${base}/agents/${encodeURIComponent(id)}/execution`, put(input)),
   approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(
     `${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash, expectedContentHash })),
   returnUseCaseToDraft: (id: string, expectedConfigHash: string) => request(`${base}/use-cases/${encodeURIComponent(id)}/return-to-draft`, body({ expectedConfigHash })),
@@ -43,7 +67,7 @@ export const orchestrationApi = {
   cancelRun: (id: string) => request<RunSummary>(`${base}/environment-runs/${encodeURIComponent(id)}/cancel`, body({})),
   answerWorkInput: (id: string, expectedAgentRunId: string, expectedAgentRevision: number, answer: string) => request<RunSummary>(
     `${base}/environment-runs/${encodeURIComponent(id)}/work-input`, body({ expectedAgentRunId, expectedAgentRevision, answer })),
-  product: (runId: string) => request<JsonRow>(`${base}/environment-runs/${encodeURIComponent(runId)}/product`),
+  evidence: (runId: string) => request<JsonRow>(`${base}/environment-runs/${encodeURIComponent(runId)}/evidence`),
   feedback: (query = "") => request<JsonRow[]>(`${base}/feedback${query}`),
   feedbackDetail: (id: string) => request<JsonRow>(`${base}/feedback/${encodeURIComponent(id)}`),
   createFeedback: (input: JsonRow) => request<JsonRow>(`${base}/feedback`, body(input)),
@@ -55,7 +79,7 @@ export const orchestrationApi = {
   refinementRuns: () => request<JsonRow[]>(`${base}/refinement/runs`),
   refinementProposals: () => request<JsonRow[]>(`${base}/refinement/proposals`),
   refinementProposal: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}`),
-  createRefinement: (sourceEnvironmentRunId: string, feedbackEntryIds: string[]) => request(`${base}/refinement/runs`, body({ sourceEnvironmentRunId, feedbackEntryIds })),
+  createRefinement: (feedbackEntryId: string) => request(`${base}/feedback/${encodeURIComponent(feedbackEntryId)}/refinement`, body({})),
   decideRefinement: (id: string, input: JsonRow) => request(`${base}/refinement/proposals/${encodeURIComponent(id)}/decision`, body(input)),
   applyRefinement: (id: string) => request(`${base}/refinement/proposals/${encodeURIComponent(id)}/apply`, body({})),
   applyStatus: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}/apply`),

@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 32
+version: 33
 tags: [arc42, traceability, evidence]
 ---
 
@@ -39,7 +39,7 @@ tags: [arc42, traceability, evidence]
 | UC-07 | goal-022 / adr-034 | Validation precheck precedes Work and requires evidence. | TEST-028 / EVID-028 | passed |
 | UC-08 | goal-005, goal-022 / adr-005, adr-006, adr-012, adr-034 | Work is subordinate and managed-worktree scoped. | TEST-028 / EVID-028 | passed |
 | UC-09 | goal-006, goal-022 / adr-007, adr-034 | `1 + maxRetries`; exhaustion creates atomic blocked Feedback. | TEST-028, TEST-029 / EVID-028, EVID-029 | passed |
-| UC-10 | goal-006, goal-022 / adr-006, adr-007, adr-034 | Product Snapshot is terminal, immutable and factual. | TEST-030, TEST-032 / EVID-030, EVID-032 | passed |
+| UC-10 | goal-006, goal-022 / adr-006, adr-007, adr-034, adr-035 | Run Evidence is terminal, immutable, factual and embedded in its owning Run. | TEST-030, TEST-032, TEST-037 / EVID-030, EVID-032, EVID-037 | passed |
 | UC-11 | goal-006, goal-022 / adr-007, adr-034 | Critic is disabled by default, read-only and non-overlapping. | TEST-029, TEST-031 / EVID-029, EVID-031 | passed |
 | UC-12 | goal-022 / adr-008, adr-034 | Human approval creates exactly one provenance-bound Feedback entry. | TEST-029, TEST-031 / EVID-029, EVID-031 | passed |
 | UC-13 | goal-005, goal-006, goal-022 / adr-006, adr-034 | Exact approved apply creates one commit and immutable continuation. | TEST-030, TEST-031 / EVID-030, EVID-031 | passed |
@@ -47,9 +47,9 @@ tags: [arc42, traceability, evidence]
 
 | ID | Tarkistus |
 | --- | --- |
-| TEST-028 | strict v20/v13/v10/v11/v12/v16 schemas, ordering, Validation loop, retry/provider-failure split, restart and no standalone run tests |
+| TEST-028 | strict v21/v14/v11/v12/v13/v17 schemas, ordering, Validation loop, retry/provider-failure split, restart and no standalone run tests |
 | TEST-029 | blocked+Feedback transaction, schedule/DST/lease/recovery, Critic read set and exact human approval tests |
-| TEST-030 | refinement allowlist/preimage/hash/impact/Git/lineage/Product Snapshot tests |
+| TEST-030 | refinement allowlist/preimage/hash/impact/Git/lineage/Run Evidence tests |
 | TEST-031 | canonical component, routing, keyboard, accessibility and 1440x900/390x844 browser QA |
 | TEST-032 | removal grep, exact version, full suite, docs/design, release smoke, local install/startup and clean-tree gates |
 | TEST-033 | Markdown round-trip/dirty guard, old-style workspace routes, keyboard/accessibility and desktop/narrow browser QA |

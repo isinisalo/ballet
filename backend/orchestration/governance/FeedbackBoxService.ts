@@ -7,14 +7,9 @@ import { ConflictError } from "../persistence/PersistenceErrors.js";
 
 export interface HumanFeedbackCommand {
   feedbackEntryId: string;
-  environmentRunId: string;
   category: FeedbackCategory;
-  targetType: FeedbackTargetType;
-  targetId: string;
-  title: string;
-  description: string;
-  correctiveActions: string[];
-  evidenceRefs?: string[];
+  comment: string;
+  sourceCommit: string;
   createdAt: string;
 }
 
@@ -26,12 +21,18 @@ export class FeedbackBoxService {
 
   createHuman(command: HumanFeedbackCommand, actor: TrustedHumanActor): void {
     if (!actor.id.trim()) throw new ConflictError("Trusted human identity is required.");
-    validateFeedbackTarget(this.connection(), command.environmentRunId, command.targetType, command.targetId);
+    const owner = this.connection().prepare(`
+      SELECT environment_run_id FROM environment_runs ORDER BY created_at DESC, rowid DESC LIMIT 1
+    `).get() as { environment_run_id: string } | undefined;
     this.store.create({
-      ...command,
+      feedbackEntryId: command.feedbackEntryId, category: command.category, comment: command.comment,
       source: "human",
+      targetType: owner ? "environment_run" : "environment_definition",
+      targetId: owner?.environment_run_id ?? "project",
+      environmentRunId: owner?.environment_run_id,
       createdBy: actor.id,
-      provenance: { actor: { id: actor.id, source: actor.source }, evidenceRefs: command.evidenceRefs ?? [] }
+      provenance: { actor: { id: actor.id, source: actor.source }, sourceCommit: command.sourceCommit },
+      createdAt: command.createdAt
     });
   }
 
@@ -62,7 +63,7 @@ export const validateFeedbackTarget = (
   if (!run) throw new ConflictError(`Feedback Environment Run ${environmentRunId} does not exist.`);
   const snapshot = JSON.parse(run.execution_snapshot_json) as Record<string, unknown>;
   const exists = type === "environment_run" ? id === environmentRunId
-    : type === "product_snapshot" ? hasOwnedProductSnapshot(connection, id, environmentRunId)
+    : type === "run_evidence" ? hasOwnedRunEvidence(connection, id, environmentRunId)
       : type === "state_execution" ? hasOwnedRow(connection, "state_executions", "state_execution_id", id, environmentRunId)
         : type === "action_execution" ? hasOwnedRow(connection, "action_executions", "action_execution_id", id, environmentRunId)
           : type === "environment_definition" ? Reflect.get(snapshot.environment as object, "id") === id
@@ -72,8 +73,8 @@ export const validateFeedbackTarget = (
   if (!exists) throw new ConflictError(`Feedback target ${type}:${id} does not exist in its immutable closure.`);
 };
 
-const hasOwnedProductSnapshot = (db: Database.Database, id: string, runId: string): boolean =>
-  Boolean(db.prepare("SELECT 1 FROM product_snapshots WHERE product_snapshot_id = ? AND environment_run_id = ?").get(id, runId));
+const hasOwnedRunEvidence = (db: Database.Database, id: string, runId: string): boolean =>
+  Boolean(db.prepare("SELECT 1 FROM run_evidences WHERE run_evidence_id = ? AND environment_run_id = ?").get(id, runId));
 const hasOwnedRow = (db: Database.Database, table: string, key: string, id: string, runId: string): boolean => {
   const allowed = new Set(["state_executions:state_execution_id", "action_executions:action_execution_id"]);
   if (!allowed.has(`${table}:${key}`)) throw new Error("Unsafe target selector.");

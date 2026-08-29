@@ -4,7 +4,7 @@ title: Ballet project direction summary
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-29'
-version: 22
+version: 23
 tags: [summary, goals, environment]
 ---
 
@@ -26,7 +26,7 @@ tags: [summary, goals, environment]
 
 The accepted strict target is Project Config v21, Root Snapshot v14, Task Envelope/role outcome v11, prompt composition v12, ExecutionSpec v13 and SQLite v17, with Feedback, Critic and Refinement v2 plus Agent/daemon binding/Run Evidence v1. `adr-034` retains deterministic ordering and the Validation-led loop; `adr-035` owns Markdown authoring, paired execution and the removal of Product/ExecutionProfile.
 
-The repository default demonstrates thirteen approved Use Cases, five ordered States, fourteen bounded Actions, four network-off Codex profiles, lean role instructions and explicitly selected reusable Skills. The compact fixture proves the same platform boundary with unrelated IDs.
+The repository default demonstrates thirteen approved Use Cases, five ordered States, fourteen bounded Actions, four Markdown Agents, lean role instructions and explicitly selected reusable Skills. The compact fixture proves the same platform boundary with unrelated IDs.
 
 ## Decision history
 

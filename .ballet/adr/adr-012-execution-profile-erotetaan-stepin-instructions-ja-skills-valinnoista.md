@@ -1,17 +1,20 @@
 ---
 id: adr-012
 title: Execution profile erotetaan Stepin instructions- ja skills-valinnoista
-status: accepted
+status: superseded
 createdAt: '2026-07-18T21:21:24.000Z'
-updatedAt: '2026-07-19T06:45:37.000Z'
+updatedAt: '2026-08-29T00:00:00.000Z'
+supersededBy: adr-035
 tags:
   - arkkitehtuuripäätös
   - execution-profile
   - step-koostaminen
-version: 3
+version: 4
 ---
 
 # Execution profile erotetaan Stepin instructions- ja skills-valinnoista
+
+> Superseded by [ADR-035](./adr-035-markdown-agents-paired-daemon-and-run-evidence.md). ExecutionProfile ei kuulu strict v21 -malliin; Markdown Agent on project truth ja daemon-binding machine-local truth.
 
 ## Konteksti
 

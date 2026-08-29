@@ -25,7 +25,8 @@ const isSafeRelativePath = (path: string): boolean => (
 
 export const isAllowedRefinementPath = (path: string): boolean => (
   isSafeRelativePath(path) && (
-    /^\.ballet\/instructions\/.+\.md$/.test(path)
+    /^\.ballet\/agents\/.+\.md$/.test(path)
+    || /^\.ballet\/instructions\/.+\.md$/.test(path)
     || /^\.agents\/skills\/[^/]+(?:\/[^/]+)*\/SKILL\.md$/.test(path)
   )
 );

@@ -9,12 +9,12 @@ const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
 describe("orchestration governance workspace lifetime", () => {
-  test("materializes the immutable Product commit read-only and cleans it after capture", async () => {
+  test("materializes the immutable Run Evidence commit read-only and cleans it after capture", async () => {
     const directory = mkdtempSync(path.join(tmpdir(), "ballet-governance-worktree-")); roots.push(directory);
     const root = path.join(directory, "repo"); const worktrees = path.join(directory, "worktrees");
-    mkdirSync(root); writeFileSync(path.join(root, "product.txt"), "product one\n"); git(root, ["init"]);
-    git(root, ["add", "product.txt"]); commit(root, "product one"); const productCommit = git(root, ["rev-parse", "HEAD"]);
-    writeFileSync(path.join(root, "product.txt"), "product two\n"); git(root, ["add", "product.txt"]); commit(root, "product two");
+    mkdirSync(root); writeFileSync(path.join(root, "evidence.txt"), "evidence one\n"); git(root, ["init"]);
+    git(root, ["add", "evidence.txt"]); commit(root, "evidence one"); const productCommit = git(root, ["rev-parse", "HEAD"]);
+    writeFileSync(path.join(root, "evidence.txt"), "evidence two\n"); git(root, ["add", "evidence.txt"]); commit(root, "evidence two");
     const currentCommit = git(root, ["rev-parse", "HEAD"]);
     const manager = new EnvironmentWorkspaceManager(root, worktrees, (kind) => kind);
     const checkout = await manager.prepareReadOnly("critic-task-1", productCommit);

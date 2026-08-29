@@ -1,14 +1,14 @@
 import type { ContractIssue } from "@shared/orchestration/primitives";
-import type { ProjectConfigurationV20 } from "@shared/orchestration/environment";
+import type { ProjectConfigurationV21 } from "@shared/orchestration/environment";
 
 export interface ProjectRecord {
   path: string;
-  config: ProjectConfigurationV20;
+  config: ProjectConfigurationV21;
   configHash: string;
 }
 
 export interface ResourceDocument {
-  kind: "goal" | "adr" | "constraint" | "use-case" | "instruction" | "skill";
+  kind: "goal" | "adr" | "constraint" | "use-case" | "agent" | "instruction" | "skill";
   id: string;
   content: string;
   contentHash: string;
@@ -28,7 +28,7 @@ export interface ReferenceIndexResponse {
 }
 
 export interface EnvironmentResponse {
-  environment: ProjectConfigurationV20["environment"];
+  environment: ProjectConfigurationV21["environment"];
   configHash: string;
   readinessIssues: ContractIssue[];
   activeRunIds: string[];
@@ -44,5 +44,6 @@ export interface OrchestrationConfigureData {
   adrs: ResourceDocument[];
   constraints: ResourceDocument[];
   useCases: ResourceDocument[];
+  agents: ResourceDocument[];
   schedules: Array<Record<string, unknown>>;
 }

@@ -5,9 +5,9 @@ import { FeedbackStore } from "./FeedbackStore.js";
 import { FlowCoordinator } from "./FlowCoordinator.js";
 import {
   TEST_AT, agentRunInput, environmentSeed, feedbackSeed, openTestDatabase,
-  productSnapshotSeed, validationOutcome, workOutcome, type TestDatabase
+  runEvidenceSeed, validationOutcome, workOutcome, type TestDatabase
 } from "./PersistenceTestFixtures.js";
-import { ProductSnapshotStore } from "./ProductSnapshotStore.js";
+import { RunEvidenceStore } from "./RunEvidenceStore.js";
 
 const databases: TestDatabase[] = [];
 afterEach(() => databases.splice(0).forEach(({ cleanup }) => cleanup()));
@@ -62,12 +62,12 @@ describe("Environment flow transactions", () => {
       correctiveActions: ["Provide prerequisite"], evidence: {}
     });
     const invalidFeedback = feedbackSeed("feedback-1", "validation_blocked", {
-      correctiveActions: [], agentRunId: "precheck-1"
+      comment: "", agentRunId: "precheck-1"
     });
     expect(() => context.outcomes.applyPrecheck({
       agentRunId: "precheck-1", providerOutcomeKey: "terminal-1", expectedActionRevision: 2,
       outcome: blocked, feedback: invalidFeedback, completedAt: TEST_AT
-    })).toThrow(/corrective actions/);
+    })).toThrow(/comment is required/);
     expect(context.flow.runs.requireAction(selected.actionExecutionId).status).toBe("prechecking");
     expect(context.executionAgentStatus("precheck-1")).toBe("queued");
     const validFeedback = feedbackSeed("feedback-1", "validation_blocked", { agentRunId: "precheck-1" });
@@ -149,9 +149,9 @@ describe("Validation-led Action transactions", () => {
     expect(new FeedbackStore(() => context.database.connection).list("run-1")).toHaveLength(1);
   });
 
-  it("completes Environment and Product Snapshot atomically only after every State is done", () => {
+  it("completes Environment and Run Evidence atomically only after every State is done", () => {
     const context = setup({ stateCount: 1 });
-    expect(() => new ProductSnapshotStore(() => context.database.connection).create(productSnapshotSeed()))
+    expect(() => new RunEvidenceStore(() => context.database.connection).create(runEvidenceSeed()))
       .toThrow(/completed Environment/);
     const action = context.flow.advance("run-1", 0, TEST_AT);
     context.outcomes.createPrecheck(action.actionExecutionId, action.revision, agentRunInput("precheck-1", "precheck", 1));
@@ -162,9 +162,9 @@ describe("Validation-led Action transactions", () => {
     expect(doneAction.status).toBe("done");
     context.flow.completeState("state-execution-1", 1, TEST_AT);
     const run = context.flow.runs.require("run-1");
-    const completed = context.flow.completeEnvironment(productSnapshotSeed(), run.revision);
+    const completed = context.flow.completeEnvironment(runEvidenceSeed(), run.revision);
     expect(completed.status).toBe("completed");
-    expect(new ProductSnapshotStore(() => context.database.connection).requireByRun("run-1"))
+    expect(new RunEvidenceStore(() => context.database.connection).requireByRun("run-1"))
       .toMatchObject({ result_commit: "b".repeat(40) });
   });
 

@@ -1,9 +1,9 @@
 import type { TimestampedApproval } from "./primitives.js";
 
-export type FeedbackSource = "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal" | "human";
-export type FeedbackCategory = "product" | "system" | "architecture" | "code" | "design" | "documentation";
+export type FeedbackSource = "validation_blocked" | "retry_exhaustion" | "provider_failure" | "system_invalid_output" | "approved_critic_proposal" | "human";
+export type FeedbackCategory = "system" | "architecture" | "code" | "design" | "documentation";
 export type FeedbackTargetType =
-  | "product_snapshot" | "environment_definition" | "environment_run"
+  | "run_evidence" | "environment_definition" | "environment_run"
   | "state_definition" | "state_execution" | "action_definition" | "action_execution" | "resource";
 
 export interface FeedbackEntry {
@@ -40,7 +40,7 @@ export interface CriticReviewProposal {
   id: string;
   criticRunId: string;
   status: "pending_human_review" | "approved" | "rejected";
-  version: 1;
+  version: 2;
   contentHash: string;
   proposedText: string;
   evidenceRefs: string[];

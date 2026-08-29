@@ -35,6 +35,17 @@ const prohibited = [
   "schemaVersion" + " = 15"
 ];
 const transitionMarker = "v" + "next";
+const replacedContractTerms = [
+  "Product" + "Snapshot",
+  "product" + "_snapshot",
+  "Product " + "Snapshot",
+  "Execution" + "Profile",
+  "execution" + "Profile",
+  "/" + "products",
+  "/" + "run-evidence",
+  "Local" + "RuntimeService",
+  "Local" + "ProviderAdapter"
+];
 const self = path.resolve(import.meta.filename);
 
 const files = (await Promise.all(scanRoots.map((entry) => collect(path.join(repositoryRoot, entry))))).flat();
@@ -49,6 +60,11 @@ for (const filename of files) {
       failures.push(`${relative}: prohibited term ${JSON.stringify(term)}`);
     }
   }
+  for (const term of replacedContractTerms) {
+    if (source.includes(term) && !allowedReplacementHistory(relative)) {
+      failures.push(`${relative}: replaced contract term ${JSON.stringify(term)}`);
+    }
+  }
   if (source.toLocaleLowerCase().includes(transitionMarker)
     && !allowedHistoricalMatch(relative, source, transitionMarker)) {
     failures.push(`${relative}: transition namespace marker remains`);
@@ -56,6 +72,13 @@ for (const filename of files) {
   if (relative.toLocaleLowerCase().includes(transitionMarker)) {
     failures.push(`${relative}: transition path remains`);
   }
+}
+
+function allowedReplacementHistory(relative) {
+  return relative.startsWith(".ballet/adr/")
+    || relative.startsWith(".ballet/goals/")
+    || relative.startsWith(".ballet/arc42/")
+    || relative === "frontend/tests/orchestrationRouting.test.ts";
 }
 
 if (failures.length > 0) {

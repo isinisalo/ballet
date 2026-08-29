@@ -1,11 +1,11 @@
 import type Database from "better-sqlite3";
 import type {
-  CreateEnvironmentRunInput, ProductSnapshotSeed, StoredActionExecution,
+  CreateEnvironmentRunInput, RunEvidenceSeed, StoredActionExecution,
   StoredEnvironmentRun, StoredStateExecution
 } from "../../../shared/orchestration/index.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { EnvironmentRunStore } from "./EnvironmentRunStore.js";
-import { ProductSnapshotStore } from "./ProductSnapshotStore.js";
+import { RunEvidenceStore } from "./RunEvidenceStore.js";
 import { ConflictError, StaleStateError } from "./PersistenceErrors.js";
 import { AgentExecutionStore } from "./AgentExecutionStore.js";
 
@@ -14,7 +14,7 @@ export class FlowCoordinator {
     private readonly connection: () => Database.Database,
     readonly runs = new EnvironmentRunStore(connection),
     private readonly execution = new AgentExecutionStore(connection),
-    private readonly snapshots = new ProductSnapshotStore(connection),
+    private readonly snapshots = new RunEvidenceStore(connection),
     private readonly events = new ControlFlowStore(connection)
   ) {}
 
@@ -79,7 +79,7 @@ export class FlowCoordinator {
     })();
   }
 
-  completeEnvironment(input: ProductSnapshotSeed, expectedRevision: number): StoredEnvironmentRun {
+  completeEnvironment(input: RunEvidenceSeed, expectedRevision: number): StoredEnvironmentRun {
     return this.connection().transaction(() => {
       const run = this.requireRunRevision(input.environmentRunId, expectedRevision);
       if (run.status !== "running" || run.activeStateExecutionId || run.activeActionExecutionId || run.activeAgentRunId) {

@@ -4,7 +4,7 @@ title: Rajoitteet
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 15
+version: 16
 tags: [arc42, constraints]
 arc42Section: 2
 ---
@@ -12,10 +12,10 @@ arc42Section: 2
 # 2. Rajoitteet
 
 - Yksi tarkka Git-checkout ja loopback-only paikallinen palvelu muodostavat järjestelmärajan.
-- Project Config v20 ja SQLite v16 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
+- Project Config v21 ja SQLite v17 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
 - Environment on ainoa root run. Standalone State- tai Action-ajoa ei ole.
 - State `order` ja Action `priority` ovat positiivisia ja yksikäsitteisiä.
-- Provider approval mode on aina `never`; verkko ja kirjoitettavat juuret tulevat hyväksytystä ExecutionProfilesta ja roolista.
+- Provider approval mode on aina `never`; verkko ja kirjoitettavat juuret tulevat hyväksytystä machine-local Agent/daemon-bindingistä ja roolista.
 - Runtime ei mergeä, pushaa, releasea tai deployaa automaattisesti.
 - Refinement kirjoittaa vain hyväksyttyihin instruction- ja Skill-poluihin managed worktreessä.
 - UI todentuu 1440x900- ja 390x844-viewporteissa sekä keyboardilla ja reduced motionilla.

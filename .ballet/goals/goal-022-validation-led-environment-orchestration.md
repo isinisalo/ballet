@@ -4,7 +4,7 @@ title: Ihmisen ohjaama Validation-led Environment orchestration
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 1
+version: 2
 tags:
   - tavoite
   - environment
@@ -29,7 +29,7 @@ Ballet muuttaa ihmisen hyväksymät Use Caset, Goals/ADRs/Constraints-päätösk
 
 ## Rajaus
 
-Tavoite kattaa approved Use Caset, project-local päätöskontekstin, unique ordered States/Actions, Validation-first-loopin, runtime-statukset, Feedback Boxin, Critic-schedulen ja approvalin, exact diff/hash -Refinementin, shared Skill -impactin, immutable continuationin, Product Snapshotin, API/UI-approval-rajat ja strict no-legacy-cutoverin.
+Tavoite kattaa approved Use Caset, project-local päätöskontekstin, unique ordered States/Actions, Validation-first-loopin, runtime-statukset, Feedback Boxin, Critic-schedulen ja approvalin, exact diff/hash -Refinementin, shared Skill -impactin, immutable continuationin, Run Evidencen, API/UI-approval-rajat ja strict no-legacy-cutoverin.
 
 Standalone State/Action Run, autonominen ihmisapproval, runtime DB migration, compatibility reader, route alias, dual-write, providerin valitsema seuraava State/Action sekä automaattinen merge/push/release/deploy eivät kuulu tavoitteeseen.
 
@@ -45,7 +45,7 @@ Standalone State/Action Run, autonominen ihmisapproval, runtime DB migration, co
 8. Refinement proposal tekee repository-kirjoituksia 0 ja nimeää 100 % muutetuista allowlist-poluista exact preimage SHA-256:lla sekä yhden exact diff SHA-256:n.
 9. Stale preimage, muuttunut base commit, puuttuva shared Skill -impact tai väärä human approval revision tuottaa 0 tiedostomuutosta ja 0 continuation-runia.
 10. Hyväksytty validi refinement tuottaa yhden managed-worktree-commitin ja yhden continuation-runin, jonka Snapshot v13 viittaa parent Runiin, proposaliin, approvaliin ja commit SHA:han; alkuperäinen snapshot muuttuu 0 tavua.
-11. Product Snapshotin jokainen status, hash, approval, Feedback- ja evidence-viite voidaan johtaa canonical project/runtime-totuudesta; provider-proosasta keksittyjä kenttiä on 0.
+11. Run Evidencen jokainen status, hash, approval, Feedback- ja evidence-viite voidaan johtaa canonical project/runtime-totuudesta; provider-proosasta keksittyjä kenttiä on 0.
 12. Lopullisissa active source/config/API/UI/release-pinnoissa on 0 korvatun domainin tai väliaikaisen namespace-prefixin osumaa manifestin gateillä.
 13. Target-UI:ssa page-level horizontal overflow, clipped core action ja pelkkään väriin nojaava status ovat 0 sekä 1440×900- että 390×844-viewporteissa; keyboard-polku kattaa kaikki hyväksyntäkomennot.
 

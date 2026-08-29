@@ -47,7 +47,7 @@ export interface CriticTaskEnvelope extends TaskEnvelopeBase {
   phase: "proposal";
   criticRunId: string;
   scheduleId: string;
-  productSnapshotIds: string[];
+  runEvidenceIds: string[];
 }
 
 export interface RefinementTaskEnvelope extends TaskEnvelopeBase {
@@ -59,7 +59,7 @@ export interface RefinementTaskEnvelope extends TaskEnvelopeBase {
   preimageHashes: Record<string, string>;
 }
 
-export type TaskEnvelopeV10 =
+export type TaskEnvelopeV11 =
   | ValidationPrecheckTaskEnvelope
   | WorkTaskEnvelope
   | ValidationPostworkTaskEnvelope

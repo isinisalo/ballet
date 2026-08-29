@@ -4,7 +4,7 @@ title: Accessible factual operator workspace
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
 updatedAt: '2026-08-29'
-version: 4
+version: 5
 tags: [tavoite, kayttokokemus, accessibility]
 ---
 
@@ -12,7 +12,7 @@ tags: [tavoite, kayttokokemus, accessibility]
 
 ## Tavoite
 
-Ballet tarjoaa tiiviin cyber-industrial-työtilan, jossa Direction, Use Cases, Environment, Run gate, Feedback, Critic, Refinement ja Product Snapshot ovat selkeitä, factual ja saavutettavia.
+Ballet tarjoaa tiiviin cyber-industrial-työtilan, jossa Goals, ADRs, Constraints, Use Cases, Agents, Runtimes, Loop Engineering, Run Gate, Feedback, Critic, Refinement ja Run Evidence ovat selkeitä, factual ja saavutettavia.
 
 ## Käyttäjäarvo
 

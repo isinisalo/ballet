@@ -5,20 +5,19 @@ import { PROJECT_CONFIG_VERSION } from "../versions.js";
 import { idListSchema, idSchema, nonEmptyTextSchema } from "./common.js";
 import { directionSchema } from "./directionSchemas.js";
 
-export const executionProfileSchema = z.object({
+export const agentDefinitionSchema = z.object({
   id: idSchema,
   name: nonEmptyTextSchema,
-  provider: z.enum(["codex", "copilot"]),
-  model: nonEmptyTextSchema,
-  reasoningEffort: nonEmptyTextSchema,
-  networkAccess: z.boolean()
+  description: z.string().max(CONTRACT_LIMITS.text),
+  enabled: z.boolean(),
+  instructionResource: idSchema,
+  skillResources: idListSchema
 }).strict();
 
 export const agentCompositionSchema = z.object({
-  executionProfileId: idSchema,
+  agentId: idSchema,
   instructionResource: idSchema,
-  skillResources: idListSchema,
-  toolPolicy: z.enum(["read_only", "workspace_write"])
+  skillResources: idListSchema
 }).strict();
 
 export const actionDefinitionSchema = z.object({
@@ -78,7 +77,7 @@ const criticScheduleSchema = z.discriminatedUnion("kind", [
 });
 
 const criticConfigurationSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   enabled: z.boolean(),
   schedules: z.array(criticScheduleSchema).max(16),
   agent: agentCompositionSchema
@@ -89,16 +88,18 @@ const criticConfigurationSchema = z.object({
 });
 
 const refinementConfigurationSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   enabled: z.boolean(),
   agent: agentCompositionSchema,
-  allowedRoots: z.tuple([z.literal(".ballet/instructions"), z.literal(".agents/skills")])
+  allowedRoots: z.tuple([
+    z.literal(".ballet/agents"), z.literal(".ballet/instructions"), z.literal(".agents/skills")
+  ])
 }).strict();
 
-export const projectConfigurationV20Schema = z.object({
+export const projectConfigurationV21Schema = z.object({
   version: z.literal(PROJECT_CONFIG_VERSION),
   direction: directionSchema,
-  executionProfiles: z.array(executionProfileSchema).max(CONTRACT_LIMITS.executionProfiles),
+  agents: z.array(agentDefinitionSchema).max(CONTRACT_LIMITS.agents),
   environment: environmentDefinitionSchema,
   critic: criticConfigurationSchema,
   refinement: refinementConfigurationSchema
@@ -118,9 +119,9 @@ export const projectConfigurationV20Schema = z.object({
       if (!useCaseIds.has(id)) context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "actions", actionIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
     }
   }
-  const profileIds = new Set(config.executionProfiles.map(({ id }) => id));
-  if (profileIds.size !== config.executionProfiles.length) {
-    context.addIssue({ code: "custom", path: ["executionProfiles"], message: "Execution Profile IDs must be unique" });
+  const agentIds = new Set(config.agents.map(({ id }) => id));
+  if (agentIds.size !== config.agents.length) {
+    context.addIssue({ code: "custom", path: ["agents"], message: "Agent IDs must be unique" });
   }
   const agents: Array<{ path: string; agent: z.infer<typeof agentCompositionSchema> }> = [
     { path: "critic.agent", agent: config.critic.agent },
@@ -131,14 +132,13 @@ export const projectConfigurationV20Schema = z.object({
     ]))
   ];
   for (const { path, agent } of agents) {
-    if (!profileIds.has(agent.executionProfileId)) {
-      context.addIssue({ code: "custom", path: [...path.split("."), "executionProfileId"], message: "Unknown Execution Profile" });
+    if (!agentIds.has(agent.agentId)) {
+      context.addIssue({ code: "custom", path: [...path.split("."), "agentId"], message: "Unknown Agent" });
     }
   }
-  if (config.critic.agent.toolPolicy !== "read_only") {
-    context.addIssue({ code: "custom", path: ["critic", "agent", "toolPolicy"], message: "Critic must be read-only" });
-  }
-  if (config.refinement.agent.toolPolicy !== "read_only") {
-    context.addIssue({ code: "custom", path: ["refinement", "agent", "toolPolicy"], message: "Refinement proposal must be read-only" });
+  for (const [index, agent] of config.agents.entries()) {
+    if (!agent.enabled && agents.some(({ agent: composition }) => composition.agentId === agent.id)) {
+      context.addIssue({ code: "custom", path: ["agents", index, "enabled"], message: "Referenced Agent must be enabled" });
+    }
   }
 });

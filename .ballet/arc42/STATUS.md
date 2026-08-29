@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 39
+version: 40
 tags: [arc42, status, handoff]
 ---
 
@@ -12,7 +12,7 @@ tags: [arc42, status, handoff]
 
 `goal-022` / `adr-034` omistavat edelleen aktiivisen Environment -> State -> Action- ja Validation-led-runtime-semanttiikan. `goal-023` / `adr-035` ovat hyväksytty superseding target Markdown-authoringille, Agent/Computer/CLI-sidonnalle, paired daemonille, minimal Feedbackille, resource-only Refinementille ja Run Evidencelle.
 
-Versiomatriisi on Project Config v20, Root Snapshot v13, Task Envelope / role outcome v10, prompt composition v11, ExecutionSpec v12 ja SQLite v16. API ja UI käyttävät vain canonical routeja. Strict removal -gate estää korvatun aktiivikoodin, transitional namespacejen ja compatibility-polkujen palautumisen.
+Versiomatriisi on Project Config v21, Root Snapshot v14, Task Envelope / role outcome v11, prompt composition v12, ExecutionSpec v13 ja SQLite v17; Feedback/Critic/Refinement ovat v2 ja Agent/daemon binding sekä Run Evidence v1. API ja UI käyttävät vain canonical routeja. Strict removal -gate estää korvatun aktiivikoodin, transitional namespacejen ja compatibility-polkujen palautumisen.
 
 | Evidenssi | Tila 2026-08-29 |
 | --- | --- |

@@ -89,7 +89,7 @@ export const coreSchema = `
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','completed','failed','cancelled','interrupted')),
     revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
     attempt INTEGER NOT NULL CHECK (attempt >= 1),
-    task_envelope_version INTEGER NOT NULL CHECK (task_envelope_version = 10),
+    task_envelope_version INTEGER NOT NULL CHECK (task_envelope_version = 11),
     task_envelope_json TEXT NOT NULL,
     task_envelope_hash TEXT NOT NULL,
     execution_task_id TEXT UNIQUE,

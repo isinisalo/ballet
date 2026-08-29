@@ -43,8 +43,8 @@ const environment = (): EnvironmentDefinition => ({
     actions: [{
       id: "action-1", name: "Action", description: "First action", priority: 1,
       useCaseIds: ["UC-1"], maxRetries: 1,
-      validation: { executionProfileId: "profile", instructionResource: "validation", skillResources: [], toolPolicy: "read_only" },
-      work: { executionProfileId: "profile", instructionResource: "work", skillResources: [], toolPolicy: "workspace_write" }
+      validation: { agentId: "profile", instructionResource: "validation", skillResources: [] },
+      work: { agentId: "profile", instructionResource: "work", skillResources: [] }
     }]
   }]
 });

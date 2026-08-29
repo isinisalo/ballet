@@ -1,16 +1,13 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { runBalletCli } from "../BalletCli.js";
 import {
-  loadLocalSettings,
   loadOrCreateServiceState,
   loadServiceState,
-  updateProviderCommands,
-  type LocalSettings,
   type ServiceState
 } from "../CheckoutState.js";
 import { renderPlist, type LaunchdService } from "../LaunchdService.js";
@@ -26,21 +23,19 @@ afterEach(async () => {
 });
 
 describe("Ballet checkout CLI", () => {
-  it("starts only the current checkout and forwards local provider overrides", async () => {
+  it("starts only the current checkout", async () => {
     const root = await gitProject();
     const output: string[] = [];
     const opened: string[] = [];
-    let commands: unknown;
+    let starts = 0;
     let serverProject: ProjectContext | undefined;
 
-    const code = await runBalletCli([
-      "--codex-command", "/opt/tools/codex", "--copilot-command=copilot"
-    ], services(root, {
+    const code = await runBalletCli([], services(root, {
       server: (project) => {
         serverProject = project;
         return {
-          ensureStarted: async (value: unknown) => {
-            commands = value;
+          ensureStarted: async () => {
+            starts += 1;
             return serviceState(project, 4401);
           }
         } as unknown as LocalServerService;
@@ -51,7 +46,7 @@ describe("Ballet checkout CLI", () => {
 
     expect(code).toBe(0);
     expect(serverProject?.root).toBe(await realRoot(root));
-    expect(commands).toEqual({ codexCommand: "/opt/tools/codex", copilotCommand: "copilot" });
+    expect(starts).toBe(1);
     expect(opened).toEqual(["http://127.0.0.1:4401"]);
     expect(output[0]).toContain(await realRoot(root));
   });
@@ -82,7 +77,7 @@ describe("Ballet checkout CLI", () => {
     const output: string[] = [];
     const serverFactory = (project: ProjectContext) => ({
       stopGracefully: async (timeout: number) => { calls.push(`stop:${timeout}`); return true; },
-      restart: async (_commands: unknown, timeout: number) => { calls.push(`restart:${timeout}`); return serviceState(project, 4403); },
+      restart: async (timeout: number) => { calls.push(`restart:${timeout}`); return serviceState(project, 4403); },
       status: async () => ({
         configured: true,
         state: serviceState(project, 4403),
@@ -106,15 +101,15 @@ describe("Ballet checkout CLI", () => {
     expect(output.join("\n")).toContain("\"serviceLabel\": \"ai.ballet.");
   });
 
-  it("exposes only the simplified public command surface", async () => {
+  it("exposes the local server and paired daemon command surfaces", async () => {
     const output: string[] = [];
     const code = await runBalletCli(["--help"], services(process.cwd(), {
       output: { stdout: (message) => output.push(message), stderr: (message) => output.push(message) }
     }));
     expect(code).toBe(0);
     expect(output[0]).toContain("ballet restart");
-    expect(output[0]).not.toContain("setup");
-    expect(output[0]).not.toContain("daemon");
+    expect(output[0]).toContain("ballet daemon setup");
+    expect(output[0]).toContain("ballet daemon start|stop|restart|status|logs");
     expect(output[0]).not.toContain("pair");
   });
 
@@ -138,22 +133,14 @@ describe("Ballet checkout CLI", () => {
 });
 
 describe("checkout-local state and launchd contract", () => {
-  it("stores settings under .git/ballet and fails closed on unknown settings fields", async () => {
+  it("stores checkout service identity under .git/ballet", async () => {
     const root = await gitProject();
     const project = await resolveProjectContext({ root });
     const state = await loadOrCreateServiceState(project);
-    await updateProviderCommands(project, { codexCommand: "/opt/codex" });
-    const existing = JSON.parse(await readFile(project.settingsPath, "utf8")) as Record<string, unknown>;
-    existing.unsupportedRoots = { builder: ["/tmp/reference"] };
-    await writeFile(project.settingsPath, `${JSON.stringify(existing)}\n`);
-    await expect(updateProviderCommands(project, { copilotCommand: "copilot" }))
-      .rejects.toThrow("unsupported fields: unsupportedRoots");
 
     expect(state.checkoutRoot).toBe(project.root);
     expect(state.instanceId).toBe(project.instanceId);
     expect(project.stateRoot).toBe(path.join(project.gitDir, "ballet"));
-    await expect(loadLocalSettings(project)).rejects.toThrow("unsupported fields: unsupportedRoots");
-    expect(JSON.parse(await readFile(project.settingsPath, "utf8"))).toEqual(existing);
   });
 
   it("renders one unique checkout service that invokes the server directly", async () => {
@@ -164,14 +151,15 @@ describe("checkout-local state and launchd contract", () => {
       project,
       programArguments: ["/usr/local/bin/ballet", "server-internal-run"],
       webDistPath: "/usr/local/share/ballet/dist"
-    }, state, { version: 1, codexCommand: "/opt/codex", copilotCommand: "copilot" });
+    }, state);
 
     expect(plist).toContain(`<key>Label</key><string>${project.serviceLabel}</string>`);
     expect(plist).toContain(`<key>WorkingDirectory</key><string>${project.root}</string>`);
     expect(plist).toContain("<string>server-internal-run</string>");
     expect(plist).toContain(`<string>${project.stateRoot}</string>`);
     expect(plist).toContain("<string>4488</string>");
-    expect(plist).toContain("<string>/opt/codex</string>");
+    expect(plist).not.toContain("--codex-command");
+    expect(plist).not.toContain("--copilot-command");
     expect(plist).toContain("<key>SuccessfulExit</key><false/>");
     expect(plist).toContain(`${project.stateRoot}/logs/launchd.out.log`);
     expect(plist).toContain(`${project.stateRoot}/logs/launchd.err.log`);
@@ -183,44 +171,35 @@ describe("checkout-local state and launchd contract", () => {
 });
 
 describe("checkout service startup", () => {
-  it("restarts a running service when a provider command override changes", async () => {
+  it("reuses a healthy running checkout service", async () => {
     const root = await gitProject();
     const project = await resolveProjectContext({ root });
     const initialState = await loadOrCreateServiceState(project);
-    await updateProviderCommands(project, { codexCommand: "/opt/codex-old" });
     let activeState = initialState;
     let running = true;
-    let shutdownRequests = 0;
     let stopCalls = 0;
-    const installedSettings: LocalSettings[] = [];
+    let installCalls = 0;
     const launchd = {
       status: async () => ({ loaded: running, running }),
       stop: async () => { stopCalls += 1; running = false; },
-      installAndStart: async (state: ServiceState, settings: LocalSettings) => {
+      installAndStart: async (state: ServiceState) => {
         activeState = state;
-        installedSettings.push(settings);
+        installCalls += 1;
         running = true;
       }
     } as unknown as LaunchdService;
     const fetchImpl = (async (_input: string | URL | Request, init?: RequestInit) => {
-      if (init?.method === "POST") {
-        shutdownRequests += 1;
-        running = false;
-        return new Response(null, { status: 202 });
-      }
+      if (init?.method === "POST") throw new Error("healthy service must not be stopped");
       if (!running) throw new TypeError("service unavailable");
       return healthResponse(project, activeState);
     }) as typeof fetch;
     const service = new LocalServerService({ project, launchd, fetch: fetchImpl, startupTimeoutMs: 100 });
 
-    const state = await service.ensureStarted({ codexCommand: "/opt/codex-new" });
+    const state = await service.ensureStarted();
 
     expect(state).toEqual(initialState);
-    expect(shutdownRequests).toBe(1);
-    expect(stopCalls).toBe(1);
-    expect(installedSettings).toHaveLength(1);
-    expect(installedSettings[0]?.codexCommand).toBe("/opt/codex-new");
-    await expect(loadLocalSettings(project)).resolves.toMatchObject({ codexCommand: "/opt/codex-new" });
+    expect(stopCalls).toBe(0);
+    expect(installCalls).toBe(0);
   });
 
   it("selects and persists a new port when another process wins the startup race", async () => {

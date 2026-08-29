@@ -2,9 +2,9 @@ import { z } from "zod";
 import { ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
 import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
-import { agentCompositionSchema, environmentDefinitionSchema, executionProfileSchema } from "./environmentSchemas.js";
+import { agentCompositionSchema, agentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
-export const rootSnapshotV13Schema = z.object({
+export const rootSnapshotV14Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
@@ -18,10 +18,16 @@ export const rootSnapshotV13Schema = z.object({
     adrs: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
     constraints: z.array(constraintSchema.extend({ contentSha256: sha256Schema }).strict())
   }).strict(),
-  executionProfiles: z.array(executionProfileSchema),
+  agents: z.array(agentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()),
   runtimeCapabilities: z.array(z.object({
-    executionProfileId: idSchema,
+    agentId: idSchema,
+    deviceId: idSchema,
+    runtimeBackendId: idSchema,
     provider: z.enum(["codex", "copilot"]),
+    model: z.string().trim().min(1),
+    reasoningEffort: z.string().trim().min(1),
+    networkAccess: z.boolean(),
+    readOnlyRoots: z.array(z.string().trim().min(1)),
     cliVersion: z.string().trim().min(1),
     supportedModels: z.array(z.string().trim().min(1)),
     supportedReasoningEfforts: z.array(z.string().trim().min(1)),
@@ -50,7 +56,7 @@ export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV13Schema,
+  snapshot: rootSnapshotV14Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
@@ -98,12 +104,15 @@ export const agentRunSchema = z.union([
   z.object({ ...agentRunBase, role: z.literal("refinement"), phase: z.literal("proposal") }).strict()
 ]);
 
-export const productSnapshotSchema = z.object({
+export const runEvidenceSchema = z.object({
+  version: z.literal(1),
   id: idSchema,
   environmentRunId: idSchema,
   commitSha: gitObjectIdSchema,
+  changedFiles: z.array(z.string().trim().min(1)),
   artifactRefs: idListSchema,
-  evidenceRefs: idListSchema,
+  validationEvidenceRefs: idListSchema,
+  lineage: z.object({ sourceRunId: idSchema.optional(), continuationRunId: idSchema.optional() }).strict(),
   createdAt: timestampSchema
 }).strict();
 

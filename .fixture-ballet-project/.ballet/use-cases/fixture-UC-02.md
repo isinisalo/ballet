@@ -1,6 +1,6 @@
 ---
 id: fixture-UC-02
-title: Verify fixture product
+title: Verify fixture evidence
 status: approved
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
@@ -15,9 +15,9 @@ expectedOutcomes: [A completed fixture Environment or visible blocked Feedback]
 goalIds: [test-goal]
 adrIds: [0001-test-adr]
 constraintIds: [fixture-constraint]
-approval: { approvedBy: fixture-human, approvedAt: '2026-08-29T00:00:00.000Z', revision: 1, contentHash: e2ffd8cff4199ec7658ab723dffd32f2945bbcbade3383cb25810f4528abf094 }
+approval: { approvedBy: fixture-human, approvedAt: '2026-08-29T00:00:00.000Z', revision: 1, contentHash: a4e176b053000c23cd2b951e5be849509b8b92febf3fa95ad0925549bcd2230c }
 ---
 
-# Verify fixture product
+# Verify fixture evidence
 
 Given a completed preparation State, when verification Actions execute by priority, then the fixture reaches terminal evidence. If preparation is incomplete, no verification Action may start.

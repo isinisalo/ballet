@@ -50,17 +50,17 @@ export class CriticScheduleStore {
         .get(input.criticScheduleId);
       if (!schedule) throw new NotFoundError(`Critic Schedule ${input.criticScheduleId} was not found.`);
       if (readInteger(schedule, "enabled") !== 1) throw new ConflictError("Disabled Critic Schedule cannot create a due run.");
-      const status = input.productSnapshotId ? "queued" : "skipped";
-      if (!input.productSnapshotId && input.skipReason !== "no_product_snapshot") {
-        throw new ConflictError("Critic run without Product Snapshot requires a skip reason.");
+      const status = input.runEvidenceId ? "queued" : "skipped";
+      if (!input.runEvidenceId && input.skipReason !== "no_run_evidence") {
+        throw new ConflictError("Critic run without Run Evidence requires a skip reason.");
       }
       this.connection().prepare(`
         INSERT INTO critic_runs (
-          critic_run_id, critic_schedule_id, due_at, due_key, product_snapshot_id, status,
+          critic_run_id, critic_schedule_id, due_at, due_key, run_evidence_id, status,
           skip_reason, created_at, updated_at, completed_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(input.criticRunId, input.criticScheduleId, input.dueAt, input.dueKey,
-        input.productSnapshotId ?? null, status, input.skipReason ?? null, input.createdAt, input.createdAt,
+        input.runEvidenceId ?? null, status, input.skipReason ?? null, input.createdAt, input.createdAt,
         status === "skipped" ? input.createdAt : null);
       this.connection().prepare(`
         UPDATE critic_schedules SET last_due_at = ?, last_run_id = ?, revision = revision + 1, updated_at = ?

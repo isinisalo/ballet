@@ -1,14 +1,14 @@
 /* eslint-disable max-lines-per-function -- The stateful SDK fake is shared across adapter integration cases. */
 import { describe, expect, it } from "vitest";
 import { CopilotClient } from "@github/copilot-sdk";
-import { CopilotSdkAdapter } from "../providers/copilot/CopilotSdkAdapter.js";
-import { normalizeCopilotEvent } from "../providers/copilot/CopilotEventNormalizer.js";
+import { CopilotSdkAdapter } from "../../daemon/providers/copilot/CopilotSdkAdapter.js";
+import { normalizeCopilotEvent } from "../../daemon/providers/copilot/CopilotEventNormalizer.js";
 import type {
   CopilotClientLike,
   CopilotSdkModule,
   CopilotSessionEvent,
   CopilotSessionLike
-} from "../providers/copilot/copilotSdkTypes.js";
+} from "../../daemon/providers/copilot/copilotSdkTypes.js";
 
 class FakeSession implements CopilotSessionLike {
   readonly sessionId = "copilot-session-1";
@@ -89,6 +89,7 @@ describe("CopilotSdkAdapter", () => {
       workingDirectory: "/tmp/worktree",
       model: "provider-default",
       reasoning: "provider-default",
+      workspaceAccess: "workspace-write",
       policy: { network: false, readOnlyRoots: [] },
       outputSchema: {
         type: "object",
@@ -129,6 +130,7 @@ describe("CopilotSdkAdapter", () => {
       workingDirectory: "/tmp/worktree",
       model: "provider-default",
       reasoning: "provider-default",
+      workspaceAccess: "workspace-write",
       policy: { network: false, readOnlyRoots: [] },
       outputSchema: { type: "object" }
     })) { void event; }

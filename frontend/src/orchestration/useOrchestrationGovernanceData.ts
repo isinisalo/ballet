@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RouteState } from "@/workspace/types";
 import { toErrorMessage } from "@/lib/errors";
-import type { GovernanceData, JsonRow } from "./runTypes";
+import type { GovernanceData } from "./runTypes";
 import { orchestrationApi } from "./orchestrationApi";
 
 const optional = async <T,>(operation: () => Promise<T>): Promise<T | undefined> => { try { return await operation(); } catch { return undefined; } };
@@ -15,7 +15,6 @@ export function useOrchestrationGovernanceData(route: RouteState) {
       const [runs, feedback, criticRuns, criticProposals, refinementRuns, refinementProposals] = await Promise.all([
         orchestrationApi.runs(), orchestrationApi.feedback(), orchestrationApi.criticRuns(), orchestrationApi.criticProposals(), orchestrationApi.refinementRuns(), orchestrationApi.refinementProposals()
       ]);
-      const products = (await Promise.all(runs.filter((run) => run.status === "completed").map((run) => optional(() => orchestrationApi.product(run.environmentRunId))))).filter(Boolean) as JsonRow[];
       const id = route.entityId;
       const [selectedRun, selectedFeedback, selectedCritic, selectedRefinement] = await Promise.all([
         id && route.workspaceView?.startsWith("run-") ? optional(() => orchestrationApi.run(id)) : undefined,
@@ -23,11 +22,10 @@ export function useOrchestrationGovernanceData(route: RouteState) {
         id && route.workspaceView === "critic-proposal" ? optional(() => orchestrationApi.criticProposal(id)) : undefined,
         id && route.workspaceView === "refinement-proposal" ? optional(() => orchestrationApi.refinementProposal(id)) : undefined
       ]);
-      const selectedProduct = id && route.workspaceView === "product-detail" ? products.find((product) => product.product_snapshot_id === id) : undefined;
       const [applyStatus, continuation] = selectedRefinement && ["applying", "applied", "apply_failed"].includes(String(selectedRefinement.status))
         ? await Promise.all([optional(() => orchestrationApi.applyStatus(id!)), optional(() => orchestrationApi.continuation(id!))]) : [undefined, undefined];
       if (current !== sequence.current) return;
-      setData({ runs, feedback, criticRuns, criticProposals, refinementRuns, refinementProposals, products, selectedRun, selectedFeedback, selectedCritic, selectedRefinement, selectedProduct, applyStatus, continuation }); setError(undefined);
+      setData({ runs, feedback, criticRuns, criticProposals, refinementRuns, refinementProposals, selectedRun, selectedFeedback, selectedCritic, selectedRefinement, applyStatus, continuation }); setError(undefined);
     } catch (reason) { if (current === sequence.current) setError(toErrorMessage(reason, "Unable to load Run and governance data.")); }
     finally { if (current === sequence.current) setLoading(false); }
   }, [route.entityId, route.workspaceView]);

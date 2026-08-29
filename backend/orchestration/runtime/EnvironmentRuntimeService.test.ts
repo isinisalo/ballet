@@ -11,7 +11,7 @@ import {
 } from "../persistence/PersistenceTestFixtures.js";
 import { planContinuationSeed } from "./ContinuationSeedPlanner.js";
 import { DeterministicExecutionQueue } from "./ExecutionQueueBoundary.js";
-import { EnvironmentRuntimeService, type ProductFinalizationPort } from "./EnvironmentRuntimeService.js";
+import { EnvironmentRuntimeService, type RunEvidenceFinalizationPort } from "./EnvironmentRuntimeService.js";
 import { authorizeProviderPath, authorizeProviderReadPath, mapProviderPermissions } from "./ProviderPermissions.js";
 import { ScriptedRuntimeProvider, type ProviderTerminal } from "./RuntimeProvider.js";
 
@@ -19,7 +19,7 @@ describe("orchestration validation-led Environment runtime", () => {
   let database: TestDatabase | undefined;
   afterEach(() => database?.cleanup());
 
-  test("precheck done skips Work and finalizes Product Snapshot", async () => {
+  test("precheck done skips Work and finalizes Run Evidence", async () => {
     const harness = createHarness([output(precheck("done"))]);
     await harness.start();
     await harness.drain();
@@ -134,10 +134,10 @@ describe("orchestration validation-led Environment runtime", () => {
     expect(harness.run().status).toBe("blocked");
   });
 
-  test("all States done produces one immutable Product Snapshot", async () => {
+  test("all States done produces one immutable Run Evidence", async () => {
     const harness = createHarness([output(precheck("done")), output(precheck("done"))], environmentSeed({ stateCount: 2 }));
     await harness.start(); await harness.drain();
-    const rows = database!.connection.prepare("SELECT * FROM product_snapshots").all();
+    const rows = database!.connection.prepare("SELECT * FROM run_evidences").all();
     expect(rows).toHaveLength(1);
   });
 
@@ -200,12 +200,12 @@ describe("orchestration validation-led Environment runtime", () => {
     expect(first.run().status).toBe("completed");
   });
 
-  test("restart retries failed finalization before Product worktree cleanup", async () => {
+  test("restart retries failed finalization before Run Evidence worktree cleanup", async () => {
     let fails = true;
-    const finalizer: ProductFinalizationPort = {
+    const finalizer: RunEvidenceFinalizationPort = {
       finalize: async (run, at) => {
         if (fails) throw new Error("simulated crash after finalization claim");
-        return { productSnapshotId: "product-recovered", environmentRunId: run.environmentRunId,
+        return { runEvidenceId: "evidence-recovered", environmentRunId: run.environmentRunId,
           branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit,
           resultCommit: "b".repeat(40), changedFiles: [], artifactRefs: [], resourceHashes: {},
           definitionHashes: {}, validationSummary: { status: "passed" }, createdAt: at };
@@ -222,7 +222,7 @@ describe("orchestration validation-led Environment runtime", () => {
     );
     expect(await replacement.reconcile()).toBe(1);
     expect(first.run().status).toBe("completed");
-    expect(database!.connection.prepare("SELECT COUNT(*) AS count FROM product_snapshots").get()).toEqual({ count: 1 });
+    expect(database!.connection.prepare("SELECT COUNT(*) AS count FROM run_evidences").get()).toEqual({ count: 1 });
   });
 
   test("read-only provider permission denies write and has no writable root", () => {
@@ -278,17 +278,17 @@ describe("orchestration validation-led Environment runtime", () => {
   });
 
   function createHarness(
-    script: ProviderTerminal[], seed = environmentSeed({ stateCount: 1 }), suppliedFinalizer?: ProductFinalizationPort
+    script: ProviderTerminal[], seed = environmentSeed({ stateCount: 1 }), suppliedFinalizer?: RunEvidenceFinalizationPort
   ) {
     database = openTestDatabase();
     const queue = new DeterministicExecutionQueue();
     const provider = new ScriptedRuntimeProvider(script);
     const finalized: StoredEnvironmentRun[] = [];
-    const finalizer: ProductFinalizationPort = {
+    const finalizer: RunEvidenceFinalizationPort = {
       finalize: async (run, at) => {
         finalized.push(run);
         return {
-          productSnapshotId: `product-${run.environmentRunId}`, environmentRunId: run.environmentRunId,
+          runEvidenceId: `evidence-${run.environmentRunId}`, environmentRunId: run.environmentRunId,
           branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit,
           resultCommit: "b".repeat(40), changedFiles: [], artifactRefs: [], resourceHashes: {},
           definitionHashes: {}, validationSummary: { status: "passed" }, createdAt: at
@@ -314,22 +314,22 @@ const output = (value: unknown): ProviderTerminal => ({
 });
 const testCheck = { name: "fixture", status: "passed" as const, evidenceRefs: ["test:fixture"] };
 const precheck = (decision: "done" | "delegate" | "blocked", prompt = "work") => ({
-  version: 10, role: "validation", summary: "precheck", checks: [testCheck],
+  version: 11, role: "validation", summary: "precheck", checks: [testCheck],
   result: decision === "done" ? { phase: "precheck", decision, evidence: {} }
     : decision === "delegate" ? { phase: "precheck", decision, workPrompt: prompt, evidence: {} }
       : { phase: "precheck", decision, reason: "blocked", correctiveActions: ["correct"], evidence: {} }
 });
 const postwork = (decision: "done" | "retry" | "blocked", prompt = "retry") => ({
-  version: 10, role: "validation", summary: "postwork", checks: [testCheck],
+  version: 11, role: "validation", summary: "postwork", checks: [testCheck],
   result: decision === "done" ? { phase: "postwork", decision, evidence: {} }
     : decision === "retry" ? { phase: "postwork", decision, workPrompt: prompt, feedback: "fix", expectedCorrection: "pass", evidence: {} }
       : { phase: "postwork", decision, reason: "blocked", correctiveActions: ["correct"], evidence: {} }
 });
 const work = (state: "completed") => ({
-  version: 10, role: "work", state, summary: "work", checks: [testCheck], artifacts: {}
+  version: 11, role: "work", state, summary: "work", checks: [testCheck], artifacts: {}
 });
 const workNeedsInput = (question: string, context: string) => ({
-  version: 10, role: "work", state: "needs_input", summary: "input required", checks: [testCheck],
+  version: 11, role: "work", state: "needs_input", summary: "input required", checks: [testCheck],
   artifacts: {}, question, context
 });
 const sequenceIds = (prefix: string) => {

@@ -1,9 +1,9 @@
 import type { ActionDefinition, AgentComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV13 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV14 } from "../../../shared/orchestration/runtime.js";
 
 export interface BoundedTaskContextInput {
-  snapshot: RootSnapshotV13;
+  snapshot: RootSnapshotV14;
   state?: StateDefinition;
   action?: ActionDefinition;
   composition: AgentComposition;
@@ -48,7 +48,7 @@ export const buildBoundedTaskContext = (input: BoundedTaskContextInput): JsonVal
       previousEvidence: input.previousEvidence ?? null
     },
     approvalBoundary: input.approvalBoundary ?? { humanDecisionRequired: false },
-    outputContract: { version: 10, schemaId: input.outputSchemaId }
+    outputContract: { version: 11, schemaId: input.outputSchemaId }
   };
   return JSON.parse(JSON.stringify(context)) as JsonValue;
 };

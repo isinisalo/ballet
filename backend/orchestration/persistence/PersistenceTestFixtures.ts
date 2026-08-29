@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  ProductSnapshotSeed, RootSnapshotV13, StateDefinition, TaskEnvelopeV10
+  RunEvidenceSeed, RootSnapshotV14, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -41,13 +41,11 @@ export const openTestDatabase = (): TestDatabase => {
   };
 };
 
-const agent = (toolPolicy: "read_only" | "workspace_write") => ({
-  executionProfileId: "profile", instructionResource: "instruction", skillResources: [], toolPolicy
-});
+const agent = () => ({ agentId: "profile", instructionResource: "instruction", skillResources: [] });
 
 export const actionDefinition = (id: string, priority: number, maxRetries = 1): ActionDefinition => ({
   id, name: id, description: `${id} description`, priority, useCaseIds: ["UC-1"], maxRetries,
-  validation: agent("read_only"), work: agent("workspace_write")
+  validation: agent(), work: agent()
 });
 
 export const environmentSeed = (options: {
@@ -75,17 +73,20 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV13 = {
-    version: 13, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const snapshot: RootSnapshotV14 = {
+    version: 14, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
     approvedUseCases: [], direction: { goals: [], adrs: [], constraints: [] },
-    executionProfiles: [{
-      id: "profile", name: "Test Profile", provider: "codex", model: "test-model", reasoningEffort: "high", networkAccess: false
+    agents: [{
+      id: "profile", name: "Test Agent", description: "Test Agent", enabled: true,
+      instructionResource: "instruction", skillResources: [], contentSha256: HASH_A
     }],
     runtimeCapabilities: [{
-      executionProfileId: "profile", provider: "codex", cliVersion: "1.0.0", supportedModels: ["test-model"],
+      agentId: "profile", deviceId: "device-1", runtimeBackendId: "backend-1", provider: "codex",
+      model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
+      cliVersion: "1.0.0", supportedModels: ["test-model"],
       supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
     }],
     resources: [{
@@ -95,7 +96,7 @@ export const environmentSeed = (options: {
     permissions: [
       { role: "validation", actionId: "action-1", toolPolicy: "read_only", networkAccess: false, approvalPolicy: "never" },
       { role: "work", actionId: "action-1", toolPolicy: "workspace_write", networkAccess: false, approvalPolicy: "never" }
-    ], governance: { critic: agent("read_only"), refinement: agent("read_only") }, createdAt: TEST_AT
+    ], governance: { critic: agent(), refinement: agent() }, createdAt: TEST_AT
   };
   return {
     environmentRunId: runId,
@@ -123,11 +124,11 @@ export const agentRunInput = (
   maxRetries = 1
 ): CreateAgentRunInput => {
   const base = {
-    version: 10 as const, taskId: `task-${agentRunId}`, environmentRunId,
+    version: 11 as const, taskId: `task-${agentRunId}`, environmentRunId,
     snapshotSha256: HASH_A, instruction: "Instruction", context: {},
     stateExecutionId: "state-execution-1", actionExecutionId, actionId: "action-1"
   };
-  let envelope: TaskEnvelopeV10;
+  let envelope: TaskEnvelopeV11;
   if (phase === "precheck") {
     envelope = { ...base, role: "validation", phase, workAttempts: attempt - 1, maxRetries };
   } else if (phase === "work") {
@@ -136,7 +137,7 @@ export const agentRunInput = (
     envelope = {
       ...base, role: "validation", phase, workAttempt: attempt,
       retriesRemaining: Math.max(0, maxRetries - Math.max(0, attempt - 1)),
-      workOutcome: { version: 10, role: "work", state: "completed", summary: "Work complete", checks: [testCheck], artifacts: {} }
+      workOutcome: { version: 11, role: "work", state: "completed", summary: "Work complete", checks: [testCheck], artifacts: {} }
     };
   }
   return {
@@ -151,15 +152,15 @@ export const feedbackSeed = (
   source: FeedbackSeed["source"],
   overrides: Partial<FeedbackSeed> = {}
 ): FeedbackSeed => ({
-  feedbackEntryId, source, category: "product", targetType: "action_execution", targetId: "action-execution-1",
-  title: "Action blocked", description: "Validation blocked the Action", correctiveActions: ["Correct the failure"],
+  feedbackEntryId, source, category: "system", targetType: "action_execution", targetId: "action-execution-1",
+  comment: "Validation blocked the Action. Correct the failure.",
   environmentRunId: "run-1", stateExecutionId: "state-execution-1",
   actionExecutionId: "action-execution-1", agentRunId: "postwork-1",
   provenance: { source: "validation" }, createdAt: TEST_AT, ...overrides
 });
 
-export const productSnapshotSeed = (environmentRunId = "run-1"): ProductSnapshotSeed => ({
-  productSnapshotId: `snapshot-${environmentRunId}`, environmentRunId,
+export const runEvidenceSeed = (environmentRunId = "run-1"): RunEvidenceSeed => ({
+  runEvidenceId: `snapshot-${environmentRunId}`, environmentRunId,
   branch: "codex/test", worktreePath: "/tmp/worktree", baseCommit: TEST_SHA,
   resultCommit: "b".repeat(40), changedFiles: ["shared/file.ts"], artifactRefs: ["artifact-1"],
   resourceHashes: { instruction: HASH_A }, definitionHashes: { environment: "c".repeat(64) },
@@ -173,10 +174,10 @@ export const validationOutcome = (
     | { phase: "postwork"; decision: "done"; evidence: EmptyEvidence }
     | { phase: "postwork"; decision: "retry"; workPrompt: string; feedback: string; expectedCorrection: string; evidence: EmptyEvidence }
     | { phase: "postwork"; decision: "blocked"; reason: string; correctiveActions: string[]; evidence: EmptyEvidence }
-) => ({ version: 10 as const, role: "validation" as const, summary: "Validation complete", checks: [testCheck], result });
+) => ({ version: 11 as const, role: "validation" as const, summary: "Validation complete", checks: [testCheck], result });
 
 export const workOutcome = () => ({
-  version: 10 as const, role: "work" as const, state: "completed" as const,
+  version: 11 as const, role: "work" as const, state: "completed" as const,
   summary: "Work complete", checks: [testCheck], artifacts: {}
 });
 

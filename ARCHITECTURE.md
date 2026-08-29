@@ -4,7 +4,7 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 22
+version: 23
 tags: [architecture, arc42, environment]
 ---
 
@@ -12,19 +12,20 @@ tags: [architecture, arc42, environment]
 
 Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). The accepted strict replacement for authoring and execution placement is [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) and its [target contract](.ballet/arc42/initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md).
 
-The implementation is transitioning locally from the v20/v16 baseline below to one atomic v21/v17 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized; this target note does not make partial code canonical.
+The active implementation is the atomic v21/v17 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized.
 
 ## Active version matrix
 
 | Contract | Version |
 | --- | ---: |
-| Project Config | 20 |
-| Root Snapshot | 13 |
-| Task Envelope / role outcome | 10 / 10 |
-| Prompt composition | 11 |
-| ExecutionSpec | 12 |
-| SQLite | 16 |
-| Feedback / Critic / Refinement | 1 / 1 / 1 |
+| Project Config | 21 |
+| Root Snapshot | 14 |
+| Task Envelope / role outcome | 11 / 11 |
+| Prompt composition | 12 |
+| ExecutionSpec | 13 |
+| SQLite | 17 |
+| Feedback / Critic / Refinement | 2 / 2 / 2 |
+| Agent/daemon binding / Run Evidence | 1 / 1 |
 
 The version cut is strict. Incompatible config or local state is rejected unchanged; there is no migration, reader, route alias or dual write.
 
@@ -33,14 +34,14 @@ The version cut is strict. Incompatible config or local state is rejected unchan
 ```mermaid
 flowchart LR
   Human[Human project owner] -->|authors direction and exact approvals| Ballet[Ballet local command center]
-  Ballet -->|bounded task envelope| Provider[Configured provider CLI]
-  Provider -->|strict role outcome| Ballet
+  Ballet -->|leased immutable task| Daemon[Paired selected computer]
+  Daemon -->|Codex CLI or Copilot CLI outcome| Ballet
   Ballet -->|local commits and artifacts| Git[Checkout-local Git repository]
-  Ballet -->|runtime facts| DB[(SQLite v16)]
+  Ballet -->|runtime facts| DB[(SQLite v17)]
   Browser[Same-origin browser UI] <-->|canonical JSON and SSE| Ballet
 ```
 
-The browser and CLI are local clients. Provider processes never receive human-approval authority. External systems are outside the default execution boundary.
+The browser and CLI are local clients. A paired daemon owns provider processes on the selected computer; neither daemon nor provider receives human-approval authority. External systems are outside the default execution boundary.
 
 ## Container view
 
@@ -50,7 +51,9 @@ flowchart TB
   HTTP --> App[Project, runtime and governance application services]
   App --> Shared[Strict shared contracts and pure gates]
   App --> Persistence[SQLite repositories and transactions]
-  App --> Execution[Provider adapters and permission policy]
+  App --> ControlPlane[Pairing, Agent binding, leases and runtime registry]
+  ControlPlane <-->|authenticated WebSocket and HTTPS| Daemon[Paired daemon]
+  Daemon --> Execution[Codex CLI and Copilot CLI adapters]
   App --> Workspace[Managed Git worktrees and finalization]
   Project[Project-local config, Markdown and Skills] --> App
   Persistence --> Local[(.git/ballet)]
@@ -61,24 +64,25 @@ flowchart TB
 
 | Component | Responsibility | Primary source |
 | --- | --- | --- |
-| Direction and config | strict v20 load/save, approval invalidation, references and resources | `shared/orchestration/schemas/**`, `backend/orchestration/project/**` |
-| Run planning | approved closure, immutable Snapshot v13, ordered State/Action seeds and permissions | `backend/orchestration/runtime/EnvironmentRunPlanner.ts` |
+| Direction and config | strict v21 load/save, Markdown Agents, approval invalidation, references and resources | `shared/orchestration/schemas/**`, `backend/orchestration/project/**` |
+| Run planning | approved closure, immutable Snapshot v14, ordered State/Action seeds and permissions | `backend/orchestration/runtime/EnvironmentRunPlanner.ts` |
 | Action control | Validation-first transitions, retry formula and next eligible work | `backend/orchestration/persistence/ActionOutcomeCoordinator.ts`, `FlowCoordinator.ts` |
-| Runtime execution | queue, provider dispatch, cancellation, recovery and finalization | `backend/orchestration/runtime/EnvironmentRuntimeService.ts` |
+| Runtime execution | queue, daemon dispatch, cancellation, recovery and finalization | `backend/orchestration/runtime/EnvironmentRuntimeService.ts`, `DaemonOrchestrationProvider.ts` |
+| Control plane and daemon | computer pairing, machine-local Agent binding, backend capabilities, leases and Codex/Copilot execution | `backend/control-plane/**`, `backend/daemon/**` |
 | Governance | Critic scheduling, proposal decisions, exact Refinement apply and continuation | `backend/orchestration/governance/**` |
-| Persistence | SQLite v16 schema, transactions, events, Feedback and reviews | `backend/orchestration/persistence/**` |
+| Persistence | SQLite v17 schema, transactions, events, Feedback, reviews and Run Evidence | `backend/orchestration/persistence/**` |
 | API/security | canonical routes, strict request schemas, loopback/origin/body limits and trusted actor boundary | `backend/orchestration/http/**`, `backend/server/createBalletServer.ts` |
-| UI | Configure, Run Gate, Feedback, Critic, Refinement and Product workspaces | `frontend/src/orchestration/**` |
+| UI | Loop Engineering, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback and reviews | `frontend/src/orchestration/**` |
 
 ## Truth and ownership
 
 | Truth | Canonical owner | Forbidden substitute |
 | --- | --- | --- |
-| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases and Project Config v20 | provider prompt or client state |
+| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases, Markdown Agents and Project Config v21 | provider prompt or client state |
 | Environment authoring | Git: Config, instructions and Skills | SQLite completion flags |
-| Runtime status, attempts, gates, schedules and decisions | SQLite v16 plus immutable Root Snapshot | config `done`/`blocked` fields or provider prose |
+| Runtime status, attempts, gates, schedules, Agent bindings and decisions | SQLite v17 plus immutable Root Snapshot | config `done`/`blocked` fields or provider prose |
 | Repository effect | local commit SHA plus exact artifact hashes | approval flag without applied bytes |
-| Product evidence | recomputable Product Snapshot projection | mutable copied product document |
+| Terminal evidence | recomputable Run Evidence projection inside its owning Run | mutable copied evidence document |
 
 ## Runtime sequences
 
@@ -127,7 +131,7 @@ sequenceDiagram
   participant C as Critic
   participant H as Human
   participant DB as SQLite
-  S->>C: one due occurrence, read-only Product Snapshot
+  S->>C: one due occurrence, read-only Run Evidence
   C-->>DB: immutable proposal only
   Note over DB: no Feedback yet
   H->>DB: approve exact revision and hash
@@ -147,13 +151,13 @@ sequenceDiagram
   H->>DB: approve exact proposal
   A->>DB: atomically claim approved apply
   A->>G: verify and apply exact bytes, validate, commit once
-  A->>DB: record commit and create one continuation Snapshot v13
+  A->>DB: record commit and create one continuation Snapshot v14
   Note over DB: parent snapshot remains immutable
 ```
 
 ## Persistence ownership
 
-SQLite owns Environment, State, Action and Agent executions; immutable task specs and outcomes; event cursors; Feedback; Critic schedules/runs/proposals; Refinement proposals/approvals/applies; continuation lineage; and Product Snapshots. Foreign keys, guarded updates, unique causal keys and transactions encode cross-row invariants. Repository content and Git objects remain outside SQLite and are referenced by exact hashes.
+SQLite owns Environment, State, Action and Agent executions; immutable task specs and outcomes; event cursors; Feedback; Critic schedules/runs/proposals; Refinement proposals/approvals/applies; continuation lineage; and Run Evidences. Foreign keys, guarded updates, unique causal keys and transactions encode cross-row invariants. Repository content and Git objects remain outside SQLite and are referenced by exact hashes.
 
 Successful work must remain Critic-readable through immutable commit/artifact evidence after transient worktree cleanup. Failed or blocked worktrees remain bounded diagnostics.
 
@@ -161,15 +165,15 @@ Successful work must remain Critic-readable through immutable commit/artifact ev
 
 - The HTTP server binds to `127.0.0.1`, validates Host, same-origin browser mutations, content type and body size, and applies strict Zod schemas.
 - Human approval actor identity comes from the trusted local UI/session boundary, never request payloads or provider output.
-- Provider permissions are snapshotted: Validation, Critic and Refinement proposal are read-only; Work writes only within its managed worktree; approval policy is always `never`.
-- Default profiles use Codex `gpt-5.6-sol`, high/xhigh reasoning and network off.
+- Daemon binding and permissions are snapshotted: Validation, Critic and Refinement proposal are read-only; Work writes only within its managed worktree; approval policy is always `never`.
+- Provider, model, reasoning and network policy are selected in the machine-local Agent binding from capabilities reported by the paired daemon.
 - Prompts and retained events must exclude secrets; provider child environments use an explicit allowlist.
 - Internal Git operations disable user/repository hooks. Ballet never merges, pushes, publishes or deploys automatically.
-- Loopback health and persisted recovery do not wait for authenticated provider discovery; provider status remains fail closed at Run preflight until discovery completes.
+- Loopback health and persisted recovery do not wait for daemon discovery; unbound, offline, unauthenticated or capability-mismatched Agents fail closed at Run preflight.
 
 ## Project/platform boundary
 
-Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, Environment, State, Action, role, profile, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
+Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, Agent, Environment, State, Action, role, runtime binding, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
 
 ## Failure modes
 

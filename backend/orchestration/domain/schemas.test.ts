@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   EXECUTION_SPEC_VERSION, PROJECT_CONFIG_VERSION, ROLE_OUTCOME_VERSION,
-  TASK_ENVELOPE_VERSION, agentRunSchema, approveUseCase, projectConfigurationV20Schema,
-  refinementOutcomeSchema, roleOutcomeV10Schema, sha256, taskEnvelopeV10Schema,
+  TASK_ENVELOPE_VERSION, agentRunSchema, approveUseCase, projectConfigurationV21Schema,
+  refinementOutcomeSchema, roleOutcomeV11Schema, sha256, taskEnvelopeV11Schema,
   validationDecisionSchema, workOutcomeSchema
 } from "../../../shared/orchestration/index.js";
 
@@ -41,7 +41,7 @@ describe("strict orchestration outcome schemas", () => {
   });
 
   it("keeps a Critic result as a proposal rather than Feedback", () => {
-    const result = roleOutcomeV10Schema.safeParse({
+    const result = roleOutcomeV11Schema.safeParse({
       ...outcomeBase, role: "critic",
       proposal: {
         proposalId: "proposal", title: "Finding", finding: "Quality gap", rationale: "Evidence", evidenceRefs: [],
@@ -88,10 +88,10 @@ describe("task and runtime boundary schemas", () => {
       ...base, role: "validation", phase: "postwork", stateExecutionId: "state", actionExecutionId: "action", actionId: "definition",
       workAttempt: 1, retriesRemaining: 1, workOutcome: { ...outcomeBase, role: "work", state: "completed", artifacts: {} }
     },
-    { ...base, role: "critic", phase: "proposal", criticRunId: "critic", scheduleId: "schedule", productSnapshotIds: [] },
+    { ...base, role: "critic", phase: "proposal", criticRunId: "critic", scheduleId: "schedule", runEvidenceIds: [] },
     { ...base, role: "refinement", phase: "proposal", refinementRunId: "refinement", approvedCriticProposalIds: [], allowedPaths: [], preimageHashes: {} }
   ])("accepts each task phase", (envelope) => {
-    expect(taskEnvelopeV10Schema.safeParse(envelope).success).toBe(true);
+    expect(taskEnvelopeV11Schema.safeParse(envelope).success).toBe(true);
   });
 
   it("rejects a role/phase mismatch", () => {
@@ -106,17 +106,17 @@ describe("task and runtime boundary schemas", () => {
       ...base, role: "validation", phase: "precheck", stateExecutionId: "state",
       actionExecutionId: "action", actionId: "definition", workAttempts: 0, maxRetries: 0
     };
-    const parsed = taskEnvelopeV10Schema.parse(envelope);
+    const parsed = taskEnvelopeV11Schema.parse(envelope);
     expect("workAttempts" in parsed && parsed.workAttempts).toBe(0);
   });
 });
 
-describe("Project Configuration v20 boundary", () => {
+describe("Project Configuration v21 boundary", () => {
   it("publishes the canonical strict versions", () => {
-    expect(PROJECT_CONFIG_VERSION).toBe(20);
-    expect(TASK_ENVELOPE_VERSION).toBe(10);
-    expect(ROLE_OUTCOME_VERSION).toBe(10);
-    expect(EXECUTION_SPEC_VERSION).toBe(12);
+    expect(PROJECT_CONFIG_VERSION).toBe(21);
+    expect(TASK_ENVELOPE_VERSION).toBe(11);
+    expect(ROLE_OUTCOME_VERSION).toBe(11);
+    expect(EXECUTION_SPEC_VERSION).toBe(13);
   });
 
   it("accepts a runnable bounded Environment and rejects unknown fields", () => {
@@ -126,9 +126,9 @@ describe("Project Configuration v20 boundary", () => {
       successGoals: ["Success"], failureGoals: ["Failure"], expectedOutcomes: ["Evidence"],
       goalIds: ["goal"], adrIds: ["adr"], constraintIds: ["constraint"]
     }, { approvedBy: "human", approvedAt: "2026-08-29T10:00:00.000Z", revision: 1 });
-    const agent = { executionProfileId: "profile", instructionResource: "instruction", skillResources: [], toolPolicy: "read_only" };
+    const agent = { agentId: "profile", instructionResource: "instruction", skillResources: [] };
     const config = {
-      version: 20,
+      version: 21,
       direction: {
         goals: [{ id: "goal", name: "Goal", status: "accepted" }],
         adrs: [{ id: "adr", name: "ADR", status: "accepted" }],
@@ -138,23 +138,25 @@ describe("Project Configuration v20 boundary", () => {
         }],
         useCases: [useCase]
       },
-      executionProfiles: [{ id: "profile", name: "Profile", provider: "codex", model: "model", reasoningEffort: "high", networkAccess: false }],
+      agents: [{ id: "profile", name: "Profile", description: "Agent", enabled: true,
+        instructionResource: "instruction", skillResources: [] }],
       environment: {
         id: "environment", name: "Environment", description: "Description",
         states: [{
           id: "state", name: "State", description: "Description", order: 1, useCaseIds: ["UC-1"],
-          actions: [{ id: "action", name: "Action", description: "Description", priority: 1, useCaseIds: ["UC-1"], maxRetries: 1, validation: agent, work: { ...agent, toolPolicy: "workspace_write" } }]
+          actions: [{ id: "action", name: "Action", description: "Description", priority: 1, useCaseIds: ["UC-1"], maxRetries: 1, validation: agent, work: { ...agent } }]
         }]
       },
-      critic: { version: 1, enabled: true, schedules: [{ id: "daily-1", kind: "daily", timeZone: "Europe/Helsinki", localTimes: ["09:00"] }], agent },
-      refinement: { version: 1, enabled: true, agent, allowedRoots: [".ballet/instructions", ".agents/skills"] }
+      critic: { version: 2, enabled: true, schedules: [{ id: "daily-1", kind: "daily", timeZone: "Europe/Helsinki", localTimes: ["09:00"] }], agent },
+      refinement: { version: 2, enabled: true, agent,
+        allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"] }
     };
-    expect(projectConfigurationV20Schema.safeParse(config).success).toBe(true);
-    expect(projectConfigurationV20Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
+    expect(projectConfigurationV21Schema.safeParse(config).success).toBe(true);
+    expect(projectConfigurationV21Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
     const duplicateAction = structuredClone(config);
     duplicateAction.environment.states.push({ ...duplicateAction.environment.states[0]!, id: "state-2", order: 2 });
-    expect(projectConfigurationV20Schema.safeParse(duplicateAction).success).toBe(false);
-    expect(projectConfigurationV20Schema.safeParse({
+    expect(projectConfigurationV21Schema.safeParse(duplicateAction).success).toBe(false);
+    expect(projectConfigurationV21Schema.safeParse({
       ...config,
       critic: { ...config.critic, schedules: [{ ...config.critic.schedules[0], timeZone: "Mars/Olympus" }] }
     }).success).toBe(false);

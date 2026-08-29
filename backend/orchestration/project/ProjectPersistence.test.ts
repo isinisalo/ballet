@@ -19,8 +19,8 @@ describe("canonical project persistence", () => {
     const context = fixture(false);
     const rejectedOldVersion = { version: 19, projectModel: {} };
     writeFileSync(path.join(context.root, ".ballet", "project.json"), JSON.stringify(rejectedOldVersion));
-    expect(() => context.projects.load()).toThrow("Project Config v19 is unsupported");
-    expect(() => context.projects.loadOptional()).toThrow("Project Config v19 is unsupported");
+    expect(() => context.projects.load()).toThrow("Project Config v21 is required");
+    expect(() => context.projects.loadOptional()).toThrow("Project Config v21 is required");
   });
 
   test("writes stable canonical JSON atomically and enforces optimistic hashes", () => {

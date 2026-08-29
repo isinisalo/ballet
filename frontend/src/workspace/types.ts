@@ -1,13 +1,15 @@
 export type WorkspaceView =
-  | "direction"
+  | "goals"
+  | "adrs"
+  | "constraints"
   | "use-cases"
   | "environment"
   | "state"
   | "action"
   | "instructions"
   | "skills"
-  | "execution-profiles"
-  | "critic"
+  | "agents"
+  | "runtimes"
   | "run-list"
   | "run-detail"
   | "run-state"
@@ -18,8 +20,6 @@ export type WorkspaceView =
   | "critic-proposal"
   | "refinement-reviews"
   | "refinement-proposal"
-  | "products"
-  | "product-detail"
   | "invalid";
 
 export interface RouteState {

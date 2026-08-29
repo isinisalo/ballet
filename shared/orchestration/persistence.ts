@@ -1,8 +1,8 @@
 import type { ActionDefinition, CriticScheduleDefinition, StateDefinition } from "./environment.js";
-import type { ExecutionSpecV12 } from "./execution.js";
+import type { ExecutionSpecV13 } from "./execution.js";
 import type { JsonValue } from "./primitives.js";
-import type { AgentRunPhase, AgentRunRole, RootSnapshotV13 } from "./runtime.js";
-import type { TaskEnvelopeV10 } from "./taskEnvelopes.js";
+import type { AgentRunPhase, AgentRunRole, RootSnapshotV14 } from "./runtime.js";
+import type { TaskEnvelopeV11 } from "./taskEnvelopes.js";
 import type { ValidationOutcome, WorkOutcome } from "./outcomes.js";
 import type { FeedbackCategory, FeedbackTargetType } from "./reviews.js";
 
@@ -31,7 +31,7 @@ export interface CreateEnvironmentRunInput {
   baseCommit: string;
   worktreePath: string;
   branch: string;
-  executionSnapshot: RootSnapshotV13;
+  executionSnapshot: RootSnapshotV14;
   executionSnapshotHash: string;
   transitionLimit: number;
   states: StateExecutionSeed[];
@@ -48,7 +48,7 @@ export interface CreateAgentRunInput {
   role: AgentRunRole;
   phase: AgentRunPhase;
   attempt: number;
-  taskEnvelope: TaskEnvelopeV10;
+  taskEnvelope: TaskEnvelopeV11;
   taskEnvelopeHash: string;
   input?: JsonValue;
   context?: JsonValue;
@@ -61,12 +61,10 @@ export interface FeedbackSeed {
   category: FeedbackCategory;
   targetType: FeedbackTargetType;
   targetId: string;
-  title: string;
-  description: string;
-  correctiveActions: string[];
+  comment: string;
   evidenceRefs?: string[];
   createdBy?: string;
-  environmentRunId: string;
+  environmentRunId?: string;
   stateExecutionId?: string;
   actionExecutionId?: string;
   agentRunId?: string;
@@ -78,8 +76,8 @@ export interface FeedbackSeed {
   createdAt: string;
 }
 
-export interface ProductSnapshotSeed {
-  productSnapshotId: string;
+export interface RunEvidenceSeed {
+  runEvidenceId: string;
   environmentRunId: string;
   branch: string;
   worktreePath: string;
@@ -107,8 +105,8 @@ export interface CriticDueSeed {
   criticScheduleId: string;
   dueAt: string;
   dueKey: string;
-  productSnapshotId?: string;
-  skipReason?: "no_product_snapshot";
+  runEvidenceId?: string;
+  skipReason?: "no_run_evidence";
   createdAt: string;
 }
 
@@ -126,7 +124,7 @@ export interface CriticProposalSeed {
 export interface HumanDecision {
   decision: "approved" | "rejected";
   expectedContentHash: string;
-  expectedVersion: 1;
+  expectedVersion: 2;
   decidedAt: string;
   rationale?: string;
 }
@@ -186,7 +184,7 @@ export interface RefinementApplySeed {
 }
 
 export interface ExecutionTaskSeed {
-  spec: ExecutionSpecV12;
+  spec: ExecutionSpecV13;
   specHash: string;
 }
 

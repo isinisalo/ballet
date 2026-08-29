@@ -6,7 +6,7 @@ import {
   ROLE_OUTCOME_VERSION,
   TASK_ENVELOPE_VERSION
 } from "../versions.js";
-import { executionProfileSchema } from "./environmentSchemas.js";
+import { agentDefinitionSchema } from "./environmentSchemas.js";
 import { gitObjectIdSchema, idSchema, nonEmptyTextSchema, sha256Schema, timestampSchema } from "./common.js";
 
 const resourceEvidenceSchema = z.object({
@@ -17,18 +17,18 @@ const resourceEvidenceSchema = z.object({
   sourceSha256: sha256Schema
 }).strict();
 
-export const executionPromptEvidenceV11Schema = z.object({
+export const executionPromptEvidenceV12Schema = z.object({
   compositionVersion: z.literal(PROMPT_COMPOSITION_VERSION),
   role: z.enum(["validation", "work", "critic", "refinement"]),
   phase: z.enum(["precheck", "work", "postwork", "proposal"]),
-  executionProfile: executionProfileSchema,
+  agent: agentDefinitionSchema,
   resources: z.array(resourceEvidenceSchema).max(256),
   prompt: nonEmptyTextSchema,
   promptSha256: sha256Schema,
   taskEnvelopeVersion: z.literal(TASK_ENVELOPE_VERSION),
   taskEnvelopeSha256: sha256Schema,
   outputSchemaVersion: z.literal(ROLE_OUTCOME_VERSION),
-  outputSchemaId: z.enum(["validation-outcome-v10", "work-outcome-v10", "critic-outcome-v10", "refinement-outcome-v10"]),
+  outputSchemaId: z.enum(["validation-outcome-v11", "work-outcome-v11", "critic-outcome-v11", "refinement-outcome-v11"]),
   outputSchemaSha256: sha256Schema
 }).strict().superRefine((evidence, context) => {
   if (sha256(evidence.prompt) !== evidence.promptSha256) {
@@ -40,13 +40,16 @@ export const executionPromptEvidenceV11Schema = z.object({
   if (!expectedPhase.includes(evidence.phase)) {
     context.addIssue({ code: "custom", path: ["phase"], message: "Role and phase do not match" });
   }
-  const expectedSchema = `${evidence.role}-outcome-v10`;
+  const expectedSchema = `${evidence.role}-outcome-v11`;
   if (evidence.outputSchemaId !== expectedSchema) {
     context.addIssue({ code: "custom", path: ["outputSchemaId"], message: "Role and output schema do not match" });
   }
 });
 
 const executionRuntimeSnapshotSchema = z.object({
+  agentId: idSchema,
+  deviceId: idSchema,
+  runtimeBackendId: idSchema,
   provider: z.enum(["codex", "copilot"]),
   cliVersion: nonEmptyTextSchema,
   model: nonEmptyTextSchema,
@@ -55,14 +58,27 @@ const executionRuntimeSnapshotSchema = z.object({
   capabilityHash: sha256Schema
 }).strict();
 
-export const executionSpecV12Schema = z.object({
+export const agentExecutionBindingV1Schema = z.object({
+  version: z.literal(1),
+  agentId: idSchema,
+  deviceId: idSchema,
+  runtimeBackendId: idSchema,
+  provider: z.enum(["codex", "copilot"]),
+  model: nonEmptyTextSchema,
+  reasoningEffort: nonEmptyTextSchema,
+  networkAccess: z.boolean(),
+  readOnlyRoots: z.array(nonEmptyTextSchema).max(32),
+  updatedAt: timestampSchema
+}).strict();
+
+export const executionSpecV13Schema = z.object({
   version: z.literal(EXECUTION_SPEC_VERSION),
   taskId: idSchema,
   kind: z.literal("agent_execution"),
   environmentRunId: idSchema,
   actionExecutionId: idSchema.optional(),
   agentRunId: idSchema,
-  evidence: executionPromptEvidenceV11Schema,
+  evidence: executionPromptEvidenceV12Schema,
   runtime: executionRuntimeSnapshotSchema,
   project: z.object({
     checkoutRoot: nonEmptyTextSchema,

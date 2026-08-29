@@ -10,7 +10,7 @@ Ballet is a checkout-local command center for human-directed AI work. A human ow
 - **Validation** prechecks before Work and postchecks its result.
 - **Runtime truth** owns Action status; `done` and `blocked` are derived, never authored in config.
 - **Feedback Box** contains append-only blocked facts and human-approved Critic findings.
-- **Product Snapshot** is a terminal projection of canonical commit, artifact, status, approval and evidence facts.
+- **Run Evidence** is a terminal projection of canonical commit, artifact, status, approval and evidence facts.
 
 The next State cannot start until every Action in the current State is `done`. A blocked Action gates the entire Environment.
 
@@ -30,11 +30,14 @@ ballet status
 
 `make latest` builds and installs a local artifact and restarts the checkout-local service. It does not publish, merge, push or deploy.
 
+Agent execution is performed by a paired daemon on the computer selected for that Agent. Open `/runtimes`, create and approve a pairing session, then run the displayed `ballet daemon setup` command on the execution computer. Daemon setup registers both Codex CLI and Copilot CLI backends; custom command paths can be supplied with `--codex-command` and `--copilot-command`.
+
 ## Project truth layout
 
 | Path | Ownership |
 | --- | --- |
-| `.ballet/project.json` | strict Project Config v20: Direction, profiles, Environment and governance composition |
+| `.ballet/project.json` | strict Project Config v21: Direction, Agents, Environment and governance composition |
+| `.ballet/agents/**` | Markdown Agent definitions and stable resource ownership |
 | `.ballet/goals/**` | human WHAT/WHY |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
 | `.ballet/constraints/**` | required and prohibited operating boundaries |
@@ -42,7 +45,7 @@ ballet status
 | `.ballet/instructions/**` | selected role instructions |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v16, service state, logs and managed worktrees |
+| `.git/ballet/**` | machine-local SQLite v17, control-plane state, service state, logs and managed worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
@@ -52,7 +55,7 @@ This abbreviated example shows the ownership boundary; the repository default co
 
 ```json
 {
-  "version": 20,
+  "version": 21,
   "direction": {
     "goals": [{ "id": "goal-022", "name": "Human-directed orchestration", "status": "accepted" }],
     "adrs": [{ "id": "adr-034", "name": "Validation-led Environment", "status": "accepted" }],
@@ -71,6 +74,21 @@ This abbreviated example shows the ownership boundary; the repository default co
       "approval": { "approvedBy": "human-id", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "<sha256>" }
     }]
   },
+  "agents": [{
+    "id": "validation",
+    "name": "Validation",
+    "description": "Read-only controller",
+    "enabled": true,
+    "instructionResource": "environment-validation",
+    "skillResources": ["test-evidence-verification"]
+  }, {
+    "id": "work",
+    "name": "Work",
+    "description": "Bounded workspace implementation",
+    "enabled": true,
+    "instructionResource": "environment-work",
+    "skillResources": ["test-evidence-verification"]
+  }],
   "environment": {
     "id": "example",
     "name": "Example",
@@ -78,7 +96,7 @@ This abbreviated example shows the ownership boundary; the repository default co
     "states": [{
       "id": "verify",
       "name": "Verification",
-      "description": "Verify the product",
+      "description": "Verify the evidence",
       "order": 1,
       "useCaseIds": ["UC-07"],
       "actions": [{
@@ -88,15 +106,15 @@ This abbreviated example shows the ownership boundary; the repository default co
         "priority": 1,
         "useCaseIds": ["UC-07"],
         "maxRetries": 1,
-        "validation": { "executionProfileId": "validation", "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification"], "toolPolicy": "read_only" },
-        "work": { "executionProfileId": "work", "instructionResource": "environment-work", "skillResources": ["test-evidence-verification"], "toolPolicy": "workspace_write" }
+        "validation": { "agentId": "validation", "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification"] },
+        "work": { "agentId": "work", "instructionResource": "environment-work", "skillResources": ["test-evidence-verification"] }
       }]
     }]
   }
 }
 ```
 
-The complete strict shape also requires execution profiles, disabled-by-default Critic configuration and Refinement configuration. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
+The complete strict shape also requires Markdown-backed Agents, disabled-by-default Critic configuration and Refinement configuration. Provider, model and reasoning selection belong to the machine-local Agent-to-daemon binding, not Project Config. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
 
 ## Use Case approval
 
@@ -124,7 +142,7 @@ When the retry budget is exhausted, Action `blocked` and exactly one Feedback en
 
 ## Critic, Feedback and Refinement
 
-Critic schedules support daily or weekly local times in an IANA timezone. The default schedule is disabled to avoid surprise provider cost. A due Critic reads the latest Product Snapshot and creates only a proposal. Human approval appends exactly one provenance-bound Feedback entry; rejection creates none.
+Critic schedules support daily or weekly local times in an IANA timezone. The default schedule is disabled to avoid surprise provider cost. A due Critic reads the latest Run Evidence and creates only a proposal. Human approval appends exactly one provenance-bound Feedback entry; rejection creates none.
 
 Refinement proposal generation is read-only. It records exact allowlisted paths, preimage/result hashes, replacement bytes, validation commands and the full reverse-impact set for shared Skills. Human approval binds the exact proposal. The platform—not an agent—applies approved bytes in a managed worktree, validates, creates one local commit and starts one immutable continuation Run. The parent Run and snapshot remain unchanged. No merge or push follows automatically.
 
@@ -132,20 +150,20 @@ Refinement proposal generation is read-only. It records exact allowlisted paths,
 
 | Workspace | UI route |
 | --- | --- |
-| Direction | `/configure/direction` |
-| Use Cases | `/configure/use-cases` |
-| Environment / State / Action | `/configure/environment`, `/configure/environment/states/:stateId`, `/configure/environment/states/:stateId/actions/:actionId` |
-| Instructions / Skills / Profiles / Critic | `/configure/resources/instructions`, `/configure/resources/skills`, `/configure/execution-profiles`, `/configure/critic` |
+| Loop Engineering / Environment / State / Action | `/automation/loops`, `/automation/loops/states/:stateId`, `/automation/loops/states/:stateId/actions/:actionId` |
+| Agents / Skills / Runtimes | `/agents`, `/skills`, `/runtimes` |
+| Goals / ADRs / Constraints | `/project/goals`, `/project/adrs`, `/project/constraints` |
+| Use Cases / Instructions | `/project/use-cases`, `/project/instructions` |
 | Run Gate | `/run`, `/run/:runId`, nested State/Action detail |
 | Feedback Box | `/feedback`, `/feedback/:id` |
-| Critic / Refinement review | `/reviews/critic/:id`, `/reviews/refinement/:id` |
-| Product Snapshot | `/products`, `/products/:id` |
+| Critic / Refinement review | `/reviews/critic`, `/reviews/critic/:id`, `/reviews/refinement`, `/reviews/refinement/:id` |
+| Run Evidence | inline in `/run/:runId` |
 
 JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. Key boundaries are `GET /api/project`, `GET /api/environment`, whole-Environment `POST /api/environment-runs`, exact human Work response `POST /api/environment-runs/:runId/work-input`, Feedback commands under `/api/feedback`, human Critic decisions under `/api/critic/proposals/:id/decision`, and exact Refinement decision/apply state under `/api/refinement/proposals/:id/*`. There are no route aliases or standalone State/Action Run commands.
 
 ## Strict local state
 
-The active matrix is Project Config v20, Root Snapshot v13, Task Envelope and role outcome v10, prompt composition v11, ExecutionSpec v12 and SQLite v16. Older local databases are intentionally unsupported: stop the service, archive or remove the old `.git/ballet/state.sqlite`, and start a fresh database. There is no migration or compatibility reader.
+The active matrix is Project Config v21, Root Snapshot v14, Task Envelope and role outcome v11, prompt composition v12, ExecutionSpec v13 and SQLite v17. Feedback, Critic and Refinement are v2; Agent/daemon binding and Run Evidence are v1. Older local databases are intentionally unsupported: stop the service, archive or remove the old `.git/ballet/state.sqlite`, and start a fresh database. There is no migration or compatibility reader.
 
 ## Verification
 

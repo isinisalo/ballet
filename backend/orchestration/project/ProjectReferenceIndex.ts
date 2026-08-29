@@ -1,7 +1,7 @@
-import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
 
-export type ProjectDocumentKind = "goal" | "adr" | "constraint" | "use-case" | "instruction" | "skill";
-export type ProjectReferenceKind = ProjectDocumentKind | "execution-profile";
+export type ProjectDocumentKind = "goal" | "adr" | "constraint" | "use-case" | "agent" | "instruction" | "skill";
+export type ProjectReferenceKind = ProjectDocumentKind;
 
 export interface ProjectReference {
   ownerType: string;
@@ -12,7 +12,7 @@ export interface ProjectReference {
 export class ProjectReferenceIndex {
   private readonly references = new Map<string, ProjectReference[]>();
 
-  constructor(config: ProjectConfigurationV20) {
+  constructor(config: ProjectConfigurationV21) {
     for (const useCase of config.direction.useCases) {
       this.addMany("goal", useCase.goalIds, "use-case", useCase.id, "goalIds");
       this.addMany("adr", useCase.adrIds, "use-case", useCase.id, "adrIds");
@@ -39,14 +39,14 @@ export class ProjectReferenceIndex {
         for (const [role, composition] of [["validation", action.validation], ["work", action.work]] as const) {
           this.add("instruction", composition.instructionResource, "action", action.id, `${role}.instructionResource`);
           this.addMany("skill", composition.skillResources, "action", action.id, `${role}.skillResources`);
-          this.add("execution-profile", composition.executionProfileId, "action", action.id, `${role}.executionProfileId`);
+          this.add("agent", composition.agentId, "action", action.id, `${role}.agentId`);
         }
       }
     }
     for (const [role, composition] of [["critic", config.critic.agent], ["refinement", config.refinement.agent]] as const) {
       this.add("instruction", composition.instructionResource, role, role, "instructionResource");
       this.addMany("skill", composition.skillResources, role, role, "skillResources");
-      this.add("execution-profile", composition.executionProfileId, role, role, "executionProfileId");
+      this.add("agent", composition.agentId, role, role, "agentId");
     }
   }
 

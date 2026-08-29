@@ -6,16 +6,16 @@ export class FeedbackStore {
   constructor(private readonly connection: () => Database.Database) {}
 
   create(input: FeedbackSeed): void {
-    if (input.correctiveActions.length === 0) throw new ConflictError("Feedback requires corrective actions.");
+    if (!input.comment.trim()) throw new ConflictError("Feedback comment is required.");
     this.connection().prepare(`
       INSERT INTO feedback_entries (
-        feedback_entry_id, source, category, target_type, target_id, status, title, description,
-        corrective_actions_json, evidence_refs_json, created_by, environment_run_id,
+        feedback_entry_id, source, category, target_type, target_id, status, comment,
+        evidence_refs_json, created_by, environment_run_id,
         state_execution_id, action_execution_id, agent_run_id, critic_proposal_id,
         refinement_proposal_id, continuation_run_id, approval_json, provenance_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(input.feedbackEntryId, input.source, input.category, input.targetType, input.targetId,
-      input.title, input.description, JSON.stringify(input.correctiveActions), JSON.stringify(input.evidenceRefs ?? []),
+      input.comment, JSON.stringify(input.evidenceRefs ?? []),
       input.createdBy ?? null, input.environmentRunId,
       input.stateExecutionId ?? null, input.actionExecutionId ?? null, input.agentRunId ?? null,
       input.criticProposalId ?? null, input.refinementProposalId ?? null, input.continuationRunId ?? null,

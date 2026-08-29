@@ -11,13 +11,13 @@ export function useOrchestrationConfigureData() {
   const refresh = useCallback(async () => {
     const requestSequence = ++sequence.current;
     try {
-      const [project, references, instructions, skills, goals, adrs, constraints, useCases, schedules] = await Promise.all([
+      const [project, references, instructions, skills, goals, adrs, constraints, useCases, agents, schedules] = await Promise.all([
         orchestrationApi.project(), orchestrationApi.references(), orchestrationApi.resources("instructions"),
         orchestrationApi.resources("skills"), orchestrationApi.resources("goals"), orchestrationApi.resources("adrs"),
-        orchestrationApi.resources("constraints"), orchestrationApi.resources("use-cases"), orchestrationApi.schedules()
+        orchestrationApi.resources("constraints"), orchestrationApi.resources("use-cases"), orchestrationApi.resources("agents"), orchestrationApi.schedules()
       ]);
       if (requestSequence !== sequence.current) return;
-      setData({ project, references, instructions, skills, goals, adrs, constraints, useCases, schedules }); setError(undefined);
+      setData({ project, references, instructions, skills, goals, adrs, constraints, useCases, agents, schedules }); setError(undefined);
     } catch (reason) {
       if (requestSequence === sequence.current) setError(toErrorMessage(reason, "Unable to load orchestration workspace."));
     } finally { if (requestSequence === sequence.current) setLoading(false); }

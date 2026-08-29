@@ -3,7 +3,7 @@ import { chmod, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { LocalSettings, ServiceState } from "./CheckoutState.js";
+import type { ServiceState } from "./CheckoutState.js";
 import { applicationLogPath } from "./CheckoutState.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
 
@@ -26,13 +26,13 @@ export interface LaunchdServiceOptions {
 export class LaunchdService {
   constructor(private readonly options: LaunchdServiceOptions) {}
 
-  async installAndStart(state: ServiceState, settings: LocalSettings): Promise<void> {
+  async installAndStart(state: ServiceState): Promise<void> {
     this.ensureMacOs();
     const plistPath = this.plistPath(state);
     await mkdir(path.dirname(plistPath), { recursive: true });
     await mkdir(path.dirname(applicationLogPath(this.options.project)), { recursive: true, mode: 0o700 });
     await prepareBootstrapLogs(this.options.project);
-    await writeFile(plistPath, renderPlist(this.options, state, settings), { mode: 0o600 });
+    await writeFile(plistPath, renderPlist(this.options, state), { mode: 0o600 });
     await execFileAsync("launchctl", ["bootout", this.domain(), plistPath]).catch(() => undefined);
     await execFileAsync("launchctl", ["bootstrap", this.domain(), plistPath]);
     await execFileAsync("launchctl", ["kickstart", "-k", `${this.domain()}/${state.serviceLabel}`]);
@@ -70,17 +70,14 @@ export class LaunchdService {
 
 export const renderPlist = (
   options: LaunchdServiceOptions,
-  state: ServiceState,
-  settings: LocalSettings = { version: 1 }
+  state: ServiceState
 ): string => {
   if (options.programArguments.length === 0) throw new Error("launchd ProgramArguments cannot be empty.");
   const serverArguments = [
     ...options.programArguments,
     "--root", options.project.root,
     "--port", String(state.port),
-    "--state-root", options.project.stateRoot,
-    ...(settings.codexCommand ? ["--codex-command", settings.codexCommand] : []),
-    ...(settings.copilotCommand ? ["--copilot-command", settings.copilotCommand] : [])
+    "--state-root", options.project.stateRoot
   ];
   const argumentsList = serverArguments
     .map((argument) => `      <string>${escapeXml(argument)}</string>`)

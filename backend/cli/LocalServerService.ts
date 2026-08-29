@@ -1,12 +1,9 @@
 import {
   findFreeLoopbackPort,
   isLoopbackPortAvailable,
-  loadLocalSettings,
   loadOrCreateServiceState,
   loadServiceState,
   saveServiceState,
-  updateProviderCommands,
-  type LocalSettings,
   type ServiceState
 } from "./CheckoutState.js";
 import type { LaunchdService, LaunchdStatus } from "./LaunchdService.js";
@@ -43,13 +40,12 @@ export class LocalServerService {
     this.fetchImpl = options.fetch ?? fetch;
   }
 
-  async ensureStarted(commands: { codexCommand?: string; copilotCommand?: string } = {}): Promise<ServiceState> {
+  async ensureStarted(): Promise<ServiceState> {
     let state = await loadOrCreateServiceState(this.options.project);
-    const { settings, commandOverridesChanged } = await this.prepareSettings(commands);
-    if (await this.reuseOrStopExisting(state, commandOverridesChanged)) return state;
+    if (await this.reuseOrStopExisting(state)) return state;
     this.preflightDatabase();
     state = await this.ensureAvailablePort(state);
-    return this.installWithConflictRecovery(state, settings);
+    return this.installWithConflictRecovery(state);
   }
 
   private preflightDatabase(): void {
@@ -61,34 +57,12 @@ export class LocalServerService {
     }
   }
 
-  private async prepareSettings(commands: {
-    codexCommand?: string;
-    copilotCommand?: string;
-  }): Promise<{ settings: LocalSettings; commandOverridesChanged: boolean }> {
-    const existing = await loadLocalSettings(this.options.project);
-    const changed = (commands.codexCommand !== undefined && commands.codexCommand !== existing.codexCommand)
-      || (commands.copilotCommand !== undefined && commands.copilotCommand !== existing.copilotCommand);
-    if (!changed) return { settings: existing, commandOverridesChanged: false };
-    return {
-      settings: await updateProviderCommands(this.options.project, commands),
-      commandOverridesChanged: true
-    };
-  }
-
-  private async reuseOrStopExisting(state: ServiceState, commandsChanged: boolean): Promise<boolean> {
+  private async reuseOrStopExisting(state: ServiceState): Promise<boolean> {
     let health = await this.probe(state);
-    if (health && this.matches(health, state)) {
-      if (!commandsChanged) return true;
-      await this.stopGracefully();
-      return false;
-    }
+    if (health && this.matches(health, state)) return true;
     const launchd = await this.options.launchd.status(state);
     if (launchd.running) health = await this.waitUntilReady(state, 2_000).catch(() => undefined);
-    if (health && this.matches(health, state)) {
-      if (!commandsChanged) return true;
-      await this.stopGracefully();
-      return false;
-    }
+    if (health && this.matches(health, state)) return true;
     if (launchd.loaded) await this.options.launchd.stop(state);
     return false;
   }
@@ -100,10 +74,10 @@ export class LocalServerService {
     return replacement;
   }
 
-  private async installWithConflictRecovery(state: ServiceState, settings: LocalSettings): Promise<ServiceState> {
+  private async installWithConflictRecovery(state: ServiceState): Promise<ServiceState> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        await this.options.launchd.installAndStart(state, settings);
+        await this.options.launchd.installAndStart(state);
         await this.waitUntilReady(state, this.options.startupTimeoutMs ?? 60_000);
         return state;
       } catch (error) {
@@ -119,9 +93,9 @@ export class LocalServerService {
     throw new Error("Ballet exhausted its local startup attempts.");
   }
 
-  async restart(commands: { codexCommand?: string; copilotCommand?: string } = {}, timeoutMs = 90_000): Promise<ServiceState> {
+  async restart(timeoutMs = 90_000): Promise<ServiceState> {
     await this.stopGracefully(timeoutMs);
-    return this.ensureStarted(commands);
+    return this.ensureStarted();
   }
 
   async stopGracefully(timeoutMs = 90_000): Promise<boolean> {

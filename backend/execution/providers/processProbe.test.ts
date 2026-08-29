@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { providerChildEnvironment } from "./processProbe.js";
+import { providerChildEnvironment } from "../../daemon/providers/processProbe.js";
 
 describe("provider child environment", () => {
   const originalSecret = process.env.BALLET_TEST_SECRET;

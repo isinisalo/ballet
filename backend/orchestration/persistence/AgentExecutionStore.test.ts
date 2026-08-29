@@ -35,7 +35,7 @@ describe("generic orchestration execution tasks and events", () => {
 
   it("rejects a task whose immutable spec differs from its Agent Run", () => {
     const { store, spec } = setup();
-    const mismatched = { ...spec, evidence: { ...spec.evidence, role: "work" as const, phase: "work" as const, outputSchemaId: "work-outcome-v10" as const } };
+    const mismatched = { ...spec, evidence: { ...spec.evidence, role: "work" as const, phase: "work" as const, outputSchemaId: "work-outcome-v11" as const } };
     expect(() => store.createTask({ spec: mismatched, specHash: hash(mismatched) })).toThrow(/Agent Run/);
   });
 });
@@ -51,26 +51,27 @@ const setup = () => {
   outcomes.createPrecheck(action.actionExecutionId, action.revision, agentInput);
   const prompt = "Validate the Action";
   const spec = {
-    version: 12 as const,
+    version: 13 as const,
     taskId: "execution-task-1",
     kind: "agent_execution" as const,
     environmentRunId: "run-1",
     actionExecutionId: "action-execution-1",
     agentRunId: "precheck-1",
     evidence: {
-      compositionVersion: 11 as const,
+      compositionVersion: 12 as const,
       role: "validation" as const,
       phase: "precheck" as const,
-      executionProfile: {
-        id: "profile", name: "Profile", provider: "codex" as const,
-        model: "gpt", reasoningEffort: "high", networkAccess: false
+      agent: {
+        id: "profile", name: "Agent", description: "Test Agent", enabled: true,
+        instructionResource: "instruction", skillResources: []
       },
       resources: [], prompt, promptSha256: sha256(prompt),
-      taskEnvelopeVersion: 10 as const, taskEnvelopeSha256: agentInput.taskEnvelopeHash,
-      outputSchemaVersion: 10 as const, outputSchemaId: "validation-outcome-v10" as const,
+      taskEnvelopeVersion: 11 as const, taskEnvelopeSha256: agentInput.taskEnvelopeHash,
+      outputSchemaVersion: 11 as const, outputSchemaId: "validation-outcome-v11" as const,
       outputSchemaSha256: HASH_A
     },
     runtime: {
+      agentId: "profile", deviceId: "device-1", runtimeBackendId: "backend-1",
       provider: "codex" as const, cliVersion: "1.0.0", model: "gpt",
       reasoningEffort: "high", networkAccess: false, capabilityHash: HASH_A
     },

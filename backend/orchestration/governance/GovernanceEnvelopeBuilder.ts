@@ -1,41 +1,41 @@
 import type Database from "better-sqlite3";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV13 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV14 } from "../../../shared/orchestration/runtime.js";
 import type { CriticTaskEnvelope, RefinementTaskEnvelope } from "../../../shared/orchestration/taskEnvelopes.js";
 
 export const buildCriticEnvelope = (input: {
   connection: Database.Database; criticRunId: string; taskId: string; snapshotSha256: string;
 }): CriticTaskEnvelope => {
   const row = input.connection.prepare(`
-    SELECT cr.critic_schedule_id, cr.product_snapshot_id, ps.*, er.execution_snapshot_json
-    FROM critic_runs cr JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+    SELECT cr.critic_schedule_id, cr.run_evidence_id, ps.*, er.execution_snapshot_json
+    FROM critic_runs cr JOIN run_evidences ps ON ps.run_evidence_id = cr.run_evidence_id
     JOIN environment_runs er ON er.environment_run_id = ps.environment_run_id
     WHERE cr.critic_run_id = ?
   `).get(input.criticRunId) as Record<string, unknown> | undefined;
-  if (!row) throw new Error(`Critic Run ${input.criticRunId} has no immutable Product Snapshot.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV13;
+  if (!row) throw new Error(`Critic Run ${input.criticRunId} has no immutable Run Evidence.`);
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV14;
   const composition = snapshot.governance.critic;
   const instruction = requireInstruction(snapshot, composition.instructionResource);
   const feedback = input.connection.prepare(`
-    SELECT feedback_entry_id, category, target_type, target_id, title, description, evidence_refs_json
+    SELECT feedback_entry_id, category, target_type, target_id, comment, evidence_refs_json
     FROM feedback_entries WHERE environment_run_id = ? AND status = 'open' ORDER BY created_at
   `).all(String(row.environment_run_id));
   return {
-    version: 10, taskId: input.taskId, environmentRunId: String(row.environment_run_id),
+    version: 11, taskId: input.taskId, environmentRunId: String(row.environment_run_id),
     snapshotSha256: input.snapshotSha256, instruction,
     context: json({
       boundary: "proposal only; do not modify files and do not approve",
       direction: { approvedUseCases: snapshot.approvedUseCases, ...snapshot.direction },
-      productSnapshot: {
-        id: row.product_snapshot_id, resultCommit: row.result_commit,
+      runEvidence: {
+        id: row.run_evidence_id, resultCommit: row.result_commit,
         changedFiles: JSON.parse(String(row.changed_files_json)), artifacts: JSON.parse(String(row.artifact_refs_json)),
         validationSummary: JSON.parse(String(row.validation_summary_json))
       },
       openFeedback: feedback,
-      requirements: { categories: ["product", "system", "architecture", "code", "design", "documentation"], exactTargetRequired: true }
+      requirements: { categories: ["system", "architecture", "code", "design", "documentation"], exactTargetRequired: true }
     }),
     role: "critic", phase: "proposal", criticRunId: input.criticRunId,
-    scheduleId: String(row.critic_schedule_id), productSnapshotIds: [String(row.product_snapshot_id)]
+    scheduleId: String(row.critic_schedule_id), runEvidenceIds: [String(row.run_evidence_id)]
   };
 };
 
@@ -48,7 +48,7 @@ export const buildRefinementEnvelope = (input: {
     WHERE rr.refinement_run_id = ?
   `).get(input.refinementRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Refinement Run ${input.refinementRunId} has no immutable source.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV13;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV14;
   const selected = input.connection.prepare(`
     SELECT fe.* FROM refinement_run_feedback rrf
     JOIN feedback_entries fe ON fe.feedback_entry_id = rrf.feedback_entry_id
@@ -58,7 +58,7 @@ export const buildRefinementEnvelope = (input: {
   const resources = snapshot.resources;
   const preimageHashes = Object.fromEntries(resources.map(({ relativePath, sourceSha256 }) => [relativePath, sourceSha256]));
   return {
-    version: 10, taskId: input.taskId, environmentRunId: String(row.source_environment_run_id),
+    version: 11, taskId: input.taskId, environmentRunId: String(row.source_environment_run_id),
     snapshotSha256: input.snapshotSha256, instruction: requireInstruction(snapshot, composition.instructionResource),
     context: json({
       boundary: "read-only proposal; no write and no approval",
@@ -79,7 +79,7 @@ export const buildRefinementEnvelope = (input: {
   };
 };
 
-const requireInstruction = (snapshot: RootSnapshotV13, id: string): string => {
+const requireInstruction = (snapshot: RootSnapshotV14, id: string): string => {
   const resource = snapshot.resources.find(({ kind, id: resourceId }) => kind === "instruction" && resourceId === id);
   if (!resource) throw new Error(`Governance instruction ${id} is absent from snapshot.`);
   return resource.content;

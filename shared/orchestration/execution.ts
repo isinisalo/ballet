@@ -1,4 +1,4 @@
-import type { ExecutionProfile, RuntimeProvider } from "./environment.js";
+import type { AgentDefinition, RuntimeProvider } from "./environment.js";
 import type { JsonValue } from "./primitives.js";
 import type { AgentRunPhase, AgentRunRole } from "./runtime.js";
 import {
@@ -16,22 +16,25 @@ export interface ExecutionResourceEvidence {
   sourceSha256: string;
 }
 
-export interface ExecutionPromptEvidenceV11 {
+export interface ExecutionPromptEvidenceV12 {
   compositionVersion: typeof PROMPT_COMPOSITION_VERSION;
   role: AgentRunRole;
   phase: AgentRunPhase;
-  executionProfile: ExecutionProfile;
+  agent: AgentDefinition;
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
   taskEnvelopeVersion: typeof TASK_ENVELOPE_VERSION;
   taskEnvelopeSha256: string;
   outputSchemaVersion: typeof ROLE_OUTCOME_VERSION;
-  outputSchemaId: "validation-outcome-v10" | "work-outcome-v10" | "critic-outcome-v10" | "refinement-outcome-v10";
+  outputSchemaId: "validation-outcome-v11" | "work-outcome-v11" | "critic-outcome-v11" | "refinement-outcome-v11";
   outputSchemaSha256: string;
 }
 
 export interface ExecutionRuntimeSnapshot {
+  agentId: string;
+  deviceId: string;
+  runtimeBackendId: string;
   provider: RuntimeProvider;
   cliVersion: string;
   model: string;
@@ -40,14 +43,27 @@ export interface ExecutionRuntimeSnapshot {
   capabilityHash: string;
 }
 
-export interface ExecutionSpecV12 {
+export interface AgentExecutionBindingV1 {
+  version: 1;
+  agentId: string;
+  deviceId: string;
+  runtimeBackendId: string;
+  provider: RuntimeProvider;
+  model: string;
+  reasoningEffort: string;
+  networkAccess: boolean;
+  readOnlyRoots: string[];
+  updatedAt: string;
+}
+
+export interface ExecutionSpecV13 {
   version: typeof EXECUTION_SPEC_VERSION;
   taskId: string;
   kind: "agent_execution";
   environmentRunId: string;
   actionExecutionId?: string;
   agentRunId: string;
-  evidence: ExecutionPromptEvidenceV11;
+  evidence: ExecutionPromptEvidenceV12;
   runtime: ExecutionRuntimeSnapshot;
   project: { checkoutRoot: string; headSha: string; configHash: string; snapshotHash: string };
   input?: JsonValue;
