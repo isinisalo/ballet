@@ -48,19 +48,19 @@ Dependencies were executed in strict order: 01→02→03→04; 03→05; 03/04/05
 
 | Use Case | Owning phases | Test type | Stable test/evidence |
 | --- | --- | --- | --- |
-| UC-01 | 02,10 | schema + architecture trace | TEST-032 / EVID-032 |
-| UC-02 | 02,07,08 | domain/API/UI authorization | TEST-029, TEST-031 / EVID-029, EVID-031 |
-| UC-03 | 02,08 | schema/property/CRUD/a11y | TEST-028, TEST-031 / EVID-028, EVID-031 |
-| UC-04 | 02,08 | schema/property/CRUD/a11y | TEST-028, TEST-031 / EVID-028, EVID-031 |
-| UC-05 | 03,07 | immutable snapshot/preflight | TEST-028, TEST-032 / EVID-028, EVID-032 |
-| UC-06 | 04 | strict role schema/state machine | TEST-028 / EVID-028 |
-| UC-07 | 04 | exact prompt/permission/adapter | TEST-028 / EVID-028 |
-| UC-08 | 04 | retry/exhaustion/fault matrix | TEST-028 / EVID-028 |
-| UC-09 | 04,05,08 | transaction/restart/read-model/browser | TEST-029, TEST-031 / EVID-029, EVID-031 |
-| UC-10 | 05,08 | schedule/lease/approval/UI | TEST-029, TEST-031 / EVID-029, EVID-031 |
-| UC-11 | 06,08 | path/preimage/diff/impact/security | TEST-030, TEST-031 / EVID-030, EVID-031 |
-| UC-12 | 06,07,08 | Git/stale/race/lineage/API/UI | TEST-030, TEST-031 / EVID-030, EVID-031 |
-| UC-13 | 06..08 | factual read model/API/a11y/browser | TEST-030, TEST-031 / EVID-030, EVID-031 |
+| UC-01 | 02,10 | config + architecture trace | TEST-032 / EVID-032 |
+| UC-02 | 02,07,08 | domain/API/UI approval | TEST-028, TEST-031 / EVID-028, EVID-031 |
+| UC-03 | 02,03,10 | snapshot/resource/trace | TEST-028, TEST-032 / EVID-028, EVID-032 |
+| UC-04 | 02,08 | State order schema/property/authoring | TEST-028, TEST-031 / EVID-028, EVID-031 |
+| UC-05 | 02,04,08 | Action priority and gate runtime/UI | TEST-028, TEST-031 / EVID-028, EVID-031 |
+| UC-06 | 02,10 | Action composition/resource readiness | TEST-028, TEST-032 / EVID-028, EVID-032 |
+| UC-07 | 04 | precheck role schema/evidence/state machine | TEST-028 / EVID-028 |
+| UC-08 | 04 | prompt/permission/provider adapter | TEST-028 / EVID-028 |
+| UC-09 | 04,05,08 | retry/atomic Feedback/restart/browser | TEST-028, TEST-029, TEST-031 / EVID-028, EVID-029, EVID-031 |
+| UC-10 | 06..08 | finalization/read model/API/a11y | TEST-030, TEST-031 / EVID-030, EVID-031 |
+| UC-11 | 05,08 | schedule/lease/proposal/UI | TEST-029, TEST-031 / EVID-029, EVID-031 |
+| UC-12 | 05,07,08 | exact approval/Feedback/API/UI | TEST-029, TEST-031 / EVID-029, EVID-031 |
+| UC-13 | 06..08 | path/hash/impact/Git/lineage/browser | TEST-030, TEST-031 / EVID-030, EVID-031 |
 
 ## Target invariant ownership
 

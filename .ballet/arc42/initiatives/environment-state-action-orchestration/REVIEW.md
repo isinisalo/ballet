@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative review
 status: review
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 5
+version: 6
 tags: [arc42, initiative, review, conformance]
 ---
 
@@ -12,9 +12,7 @@ tags: [arc42, initiative, review, conformance]
 
 ## Verdict
 
-The atomic strict cutover conforms to `goal-022`, `adr-034`, `TARGET-CONTRACT.md`, CON-015 and the removal manifest for the deterministic/local acceptance scope. The canonical code, config, SQLite, API, UI, release fixture and active documentation now use Environment -> State -> Action and the target version matrix. No unresolved cutover finding remains.
-
-The initiative stays in `review` because a production-like real-provider Environment occurrence and independent Product Snapshot/continuation review are still useful operational evidence. This does not leave a compatibility or transition surface in the product.
+The canonical default project, resource closure, compact fixture, active documentation and editable flow diagram conform to the strict target and pass their phase 10 gates. The initiative remains in `review`: the bounded baseline-to-HEAD phase 11 audits identified material runtime recovery, approval-security and authoring/accessibility gaps that must be corrected and reverified before the final verdict. No compatibility or transition surface is authorized as a workaround.
 
 ## Conformance findings
 

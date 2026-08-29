@@ -1,7 +1,7 @@
 ---
 id: adr-021
 title: Workflow-canvas projisoi Validationin JobNoden sisään
-status: accepted
+status: superseded
 createdAt: '2026-08-20T00:00:00.000Z'
 updatedAt: '2026-08-20T00:00:00.000Z'
 tags:

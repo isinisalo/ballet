@@ -1,7 +1,7 @@
 ---
 id: adr-015
 title: Work Loop, revisioitu State ja Loop Orchestrator
-status: accepted
+status: superseded
 createdAt: '2026-08-15T00:00:00.000Z'
 updatedAt: '2026-08-16T00:00:00.000Z'
 tags:

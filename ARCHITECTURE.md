@@ -4,77 +4,190 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 20
-tags:
-  - architecture
-  - arc42
+version: 21
+tags: [architecture, arc42, environment]
 ---
 
 # Ballet architecture
 
-Ballet is a checkout-local orchestration command center. Its canonical architecture is the accepted Environment -> State -> Action model in [`adr-034`](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md), with the full contract in the [`environment-state-action-orchestration`](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md) initiative.
+Ballet is a checkout-local orchestration command center. The accepted architecture is [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md); its bounded semantics and verification ownership live in the [Environment orchestration initiative](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md).
 
-## Truth boundaries
-
-- Project truth is version-controlled Markdown, `.ballet/project.json`, instructions and Skills.
-- Machine-local truth is fresh SQLite v16 under `.git/ballet`, immutable run snapshots, events and managed worktrees.
-- Runtime status is authoritative; `done` and `blocked` are derived facts.
-- UI and providers project facts. They do not own ordering, approval or retry decisions.
-
-## Runtime architecture
-
-```text
-Human-approved direction
-  -> strict Project Config v20
-  -> immutable Root Snapshot v13
-  -> Environment Run
-  -> lowest-order eligible State
-  -> lowest-priority eligible Action
-  -> Validation precheck
-       -> done
-       -> delegate -> Work -> Validation postwork -> done | retry | blocked
-       -> blocked
-  -> next State only after every prior Action is done
-  -> Product Snapshot
-```
-
-Validation controls the loop. `maxRetries` counts additional Work attempts after the first. Exhaustion persists the blocked Action and Feedback entry in one transaction. Provider failure is a technical outcome and never silently becomes a semantic retry.
-
-Critic and Refinement are separate governance flows. A Critic proposal requires a human decision before it can become Feedback. A Refinement proposal is read-only and exact-hash-bound; approval applies only allowed instruction/Skill paths in a managed worktree, creates one commit and starts an immutable continuation run.
-
-## Building blocks
-
-| Block | Responsibility | Source |
-| --- | --- | --- |
-| Shared contracts | Strict schemas, version constants, status derivation, route contracts | `shared/orchestration/**` |
-| Project services | v20 config and Markdown closure | `backend/orchestration/project/**` |
-| Runtime | planning, Validation-led control, provider dispatch and continuation | `backend/orchestration/runtime/**` |
-| Persistence | SQLite v16 transactions, events, schedules, feedback and reviews | `backend/orchestration/persistence/**` |
-| Governance | Critic, human approvals and Refinement apply | `backend/orchestration/governance/**` |
-| HTTP/SSE | loopback-secured canonical `/api/*` boundary | `backend/orchestration/http/**` |
-| UI | canonical configure, run, feedback, review and product workspaces | `frontend/src/orchestration/**` |
-| Provider/worktree primitives | provider-neutral execution and local Git isolation | `backend/execution/**` |
-
-## Strict version matrix
+## Active version matrix
 
 | Contract | Version |
 | --- | ---: |
 | Project Config | 20 |
 | Root Snapshot | 13 |
-| Task Envelope / role outcome | 10 |
+| Task Envelope / role outcome | 10 / 10 |
 | Prompt composition | 11 |
 | ExecutionSpec | 12 |
 | SQLite | 16 |
-| Feedback / Critic / Refinement | 1 |
+| Feedback / Critic / Refinement | 1 / 1 / 1 |
 
-There is no migration, compatibility reader, route alias or dual write. Incompatible local databases must be archived or removed.
+The version cut is strict. Incompatible config or local state is rejected unchanged; there is no migration, reader, route alias or dual write.
+
+## Context view
+
+```mermaid
+flowchart LR
+  Human[Human project owner] -->|authors direction and exact approvals| Ballet[Ballet local command center]
+  Ballet -->|bounded task envelope| Provider[Configured provider CLI]
+  Provider -->|strict role outcome| Ballet
+  Ballet -->|local commits and artifacts| Git[Checkout-local Git repository]
+  Ballet -->|runtime facts| DB[(SQLite v16)]
+  Browser[Same-origin browser UI] <-->|canonical JSON and SSE| Ballet
+```
+
+The browser and CLI are local clients. Provider processes never receive human-approval authority. External systems are outside the default execution boundary.
+
+## Container view
+
+```mermaid
+flowchart TB
+  UI[React/Vite workspaces] --> HTTP[Express HTTP and SSE boundary]
+  HTTP --> App[Project, runtime and governance application services]
+  App --> Shared[Strict shared contracts and pure gates]
+  App --> Persistence[SQLite repositories and transactions]
+  App --> Execution[Provider adapters and permission policy]
+  App --> Workspace[Managed Git worktrees and finalization]
+  Project[Project-local config, Markdown and Skills] --> App
+  Persistence --> Local[(.git/ballet)]
+  Workspace --> Git[(Local Git objects)]
+```
+
+## Component view
+
+| Component | Responsibility | Primary source |
+| --- | --- | --- |
+| Direction and config | strict v20 load/save, approval invalidation, references and resources | `shared/orchestration/schemas/**`, `backend/orchestration/project/**` |
+| Run planning | approved closure, immutable Snapshot v13, ordered State/Action seeds and permissions | `backend/orchestration/runtime/EnvironmentRunPlanner.ts` |
+| Action control | Validation-first transitions, retry formula and next eligible work | `backend/orchestration/persistence/ActionOutcomeCoordinator.ts`, `FlowCoordinator.ts` |
+| Runtime execution | queue, provider dispatch, cancellation, recovery and finalization | `backend/orchestration/runtime/EnvironmentRuntimeService.ts` |
+| Governance | Critic scheduling, proposal decisions, exact Refinement apply and continuation | `backend/orchestration/governance/**` |
+| Persistence | SQLite v16 schema, transactions, events, Feedback and reviews | `backend/orchestration/persistence/**` |
+| API/security | canonical routes, strict request schemas, loopback/origin/body limits and trusted actor boundary | `backend/orchestration/http/**`, `backend/server/createBalletServer.ts` |
+| UI | Configure, Run Gate, Feedback, Critic, Refinement and Product workspaces | `frontend/src/orchestration/**` |
+
+## Truth and ownership
+
+| Truth | Canonical owner | Forbidden substitute |
+| --- | --- | --- |
+| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases and Project Config v20 | provider prompt or client state |
+| Environment authoring | Git: Config, instructions and Skills | SQLite completion flags |
+| Runtime status, attempts, gates, schedules and decisions | SQLite v16 plus immutable Root Snapshot | config `done`/`blocked` fields or provider prose |
+| Repository effect | local commit SHA plus exact artifact hashes | approval flag without applied bytes |
+| Product evidence | recomputable Product Snapshot projection | mutable copied product document |
+
+## Runtime sequences
+
+### Normal Action
+
+```mermaid
+sequenceDiagram
+  participant R as Runtime
+  participant V as Validation
+  participant W as Work
+  participant DB as SQLite
+  R->>DB: select first pending Action in first incomplete State
+  R->>V: precheck immutable context
+  V-->>R: delegate + bounded dynamic prompt
+  R->>W: execute prompt in managed worktree
+  W-->>R: completed + artifacts/checks
+  R->>V: postcheck exact Work evidence
+  V-->>R: done + acceptance evidence
+  R->>DB: commit Action done and next gate atomically
+```
+
+### Retry and block
+
+```mermaid
+sequenceDiagram
+  participant V as Validation
+  participant R as Runtime
+  participant W as Work
+  participant DB as SQLite
+  V-->>R: retry + correction
+  alt attempts used less than 1 + maxRetries
+    R->>W: next Work attempt with correction
+  else retry exhausted
+    R->>DB: one transaction: Action blocked + one Feedback entry
+    DB-->>R: later Action and State dispatch gated
+  end
+```
+
+Provider failure, cancellation and invalid structured output are operational failure boundaries. They do not silently become semantic retry decisions.
+
+### Critic approval
+
+```mermaid
+sequenceDiagram
+  participant S as Scheduler
+  participant C as Critic
+  participant H as Human
+  participant DB as SQLite
+  S->>C: one due occurrence, read-only Product Snapshot
+  C-->>DB: immutable proposal only
+  Note over DB: no Feedback yet
+  H->>DB: approve exact revision and hash
+  DB->>DB: one transaction: decision + one Feedback entry
+```
+
+### Refinement continuation
+
+```mermaid
+sequenceDiagram
+  participant P as Refinement proposer
+  participant H as Human
+  participant A as Apply service
+  participant G as Managed worktree
+  participant DB as SQLite
+  P-->>DB: read-only exact paths/preimages/result hashes/impact
+  H->>DB: approve exact proposal
+  A->>DB: atomically claim approved apply
+  A->>G: verify and apply exact bytes, validate, commit once
+  A->>DB: record commit and create one continuation Snapshot v13
+  Note over DB: parent snapshot remains immutable
+```
+
+## Persistence ownership
+
+SQLite owns Environment, State, Action and Agent executions; immutable task specs and outcomes; event cursors; Feedback; Critic schedules/runs/proposals; Refinement proposals/approvals/applies; continuation lineage; and Product Snapshots. Foreign keys, guarded updates, unique causal keys and transactions encode cross-row invariants. Repository content and Git objects remain outside SQLite and are referenced by exact hashes.
+
+Successful work must remain Critic-readable through immutable commit/artifact evidence after transient worktree cleanup. Failed or blocked worktrees remain bounded diagnostics.
+
+## Security and trust boundaries
+
+- The HTTP server binds to `127.0.0.1`, validates Host, same-origin browser mutations, content type and body size, and applies strict Zod schemas.
+- Human approval actor identity comes from the trusted local UI/session boundary, never request payloads or provider output.
+- Provider permissions are snapshotted: Validation, Critic and Refinement proposal are read-only; Work writes only within its managed worktree; approval policy is always `never`.
+- Default profiles use Codex `gpt-5.6-sol`, high/xhigh reasoning and network off.
+- Prompts and retained events must exclude secrets; provider child environments use an explicit allowlist.
+- Internal Git operations disable user/repository hooks. Ballet never merges, pushes, publishes or deploys automatically.
+
+## Project/platform boundary
+
+Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, Environment, State, Action, role, profile, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
+
+## Failure modes
+
+| Failure | Required behavior |
+| --- | --- |
+| Invalid config, duplicate order/priority or stale approval | readiness blocks before any provider task |
+| Missing instruction/Skill or changed resource hash | snapshot/dispatch fails closed |
+| Provider failure or invalid structured output | operational failure is recorded; no false semantic retry or done |
+| Retry exhaustion or Validation blocked | Action and one Feedback entry commit atomically; later work stops |
+| Duplicate callback or restart | idempotent recovery resumes or exposes one explicit terminal failure |
+| Cancel during provider execution | provider is cancelled and no later dispatch occurs |
+| Critic overlap or crash | lease/recovery permits at most one occurrence and one catch-up |
+| Stale/failing Refinement apply | zero project writes and zero continuation Runs |
+| Finalization interruption | recoverable idempotent finalization completes once or exposes a factual failure |
+| Incompatible local database | startup rejects it with archive/remove remediation |
 
 ## Canonical documentation
 
 - [arc42 index](.ballet/arc42/README.md)
-- [status](.ballet/arc42/STATUS.md)
+- [architecture status](.ballet/arc42/STATUS.md)
 - [traceability](.ballet/arc42/TRACEABILITY.md)
 - [quality scenarios](.ballet/arc42/10-quality-requirements.md)
-- [design system](DESIGN.md)
-
-Historical initiatives and superseded ADRs remain audit evidence, not active architecture.
+- [design contract](DESIGN.md)
+- [editable orchestration diagram](ballet.drawio)

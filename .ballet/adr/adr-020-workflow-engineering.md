@@ -1,7 +1,7 @@
 ---
 id: adr-020
 title: Workflow Engineering ja erilliset Job- ja Validation-nodet
-status: accepted
+status: superseded
 createdAt: '2026-08-20T00:00:00.000Z'
 updatedAt: '2026-08-20T00:00:00.000Z'
 tags:

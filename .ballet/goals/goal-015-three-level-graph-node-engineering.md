@@ -1,7 +1,7 @@
 ---
 id: goal-015
 title: Kolmitasoinen Graph Node Engineering ja agenttiohjattu reititys
-status: accepted
+status: superseded
 createdAt: '2026-08-22T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:

@@ -1,46 +1,26 @@
 ---
 id: goal-006
-title: Kestävä tila, palautuminen ja havainnoitavuus
+title: Durable runtime truth and immutable evidence
 status: accepted
 createdAt: '2026-07-18T00:00:00.000Z'
-updatedAt: '2026-08-17T00:00:00.000Z'
-tags:
-  - tavoite
-  - jatkuvuus
-  - havainnoitavuus
-version: 2
+updatedAt: '2026-08-29'
+version: 3
+tags: [tavoite, runtime, evidence]
 ---
 
-# Kestävä tila, palautuminen ja havainnoitavuus
+# Durable runtime truth and immutable evidence
 
 ## Tavoite
 
-Ballet säilyttää Root Runien, Loop Runien, Work Loop Node Runien, roolikohtaisten Node Runien, State-revisioiden, suoritustehtävien, tapahtumien ja ajastusten tilan paikallisesti niin, että operaattori ymmärtää, mitä tapahtui myös prosessin uudelleenkäynnistyksen jälkeen.
+Ballet säilyttää Environment-, State-, Action-, Agent-, Feedback-, Critic-, Refinement- ja approval-faktat checkout-local SQLite v16:ssa niin, että eteneminen, keskeytys ja lopputulos voidaan selittää prosessin uudelleenkäynnistyksen jälkeen.
 
-Aktiivisen työn, ihmisen vastausta odottavan vaiheen, finalisoinnin ja päättyneen Runin tilan pitää olla yksiselitteisesti havaittavissa.
+## Käyttäjäarvo
 
-## Tarkoitus
+Operaattori näkee factual statukset, yritykset, blockerit, approval-provenienssin, commitit ja continuation-lineagen ilman keksittyä edistymistä tai provider-proosaan sidottua totuutta.
 
-Kestävä tila estää agenttityön katoamisen prosessin elinkaaren mukana. Eksplisiittinen palautumismalli erottaa turvallisesti jatkettavan jonotyön sellaisesta kesken jääneestä työstä, jota ei saa suorittaa uudelleen hiljaisesti.
+## Mitattavat success criteria
 
-## Kyvykkyydet
-
-- Root Run-, Loop Run-, Work Loop Node Run-, roolikohtaisen Node Run-, State revision-, repair-, suoritustehtävä-, tapahtuma- ja ajastustilan paikallinen tallennus.
-- Jonossa olevan työn säilyttäminen odottamattoman palvelukatkoksen yli.
-- Kesken olleen suorituksen merkitseminen keskeytyneenä epäonnistuneeksi käynnistyksen yhteydessä.
-- Runin peruuttaminen sekä jonossa olevien ja käynnissä olevien tehtävien hallittu lopettaminen.
-- Aktiivisten ja viimeaikaisten Runien, nykyisen Work Loop Noden ja roolin sekä finalisoinnin tuloksen näyttäminen.
-- Palveluntarjoajasta riippumattoman, yhteyskatkon jälkeen jatkettavan konsolitapahtumavirran näyttäminen.
-- Ajastuksen edellisen esiintymän, seuraavan suoritusajan ja ohitetun ajon syyn säilyttäminen.
-- Konsolisisällön katkaisutilan näyttäminen säilytysrajan täyttyessä.
-
-## Tuotteen rajaukset
-
-- Ajonaikainen tila kuuluu nykyiseen klooniin eikä muodosta checkoutien yhteistä historiaa.
-- Keskeytynyttä käynnissä ollutta tehtävää ei ajeta automaattisesti uudelleen.
-- Konsoli näyttää palveluntarjoajan julkaisemat tapahtumat ja reasoning-yhteenvedot, ei piilotettua päättelyketjua.
-- Ei-terminaalisen konsolisisällön säilytys on rajattu yhteen mebitavuun tehtävää kohti; terminaalitapahtumat säilyvät.
-
-## Todentaminen
-
-Tavoite toteutuu, kun odottamattoman katkoksen yli säilynyt jonotettu työ jatkuu palvelun seuraavassa käynnistyksessä, kesken jäänyt työ näkyy eksplisiittisenä epäonnistumisena ja käyttäjä pystyy jäljittämään Runin vaiheet, tapahtumat, lopputuloksen ja finalisoinnin paikallisesta historiasta.
+1. Retry exhaustion tallentaa Action `blocked` -faktan ja yhden Feedback-entryn samassa transaktiossa, myös duplicate callbackin ja restartin jälkeen.
+2. Critic occurrence, proposal ja human decision ovat idempotentteja ja restart-recoverableja; overlap-occurrenceja syntyy 0.
+3. Parent Root Snapshot muuttuu continuationin jälkeen 0 tavua, ja lineage viittaa exact proposal-, approval- ja commit-identiteetteihin.
+4. Product Snapshot syntyy vain terminal completed Runista ja jokainen sen fakta voidaan johtaa canonical storeista.

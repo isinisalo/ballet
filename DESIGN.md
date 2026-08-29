@@ -113,6 +113,24 @@ Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact met
 - **Refinement review** shows exact paths, operations, preimage/result hashes, diff and impact before approval.
 - **Product Snapshot** projects the terminal commit, artifacts, evidence and continuation lineage.
 
+Each workspace has one canonical URL owner. `/` is a shell landing redirect to `/configure/direction`, not a second Direction workspace.
+
+| Workspace | Canonical route |
+| --- | --- |
+| Direction | `/configure/direction` |
+| Use Cases | `/configure/use-cases` with `?id=` for entity selection |
+| Environment | `/configure/environment` |
+| State | `/configure/environment/states/:stateId` |
+| Action | `/configure/environment/states/:stateId/actions/:actionId` |
+| Instructions / Skills | `/configure/resources/instructions`, `/configure/resources/skills`, each with `?id=` |
+| Execution Profiles / Critic | `/configure/execution-profiles`, `/configure/critic` |
+| Run Gate | `/run`, `/run/:runId`, nested State and Action routes |
+| Feedback Box | `/feedback`, `/feedback/:id` |
+| Critic / Refinement review | `/reviews/critic`, `/reviews/critic/:id`, `/reviews/refinement`, `/reviews/refinement/:id` |
+| Product Snapshot | `/products`, `/products/:id` |
+
+Back/forward restores the same selected entity. An invalid or malformed ID renders a labelled recovery state with a route back to the parent workspace; it never silently renders an empty detail.
+
 ## Layout contracts
 
 At 1440x900, a persistent compact sidebar and multi-column workbench may coexist, but the primary Action or review remains readable without page-level horizontal scrolling. At 390x844, navigation collapses, cards stack in semantic order, code/diff regions scroll internally and every essential control remains reachable.
@@ -127,6 +145,24 @@ Controls are at least 40 px high on narrow screens. Focus is visible, tab order 
 - Disabled approval includes the exact blocking reason. Confirmation repeats hashes and current revision.
 - Diff panes keep additions, deletions and unchanged context distinguishable without color alone.
 - Empty, loading, stale and error states preserve the workspace hierarchy.
+
+## Action flow and status language
+
+Validation is visually primary and labelled `main/controller`; Work is indented or connected as `subordinate`. Precheck appears before optional Work, postcheck after it, and retry returns only to Work. The UI displays `1 + maxRetries` total attempts and distinguishes an operational provider failure from a semantic Validation retry.
+
+Mint means validated or safe, amber means attention/retry, red means blocked/failure and blue means selection/primary action. Each appears with explicit text and, where useful, an icon. Runtime status is read from the API. Client components never synthesize `done`, `blocked`, percent complete, ETA or a next target.
+
+## Approval and stale-state contract
+
+Use Case, Critic and Refinement approval are separate deliberate dialogs. The dialog repeats the exact entity, current revision, semantic/proposal hash and consequence. Critic approval explains that one Feedback entry will be appended. Refinement approval shows exact unified diff, paths, preimage/result hashes, shared Skill impact and continuation consequence; code and diff panes scroll internally.
+
+An unsaved draft cannot be approved. HTTP 409 conflicts preserve the local draft, show the current server revision/hash and offer explicit reload or discard. A proposal cannot be force-applied, Feedback cannot be manually resolved before verified continuation evidence, and no UI control marks an Action done.
+
+## Responsive and accessibility acceptance
+
+The full Direction, Use Case, Environment, Action, Run retry, blocked Feedback, Critic approval, Refinement diff and Product Snapshot matrix is reviewed at 1440×900 and 390×844. At narrow width, sidebar and portalled dialog/sheet controls meet the 40 px minimum, route selection closes mobile navigation, dialogs stay within the viewport and exact diffs scroll inside their region. Page-level `overflow-x-hidden` must not conceal clipped core content: QA measures both scroll width and element bounds.
+
+Route changes move focus to the new workspace heading or announce it without stealing focus during factual SSE refresh. Current navigation uses `aria-current`; all form fields, switches and status cues have accessible names; keyboard order follows visual reading order; reduced motion removes non-essential movement.
 
 ## Implementation boundary
 

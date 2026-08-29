@@ -1,7 +1,7 @@
 ---
 id: goal-021
 title: Graph Engineering käyttää hierarkkista node-omisteista Reward-MDP:tä
-status: accepted
+status: superseded
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
 version: 1

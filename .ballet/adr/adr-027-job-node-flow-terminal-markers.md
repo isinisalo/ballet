@@ -1,7 +1,7 @@
 ---
 id: adr-027
 title: Job Node -flow käyttää ID-kortteja ja kiinteitä terminaalimerkkejä
-status: accepted
+status: superseded
 createdAt: '2026-08-22T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:

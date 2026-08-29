@@ -1,7 +1,7 @@
 ---
 id: adr-025
 title: Job Node authoring käyttää industrial flow -projektiota
-status: accepted
+status: superseded
 createdAt: '2026-08-22T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:

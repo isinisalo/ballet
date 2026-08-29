@@ -67,9 +67,9 @@ Project Config v20, Root Snapshot v13, Task Envelope/outcome v10, composition v1
 
 Provider adapters, ExecutionProfiles, managed worktrees, resource composition, queue/events, strict SQLite wrapper, HTTP security, SSE, tracker outbox ja design tokens adaptoidaan. Existing dark cyber-industrial palette, Inter/Geist, spacing, radii, dense workbench ja responsive/a11y-periaatteet säilyvät. MDP-matrix, freeform Graph topology ja protected ActionNode-policy-flow supersedoidaan target workspaces/Validation-led flow -projektiolla.
 
-## Transition-poikkeus
+## Toteutettu transition
 
-Phases 02–08 saavat käyttää eristettyä vNext namespacea/hakemistoa, `/api/vnext`-API:a ja `/vnext`-UI-routeja. VNext ja v19 eivät saa lukea tai kirjoittaa toistensa dataa; dual-writeä ei ole eikä väliaikainen pinta ole compatibility layer. Phase 09 poistaa vanhan canonical-polun ja canonicalisoi vNextin atomisesti. Lopullisessa branchissa ei ole vNext-prefixiä eikä vanhaa aktiivipolkua.
+Phases 02–08 käyttivät eristettyä määräaikaista namespacea ja dataa. Phase 09 canonicalisoi targetin atomisesti ja poisti transition-pinnat. Aktiivisessa branchissa on vain strict v20/v16 canonical polku; transition ei ole jatkuva poikkeus eikä compatibility layer.
 
 ## Seuraukset
 

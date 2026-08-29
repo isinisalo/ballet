@@ -1,7 +1,7 @@
 ---
 id: goal-014
 title: Viiden Loopin deterministinen Graph Engineering RunBook
-status: accepted
+status: superseded
 createdAt: '2026-08-20T00:00:00.000Z'
 updatedAt: '2026-08-20T00:00:00.000Z'
 tags:

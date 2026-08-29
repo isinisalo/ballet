@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 36
+version: 37
 tags: [arc42, status, handoff]
 ---
 
@@ -18,7 +18,8 @@ Versiomatriisi on Project Config v20, Root Snapshot v13, Task Envelope / role ou
 | --- | --- |
 | Domain, persistence, runtime, governance and API automated suites | passed before final documentation gate |
 | Canonical responsive UI component suites | passed before final browser gate |
-| Full docs/design/removal/release/install/startup gates | passed locally; 27 files/254 tests, 219-file removal gate, packaged smoke and healthy local service |
+| Canonical default project/resources/docs/diagram | passed locally; 13 approved Use Cases, 5 States, 14 Actions, 4 role profiles, 28 files/260 tests, zero-warning lint/build/design/XML/removal gates |
+| Final cross-layer conformance | active review; bounded audits identified runtime recovery, approval security and authoring/accessibility gaps to correct before merge readiness |
 | External writes | not authorized and not performed |
 
-Initiative: [environment-state-action-orchestration](initiatives/environment-state-action-orchestration/BRIEF.md). Seuraava yksi evidence-toimi on erikseen valtuutettu real-provider Environment occurrence ja sen Product Snapshot/continuation-review; scope change tai external write vaatii ihmisen uuden päätöksen.
+Initiative: [environment-state-action-orchestration](initiatives/environment-state-action-orchestration/BRIEF.md). Seuraava työ on phase 11 audit-findings-korjaus, full validation, paikallinen install/startup-smoke ja canonical browser matrix. Scope change tai external write vaatii ihmisen uuden päätöksen.

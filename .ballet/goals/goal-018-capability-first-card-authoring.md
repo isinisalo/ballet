@@ -1,7 +1,7 @@
 ---
 id: goal-018
 title: Capability-first card authoring
-status: accepted
+status: superseded
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:

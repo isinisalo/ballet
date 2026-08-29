@@ -1,31 +1,27 @@
 ---
 id: story-release-map
-title: Story / Release Map
-version: 1
-updatedAt: 2026-08-20
+title: Local delivery evidence map
+status: accepted
+createdAt: '2026-08-20'
+updatedAt: '2026-08-29'
+version: 2
+tags: [release, evidence, local]
 ---
 
-# Story / Release Map
+# Local delivery evidence map
 
-This ordered map owns what is delivered and in which order. Implementation tasks live only in the configured `tk` work store.
+This map records local build, install, startup and review evidence. It does not authorize publishing, merge, push or deploy.
 
-## REL-GE-001 · Graph Engineering RunBook
+## Environment orchestration cutover
 
-- Status: `building`
-- Target environment: local Ballet checkout
-- Design: `GOAL-014`, `REQ-014`, `ADR-022`, `QS-016`, `QS-017`, `QS-018`
-- Acceptance: `.ballet/arc42/initiatives/graph-engineering-runbook/REVIEW.md`
-- Stories, in order:
-  - `STORY-GE-001` — deterministic five-Loop RunBook and strict version cut
-  - `STORY-GE-002` — fail-closed two-store `tk` integration
-  - `STORY-GE-003` — simplified Graph Engineering projection with Workflow visual stability
+| Evidence stage | Owner | Acceptance |
+| --- | --- | --- |
+| Direction and approved Use Cases | `.ballet/project.json`, `.ballet/goals/**`, `.ballet/adr/**`, `.ballet/constraints/**`, `.ballet/use-cases/**` | strict resource validator and 13-Use-Case trace |
+| Ordered delivery Environment | five State definitions and fourteen Action compositions | readiness plus order/priority and resource-reference tests |
+| Runtime and governance | `TEST-028`–`TEST-030` | Validation-first, retry/block, Critic and Refinement integration evidence |
+| Responsive product UI | `TEST-031` | canonical browser matrix at 1440×900 and 390×844 |
+| Strict local artifact | `TEST-032` | full gates, cutover search, packaged fixture, `make latest` and startup smoke |
 
-## REL-GE-002 · Live tk qualification
+## Rollback boundary
 
-- Status: `planned`
-- Target environment: local Ballet checkout with pinned `tk` prerequisite
-- Design: `ADR-022`, `QS-018`
-- Acceptance: successful real-CLI smoke against revision `d778bb520ee526c314c26f2bb876447e0a19caa5`
-- Stories, in order:
-  - `STORY-GE-004` — qualify the pinned real `tk` binary after installation
-
+Before any separately authorized external write, rollback means discarding the feature branch or checking out the pre-cutover commit and archiving/removing incompatible local state. There is no runtime database down migration.

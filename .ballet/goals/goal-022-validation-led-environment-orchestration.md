@@ -51,8 +51,8 @@ Standalone State/Action Run, autonominen ihmisapproval, runtime DB migration, co
 
 ## Supersession
 
-Tämä Goal korvaa `goal-021`:n Graph/GraphNode/ActionNode-, Reward-MDP-, acceptance-ledger-, Graph Node Module- ja matrix-authoring-tavoitteen vasta atomisessa phase 09 strict cutoverissa. Siihen asti v19 säilyy aktiivisena baseline-toteutuksena eikä vNext lue tai kirjoita sen dataa. Checkout-localisuus, provider-neutraalius, immutable evidence, worktree-eristys, design-tokenit ja external-write-ihmisraja säilyvät.
+Phase 09 strict cutover on toteutettu. `goal-021` ja muut korvatun orchestration/UI-domainin Goalit ovat `superseded`; checkout-localisuus, provider-neutraalius, immutable evidence, worktree-eristys, design-tokenit ja external-write-ihmisraja säilyvät aktiivisina.
 
 ## Ihmispäätös
 
-Projektin omistajan 2026-08-29 antama “Audit ja arkkitehtuurisopimus” -pyyntö hyväksyi WHAT/WHY:n, success criteria -suunnan, strict version cutin, 13 Use Casen semanttisen scope-rajan sekä `adr-034`:n päätösaiheen. Se valtuuttaa tämän paikallisen architecture-commitin mutta ei runtime-toteutusta tässä vaiheessa eikä mergeä, pushia, releaseä tai deployta.
+Projektin omistajan 2026-08-29 antama prompt-kokonaisuus hyväksyi WHAT/WHY:n, success criteria -suunnan, strict version cutin, 13 Use Casen semanttisen scope-rajan sekä `adr-034`:n päätösaiheen. Se valtuutti paikallisen toteutuksen ja verification-commitit, mutta ei mergeä, pushia, release-julkaisua tai deployta.

@@ -1,7 +1,7 @@
 ---
 id: adr-022
 title: Deterministinen Graph Engineering RunBook ja kaksistoreinen tk-sovitus
-status: accepted
+status: superseded
 createdAt: '2026-08-20T00:00:00.000Z'
 updatedAt: '2026-08-21T00:00:00.000Z'
 tags:

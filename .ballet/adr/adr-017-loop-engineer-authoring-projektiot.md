@@ -1,7 +1,7 @@
 ---
 id: adr-017
 title: Loop Engineerin authoring-projektiot ja tasokohtainen Edge-omistajuus
-status: accepted
+status: superseded
 createdAt: '2026-08-16T00:00:00.000Z'
 updatedAt: '2026-08-16T00:00:00.000Z'
 tags:

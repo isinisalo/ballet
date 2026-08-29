@@ -1,7 +1,7 @@
 ---
 id: adr-029
 title: Graph ja GraphNode authoroidaan capability-first-korttinäkymissä
-status: accepted
+status: superseded
 createdAt: '2026-08-23T00:00:00.000Z'
 updatedAt: '2026-08-23T00:00:00.000Z'
 tags:

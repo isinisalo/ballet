@@ -1,7 +1,7 @@
 ---
 id: goal-012
 title: Kaksitasoinen Graph Engineering ja Loop Engineering
-status: accepted
+status: superseded
 createdAt: '2026-08-19T00:00:00.000Z'
 updatedAt: '2026-08-19T00:00:00.000Z'
 tags:

@@ -1,7 +1,7 @@
 ---
 id: adr-018
 title: Graph Engineering, Loop Engineering ja Orchestrator-ohjattu v11-graafi
-status: accepted
+status: superseded
 createdAt: '2026-08-19T00:00:00.000Z'
 updatedAt: '2026-08-19T00:00:00.000Z'
 tags:

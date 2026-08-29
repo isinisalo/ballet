@@ -1,7 +1,7 @@
 ---
 id: goal-004
 title: Work Loop -työnkulut, validointi, korjaus ja ajastus
-status: accepted
+status: superseded
 createdAt: '2026-07-18T00:00:00.000Z'
 updatedAt: '2026-08-16T00:00:00.000Z'
 tags:

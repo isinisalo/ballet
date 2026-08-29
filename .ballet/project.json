@@ -2,114 +2,93 @@
   "version": 20,
   "direction": {
     "goals": [
+      { "id": "goal-002", "name": "Version-controlled project truth", "status": "accepted" },
+      { "id": "goal-005", "name": "Safe and repeatable Git execution", "status": "accepted" },
+      { "id": "goal-006", "name": "Durable state and immutable evidence", "status": "accepted" },
+      { "id": "goal-007", "name": "Accessible operator experience", "status": "accepted" },
+      { "id": "goal-009", "name": "Continuous arc42 architecture method", "status": "accepted" },
       { "id": "goal-022", "name": "Human-directed validation-led environment orchestration", "status": "accepted" }
     ],
     "adrs": [
-      { "id": "adr-034", "name": "Environment State Action uses validation-led deterministic orchestration", "status": "accepted" }
+      { "id": "adr-002", "name": "Version-controlled project truth and machine-local runtime truth", "status": "accepted" },
+      { "id": "adr-003", "name": "Shared TypeScript application architecture", "status": "accepted" },
+      { "id": "adr-005", "name": "Provider-neutral agent execution", "status": "accepted" },
+      { "id": "adr-006", "name": "Managed-worktree run isolation", "status": "accepted" },
+      { "id": "adr-007", "name": "SQLite runtime and schedule state", "status": "accepted" },
+      { "id": "adr-008", "name": "Loopback API and closed permission model", "status": "accepted" },
+      { "id": "adr-011", "name": "arc42 template and continuous method", "status": "accepted" },
+      { "id": "adr-012", "name": "Execution profiles separate from instructions and Skills", "status": "accepted" },
+      { "id": "adr-013", "name": "Reusable procedures belong to Skills", "status": "accepted" },
+      { "id": "adr-034", "name": "Validation-led deterministic Environment orchestration", "status": "accepted" }
     ],
     "constraints": [
-      {
-        "id": "constraint-001",
-        "name": "Human approval and ordered execution integrity",
-        "status": "accepted",
-        "kind": "required",
-        "description": "Only explicit human commands approve Use Cases, Critic proposals, and Refinement proposals; States and Actions execute in ascending order.",
-        "rationale": "The runtime must preserve operator authority and never advance beyond an incomplete or blocked gate."
-      }
+      { "id": "constraint-001", "name": "Human approval and ordered execution integrity", "status": "accepted", "kind": "required", "description": "Human decisions and deterministic State and Action gates remain authoritative.", "rationale": "The runtime must preserve operator authority and explain every progression decision." },
+      { "id": "constraint-002", "name": "Read approved direction", "status": "accepted", "kind": "required", "description": "Every Action evaluates its relevant Goals, ADRs, Constraints and approved Use Cases before work.", "rationale": "Agents cannot implement approved intent they have not received." },
+      { "id": "constraint-003", "name": "Run exact validation", "status": "accepted", "kind": "required", "description": "Every Action runs the checks named by its instruction and reports their exact outcome.", "rationale": "Completion must be reproducible from concrete checks." },
+      { "id": "constraint-004", "name": "Preserve clean architecture", "status": "accepted", "kind": "required", "description": "Changes preserve explicit domain boundaries, single ownership and maintainable dependencies.", "rationale": "A local success must not create hidden coupling or duplicate truth." },
+      { "id": "constraint-005", "name": "Evidence is required for done", "status": "accepted", "kind": "required", "description": "Validation may return done only with stable, independently inspectable evidence.", "rationale": "Provider prose is not an execution fact." },
+      { "id": "constraint-006", "name": "Use safe paths and isolated worktrees", "status": "accepted", "kind": "required", "description": "Repository writes stay within the managed worktree and approved path boundary.", "rationale": "The active checkout and unrelated files must remain protected." },
+      { "id": "constraint-007", "name": "Meet accessibility and responsive contracts", "status": "accepted", "kind": "required", "description": "Core workflows remain keyboard-operable, labelled and usable at the accepted desktop and narrow viewports.", "rationale": "Operator authority must not depend on pointer input, color or a wide screen." },
+      { "id": "constraint-008", "name": "No premature State progression", "status": "accepted", "kind": "prohibited", "description": "No later State or lower-priority bypass may start before every preceding gate is done.", "rationale": "Deterministic order is the Environment control contract." },
+      { "id": "constraint-009", "name": "No agent self-approval", "status": "accepted", "kind": "prohibited", "description": "Agents cannot approve Use Cases, Critic proposals or Refinement proposals.", "rationale": "Proposal authority and human decision authority must stay separate." },
+      { "id": "constraint-010", "name": "No automatic merge push release or deploy", "status": "accepted", "kind": "prohibited", "description": "Local execution never merges, pushes, publishes or deploys without a separate exact human authorization.", "rationale": "A local run does not grant external lifecycle authority." },
+      { "id": "constraint-011", "name": "No unauthorized external writes", "status": "accepted", "kind": "prohibited", "description": "Agents do not write to external services without explicit scoped human authorization.", "rationale": "Execution profiles and prompts cannot widen external authority." },
+      { "id": "constraint-012", "name": "No compatibility or dual-write paths", "status": "accepted", "kind": "prohibited", "description": "The strict target does not add migrations, compatibility readers, route aliases or dual writes.", "rationale": "One canonical contract keeps the pre-production system understandable and fail-closed." },
+      { "id": "constraint-013", "name": "No project workflow in platform code", "status": "accepted", "kind": "prohibited", "description": "Ballet-specific workflow identifiers and procedures do not appear in generic backend, frontend or shared platform logic.", "rationale": "The platform must execute arbitrary project-local Environments." },
+      { "id": "constraint-014", "name": "No fake validation or skipped failures", "status": "accepted", "kind": "prohibited", "description": "Checks are not fabricated, disabled or skipped to claim completion.", "rationale": "Failing evidence must remain visible and actionable." },
+      { "id": "constraint-015", "name": "No secrets in prompts or logs", "status": "accepted", "kind": "prohibited", "description": "Secrets, credentials and unredacted sensitive values never enter prompts, events or retained logs.", "rationale": "Immutable evidence must be safe to inspect." }
     ],
     "useCases": [
-      {
-        "id": "UC-01",
-        "name": "Deliver validation-led environment orchestration",
-        "status": "approved",
-        "examples": [
-          {
-            "given": "approved direction and a runnable Environment",
-            "when": "the Environment Run executes in order",
-            "then": "Validation gates every Action and produces an auditable Product Snapshot"
-          }
-        ],
-        "successGoals": ["Ordered, evidence-backed delivery"],
-        "failureGoals": ["No premature State progression", "No agent-owned human approval"],
-        "expectedOutcomes": ["Completed Environment Run or visible blocked Feedback"],
-        "goalIds": ["goal-022"],
-        "adrIds": ["adr-034"],
-        "constraintIds": ["constraint-001"],
-        "approval": {
-          "approvedBy": "local-human",
-          "approvedAt": "2026-08-29T00:00:00.000Z",
-          "revision": 1,
-          "contentHash": "41c838da66cd52415ddacf08fa887805f676d71f01c323f4a44a371f02543f64"
-        }
-      }
+      { "id": "UC-01", "name": "Define project direction", "status": "approved", "examples": [{ "given": "the project needs a bounded outcome", "when": "the human maintains Goals, ADRs and Constraints", "then": "agents receive one explicit approved decision context" }], "successGoals": ["Direction is version-controlled and unambiguous"], "failureGoals": ["No provider prompt becomes an alternative source of project intent"], "expectedOutcomes": ["A traceable Direction closure for authoring and execution"], "goalIds": ["goal-002", "goal-022"], "adrIds": ["adr-002", "adr-034"], "constraintIds": ["constraint-002", "constraint-004", "constraint-005"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "32f5ee05323649744fd4efb50005a41805a39430c1c271859319d97b84aeb638" } },
+      { "id": "UC-02", "name": "Describe and approve a Use Case", "status": "approved", "examples": [{ "given": "a draft Use Case with acceptance intent", "when": "the human approves its exact semantic hash", "then": "the approved revision may enter an Environment" }, { "given": "an approved Use Case", "when": "its semantic content changes", "then": "approval is invalidated and execution is blocked" }], "successGoals": ["Only exact human-approved Use Cases are runnable"], "failureGoals": ["No stale approval survives a semantic edit"], "expectedOutcomes": ["An immutable approval record bound to one canonical content hash"], "goalIds": ["goal-022"], "adrIds": ["adr-008", "adr-034"], "constraintIds": ["constraint-001", "constraint-002", "constraint-009"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "14078fee7ddbdbfbaca012142e37d02434ce37c1743a221149e2221108ed1dbb" } },
+      { "id": "UC-03", "name": "Provide architecture decisions to agents", "status": "approved", "examples": [{ "given": "an Action traces to accepted architecture", "when": "its immutable task context is composed", "then": "the relevant Goal, ADR, Constraint and Use Case references are available to the roles" }], "successGoals": ["Architecture decisions reach every affected Action"], "failureGoals": ["No Action relies on ambient or obsolete architecture context"], "expectedOutcomes": ["A hash-bound instruction and Skill closure with stable decision references"], "goalIds": ["goal-009", "goal-022"], "adrIds": ["adr-011", "adr-013", "adr-034"], "constraintIds": ["constraint-002", "constraint-004", "constraint-005"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "62d51f10bf530922894a8337e1e7095439d9069c279e63e881ba99e1832b8b01" } },
+      { "id": "UC-04", "name": "Model work as an Environment", "status": "approved", "examples": [{ "given": "approved work with multiple dependency stages", "when": "the human defines ordered States", "then": "the Environment exposes one deterministic progression path" }, { "given": "duplicate or empty State ordering", "when": "run readiness is evaluated", "then": "the Environment is rejected before provider dispatch" }], "successGoals": ["Work is decomposed into ordered and inspectable States"], "failureGoals": ["No freeform topology or ambiguous State order is runnable"], "expectedOutcomes": ["A strict Environment definition with unique ascending State order"], "goalIds": ["goal-002", "goal-022"], "adrIds": ["adr-034"], "constraintIds": ["constraint-008", "constraint-012", "constraint-013"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "667179c286094ee14c13ce7eb6c609e6c952a9d16b103bb139d7ff214dd92111" } },
+      { "id": "UC-05", "name": "Process State Actions by priority", "status": "approved", "examples": [{ "given": "a State with multiple Actions", "when": "the runtime selects work", "then": "it dispatches the lowest-priority-number pending Action" }, { "given": "an earlier Action or State is not done", "when": "later work is considered", "then": "zero later Actions are dispatched" }], "successGoals": ["Action selection is deterministic and gate-safe"], "failureGoals": ["No pending or blocked predecessor can be bypassed"], "expectedOutcomes": ["Ascending priority execution inside the first incomplete State"], "goalIds": ["goal-022"], "adrIds": ["adr-034"], "constraintIds": ["constraint-001", "constraint-008"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "2de83e3f6b22f24bdb83ec3569bba9f4a39b36ec7c32f1a390e41e124abe340f" } },
+      { "id": "UC-06", "name": "Define an Action", "status": "approved", "examples": [{ "given": "one bounded capability is needed", "when": "the human defines its task, evidence, retries, roles and resources", "then": "Validation and Work receive an executable immutable composition" }], "successGoals": ["Every Action is bounded, resourced and independently verifiable"], "failureGoals": ["No single Action represents the whole project"], "expectedOutcomes": ["An Action with exact Use Case references, instructions, Skills and retry limit"], "goalIds": ["goal-002", "goal-022"], "adrIds": ["adr-012", "adr-013", "adr-034"], "constraintIds": ["constraint-002", "constraint-004", "constraint-006"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "81267d3c714249de4b605dc1853755cbb6ade8df1a75b3699c36d86ad56b56f0" } },
+      { "id": "UC-07", "name": "Check Action readiness", "status": "approved", "examples": [{ "given": "a pending Action", "when": "Validation performs the precheck", "then": "it returns only done, delegate or blocked with evidence" }, { "given": "insufficient or contradictory evidence", "when": "Validation evaluates readiness", "then": "it cannot return done" }], "successGoals": ["Validation proves completion or bounds the next work before any write"], "failureGoals": ["No false done or Work-first execution"], "expectedOutcomes": ["A strict evidence-backed precheck outcome"], "goalIds": ["goal-022"], "adrIds": ["adr-034"], "constraintIds": ["constraint-003", "constraint-005", "constraint-014"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "1bdf58dbae7d66aee416081fa6f07684f36cbefb1ce8d23e8ba3c0b3ce6993ac" } },
+      { "id": "UC-08", "name": "Delegate bounded work to a subordinate agent", "status": "approved", "examples": [{ "given": "Validation returns delegate with a bounded dynamic prompt", "when": "the runtime creates Work", "then": "Work executes only that prompt in the managed worktree" }, { "given": "Work attempts an approval or external write", "when": "permissions are evaluated", "then": "the operation is denied" }], "successGoals": ["Subordinate Work is isolated and explicitly scoped"], "failureGoals": ["Work cannot route, approve or widen its permissions"], "expectedOutcomes": ["A completed or needs-input Work outcome for Validation to postcheck"], "goalIds": ["goal-005", "goal-022"], "adrIds": ["adr-005", "adr-006", "adr-012", "adr-034"], "constraintIds": ["constraint-002", "constraint-006", "constraint-010", "constraint-011"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "4b2de55e1b971aff94d2b1619407eafcc110b64bff51ab15564011850c82dfe3" } },
+      { "id": "UC-09", "name": "Retry or block an Action", "status": "approved", "examples": [{ "given": "Validation rejects completed Work while retry budget remains", "when": "postwork returns retry", "then": "one additional Work attempt receives the correction" }, { "given": "the final allowed Work attempt still needs retry", "when": "postwork is applied", "then": "the Action and exactly one Feedback entry are committed atomically as blocked" }], "successGoals": ["Semantic retries are bounded and blockers stay visible"], "failureGoals": ["No provider failure silently consumes semantic retry budget"], "expectedOutcomes": ["Done, a bounded retry, or atomic blocked Feedback"], "goalIds": ["goal-006", "goal-022"], "adrIds": ["adr-007", "adr-034"], "constraintIds": ["constraint-001", "constraint-005", "constraint-008", "constraint-014"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "c04f800b84dac440f8fe46ca33649f2dbecf581f7d08cb51174889f2400c168c" } },
+      { "id": "UC-10", "name": "Form the final Product Snapshot", "status": "approved", "examples": [{ "given": "every Environment Action is done and finalization succeeds", "when": "the run reaches terminal completion", "then": "a Product Snapshot projects commit, artifacts, statuses, approvals and evidence" }, { "given": "the Environment is incomplete or blocked", "when": "product data is requested", "then": "no terminal Product Snapshot is invented" }], "successGoals": ["The final product is factual, immutable and inspectable"], "failureGoals": ["No provider prose or partial run becomes a Product Snapshot"], "expectedOutcomes": ["A recomputable terminal projection linked to canonical truth"], "goalIds": ["goal-006", "goal-022"], "adrIds": ["adr-006", "adr-007", "adr-034"], "constraintIds": ["constraint-003", "constraint-005"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "a974e3b67de2b0b10223874c1c9ff7779e599e1bf5e481ccf53c6b58ad9912d0" } },
+      { "id": "UC-11", "name": "Run scheduled quality criticism", "status": "approved", "examples": [{ "given": "a disabled default Critic schedule", "when": "the project loads", "then": "no automatic provider run starts" }, { "given": "an enabled due occurrence with a valid lease", "when": "Critic inspects the latest Product Snapshot", "then": "it produces at most one read-only proposal and no Feedback" }], "successGoals": ["Quality criticism is scheduled, non-overlapping and evidence-based"], "failureGoals": ["No schedule overlap, write or autonomous approval"], "expectedOutcomes": ["An immutable Critic proposal awaiting a human decision"], "goalIds": ["goal-006", "goal-022"], "adrIds": ["adr-007", "adr-034"], "constraintIds": ["constraint-009", "constraint-011", "constraint-015"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "bbb986c32e2507705eafad61a4d5942fc52457cb0d640ff3c89e3f0256e4c7ca" } },
+      { "id": "UC-12", "name": "Approve and collect Feedback", "status": "approved", "examples": [{ "given": "a Critic proposal with exact revision and hash", "when": "the human approves it", "then": "exactly one provenance-bound Feedback entry is appended" }, { "given": "a rejected, stale or unapproved proposal", "when": "Feedback is queried", "then": "it contributes zero Feedback entries" }], "successGoals": ["Only deliberate human-approved criticism enters the Feedback Box"], "failureGoals": ["No proposal is treated as Feedback before approval"], "expectedOutcomes": ["Append-only Feedback with exact proposal provenance"], "goalIds": ["goal-022"], "adrIds": ["adr-008", "adr-034"], "constraintIds": ["constraint-009", "constraint-011"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "3d391ede26f9c74d6931ef7019abad28db3d1a92a422c506cc3da710e9330932" } },
+      { "id": "UC-13", "name": "Refine an Action and rerun immutably", "status": "approved", "examples": [{ "given": "approved Feedback and a read-only exact-hash Refinement proposal", "when": "the human approves the exact impact and apply succeeds", "then": "one managed-worktree commit creates one immutable continuation run" }, { "given": "a stale preimage, forbidden path or incomplete shared Skill impact", "when": "apply is attempted", "then": "zero project files and zero continuation runs are created" }], "successGoals": ["Approved refinement is exact, local and auditable"], "failureGoals": ["No proposal writes, partial apply or parent-run mutation"], "expectedOutcomes": ["A verified refinement commit and lineage-bound continuation run"], "goalIds": ["goal-005", "goal-006", "goal-022"], "adrIds": ["adr-006", "adr-034"], "constraintIds": ["constraint-006", "constraint-009", "constraint-010", "constraint-011", "constraint-012"], "approval": { "approvedBy": "project-owner-specification", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "d222722e8ba03c7283d268791661be0868a1cfc730f6b735e4e7824cbac349c5" } }
     ]
   },
   "executionProfiles": [
-    {
-      "id": "codex-gpt-5-6-sol-high-network-off",
-      "name": "Codex GPT-5.6 Sol · High · Network off",
-      "provider": "codex",
-      "model": "gpt-5.6-sol",
-      "reasoningEffort": "high",
-      "networkAccess": false
-    }
+    { "id": "codex-validation-high-network-off", "name": "Validation · Codex GPT-5.6 Sol · High · Network off", "provider": "codex", "model": "gpt-5.6-sol", "reasoningEffort": "high", "networkAccess": false },
+    { "id": "codex-work-xhigh-network-off", "name": "Work · Codex GPT-5.6 Sol · XHigh · Network off", "provider": "codex", "model": "gpt-5.6-sol", "reasoningEffort": "xhigh", "networkAccess": false },
+    { "id": "codex-critic-high-network-off", "name": "Critic · Codex GPT-5.6 Sol · High · Network off", "provider": "codex", "model": "gpt-5.6-sol", "reasoningEffort": "high", "networkAccess": false },
+    { "id": "codex-refinement-xhigh-network-off", "name": "Refinement · Codex GPT-5.6 Sol · XHigh · Network off", "provider": "codex", "model": "gpt-5.6-sol", "reasoningEffort": "xhigh", "networkAccess": false }
   ],
   "environment": {
-    "id": "ballet-development",
-    "name": "Ballet development",
-    "description": "Execute approved Ballet changes through a Validation-led quality gate.",
+    "id": "ballet-development", "name": "Ballet product development", "description": "Deliver Ballet changes through approved direction, deterministic gates, Validation-led execution and immutable evidence.",
     "states": [
-      {
-        "id": "deliver",
-        "name": "Deliver approved change",
-        "description": "Implement and validate one approved bounded change.",
-        "order": 1,
-        "useCaseIds": ["UC-01"],
-        "actions": [
-          {
-            "id": "implement-and-validate",
-            "name": "Implement and validate",
-            "description": "Validation determines whether work is needed and accepts or blocks the result.",
-            "priority": 1,
-            "useCaseIds": ["UC-01"],
-            "maxRetries": 2,
-            "validation": {
-              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
-              "instructionResource": "environment-validation",
-              "skillResources": [],
-              "toolPolicy": "read_only"
-            },
-            "work": {
-              "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
-              "instructionResource": "environment-work",
-              "skillResources": [],
-              "toolPolicy": "workspace_write"
-            }
-          }
-        ]
-      }
+      { "id": "direction-and-acceptance", "name": "Direction and acceptance", "description": "Establish accepted decision context and an exact approved Use Case closure.", "order": 1, "useCaseIds": ["UC-01", "UC-02", "UC-03"], "actions": [
+        { "id": "verify-direction", "name": "Verify Goals, ADRs and Constraints", "description": "Reconcile the bounded initiative with accepted WHAT, WHY, architecture decisions and constraints; record trace gaps explicitly.", "priority": 1, "useCaseIds": ["UC-01", "UC-03"], "maxRetries": 1, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["arc42/decision-records", "arc42/quality-scenarios", "arc42/traceability"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["arc42/decision-records", "arc42/quality-scenarios", "arc42/traceability"], "toolPolicy": "workspace_write" } },
+        { "id": "verify-use-cases", "name": "Verify approved Use Cases and traceability", "description": "Make the Use Case closure complete, exact-hash approved and traceable to measurable acceptance evidence.", "priority": 2, "useCaseIds": ["UC-02", "UC-03"], "maxRetries": 1, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["arc42/quality-scenarios", "arc42/traceability", "test-evidence-verification"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["arc42/quality-scenarios", "arc42/traceability", "test-evidence-verification"], "toolPolicy": "workspace_write" } }
+      ] },
+      { "id": "architecture-and-design", "name": "Architecture and design", "description": "Define maintainable architecture, runtime contracts and accessible interaction design before implementation.", "order": 2, "useCaseIds": ["UC-03", "UC-04", "UC-05", "UC-06"], "actions": [
+        { "id": "maintain-arc42", "name": "Maintain affected arc42 sections", "description": "Update the smallest canonical architecture views, stable IDs and links required by the approved change.", "priority": 1, "useCaseIds": ["UC-03"], "maxRetries": 2, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["arc42/architecture-views", "arc42/document-maintenance", "arc42/traceability"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["arc42/architecture-views", "arc42/document-maintenance", "arc42/traceability"], "toolPolicy": "workspace_write" } },
+        { "id": "define-contracts", "name": "Define domain and API contracts", "description": "Specify strict TypeScript domain boundaries, persistence invariants and HTTP contracts without compatibility paths.", "priority": 2, "useCaseIds": ["UC-04", "UC-05", "UC-06"], "maxRetries": 2, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["typescript-domain-design", "sqlite-transactional-invariants", "http-api-validation-security", "arc42/conformance-review"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["typescript-domain-design", "sqlite-transactional-invariants", "http-api-validation-security"], "toolPolicy": "workspace_write" } },
+        { "id": "align-product-design", "name": "Align product interaction design", "description": "Define canonical workspaces, status semantics, approval consequences and responsive accessibility behavior.", "priority": 3, "useCaseIds": ["UC-04", "UC-06"], "maxRetries": 2, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["react-workspace-accessibility", "arc42/conformance-review"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["react-workspace-accessibility", "arc42/document-maintenance"], "toolPolicy": "workspace_write" } }
+      ] },
+      { "id": "implementation", "name": "Implementation", "description": "Implement the approved design across shared contracts, runtime persistence and user-facing workspaces.", "order": 3, "useCaseIds": ["UC-04", "UC-05", "UC-06", "UC-07", "UC-08", "UC-09", "UC-10", "UC-12", "UC-13"], "actions": [
+        { "id": "implement-shared-domain", "name": "Implement shared domain contracts", "description": "Implement pure strict schemas, status derivations, ordering and public DTO contracts with focused tests.", "priority": 1, "useCaseIds": ["UC-04", "UC-05", "UC-06"], "maxRetries": 3, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["typescript-domain-design", "test-evidence-verification", "arc42/conformance-review"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["typescript-domain-design", "test-evidence-verification"], "toolPolicy": "workspace_write" } },
+        { "id": "implement-runtime-persistence", "name": "Implement backend runtime and persistence", "description": "Implement Validation-led control, atomic SQLite facts, recovery, permissions and governance idempotency.", "priority": 2, "useCaseIds": ["UC-07", "UC-08", "UC-09", "UC-12", "UC-13"], "maxRetries": 3, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["sqlite-transactional-invariants", "http-api-validation-security", "test-evidence-verification", "arc42/conformance-review"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["typescript-domain-design", "sqlite-transactional-invariants", "http-api-validation-security", "test-evidence-verification"], "toolPolicy": "workspace_write" } },
+        { "id": "implement-frontend", "name": "Implement frontend workspaces", "description": "Implement factual Configure, Run, Feedback, review and Product Snapshot experiences with canonical routes.", "priority": 3, "useCaseIds": ["UC-01", "UC-02", "UC-04", "UC-05", "UC-10", "UC-12", "UC-13"], "maxRetries": 3, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["react-workspace-accessibility", "test-evidence-verification", "arc42/conformance-review"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["react-workspace-accessibility", "test-evidence-verification"], "toolPolicy": "workspace_write" } }
+      ] },
+      { "id": "verification", "name": "Verification", "description": "Prove runtime semantics, repository quality, security and accessible operation without skipped failures.", "order": 4, "useCaseIds": ["UC-02", "UC-05", "UC-07", "UC-08", "UC-09", "UC-10", "UC-11", "UC-12", "UC-13"], "actions": [
+        { "id": "verify-action-runtime", "name": "Verify Action runtime semantics", "description": "Exercise ordering, precheck, delegation, retry, blocked Feedback, restart and immutable evidence behavior.", "priority": 1, "useCaseIds": ["UC-05", "UC-07", "UC-08", "UC-09"], "maxRetries": 2, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification", "sqlite-transactional-invariants", "arc42/evaluation"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["test-evidence-verification", "sqlite-transactional-invariants"], "toolPolicy": "workspace_write" } },
+        { "id": "verify-repository-quality", "name": "Verify repository build and quality", "description": "Run the exact repository validation, test, lint, build and document checks and retain truthful evidence.", "priority": 2, "useCaseIds": ["UC-10"], "maxRetries": 1, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification", "arc42/conformance-review", "arc42/evaluation"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["test-evidence-verification"], "toolPolicy": "workspace_write" } },
+        { "id": "audit-security-accessibility", "name": "Audit security and accessibility", "description": "Verify request validation, actor trust, permission boundaries, secret hygiene, keyboard use and responsive layouts.", "priority": 3, "useCaseIds": ["UC-02", "UC-08", "UC-11", "UC-12", "UC-13"], "maxRetries": 2, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["http-api-validation-security", "react-workspace-accessibility", "arc42/conformance-review"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["http-api-validation-security", "react-workspace-accessibility", "test-evidence-verification"], "toolPolicy": "workspace_write" } }
+      ] },
+      { "id": "release-evidence", "name": "Release evidence", "description": "Assemble truthful documentation, local install/startup evidence and a human-reviewable delivery package.", "order": 5, "useCaseIds": ["UC-01", "UC-03", "UC-10", "UC-11", "UC-12", "UC-13"], "actions": [
+        { "id": "maintain-product-docs", "name": "Maintain product documentation and traceability", "description": "Update README, architecture status, traceability and initiative evidence only from completed checks and decisions.", "priority": 1, "useCaseIds": ["UC-01", "UC-03", "UC-10"], "maxRetries": 1, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["arc42/document-maintenance", "arc42/traceability", "arc42/initiative-handoff"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["arc42/document-maintenance", "arc42/traceability", "arc42/initiative-handoff"], "toolPolicy": "workspace_write" } },
+        { "id": "install-startup-smoke", "name": "Run local install and startup smoke", "description": "Build and install the local artifact, start a fresh strict database and verify canonical health without external writes.", "priority": 2, "useCaseIds": ["UC-10"], "maxRetries": 1, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification", "http-api-validation-security"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["test-evidence-verification", "http-api-validation-security"], "toolPolicy": "workspace_write" } },
+        { "id": "review-release-evidence", "name": "Review the delivery evidence package", "description": "Perform conformance, risk and method-health review and hand off explicit limitations without external lifecycle actions.", "priority": 3, "useCaseIds": ["UC-10", "UC-11", "UC-12", "UC-13"], "maxRetries": 1, "validation": { "executionProfileId": "codex-validation-high-network-off", "instructionResource": "environment-validation", "skillResources": ["arc42/conformance-review", "arc42/evaluation", "arc42/method-health", "arc42/initiative-handoff"], "toolPolicy": "read_only" }, "work": { "executionProfileId": "codex-work-xhigh-network-off", "instructionResource": "environment-work", "skillResources": ["arc42/evaluation", "arc42/method-health", "arc42/initiative-handoff", "test-evidence-verification"], "toolPolicy": "workspace_write" } }
+      ] }
     ]
   },
-  "critic": {
-    "version": 1,
-    "enabled": false,
-    "schedules": [],
-    "agent": {
-      "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
-      "instructionResource": "environment-validation",
-      "skillResources": [],
-      "toolPolicy": "read_only"
-    }
-  },
-  "refinement": {
-    "version": 1,
-    "enabled": true,
-    "agent": {
-      "executionProfileId": "codex-gpt-5-6-sol-high-network-off",
-      "instructionResource": "environment-validation",
-      "skillResources": [],
-      "toolPolicy": "read_only"
-    },
-    "allowedRoots": [".ballet/instructions", ".agents/skills"]
-  }
+  "critic": { "version": 1, "enabled": false, "schedules": [{ "id": "weekday-quality-review", "kind": "weekly", "timeZone": "Europe/Helsinki", "localTimes": ["09:00"], "weekdays": [1, 3, 5] }], "agent": { "executionProfileId": "codex-critic-high-network-off", "instructionResource": "environment-critic", "skillResources": ["arc42/conformance-review", "arc42/evaluation", "test-evidence-verification"], "toolPolicy": "read_only" } },
+  "refinement": { "version": 1, "enabled": true, "agent": { "executionProfileId": "codex-refinement-xhigh-network-off", "instructionResource": "environment-refinement", "skillResources": ["safe-refinement-proposal", "arc42/traceability", "test-evidence-verification"], "toolPolicy": "read_only" }, "allowedRoots": [".ballet/instructions", ".agents/skills"] }
 }

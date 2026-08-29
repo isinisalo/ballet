@@ -1,7 +1,7 @@
 ---
 id: goal-011
 title: Kolmitasoinen Loop Engineer -työtila
-status: accepted
+status: superseded
 createdAt: '2026-08-16T00:00:00.000Z'
 updatedAt: '2026-08-16T00:00:00.000Z'
 tags:

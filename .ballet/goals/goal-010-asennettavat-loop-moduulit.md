@@ -1,7 +1,7 @@
 ---
 id: goal-010
 title: Asennettavat ja vietävät yhden Loopin moduulit
-status: accepted
+status: superseded
 createdAt: '2026-08-16T00:00:00.000Z'
 updatedAt: '2026-08-17T00:00:00.000Z'
 tags:

@@ -1,7 +1,7 @@
 ---
 id: adr-033
 title: Graph ja GraphNode käyttävät erillisiä node-omisteisia Reward-MDP-scopeja
-status: accepted
+status: superseded
 createdAt: '2026-08-23'
 updatedAt: '2026-08-23'
 version: 1

@@ -1,7 +1,10 @@
 import { readFile, readdir, stat } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import YAML from "yaml";
+import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
+import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
 import { projectConfigurationV20Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.ts";
 
@@ -179,7 +182,78 @@ if (!parsed.success) {
     const filename = path.join(root, ".agents/skills", id, "SKILL.md");
     if (!(await exists(filename))) addIssue(`Missing Skill resource ${id}.`);
   }
+
+  for (const issue of validateRunnableEnvironment(config.environment, config.direction)) {
+    addIssue(`Default project is not runnable: ${issue.path}: ${issue.message}`);
+  }
+  if (config.direction.useCases.length !== 13) addIssue(`Default project must contain 13 Use Cases; found ${config.direction.useCases.length}.`);
+  const expectedUseCases = new Set(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
+  for (const id of expectedUseCases) if (!config.direction.useCases.some((useCase) => useCase.id === id)) addIssue(`Missing canonical Use Case ${id}.`);
+  if (config.environment.states.length !== 5) addIssue(`Default project must contain five canonical States; found ${config.environment.states.length}.`);
+  for (const profile of config.executionProfiles) {
+    if (profile.provider !== "codex" || profile.model !== "gpt-5.6-sol"
+      || !["high", "xhigh"].includes(profile.reasoningEffort) || profile.networkAccess) {
+      addIssue(`Default Execution Profile ${profile.id} must use Codex gpt-5.6-sol high/xhigh with network off.`);
+    }
+  }
+  if (config.executionProfiles.length < 4) addIssue("Default project needs explicit Validation, Work, Critic and Refinement Execution Profiles.");
+  if (config.critic.enabled) addIssue("Default Critic schedule must be disabled.");
+  if (config.critic.schedules.length === 0) addIssue("Default Critic needs a disabled example schedule with a valid IANA timezone.");
+
+  const useCaseDocuments = await indexedMarkdownDocuments(path.join(root, ".ballet/use-cases"));
+  for (const useCase of config.direction.useCases) {
+    const document = useCaseDocuments.get(useCase.id);
+    if (!document) { addIssue(`Use Case ${useCase.id} has no canonical Markdown document.`); continue; }
+    const fm = document.frontmatter;
+    const comparable = ["examples", "successGoals", "failureGoals", "expectedOutcomes", "goalIds", "adrIds", "constraintIds", "approval"];
+    if (fm.title !== useCase.name || fm.status !== useCase.status) addIssue(`Use Case ${useCase.id} title/status differs between config and Markdown.`);
+    for (const field of comparable) if (JSON.stringify(fm[field]) !== JSON.stringify(useCase[field])) {
+      addIssue(`Use Case ${useCase.id} ${field} differs between config and Markdown.`);
+    }
+    if (fm.approval?.contentHash !== useCaseApprovalHash(useCase)) addIssue(`Use Case ${useCase.id} Markdown approval hash is stale.`);
+    for (const heading of ["## Intent", "## Examples", "## Success goals", "## Failure goals", "## Expected outcomes"]) {
+      if (!document.body.includes(heading)) addIssue(`Use Case ${useCase.id} is missing ${heading}.`);
+    }
+  }
+
+  const allInstructionFiles = (await walk(path.join(root, ".ballet/instructions"))).filter((file) => file.endsWith(".md"));
+  for (const file of allInstructionFiles) {
+    const id = path.basename(file, ".md");
+    if (!instructionIds.has(id)) addIssue(`Orphan instruction resource ${rel(file)}.`);
+  }
+  const allSkillFiles = (await walk(path.join(root, ".agents/skills"))).filter((file) => file.endsWith("/SKILL.md"));
+  for (const file of allSkillFiles) {
+    const id = rel(path.dirname(file)).replace(/^\.agents\/skills\//, "");
+    if (!skillIds.has(id)) addIssue(`Orphan Skill resource ${rel(file)}.`);
+  }
 }
+
+await validateFixtureProject();
+
+const diagramPath = path.join(root, "ballet.drawio");
+const diagramSource = await readFile(diagramPath, "utf8").catch(() => "");
+if (!diagramSource) addIssue("Missing editable root ballet.drawio.");
+else {
+  const parsedXml = spawnSync("xmllint", ["--noout", diagramPath], { encoding: "utf8" });
+  if (parsedXml.status !== 0) addIssue(`ballet.drawio is not well-formed XML: ${parsedXml.stderr.trim()}`);
+  for (const label of ["Human direction", "Goals / ADRs / Constraints", "Approved Use Cases", "Environment", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Human approval", "Continuation Run", "Product Snapshot"]) {
+    if (!diagramSource.includes(label)) addIssue(`ballet.drawio is missing required label ${label}.`);
+  }
+  for (const removed of ["RewardMDP", "reward_mdp", "Reward-MDP", "GraphNode", "ActionNode", "acceptance_ledger", "policy_decision"]) {
+    if (diagramSource.includes(removed)) addIssue(`ballet.drawio retains removed label ${removed}.`);
+  }
+}
+
+for (const useCase of rawConfig.direction?.useCases ?? []) {
+  if (!(docs.get(path.join(arc42Root, "TRACEABILITY.md"))?.body ?? "").includes(useCase.id)) {
+    addIssue(`TRACEABILITY is missing canonical Use Case ${useCase.id}.`);
+  }
+}
+
+const additionalLinkFiles = ["README.md", "DESIGN.md",
+  ...rawConfig.direction.constraints.map(({ id }) => `.ballet/constraints/${id}.md`),
+  ...rawConfig.direction.useCases.map(({ id }) => `.ballet/use-cases/${id}.md`)];
+for (const filename of additionalLinkFiles) await validateLocalLinks(path.join(root, filename));
 
 for (const removed of [".ballet/graph-node-library", ".ballet/graph-node-modules"]) {
   if (await exists(path.join(root, removed))) addIssue(`Removed project-data surface remains: ${removed}.`);
@@ -204,10 +278,45 @@ async function indexedMarkdown(directory) {
   return result;
 }
 
+async function indexedMarkdownDocuments(directory) {
+  const result = new Map();
+  for (const filename of (await walk(directory)).filter((file) => file.endsWith(".md"))) {
+    const document = await parseMarkdown(filename); if (typeof document.frontmatter?.id === "string") result.set(document.frontmatter.id, document); }
+  return result;
+}
+
+async function validateFixtureProject() {
+  const fixtureRoot = path.join(root, ".fixture-ballet-project");
+  const raw = JSON.parse(await readFile(path.join(fixtureRoot, ".ballet/project.json"), "utf8"));
+  const parsedFixture = projectConfigurationV20Schema.safeParse(raw);
+  if (!parsedFixture.success) { parsedFixture.error.issues.forEach((issue) => addIssue(
+    `Fixture Project Config:${issue.path.join(".")}: ${issue.message}`)); return; }
+  const fixture = parsedFixture.data;
+  for (const issue of validateRunnableEnvironment(fixture.environment, fixture.direction)) addIssue(`Fixture is not runnable: ${issue.path}: ${issue.message}`);
+  if (fixture.environment.states.length < 2) addIssue("Fixture needs at least two States.");
+  if (fixture.environment.states.reduce((count, state) => count + state.actions.length, 0) < 3) addIssue("Fixture needs multiple Actions across two States.");
+  if (fixture.critic.enabled || fixture.critic.schedules.length === 0) addIssue("Fixture Critic must be disabled with a valid example schedule.");
+  for (const agent of allAgents(fixture)) {
+    const instruction = path.join(fixtureRoot, ".ballet/instructions", `${agent.instructionResource}.md`);
+    if (!(await exists(instruction))) addIssue(`Fixture missing instruction ${agent.instructionResource}.`);
+    else for (const issue of validateActionInstruction(await readFile(instruction, "utf8"))) addIssue(`Fixture instruction ${agent.instructionResource}: ${issue.message}.`);
+    for (const skill of agent.skillResources) if (!(await exists(path.join(fixtureRoot, ".agents/skills", skill, "SKILL.md")))) addIssue(`Fixture missing Skill ${skill}.`);
+  }
+}
+
+async function validateLocalLinks(file) {
+  if (!(await exists(file))) { addIssue(`Missing linked-document input ${rel(file)}.`); return; }
+  const source = await readFile(file, "utf8");
+  for (const match of source.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+    const raw = match[1].trim();
+    const target = raw.replace(/^<|>$/g, "").split(/\s+["']/)[0];
+    if (/^(?:https?:|mailto:|app:)/.test(target)) continue;
+    const [pathPart] = target.split("#", 1);
+    if (pathPart && !(await exists(path.resolve(path.dirname(file), decodeURIComponent(pathPart))))) addIssue(`${rel(file)}: broken local link ${raw}.`);
+  }
+}
+
 function allAgents(project) {
-  return [
-    project.critic.agent,
-    project.refinement.agent,
-    ...project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]))
-  ];
+  return [project.critic.agent, project.refinement.agent,
+    ...project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]))];
 }

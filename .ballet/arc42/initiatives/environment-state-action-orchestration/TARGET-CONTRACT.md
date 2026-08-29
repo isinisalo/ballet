@@ -4,7 +4,7 @@ title: Validation-led Environment State Action target contract
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 2
+version: 3
 tags:
   - arc42
   - initiative
@@ -34,57 +34,58 @@ Project Config v20 is strict and rejects unknown fields. Its semantic shape is:
 ```text
 version: 20
 executionProfiles: ExecutionProfile[]
-issueTracker: existing generic tracker config
 direction:
-  goalIds: unique GoalId[]
-  adrIds: unique AdrId[]
-  constraints: [{ id, description }]
-useCases: [{
-  id, title, description,
-  approval: { status: draft | approved | rejected, revision, decidedAt?, decisionRef? },
-  goalIds, adrIds, constraintIds,
-  acceptanceCriteria: [{ id, description, evidenceKind }]
-}]
+  goals: [{ id, name, status: draft | accepted | superseded }]
+  adrs: [{ id, name, status: draft | accepted | superseded }]
+  constraints: [{ id, name, status, kind: required | prohibited, description, rationale, scope? }]
+  useCases: [{ id, name, status: draft | approved,
+    examples: [{ given, when, then }], successGoals, failureGoals, expectedOutcomes,
+    goalIds, adrIds, constraintIds,
+    approval?: { approvedBy, approvedAt, revision, contentHash } }]
 environment:
-  id, name, approvedUseCaseIds,
+  id, name, description,
   states: [{
-    id, order, title, description, useCaseCriterionIds,
+    id, order, name, description, useCaseIds,
     actions: [{
-      id, priority, title, description, useCaseCriterionIds, maxRetries,
-      validation: { id, task, executionProfileId, primaryInstructionId, skillIds },
-      work: { id, task, executionProfileId, primaryInstructionId, skillIds }
+      id, priority, name, description, useCaseIds, maxRetries, input?,
+      validation: { executionProfileId, instructionResource, skillResources, toolPolicy },
+      work: { executionProfileId, instructionResource, skillResources, toolPolicy }
     }]
   }]
 critic:
-  schedule: { version: 1, enabled, intervalMinutes, timezone },
-  executionProfileId, primaryInstructionId, skillIds
+  version: 1, enabled,
+  schedules: [{ id, kind: daily | weekly, timeZone, localTimes, weekdays? }],
+  agent: composition
+refinement:
+  version: 1, enabled, agent: composition,
+  allowedRoots: [`.ballet/instructions`, `.agents/skills`]
 ```
 
 `order` is a positive integer unique within one Environment. `priority` is a positive integer unique within one State. Gaps are allowed; sort is numeric ascending with ID as a defensive deterministic error-report tie-break only. A duplicate is invalid and cannot start a Run.
 
 ## Use Case approval and direction traceability
 
-Only `approval.status = approved` Use Cases may appear in `environment.approvedUseCaseIds` or a Root Snapshot. Approval is a human-only command with expected Use Case revision. Editing approved semantic content increments revision and returns it to `draft`; no silent continued approval. Rejection records a decision reference and remains in audit history.
+Only `status = approved` Use Cases with a matching canonical `approval.contentHash` may be referenced by a State/Action or copied into a Root Snapshot. Approval is a human-only command with expected project hash; it records trusted actor, timestamp and monotonic Use Case revision. Editing approved semantic content returns it to `draft`; no silent continued approval. Revocation and subsequent decisions remain immutable audit facts in runtime evidence.
 
-Every State and Action must trace to at least one approved Use Case acceptance criterion. Every approved Use Case must trace to at least one Goal and may cite ADRs/Constraints. Missing/dangling/unapproved references block snapshot creation with zero provider tasks.
+Every State and Action must trace to at least one approved Use Case. Each Use Case carries non-empty Given/When/Then examples, success goals, failure goals and expected outcomes, traces to at least one Goal and cites accepted ADRs/Constraints. Missing, dangling, inactive or unapproved references block snapshot creation with zero provider tasks.
 
 ## Thirteen canonical Use Cases
 
 | ID | Human-visible outcome | Target phase | Primary verification type |
 | --- | --- | --- | --- |
-| UC-01 | Maintain Direction as Goals/ADRs/Constraints decision context. | 02,10 | config/trace schema and arc42 conformance |
-| UC-02 | Draft, review and explicitly approve a Use Case before execution. | 02,07,08 | domain command/API/UI authorization tests |
-| UC-03 | Author one Environment with unique ascending State order. | 02,08 | schema/property/keyboard CRUD tests |
-| UC-04 | Author each State's Actions with unique ascending priority. | 02,08 | schema/property/keyboard CRUD tests |
-| UC-05 | Start an Environment Run from one immutable approved closure. | 03,07 | snapshot/hash/preflight integration tests |
-| UC-06 | Validation prechecks an Action and returns done, delegate or blocked. | 04 | role schema and runtime state-machine tests |
-| UC-07 | Work receives only Validation's dynamic prompt and executes subordinately. | 04 | exact composition/permission/provider adapter tests |
-| UC-08 | Validation postchecks Work and returns done, retry or blocked within the retry formula. | 04 | retry/exhaustion/failure distinction tests |
-| UC-09 | See atomic blocked Feedback and Environment gate state. | 04,05,08 | SQLite transaction/restart/read-model/browser tests |
-| UC-10 | Run scheduled Critic read-only and approve/reject its proposal before Feedback. | 05,08 | schedule lease/idempotency/approval/UI tests |
-| UC-11 | Generate and inspect a read-only exact diff/hash Refinement proposal. | 06,08 | path/preimage/diff/impact/security tests |
-| UC-12 | Approve and apply Refinement to one managed commit and immutable continuation Run. | 06,07,08 | Git/approval/stale/race/lineage tests |
-| UC-13 | Inspect a factual Product Snapshot of commit, artifacts, statuses, approvals and evidence. | 06..08 | read-model/API/a11y/browser tests |
+| UC-01 | Define project Direction. | 02,10 | config/trace schema and arc42 conformance |
+| UC-02 | Describe and explicitly approve a Use Case before execution. | 02,07,08 | domain command/API/UI authorization tests |
+| UC-03 | Provide architecture decisions to every affected agent role. | 02,03,10 | snapshot/resource/trace tests |
+| UC-04 | Model work as one Environment with unique ascending State order. | 02,08 | schema/property/keyboard authoring tests |
+| UC-05 | Process State Actions in unique ascending priority without bypass. | 02,04,08 | ordering/gate/runtime/UI tests |
+| UC-06 | Define one bounded Action with roles, retries, instructions and Skills. | 02,10 | schema/resource/readiness tests |
+| UC-07 | Validation prechecks readiness before Work. | 04 | role schema, evidence and state-machine tests |
+| UC-08 | Delegate a bounded dynamic prompt to subordinate Work. | 04 | composition/permission/provider adapter tests |
+| UC-09 | Retry within `1 + maxRetries` or block with atomic Feedback. | 04,05,08 | transaction/restart/read-model/browser tests |
+| UC-10 | Form a factual terminal Product Snapshot. | 06..08 | finalization/read-model/API/a11y tests |
+| UC-11 | Run scheduled read-only Critic and retain a proposal only. | 05,08 | schedule lease/idempotency/UI tests |
+| UC-12 | Human-approve criticism into append-only Feedback. | 05,07,08 | approval/transaction/API/UI tests |
+| UC-13 | Human-approve exact Refinement and create an immutable continuation Run. | 06..08 | Git/hash/stale/race/lineage/browser tests |
 
 ## Ordering and gate invariants
 
@@ -101,12 +102,12 @@ Persist exactly one source status from:
 
 ```text
 pending
-→ validating_precheck
+→ prechecking
 → done
 | blocked
-| delegated → working → validating_postwork
+| working → postchecking
                        → done
-                       | retrying → working
+                       | working
                        | blocked
 ```
 
@@ -187,7 +188,7 @@ Action blocking and its Feedback insert share one SQLite transaction and unique 
 
 ## Critic contract v1
 
-Config schedule v1 has `enabled`, `intervalMinutes` (15..10080) and IANA `timezone`. Machine-local schedule facts have `nextDueAt`, optional lease owner/expiry, last start/completion and monotonic revision. At most one Critic execution is leased per Environment. Restart recovers an expired lease and dispatches one due occurrence, never replaying a completed occurrence.
+Config schedule v1 is disabled by default and contains bounded daily/weekly schedules with unique local `HH:mm` values, an IANA `timeZone` and unique ISO weekdays for weekly cadence. Machine-local schedule facts have `nextDueAt`, lease owner/expiry, last start/completion and monotonic revision. At most one Critic execution is leased per Environment. Restart recovers an expired lease and dispatches at most one due catch-up occurrence, never replaying a completed occurrence.
 
 Critic reads the latest immutable Product Snapshot and retained artifact/commit evidence. It writes neither repository nor Feedback. Its immutable proposal contains proposal ID, source Product Snapshot/hash, findings, evidence refs, createdAt and status `proposed | approved | rejected | expired`. Human approve/reject commands require expected proposal revision. Approval appends one Feedback entry atomically; it does not directly refine config.
 
@@ -203,7 +204,6 @@ Proposal states are `proposed | approved | rejected | stale | applying | applied
 
 Allowed paths are only:
 
-- `.ballet/project.json`;
 - `.ballet/instructions/**/*.md`;
 - `.agents/skills/**/SKILL.md`.
 

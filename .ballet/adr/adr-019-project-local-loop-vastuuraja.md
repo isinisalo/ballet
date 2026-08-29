@@ -1,7 +1,7 @@
 ---
 id: adr-019
 title: Project-local Loopin yhden vastuun ja yhden onnistumisrajan sopimus
-status: accepted
+status: superseded
 createdAt: '2026-08-20T00:00:00.000Z'
 updatedAt: '2026-08-20T00:00:00.000Z'
 tags:
