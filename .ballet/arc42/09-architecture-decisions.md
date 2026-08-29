@@ -3,8 +3,8 @@ id: arc42-section-09
 title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 25
+updatedAt: '2026-08-29'
+version: 26
 tags:
   - arc42
   - decisions
@@ -19,7 +19,7 @@ Tämä osio indeksoi kanoniset ADR-tiedostot kopioimatta niiden kontekstia, pä�
 
 ## Tila
 
-Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-033 omistaa aktiivisen hierarchical node-ID Reward-MDP:n ja 5×5/N×N-authoring-projektion. ADR-031:n single-policy/ledger-state/array-order ja ADR-032:n 62-state landscape/pulse/horizon ovat superseded. ADR-025/027:n protected Action Node flow sekä ADR-029:n capability-first-osat säilyvät.
+Indeksi vastaa repositoryn päätöstilaa 2026-08-29. ADR-034 hyväksyy Validation-led Environment→State→Action-targetin ja supersedoi Graph/Reward-MDP-kokonaisuuden vasta phase-09 strict cutoverissa. Siihen asti ADR-033 sekä ADR-025/027/029:n suojatut v19-projektiot omistavat aktiivisen toteutuksen.
 
 ## Päätösindeksi
 
@@ -58,6 +58,7 @@ Indeksi vastaa repositoryn päätöstilaa 2026-08-23. ADR-033 omistaa aktiivisen
 | adr-031 | superseded by adr-033 | Historical single Graph Reward-MDP | [Graph Engineering käyttää yhtä compiled discounted Reward-MDP:tä](../adr/adr-031-single-graph-reward-mdp.md) |
 | adr-032 | superseded by adr-033 | Historical 62-state reward-impact projection; human-unit semantics survive | [Graph Decision Model käyttää visuaalista reward-impact-dashboardia](../adr/adr-032-visual-reward-impact-dashboard.md) |
 | adr-033 | accepted | Hierarchical node-owned Reward-MDP, acceptance gate and 5×5/N×N projection | [Graph ja GraphNode käyttävät erillisiä node-omisteisia Reward-MDP-scopeja](../adr/adr-033-hierarchical-node-owned-reward-mdp.md) |
+| adr-034 | accepted; phase-09 supersession pending implementation | Validation-led Environment→State→Action target, approvals, continuation and strict cutover | [Validation-led Environment, State ja Action -orkestrointi](../adr/adr-034-validation-led-environment-state-action-orchestration.md) |
 
 ## Supersession-suhteet
 
@@ -139,6 +140,10 @@ adr-029:n Graph Decision Model form/matrix/table -projektio
 adr-031:n single policy / ledger-state / array-order ja adr-032:n 62-state landscape
         └── superseded by ──▶ adr-033
             node-ID global/local policyt, erillinen acceptance-portti ja 5×5/N×N-matriisi
+
+adr-016/023/025/027/029/031/032/033:n Graph/GraphNode/ActionNode/Reward-MDP/module/policy/acceptance-projektiot
+        └── superseded at phase-09 strict cutover by ──▶ adr-034
+            Environment→State→Action, Validation-led execution, Feedback/Critic/Refinement approvals ja immutable continuation
 ```
 
 | Vanhempi päätös | Korvaava päätös | Suhteen tarkka vaikutus |
@@ -168,6 +173,7 @@ adr-031:n single policy / ledger-state / array-order ja adr-032:n 62-state lands
 | adr-028, vain Portti B:lle ennakoitu Config v17 / Snapshot v10 / SQLite v13 -numerovaraus | adr-030 | Phase 2 käyttää v17/v10/v13 strict cutia option-cost-evidenssiin. Portti B:n calibrated-pilot- ja human approval -semantiikka säilyy, mutta sen exact version matrix päätetään myöhemmin. |
 | adr-029, vain Graph Decision Model form/matrix/table -projektio | adr-032 | Ensisijainen Decision Model käyttää projected-state-pulssia, policy-horisonttia, transition-impactia, state-heatmapia ja ihmisyksiköitä. Capability-first Graph/GraphNode-kortit, URL-omistajuus, exact sopimukset ja ADR-025/027:n Action flow säilyvät. |
 | adr-031, single-policy/ledger-state/ordered ActionNode -osat; adr-032, 62-state landscape/pulse/horizon | adr-033 | Graph ja GraphNode saavat erilliset node-ID-omisteiset policy-scopet, acceptance-ledger jää Graph-portiksi ja UI näyttää 5×5/N×N Q(s,a)-matriisin. Outcome-aware reward, hard authorization, exact detail ja reward/cost/estimate-värit säilyvät. |
+| adr-016/023/025/027/029/031/032/033, Graph Node Module-, Graph/GraphNode/ActionNode-, Reward-MDP-, policy-, acceptance- ja MDP-visualisointiosat | adr-034 | Phase-09 strict cutover korvaa ne Environment→State→Action-domainilla, Validation-led-loopilla, runtime-statusjohdannaisilla, Feedback/Critic/Refinement-hyväksynnöillä ja immutable continuation Runilla. Provider/worktree/resource/security/SSE/design-token-periaatteet adaptoidaan; historiallisia ADR:iä ei kirjoiteta uudelleen. |
 
 ## Päätösten käyttö
 
@@ -187,11 +193,11 @@ Kaikki yllä indeksoidut ADR:t; `adr-011` määrittää indeksointi- ja source-o
 
 ## Evidenssi
 
-`npm run validate:arc42` ratkaisee jokaisen ADR-linkin ja tarkistaa viitatun frontmatter-ID:n. Dokumentaation conformance review tarkistaa, ettei hyväksyttyjen päätösten historiaa muuteta hiljaisesti. ADR-026:n core implementation -evidenssi indeksoidaan EVID-021:een ilman pilotin tai täyden UI-projektion yliraportointia.
+`npm run validate:arc42` ratkaisee jokaisen ADR-linkin ja tarkistaa viitatun frontmatter-ID:n. Dokumentaation conformance review tarkistaa, ettei hyväksyttyjen päätösten historiaa muuteta hiljaisesti. ADR-034:n dokumenttisopimus validoidaan initiative-evidenssillä; sen implementation-evidenssiä ei väitetä ennen TEST-028–TEST-032-ketjuja.
 
 ## Avoimet kysymykset
 
-- ADR-031 ja ADR-032 ovat accepted. Tuotantokaltainen Reward-MDP-pilotti sekä toteutetun visual impact -dashboardin final human visual review puuttuvat edelleen, eikä niitä päätellä teknisestä hyväksynnästä.
+- ADR-034 on hyväksytty target-päätös, mutta sen phase-09 supersession ei ole vielä toteutunut. Aktiivisen v19:n ja targetin statuksia ei saa yhdistää acceptance-väitteeksi.
 
 ## Seuraava katselmointiperuste
 

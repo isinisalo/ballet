@@ -3,8 +3,8 @@ id: arc42-section-03
 title: Konteksti ja rajaus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 6
+updatedAt: '2026-08-29'
+version: 7
 tags:
   - arc42
   - context
@@ -20,7 +20,7 @@ Tämä osio määrittää Balletin liiketoiminta- ja teknisen järjestelmärajan
 
 ## Tila
 
-Konteksti vastaa nykyistä checkout-local-arkkitehtuuria. Kolmitasoiset Graph Engineering-, Graph Node- ja Action Node -näkymät sekä Graph/GraphNode Run -näkymät ovat käyttöliittymäprojektioita saman rajan sisällä; ne eivät ole uusia runtime-järjestelmiä.
+Konteksti erottaa aktiivisen v19-toteutuksen ja hyväksytyn Environment-tavoitteen. Kolmitasoiset Graph Engineering-, Graph Node- ja Action Node -näkymät sekä Graph/GraphNode Run -näkymät pysyvät phase-09 cutoveriin asti aktiivisina projektioina. Hyväksytty Environment→State→Action-konteksti toteutetaan ensin CTR-012:n eristämänä eikä se vielä kuvaa aktiivista runtimea.
 
 ## Liiketoimintakonteksti
 
@@ -39,6 +39,7 @@ Ballet auttaa projektin omistajaa ja toimitustiimiä määrittelemään, suoritt
 | Osapuoli | Balletiin tuleva tieto | Balletista lähtevä tieto/vaikutus | Luottamusraja |
 | --- | --- | --- | --- |
 | Projektin omistaja/operaattori | Goalit, project-resurssit, Run-käsky, Human Validation ja ulkoinen valtuutus. | UI/CLI-tila, evidenssi, worktree-tulos ja pyydetty päätös. | Ihminen säilyttää WHAT/WHY:n ja ulkoisten toimien vallan. |
+| Projektin omistaja tavoitemallissa | Hyväksytyt Use Caset, Goals/ADR/Constraints-konteksti sekä Critic- ja Refinement-päätökset. | Ordered Environment -tila, Feedback Box, exact diff/hash -ehdotus, continuation lineage ja Product Snapshot. | Agentti ei saa hyväksyä omaa Critic- tai Refinement-ehdotustaan eikä käynnissä oleva Run omaksu muuttunutta projektitotuutta. |
 | Kehittäjä tai AI-agentti | Rajattu toteutus, analyysi ja schema-validi outcome. | Task Envelope, resurssit, rooli, tila ja acceptance-evidenssi. | Providerin vastaus ei ole kanoninen ennen validointia ja commitointia. |
 | Riippumaton katselmoija | Conformance- ja hyväksymishavainto. | BRIEF, PLAN, diffi, testit ja EVIDENCE. | Katselmointi ei saa hiljaisesti muuttaa arvioitavaa toteutusta. |
 | Git-checkout | Lähdekoodi, Goals, ADR:t, arc42, project config, instructionit, skillit ja historia. | Vain ihmisvaltuutettu integraatio; Node-työ tehdään Root Run -worktreessä. | Active checkout ja Run-worktree ovat eri kirjoitusalueita. |
@@ -62,6 +63,8 @@ flowchart LR
 
 React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Config v19 -resurssit, muodostaa Graph- tai GraphNode-Runille immutable Root Snapshot v12:n, kääntää global/reachable-local Reward-MDP:t erillisiksi policy-taulukoiksi, luo branch/worktreen ja persistoi runtime-faktat SQLite v15:een. Adapterit saavat Task Envelope v9:n. Vain validoitu typed outcome sekä exact acceptance-effect-portin läpäisevä Validation-evidenssi voivat tuottaa atomisen State-, ledger- tai scope-observation-revision.
 
+Hyväksytyssä target-kontekstissa sama checkout-local-palveluraja säilyy, mutta canonical input on hyväksytty Use Case ja sen Goals/ADR/Constraints-jälki. Root Snapshot v13 jäädyttää ordered Environmentin; Validation ohjaa Actionin precheck→Work→postwork-syklin; runtime status johtaa `done`/`blocked`-arvot; Feedback, Critic proposal, human approval, Refinement proposal, immutable continuation Run ja Product Snapshot ovat typed target-sopimuksia. Vaiheissa 02–08 nämä pinnat ovat `/api/vnext`- ja `/vnext`-rajojen takana, käyttävät v19:stä erillistä dataa ja poistavat prefixin atomisessa phase-09 cutoverissa.
+
 ## I/O-, kanava- ja luottamusrajakartoitus
 
 | Rajapinta | Input | Output | Kanava ja muoto | Luottamus/validointi | Virhevaikutus |
@@ -72,6 +75,7 @@ React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Conf
 | Backend ↔ SQLite | Run-, queue-, outcome-, event- ja State-faktat. | Canonical runtime projection. | Paikallinen SQLite-transaktio. | Constraintit, revision check ja commit-raja. | Rollback; restart jatkaa viimeisestä kokonaisesta commitista. |
 | Queue ↔ provider adapter | `TaskEnvelope`, exact prompt, profiili, oikeudet ja output schema. | Provider-tapahtumat, schema-validi outcome tai virhe. | Provider-protokolla provider-kohtaisessa FIFO-kaistassa. | Ei fallbackia; adapteri ei keksi resursseja tai päätöksiä. | Tehtävä epäonnistuu/keskeytyy; nolla implisiittistä uudelleenajoa. |
 | Browser/package ↔ module service | UTF-8 JSON -sisältö tai versionhallittu library package. | Inspect/plan/commit/export/remove-tulos. | File API content tai HTTP JSON; ei mielivaltaista server-pathia. | Koko-, schema-, provenance-, conflict- ja trust-tarkistus. | Commitia ei tehdä ennen validia suunnitelmaa. |
+| Human approval ↔ target command boundary | Critic- tai Refinement-ehdotuksen ID, odotettu revision ja päätös. | Atominen hyväksytty/hylätty siirtymä; refinementissä uusi commit ja continuation Run vasta hyväksynnän jälkeen. | Strict `/api/vnext` phaseissa 02–08, canonical API phase 09:n jälkeen. | Identity, proposal state, exact base/diff/preimage hash ja active-run lock tarkastetaan transaktiossa. | Konflikti tai vanhentunut hash pysäyttää ilman tiedosto- tai runtime-osakirjoitusta. |
 
 ## Luottamusrajat
 
@@ -80,6 +84,7 @@ React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Conf
 3. **Runtime → provider:** provider saa vain koostetun tehtävän; providerin teksti on epäluotettua, kunnes output schema ja runtime-säännöt hyväksyvät sen.
 4. **Worktree → active checkout/remote:** tulos ei ylitä rajaa ilman erillistä ihmisvaltuutusta.
 5. **Graph Node Module → project-local resources:** paketti on dataa, ei luotettua koodia; materialisointi on inspect/plan/install-transaktio eikä paketti saa omistaa peer-GraphNode-targetteja.
+6. **Target proposal → human approval → repository/runtime:** Critic ja Refinement saavat ehdottaa, mutta eivät kirjoittaa Feedback Boxiin tai repositoryyn ennen erillistä ihmiskomentoa; hyväksytty refinement synnyttää uuden immutable continuation Runin.
 
 ## Rajauksen ulkopuolella
 
@@ -92,15 +97,15 @@ React SPA käyttää Expressin loopback-API:a. Backend lukee strict Project Conf
 
 ## Kanoniset lähteet
 
-`README.md`, `goal-001`, `goal-003`, `goal-005`, `goal-008`, `goal-010`, `goal-015`, `goal-020` ja ADR-001/005/006/008/009/016/031.
+`README.md`, aktiivisen v19:n Goalit ja ADR:t sekä targetin `goal-022`, `adr-034` ja [TARGET-CONTRACT](initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md).
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`, `adr-016` ja `adr-031`.
+`adr-001`, `adr-005`, `adr-006`, `adr-008`, `adr-009`, `adr-016`, aktiivinen `adr-033` ja target `adr-034`.
 
 ## Evidenssi
 
-Local API-, checkout identity-, provider adapter-, Git worktree-, recovery- ja Graph Node Module -testit kattavat toteutetut tekniset rajat. Reward-MDP-rajan evidenssi indeksoidaan EVID-026/GRM-evid-004-ketjuun.
+Local API-, checkout identity-, provider adapter-, Git worktree-, recovery- ja Graph Node Module -testit kattavat aktiiviset tekniset rajat. Target-kontekstin toteutusevidenssi on vielä pending ja indeksoidaan EVID-028–EVID-032-ketjuun.
 
 ## Avoimet kysymykset
 

@@ -3,8 +3,8 @@ id: arc42-section-02
 title: Rajoitteet
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-17'
-version: 3
+updatedAt: '2026-08-29'
+version: 4
 tags:
   - arc42
   - constraints
@@ -30,6 +30,7 @@ Rajoitteet perustuvat hyväksyttyihin Goaleihin ja ADR:iin, repository-ohjeisiin
 | CTR-003 | Frontend, backend ja shared contracts muodostavat yhden TypeScript-sovellusarkkitehtuurin. | Tyypitetyt sopimukset ja yhteinen build/test-ketju ovat ensisijaisia; erillistä palveluverkkoa ei lisätä. | ADR vaaditaan | adr-003 |
 | CTR-004 | Runtime-totuus on checkout-local SQLite `.git/ballet`-hakemistossa eikä versionhallittua projektitotuutta. | State, Runit, jonot ja tapahtumat palautuvat lokaalisti; Goals/ADR/arc42 eivät kopioidu kantaan kanonisena sisältönä. | ADR vaaditaan | adr-002, adr-007, adr-015 |
 | CTR-009 | `ExecutionProfile` ei sisällä Responses API:n `reasoning.mode`-kenttää; projektin baseline on `medium`, kunnes eval-evidenssi perustelee muutoksen. | Provider-kohtaisia piilovalintoja tai “pro mode” -oletusta ei tehdä; profiili ratkaistaan project-local-konfiguraatiosta. | Eval + hyväksyntä | adr-012 |
+| CTR-012 | Environment-vNext saa vaiheissa 02–08 elää vain eristetyssä namespace/hakemistossa, `/api/vnext`-API:ssa, `/vnext`-UI:ssa ja v15-datasta erillisessä persistence-pinnassa. | v19 ja vNext eivät lue tai kirjoita toistensa dataa, dual-writeä, migraatiota, compatibility readeria tai route-aliasta ei ole, ja phase 09 poistaa sekä vanhan aktiivipolun että kaikki vNext-prefixit. | Määräaikainen; removal gate pakollinen | goal-022, adr-034 |
 
 ## Turvallisuus- ja luottamusrajoitteet
 
@@ -53,6 +54,7 @@ Rajoitteet perustuvat hyväksyttyihin Goaleihin ja ADR:iin, repository-ohjeisiin
 - CTR-006 ja CTR-007 estävät Ballet-platformia muuttumasta yhden projektin prosessimoottoriksi.
 - CTR-008 ja CTR-011 tekevät kahdesta eri rajasta eksplisiittisen: epäluotetun authoring-sisällön materialisointi ja ulkoisen vaikutuksen valtuutus.
 - CTR-009 rajoittaa provider-optimoinnin mitattavaan `ExecutionProfile`-evidenssiin; adapteri ei saa korvata puuttuvaa päätöstä fallbackilla.
+- CTR-012 tekee välivaiheen buildattavuudesta eristyssopimuksen, ei compatibility-kerrosta: vain toinen canonical runtime on aktiivinen kerrallaan ja strict cutover tarkastetaan removal-manifestilla.
 
 ## Kanoniset lähteet
 
@@ -60,7 +62,7 @@ Hyväksytyt Goalit ja ADR:t, `AGENTS.md`, `DESIGN.md`, `.ballet/project.json` se
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-003`, `adr-006`, `adr-008`, `adr-009` ja `adr-011`–`adr-016`.
+`adr-001`, `adr-002`, `adr-003`, `adr-006`, `adr-008`, `adr-009`, `adr-011`–`adr-016` sekä `adr-034`.
 
 ## Evidenssi
 

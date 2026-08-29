@@ -3,8 +3,8 @@ id: arc42-section-06
 title: Ajonaikainen näkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 19
+updatedAt: '2026-08-29'
+version: 20
 tags:
   - arc42
   - runtime
@@ -15,7 +15,7 @@ arc42Section: 6
 
 ## Tarkoitus ja tila
 
-Tämä osio kuvaa strict-v19:n aktiiviset arkkitehtonisesti merkittävät runtime-skenaariot. RT-020/021:n single-policy/array-order-osat ovat historiallisia; RT-022:n recovery, RT-023:n GraphNode Root Run ja RT-024:n module-polku säilyvät ADR-033:n tarkentamina. RT-025 omistaa hierarkkisen global/local-suorituksen.
+Tämä osio erottaa strict-v19:n aktiiviset runtime-skenaariot hyväksytyistä target-skenaarioista. RT-022–RT-025 pysyvät aktiivisina phase-09 cutoveriin asti. RT-026–RT-028 määrittävät ADR-034:n Environment-, Critic- ja Refinement-kulut, mutta niiden toteutusevidenssi on vielä pending.
 
 ## RT-025: hierarchical Reward-MDP Root Run
 
@@ -90,6 +90,63 @@ GraphNode Root Run käyttää samaa strict snapshot-, worktree-, local policy-, 
 
 Module inspect rajoittaa koon, validoi strict v7 JSON:n mukaan lukien local policyn ja laskee canonical hashin. Plan näyttää namespacen, profile/resource mappingin, konfliktit ja provenance-muutokset. Commit re-plannaa samasta inputista, materialisoi resource closuren ja kirjoittaa Project Config v19:n viimeisenä. Uusi node jättää global-matriisin incomplete-tilaan. Runtime ei lue packagea.
 
+## RT-026: target Environment Run
+
+```mermaid
+sequenceDiagram
+  actor Human as Ihminen
+  participant Planner as Environment planner
+  participant Store as SQLite v16
+  participant Validation as Validation controller
+  participant Work as Work role
+
+  Human->>Planner: Start approved Environment
+  Planner->>Planner: Validate Use Case trace, order, priority, resources and permissions
+  Planner->>Store: Commit immutable Root Snapshot v13
+  loop States by unique ascending order
+    loop Actions by unique ascending priority
+      Validation->>Store: precheck invocation
+      Validation-->>Store: done | delegate | blocked
+      alt done
+        Store->>Store: Commit Action done
+      else delegate
+        Validation->>Work: dynamic prompt + bounded permissions
+        Work-->>Validation: completed | needs_input
+        Validation-->>Store: postwork done | retry | blocked
+        alt retry and additional attempt remains
+          Store->>Validation: next attempt of same Action
+        else done
+          Store->>Store: Commit Action done
+        else blocked or retry exhausted
+          Store->>Store: Atomic Action blocked + Feedback v1
+        end
+      else blocked
+        Store->>Store: Atomic Action blocked + Feedback v1
+      end
+    end
+    Store->>Store: Advance only when every Action derives done=true
+  end
+  Store-->>Human: Environment terminal projection
+```
+
+Planner lukee vain hyväksytyn Use Casen ja target Project Config v20:n. Statejen `order` ja Actionien `priority` ovat scopekohtaisesti unique positive integer -arvoja; runtime ei käytä array-paikkaa päätöksenä. Action status on canonical fakta ja `done`/`blocked` ovat siitä johdettuja. Validationin precheck sallii vain `done | delegate | blocked`, postwork vain `done | retry | blocked`, ja Work vain `completed | needs_input`. `maxRetries=N` sallii yhteensä `1+N` Work-yritystä; provider/protokollavirhe ei kuluta semantic retryä eikä muutu keksityksi Validation-outcomeksi. Retry exhaustion sekä blocked-status ja Feedback-entry commitoidaan samassa transactionissa.
+
+## RT-027: target Critic schedule ja proposal approval
+
+1. Persistent schedule löytää erääntyneen Critic-ajon lease-suojatusti; restart voi jatkaa samaa schedule-invocationia luomatta duplikaattia.
+2. Critic lukee immutable Run-snapshotin, worktree-commitin ja nimetyn evidenssin read-only-oikeuksilla. Onnistunut Run-worktree säilyy tämän lukuikkunan yli eikä cleanup katkaise todistusaineistoa.
+3. Critic tuottaa strict proposal v1:n. Proposal ei ole Feedback Box -entry eikä muuta project/runtime-totuutta.
+4. Ihminen hyväksyy tai hylkää proposal-ID:n ja expected revisionin erillisellä typed commandilla. Vain hyväksyntä voi luoda Feedback-entryn atomisesti; stale/duplicate-päätös vaikuttaa nolla kertaa.
+
+## RT-028: target Refinement, continuation ja Product Snapshot
+
+1. Refinement lukee approved Feedbackin, base-commitin, sallitut project-local-polut ja niiden preimage-hashit read-only-tilassa.
+2. Proposal v1 jäädyttää exact diff/hash -sisällön. Ennen ihmishyväksyntää tiedosto-, Git- ja runtime-kirjoituksia on nolla.
+3. Approval-palvelu lukitsee authoring-rajan, revalidoi proposalin tilan, base-commitin, allowed-path-setin ja jokaisen preimage-hashin.
+4. Hyväksytty diffi sovelletaan managed worktreehen ja commitoidaan kerran. Konflikti tai hash-drift rollbackaa koko applyn.
+5. Commit tuottaa uuden immutable Root Snapshot v13:n ja continuation Runin, joka viittaa parent Runiin, Feedbackiin, proposaliin, approvaliin ja committiin. Parent Run ei muutu in-place.
+6. Product Snapshot projisoi commitin, artefaktit ja evidenssin; se ei ole project truth eikä dispatch authority. Cleanup voi alkaa vasta, kun lineage ja Critic/refinement-lukuevidenssi ovat durableja.
+
 ## Skenaarioindeksi
 
 | ID | Tila | Omistaja |
@@ -119,6 +176,9 @@ Module inspect rajoittaa koon, validoi strict v7 JSON:n mukaan lukien local poli
 | RT-023 | active | GraphNode Root Run. |
 | RT-024 | active | Graph Node Module v7 materialization. |
 | RT-025 | active | Hierarchical global/local Reward-MDP Root Run. |
+| RT-026 | accepted target; pending implementation | Ordered Environment Run and Validation-led Action lifecycle. |
+| RT-027 | accepted target; pending implementation | Scheduled Critic proposal and human approval. |
+| RT-028 | accepted target; pending implementation | Exact refinement apply, immutable continuation Run and Product Snapshot. |
 
 ## Samanaikaisuusmalli
 
@@ -142,10 +202,13 @@ Module inspect rajoittaa koon, validoi strict v7 JSON:n mukaan lukien local poli
 | Persistence failure | Koko transaction rollback. | Restart/retry viimeisestä commitista. |
 | Module stale/conflict | Commit estyy; configia ei kirjoiteta. | Inspect/plan uudelleen nykytilasta. |
 | External write ilman authorizationia | Action puuttuu hard admissible setistä tai Node pysähtyy `needs_input`:iin; kirjoituksia 0. | Ihminen antaa täsmällisen valtuutuksen uuteen snapshotiin. |
+| Target precheck/postwork outcome ei kuulu sallittuun enumiin | Koko target-transaction rollback; Action status ja Feedback pysyvät ennallaan. | Korjaa provider-output ja jatka samasta commitoidusta runtime-tilasta. |
+| Target blocked/retry exhaustion | Action `blocked` ja Feedback v1 syntyvät atomisesti; seuraava Action/State dispatch = 0. | Ihminen käsittelee Feedback/Critic/Refinement-rajan hyväksytyllä komennolla. |
+| Refinement base/preimage/hash tai approval revision vanhentui | Apply, commit ja continuation Run = 0. | Luo uusi read-only-proposal nykyisestä hyväksytystä pohjasta. |
 
 ## Kanoniset lähteet ja evidenssi
 
-`adr-033` omistaa control semanticsin. `backend/policy/PolicyScope.ts`, `backend/policy/RewardMdpCompiler.ts`, `backend/runs/GraphExecutionPlanner.ts`, `backend/runtime/RuntimeFlowCoordinator.ts`, `backend/runtime/RuntimePolicyStore.ts` ja `backend/storage/RuntimeSchema.ts` omistavat suoritettavan käytöksen. `TEST-027` / `EVID-027` kattavat deterministic scope-policy-, ledger-gate-, authorization-, retry/escalate-, restart- ja persistence-skenaariot. Tuotantokaltainen pilotti pysyy avoimena.
+`adr-033` ja nimetyt lähdekoodiankkurit omistavat aktiivisen v19-control semanticsin. `adr-034` ja Target Contract omistavat RT-026–RT-028-targetin. `TEST-027` / `EVID-027` kattavat aktiivisen runtimen; targetin `TEST-028`–`TEST-030` / `EVID-028`–`EVID-030` ovat pending toteutukseen ja fault-injection-evidenssiin asti.
 
 ## Seuraava katselmointiperuste
 

@@ -3,8 +3,8 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 22
+updatedAt: '2026-08-29'
+version: 23
 tags:
   - arc42
   - architecture
@@ -15,7 +15,7 @@ tags:
 
 ## Nykytila
 
-12-osioinen baseline on accepted. Aktiivinen implementation on `goal-021` / `adr-033`: Graphin GraphNode-ID `reward_mdp_v4`, jokaisen GraphNoden ActionNode-ID `reward_mdp_v4`, erillinen acceptance-portti ja kerran compiled global/local-policyt. Strict cut on v19/v4/v7/v12/v9/v10/v11/v5/v15.
+12-osioinen baseline on accepted. `goal-022` / `adr-034` hyväksyvät Environment → State → Action- ja Validation-led-targetin, mutta aktiivinen implementation on phase 09:ään asti `goal-021` / `adr-033`: Graphin GraphNode-ID `reward_mdp_v4`, jokaisen GraphNoden ActionNode-ID `reward_mdp_v4`, erillinen acceptance-portti ja kerran compiled global/local-policyt. Nykyinen strict cut on v19/v4/v7/v12/v9/v10/v11/v5/v15; target matrix on v20/v13/v10/v11/v12/v16 + Feedback/Critic/Refinement v1.
 
 ## Osiot
 
@@ -39,9 +39,10 @@ tags:
 - [METHOD-HEALTH](METHOD-HEALTH.md): vain mitattu menetelmäevidenssi.
 - [STATE-CONTRACT](STATE-CONTRACT.md): bounded project State; authorization ja acceptance pysyvät erillisinä snapshoteina.
 - [Hierarchical Reward-MDP initiative](initiatives/hierarchical-reward-mdp/BRIEF.md): tämän hard cutin BRIEF/PLAN/EVIDENCE/REVIEW.
+- [Environment orchestration target](initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md): accepted target, transition, phases 02–11 ja removal-gatet.
 - [Initiative template](initiatives/TEMPLATE/BRIEF.md): uuden rajatun työn rakenne.
 
-Vanhat initiativet säilyvät historiallisena evidenssinä. Niiden single-policy/scoped agent/SSP/Repair/calibration-väitteet eivät ohita `adr-033`:n supersessionia.
+Vanhat initiativet säilyvät historiallisena evidenssinä. Niiden single-policy/scoped agent/SSP/Repair/calibration-väitteet eivät ohita aktiivista `adr-033`-baselinea tai accepted `adr-034`-targetia.
 
 ## Kanoninen omistajuus
 
@@ -61,4 +62,4 @@ Epäselvä WHAT/WHY, laatuprioriteetti, merkittävä ADR tai external-write-valt
 
 ## Evidenssi
 
-`npm run validate:arc42` tarkistaa dokumenttirakenteen, linkit, trace-ID:t, project-resurssit sekä strict-v19 global 15/25 + local 84-cell -defaultin. Tuotantokaltainen pilotti on pending, kunnes nimetty Root Run -evidenssi on olemassa.
+`npm run validate:arc42` tarkistaa dokumenttirakenteen, linkit, trace-ID:t, project-resurssit sekä ennen phase 09:ää strict-v19 global 15/25 + local 84-cell -defaultin. Target-evidenssi on pending, kunnes `TEST-028`–`TEST-032` on ajettu toteutusta vasten.

@@ -3,8 +3,8 @@ id: arc42-traceability
 title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 27
+updatedAt: '2026-08-29'
+version: 28
 tags:
   - arc42
   - traceability
@@ -15,11 +15,11 @@ tags:
 
 ## Tarkoitus
 
-Tämä tiedosto yhdistää hyväksytyn, review- tai draft-tilaisen intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-021` / `REQ-001`–`REQ-021` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
+Tämä tiedosto yhdistää hyväksytyn, review- tai draft-tilaisen intentin mitattavaan evidenssiin kopioimatta stable ID:iden omistamaa kanonista sisältöä. Jokaisella `goal-001`–`goal-022` / `REQ-001`–`REQ-022` -parilla on vähintään yksi havaittava QS–ratkaisu–testi–evidenssi-ketju.
 
 ## Tila
 
-Matriisi sisältää 27 laatuketjua. QS-001–QS-026 säilyvät accepted/historical-ketjuina ja supersession tulkitaan `adr-033`:n mukaan. QS-027 on aktiivisen hierarchical Reward-MDP -cutin trace; tekniset final gates, selain-QA ja tuotantokaltainen pilotti pidetään erillään.
+Matriisi sisältää 32 laatuketjua. QS-027 on aktiivisen v19-cutin trace phase-09 cutoveriin asti. QS-028–QS-032 ovat `goal-022` / `adr-034` -targetin hyväksyttyjä mutta implementation-evidenssiltään pending-ketjuja; dokumenttivalidointi ei muuta niiden statusta verifiediksi.
 
 ## Trace-matriisi
 
@@ -53,6 +53,11 @@ Matriisi sisältää 27 laatuketjua. QS-001–QS-026 säilyvät accepted/histori
 | goal-002 / REQ-002; goal-006 / REQ-006; goal-019 / REQ-019 | QS-025 | adr-030 / CON-002 / CON-012 | BB-002–BB-005 / BB-011 / BB-012 | RT-009 / RT-019 / DEP-001 / DEP-002 | TEST-025 | EVID-025 | governance and Phase 2 observation verified; Phases 3–7 and human activation pending |
 | goal-020 / REQ-020 | QS-026 | adr-031 / adr-032 / CON-002 / CON-013 | BB-001–BB-006 / BB-009 / BB-013 | RT-009 / RT-020 / DEP-001 / DEP-002 | TEST-026 | EVID-026 | technical and visual gates passed; production-like pilot pending |
 | goal-021 / REQ-021 | QS-027 | adr-033 / CON-002 / CON-014 | BB-001–BB-006 / BB-009 / BB-014 | RT-022 / RT-023 / RT-024 / RT-025 / DEP-001 / DEP-002 | TEST-027 | EVID-027 | implementation and automated tests passed; final repository/browser gates pending |
+| goal-022 / REQ-022 | QS-028 | adr-034 / CON-002 / CON-015 | BB-003–BB-006 / BB-015 | RT-026 / DEP-001 / DEP-002 / DEP-005 | TEST-028 | EVID-028 | accepted target; ordering/Validation implementation evidence pending |
+| goal-022 / REQ-022 | QS-029 | adr-034 / CON-001 / CON-015 | BB-002 / BB-005 / BB-007 / BB-015 | RT-026 / RT-027 / DEP-001 / DEP-005 | TEST-029 | EVID-029 | accepted target; Feedback/Critic/approval evidence pending |
+| goal-022 / REQ-022 | QS-030 | adr-034 / CON-015 | BB-003–BB-007 / BB-015 | RT-028 / DEP-002 / DEP-005 | TEST-030 | EVID-030 | accepted target; refinement and continuation evidence pending |
+| goal-022 / REQ-022 | QS-031 | adr-034 / CON-005 / CON-015 | BB-001 / BB-002 / BB-015 | RT-026–RT-028 / DEP-001 / DEP-005 | TEST-031 | EVID-031 | accepted target; responsive accessible UI evidence pending |
+| goal-022 / REQ-022 | QS-032 | adr-034 / CON-015 | BB-001–BB-008 / BB-010 / BB-015 | RT-026–RT-028 / DEP-001–DEP-005 | TEST-032 | EVID-032 | accepted target; strict cutover and release evidence pending |
 <!-- traceability:end -->
 
 ## Testi- ja monitorikatalogi
@@ -86,6 +91,11 @@ Matriisi sisältää 27 laatuketjua. QS-001–QS-026 säilyvät accepted/histori
 | TEST-025 | Governed calibration/promotion -matriisi: versioned provider-neutral option dimensions ja unknown-semantics, hierarchy-safe attribution, immutable dataset/model/report hashes ja lineage, explicit priors/sample/coverage gates, joint outcome×actual-state ja cost estimation, exact/seeded/held-out/sensitivity evaluation, shadow/controller separation, zero counterfactual evidence, proposal thresholds, human activation/rollback, future-run-only snapshot effect ja restart/no-duplicate. | `governed-policy-calibration-and-promotion` contract/persistence/calibration/evaluation/runtime suites + human activation audit |
 | TEST-026 | Strict Reward-MDP -matriisi: v18/v3/v6/v11/v9/v10/v11/v4/v14 schema, acceptance delta/immutability, exact default PPM/provenance, outcome-aware reward/Q, hard authorization, canonical deterministic compiler/tie/absorption/hash, one-time policy snapshot/lookup, ordered Action Node Work→Validation, retry/escalate, restart/idempotenssi, real choice/DONE hermetic Run, legacy absence, UI pulse/horizon/reward-impact/relative V-landscape/acceptance detail, protected desktop/narrow flow, full test/lint/build/design/module/boundary/diff/latest/startup gates. | `graph-reward-mdp` compiler/runtime/frontend/conformance suites + repository final gates |
 | TEST-027 | Strict v19/v4/v7/v12/v5/v15 hierarchical Reward-MDP -matriisi: node-derived ID:t, explicit initial, sparse required cells, unique outcome/exact PPM/terminal/guard/authorization/absorption; bound-only Graph reward, zero unbound/split/duplicate progress ja once-only local terminal bonus; global→local→Action→local→global, backtrack/retry/exhaustion/escalate/mismatch/restart/out-of-contract/256-raja; +10 nodea→15×15 ilman ledger-kasvua, atomic rename/delete, Module v7 roundtrip; Graph 5×5, PLAN 2×2, DESIGN 12×12, 1/5/40 × 1/17/64 CSS-grid/virtualization/keyboard/reduced-motion/desktop/narrow; full test/lint/build/arc42/DESIGN/module/boundary/diff/latest/startup gates. | `hierarchical-reward-mdp` shared/backend/frontend/module/conformance suites + repository final gates |
+| TEST-028 | Project Config v20/Root Snapshot v13/role v10 -matriisi: approved Use Case trace, unique positive State order ja Action priority, JSON-permutaatio, all-Actions-done gate, immutable snapshot, precheck/Work/postwork enumit, dynamic prompt/permissions, maxRetries 0/2/5, provider failure ≠ semantic retry ja standalone State/Action Run -poisto. | `environment-state-action-orchestration` shared/project/planner/runtime/provider suites |
+| TEST-029 | Feedback/Critic/approval-matriisi: atomic blocked+Feedback, restart/no-duplicate, interval/timezone/due/lease/recovery, immutable Critic read set, proposal lifecycle, zero pre-approval Feedback/write, human identity+expected revision, stale/duplicate/agent approval ja successful-worktree read retention. | `environment-state-action-orchestration` persistence/schedule/critic/approval/audit suites |
+| TEST-030 | Refinement/apply/continuation-matriisi: allowed paths, shared Skill reverse-impact, exact base/diff/preimage hashes, read-only proposal, human approval, active-run lock, stale/conflict rollback, one managed-worktree commit, immutable parent, one continuation Run, lineage ja Product Snapshot projection. | `environment-state-action-orchestration` refinement/git/runtime/projection suites |
+| TEST-031 | Target UI -matriisi: Direction, Use Cases, Environment/State/Action, Validation flow, Run Gate, Feedback Box, Critic review, exact refinement approval ja Product Snapshot; canonical route state, factual DTO:t, keyboard/focus, color-independent labels, reduced motion sekä 1440×900/390×844 overflow/console QA. | `environment-state-action-orchestration` frontend/component/browser/a11y suites |
+| TEST-032 | Phase-09 strict cutover -matriisi: v19/vNext cross-read/write sentinel, fresh SQLite v16 fail-closed start, exact target version assertions, canonical API/UI route replacement, removal-manifest grep-gatet sekä full test/lint/build/arc42/DESIGN/package/install/API/UI/release smoke/latest/startup ja clean tree. | `environment-state-action-orchestration` conformance/release suites + repository final gates |
 
 ## Evidenssikatalogi
 
@@ -118,6 +128,11 @@ Matriisi sisältää 27 laatuketjua. QS-001–QS-026 säilyvät accepted/histori
 | EVID-025 | Provider-neutral option-cost-, offline calibration-, immutable registry-, evaluation-, shadow-, proposal-, human activation- ja rollback-ketju. | `.ballet/arc42/initiatives/governed-policy-calibration-and-promotion/EVIDENCE.md`; GPCP-EVID-001/002 verified locally, GPCP-EVID-003–007 pending |
 | EVID-026 | Graph Reward-MDP strict cutin implementation-, compiler/runtime-, UI-, documentation- ja final-gate-evidenssi. | `.ballet/arc42/initiatives/graph-reward-mdp/EVIDENCE.md`; GRM-evid-001–005 |
 | EVID-027 | Hierarchical Reward-MDP:n contract/compiler/runtime/CRUD/module/UI/documentation/final-gate-evidenssi. | `.ballet/arc42/initiatives/hierarchical-reward-mdp/EVIDENCE.md`; HRM-evid-001–006 |
+| EVID-028 | Approved Use Case-, ordering-, Validation-led gate/retry- ja immutable Environment Run -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
+| EVID-029 | Atomic Feedback-, Critic schedule/proposal-, human approval- ja worktree retention -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
+| EVID-030 | Exact refinement-, managed commit-, continuation lineage- ja Product Snapshot -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
+| EVID-031 | Target responsive/accessibility/browser- ja factual projection -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
+| EVID-032 | Strict cutover removal-, cross-store-, version-, release-, install- ja startup-evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
 
 ## Ketjun tulkinta
 
@@ -129,16 +144,17 @@ Goalit, laatuskenaariot, ADR:t/konseptit, building blockit, runtime/deployment-s
 
 ## Relevantit päätökset
 
-`adr-011`, `adr-015`, `adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin sekä `adr-033`; superseded/historialliset ketjut säilyvät audit trailina.
+`adr-011`, `adr-015`, `adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin, aktiivinen `adr-033` sekä target `adr-034`; superseded/historialliset ketjut säilyvät audit trailina.
 
 ## Evidenssi
 
-Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 18 Goal/REQ-parien kattavuuden ja pitää review/pending-evidenssin erossa hyväksytystä.
+Project-local-validator hylkää tuntemattomat trace-ID:t ja puutteelliset quality scenario -kentät. Conformance review tarkistaa lisäksi kaikkien 22 Goal/REQ-parien kattavuuden ja pitää accepted-target/pending-evidenssin erossa toteutetusta hyväksynnästä.
 
 ## Avoimet kysymykset
 
 - Pilot- ja release-pending-evidenssiä ei saa nostaa verified-tilaan ilman konkreettista artifact referenceä.
 - EVID-011–EVID-013:n tai EVID-027:n paikallinen verification ei korvaa production-pilottia tai ihmisarviota.
+- EVID-028–EVID-032 pysyvät pending, kunnes implementation-vaiheet tuottavat exact test outputit, artifact-viitteet ja tarvittavat ihmisverdictit.
 
 ## Seuraava katselmointiperuste
 

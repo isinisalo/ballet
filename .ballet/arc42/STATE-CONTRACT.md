@@ -3,8 +3,8 @@ id: arc42-state-contract-v1
 title: GraphEngineeringStateV1-sopimus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 8
+updatedAt: '2026-08-29'
+version: 9
 tags:
   - arc42
   - state
@@ -20,6 +20,8 @@ Tämä tiedosto määrittää viiden Graph Engineering -Loopin rajatun jaetun pr
 ## Tila
 
 `GraphEngineeringStateV1` on accepted päätöksellä `adr-022` ja tarkennettu `adr-031`:ssä. Sama rakenteellinen alkuarvo on materialisoitu project-local Graphiin. Decision State, immutable authorization-snapshot ja acceptance-ledger ovat erillisiä: project State ei voi antaa actionille lupaa, muuttaa obligation-ID:tä/painoa tai patchata compiled policya.
+
+Tämä sopimus kuvaa aktiivista v19-baselinea phase-09 cutoveriin asti. `goal-022` / `adr-034` -targetin **State** on eri käsite: Environmentin unique ascending `order` -arvon omistava execution unit, joka sisältää priority-ordered Actionit. Target-runtime ei käytä `GraphEngineeringStateV1`:tä compatibility readerina tai continuation-datana; exact target-semantics on [TARGET-CONTRACT](initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md).
 
 ## Alkuarvo
 
@@ -80,7 +82,7 @@ SQLite v15 omistaa runtime-, scope-tagged policy decision/observation-, acceptan
 
 ## Relevantit päätökset
 
-`adr-006`, `adr-011`, `adr-015`, `adr-022` ja `adr-031`.
+`adr-006`, `adr-011`, `adr-015`, `adr-022`, aktiivisen baselineen `adr-033` sekä target-erotteluun `adr-034`.
 
 ## Evidenssi
 
@@ -92,4 +94,4 @@ SQLite v15 omistaa runtime-, scope-tagged policy decision/observation-, acceptan
 
 ## Seuraava katselmointiperuste
 
-Katselmoi vain, jos pilotti osoittaa toistuvan evidenssipohjaisen coordination gapin, jota ei voi ilmaista nykyisillä bounded references -kentillä.
+Katselmoi, jos aktiivisen v19:n coordination gap muuttuu tai phase-09 cutover poistaa tämän sopimuksen canonical pinnasta. Target-Statea ei lisätä tähän tiedostoon rinnakkaiseksi shape-versioksi.

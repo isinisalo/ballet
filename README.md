@@ -132,7 +132,7 @@ The shared invalidation stream carries refresh signals, never provider prose or 
 ## Security and Git behavior
 
 - The server accepts loopback hosts; browser mutations require the Ballet origin.
-- Imported Graph Node Modules are untrusted, size-bounded JSON. They cannot contain a local policy, peer Graph Node targets, Repair resources or executable hooks.
+- Imported Graph Node Modules are untrusted, size-bounded JSON. V7 carries one GraphNode's complete local policy, but cannot contain peer Graph Node targets, project-global acceptance bindings/effects, Repair resources or executable hooks.
 - Provider processes run only in the managed Root Run worktree and receive no Ballet service credentials.
 - Network access defaults off and is enabled only by the selected ExecutionProfile.
 - Unauthorized actions are removed from `A(s)` and cannot be dispatched. They are not converted into a soft reward penalty.

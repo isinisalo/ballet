@@ -171,6 +171,68 @@ Authoring has exactly three canonical URL-owned levels:
 
 Run has Graph and GraphNode routes only. URL state owns the active level and IDs. Inspector selection remains ephemeral and never mutates topology.
 
+## Target design appendix: Validation-led Environment
+
+This appendix is accepted design authority for the isolated phases 07–08 vNext surface under `goal-022`, `adr-034` and the `environment-state-action-orchestration` Target Contract. It does not replace the canonical strict-v19 Graph UI before phase 09. VNext uses only `/vnext` and `/api/vnext`, reads and writes no v19 data, and carries an explicit phase 09 removal/canonicalization gate. The final branch contains neither prefix nor old active route.
+
+The target keeps this document's dark palette, Inter/Geist typography, 4px spacing system, radii, dense workbench language, semantic Secondary/Tertiary/Error signals and color-independent labels. It introduces no new palette, gradient, freeform topology, reward/policy matrix or shape language.
+
+### Direction workspace
+
+- Show Goals, accepted ADRs and Constraints as compact, exact-ID decision-context cards with source links and status.
+- Direction is project truth, not a runtime dashboard. Provider prose cannot create or approve a Goal, ADR, Constraint or Use Case.
+- Long IDs/paths remain accessible and the relationship to affected Use Cases is inspectable without copying full canonical documents.
+
+### Use Cases workspace
+
+- Present draft, approved and rejected Use Cases with exact revision, Goal/ADR/Constraint links, acceptance criteria and explicit human approve/reject actions.
+- Approval displays the exact revision and warns that semantic edits return an approved Use Case to draft.
+- Active Run locking disables mutation for every Use Case in its immutable closure while leaving inspection/navigation available.
+
+### Environment and ordered lanes
+
+- Environment is one ordered workspace, not a freeform graph. States render in numeric `order` as stable lanes/sections; each State renders Actions in numeric `priority` as rows/cards.
+- Every State/Action shows exact ID, order/priority, approved Use Case/criterion trace and factual readiness. Duplicate order/priority is a blocking authoring error, never resolved visually by drag order.
+- Desktop may use horizontally coordinated lanes only inside a bounded panel; the page itself never overflows. Narrow layout stacks the same States/Actions in exact order.
+- Do not render Graph topology, planets, spokes, Bézier routes, Q/V, reward heatmaps, policy horizons or acceptance rails in the target surface.
+
+### Validation-led Action flow
+
+- Validation is the main/controller card and Work is visually subordinate. The deterministic flow is `Validation precheck → done | delegate | blocked`; only `delegate` enters Work, followed by `Validation postwork → done | retry | blocked`.
+- Retry returns from postwork Validation to subordinate Work and always labels attempt `current / (1 + maxRetries)`. Exhaustion ends in Error-semantic blocked plus a Feedback reference.
+- Use the existing 1.5px mint flow, amber retry attention, Error blocked semantics, dark technical grid where a flow canvas materially helps, and reduced-motion support. Color is always paired with exact text/icon/status.
+- Validation/Work cards expose inspector settings and instructions; done/blocked markers and branch labels are projections, not control buttons. There is no authorable next target.
+
+### Run gate and Feedback Box
+
+- Run Gate leads with current ordered State/Action, factual status, attempt budget, Validation phase and why later work is gated. `done`/`blocked` are derived and labeled as such.
+- Feedback Box lists append-only factual Action-blocked entries and human-approved Critic entries with provenance/evidence. An unapproved Critic proposal never appears as Feedback.
+- Do not invent progress percentages, ETA, elapsed time, dialogue or status from provider text.
+
+### Critic review
+
+- Show schedule enabled/cadence/timezone, durable due/lease status and immutable proposals separately from Feedback.
+- Proposal review presents source Product Snapshot/hash, findings and evidence, then explicit keyboard-reachable Approve and Reject commands with expected revision.
+- Approval is a deliberate human action; no agent/autoplay affordance or combined “approve and refine” shortcut is allowed.
+
+### Refinement exact-diff approval
+
+- Show base commit, exact changed paths, every preimage SHA-256, exact diff SHA-256, shared Skill impact closure and validation plan before approval.
+- Unified diff content uses Geist and panel-contained scrolling. Narrow view preserves line semantics without page overflow and provides path-by-path navigation.
+- Separate proposed, approved, stale, applying, applied and failed statuses. Human approval is distinct from deterministic apply; stale/mismatched inputs visibly produce zero write.
+
+### Product Snapshot
+
+- Present source Run/snapshot/commit/config/resource hashes, approved Use Case revisions, ordered State/Action statuses, attempts, Feedback, Critic/refinement/approval lineage, changed artifacts and evidence.
+- Product Snapshot is a read-only projection with exact source labels, not a second editor or mutable project model.
+
+### Responsive and accessibility acceptance
+
+- At 1440×900 and 390×844: page-level horizontal overflow = 0, clipped core action = 0 and status conveyed only by color = 0.
+- All authoring, review, approve/reject and diff-navigation actions are keyboard reachable with visible focus and exact accessible names. Destructive/reject/apply boundaries use confirmation appropriate to impact.
+- Narrow controls are at least 40px and form text at least 16px. Sticky/internal scrolling stays within named panels; primary content order matches the domain order.
+- Browser back/forward reproduces URL-owned workspace/entity selection. Ephemeral inspector selection never mutates project/runtime truth.
+
 ## MDP Terminology
 
 - `Action` is the node-ID MDP choice `a ∈ A(s)`: a GraphNode in the Graph scope or an ActionNode in a GraphNode scope. Policy, Q/V and guard surfaces use this term directly.

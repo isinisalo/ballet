@@ -3,8 +3,8 @@ id: ballet-goals-summary
 title: Ballet-projektin yhteenveto
 status: accepted
 createdAt: '2026-07-18'
-updatedAt: '2026-08-23'
-version: 19
+updatedAt: '2026-08-29'
+version: 20
 tags:
   - yhteenveto
   - tavoitteet
@@ -12,15 +12,21 @@ tags:
 
 # Ballet-projektin yhteenveto
 
-> **Ballet on yhden Git-checkoutin paikallinen komentokeskus, jossa global Reward-MDP valitsee GraphNoden, sen local Reward-MDP valitsee ActionNoden ja immutable runtime todentaa toteutuneen työn.**
+> **Balletin hyväksytty suunta on ihmisen hyväksymistä Use Caseista johdettu Environment → State → Action, jossa Validation ohjaa työn ja immutable runtime todentaa toteutuneen vaikutuksen.**
 
 ![Balletin projektikartta](./ballet-project-map.png)
 
 ## Käyttäjäarvo
 
-Ballet erottaa project intention, deterministic policyn ja toteutuneen execution truthin. Jokainen Root Run sidotaan Git-HEADiin, strict project configiin, authorization- ja acceptance-snapshoteihin sekä kerran compiled policyyn. Provider tuottaa Work/Validation-tuloksen; se ei valitse seuraavaa GraphNodea eikä anna numeerista progressia.
+Ballet erottaa human-approved project intentionin, deterministic order/controlin ja toteutuneen execution truthin. Accepted targetissa approved Use Caset ja Goals/ADRs/Constraints ohjaavat ordered State/Action -rakennetta, Validation kontrolloi Workia ja ihmisapproval portittaa Critic/Refinement-vaikutukset. Provider ei valitse seuraavaa Statea/Actionia eikä hyväksy omaa proposaliaan.
+
+## Hyväksytty target
+
+`goal-022` / `adr-034` / `REQ-022` hyväksyvät Project Config v20-, Snapshot v13-, Task/outcome v10-, composition v11-, ExecutionSpec v12- ja SQLite v16 -cutin sekä Feedback/Critic/Refinement v1:n. Targetin 13 Use Casea, exact ordering/retry/approval/refinement/UI-semantics ja removal-gatet ovat `environment-state-action-orchestration`-initiativen Target Contractissa. Toteutusevidenssit `EVID-028`–`EVID-032` ovat pending.
 
 ## Aktiivinen tuote
+
+Phase 09:ään asti aktiivinen toteutusbaseline on edelleen:
 
 1. Repositoryssä authoroidaan Goalit, ADR:t, arc42, global 5×5 ja GraphNode-local N×N Reward Decision Modelit, nodet, Work/Validation, ExecutionProfilet, instructionit ja skillit.
 2. GraphNode ja ActionNode ovat oman scopensa state/action-ID:itä; terminalit eivät lisää matriisirivejä.
@@ -37,11 +43,12 @@ Default project data sisältää viisi GraphNodea, 17 ActionNodea, global 15/25 
 
 ## Päätöshistoria
 
-`goal-021` ja `adr-033` ovat aktiiviset. Goal 020 sekä ADR-031/032 ovat superseded single-policy/ledger-state/array-order/62-landscape-osiltaan; historia säilyy audit trailina.
+`goal-022` ja `adr-034` ovat accepted target. `goal-021` ja `adr-033` omistavat aktiivisen v19 implementation baselinen phase 09:ään asti. Final cut supersedoi Graph/module/policy/matrix/control-osat ADR-034:n täsmällisen listan mukaan; historia säilyy audit trailina.
 
 ## Todentamatta
 
 - Tuotantokaltainen viiden GraphNoden Reward-MDP Root Run -pilotti.
+- Kaikki targetin `EVID-028`–`EVID-032` implementation-, browser-, release- ja startup-tulokset.
 - Pinned tracker/provider live-smoke siltä osin kuin ulkoinen prerequisite puuttuu.
 - Ihmisen lopullinen visual review desktop/narrow-pinnasta.
 
@@ -50,7 +57,7 @@ Tekninen acceptance ei muuta näitä automaattisesti suoritetuksi eikä valtuuta
 ## Kanoninen lukujärjestys
 
 1. [ARCHITECTURE.md](../../ARCHITECTURE.md)
-2. [goal-021](goal-021-hierarchical-reward-mdp.md)
-3. [adr-033](../adr/adr-033-hierarchical-node-owned-reward-mdp.md)
+2. [goal-022](goal-022-validation-led-environment-orchestration.md)
+3. [adr-034](../adr/adr-034-validation-led-environment-state-action-orchestration.md)
 4. [arc42-indeksi](../arc42/README.md) ja [TRACEABILITY](../arc42/TRACEABILITY.md)
-5. [Hierarchical Reward-MDP initiative](../arc42/initiatives/hierarchical-reward-mdp/BRIEF.md)
+5. [Environment orchestration Target Contract](../arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md)

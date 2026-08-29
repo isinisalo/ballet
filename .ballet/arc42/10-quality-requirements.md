@@ -3,8 +3,8 @@ id: arc42-section-10
 title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 24
+updatedAt: '2026-08-29'
+version: 25
 tags:
   - arc42
   - quality
@@ -16,7 +16,7 @@ arc42Section: 10
 
 ## Tarkoitus ja tila
 
-Tämä osio omistaa aktiiviset, mitattavat hyväksymisskenaariot. QS-014–QS-023, QS-025 ja QS-026 säilyvät historiallisina trace-ketjuina. QS-024 säilyttää capability-first/protected Action flow -vaatimuksen. QS-027 on strict-v19 hierarchical Reward-MDP:n priority-1-raja.
+Tämä osio omistaa aktiiviset ja hyväksytyt target-laatuskenaariot. QS-027 on strict-v19:n aktiivinen priority-1-raja phase-09 cutoveriin asti. QS-028–QS-032 ovat goal-022/adr-034-targetin priority-1-hyväksymisrajat; niiden tila on pending toteutukseen ja nimettyyn evidenssiin asti.
 
 ## Laatupuu
 
@@ -33,10 +33,15 @@ flowchart TD
   integrity --> q11["QS-011 composition"]
   integrity --> q26["QS-026 Reward-MDP"]
   integrity --> q27["QS-027 hierarchical Reward-MDP"]
+  integrity --> q28["QS-028 ordered Validation-led runtime"]
+  safety --> q29["QS-029 Feedback + Critic approval"]
+  recovery --> q30["QS-030 exact refinement continuation"]
   recovery --> q12["QS-012 restart/cancel"]
   usability --> q5["QS-005 architecture truth"]
   usability --> q9["QS-009 Module v7"]
   usability --> q24["QS-024 authoring"]
+  usability --> q31["QS-031 target UI"]
+  usability --> q32["QS-032 strict cut"]
 ```
 
 ## Laatuskenaariot
@@ -71,6 +76,11 @@ flowchart TD
 | QS-025 | goal-019 | Historiallinen calibration/shadow/promotion-vaihe. | Superseded v17. | historical | Säilytä observation vain audit trailina. | Active dataset registry-, candidate-, shadow-, activation- ja rollback-polkuja 0. | historical | EVID-025 | superseded |
 | QS-026 | goal-020 | Historiallinen single Graph Reward-MDP -vaihe. | Superseded strict v18. | historical | Säilytä outcome-aware reward, hard authorization ja deterministic compiler ADR-033:ssa. | Active single-policy/ledger-state/array-order-sopimuksia 0. | historical | EVID-026 | superseded |
 | QS-027 | goal-021 | Node lisätään/renametaan/poistetaan tai global/local typed outcome havaitaan; kohtaamme retry/exhaustionin, backtrackin, terminal-escalationin, acceptance-mismatchin, restartin, authorizationin ja suuren matriisin. | Strict v19/v4/v7/v12/v9/v10/v11/v5/v15; Graph 1/5/40, local 1/17/64; 1440×900 ja 390×844. | BB-001–BB-006, BB-009, BB-014, RT-022–RT-025, CON-014 | Johda state/action-ID:t nodeista, compileeraa required scopet kerran, valitse observed branch deterministisesti, portita terminal ledger exactisti ja näytä 5×5/N×N ilman raskasta form/table-pintaa. | Default Graph 15/25, PLAN 3/4, DESIGN 78/144; +10 GraphNodea = 15×15 ja ledger-size ennallaan; probability = 1 000 000 ppm/cell; duplicate outcome = 0 hyväksyttyä; unbound node ja Action-split progress-reward = 0; local completion bonus kerran; happy/backtrack/retry/exhaustion/escalate/mismatch/restart/out-of-contract testit läpäisevät; combined policy decisions ≤ 256; rename atominen ja dangling delete = 0; Module v7 hash-roundtrip; semantic CSS-grid, keyboard/focus, reduced motion, page overflow/clipped core action/console error = 0; lint warning = 0. | 1 | EVID-027 | technical acceptance passed; human/pilot evidence pending |
+| QS-028 | goal-022 | Ihminen käynnistää hyväksytyn Environmentin, jonka JSON-järjestys poikkeaa `order`/`priority`-arvoista, ja Validation delegoi Workin sekä pyytää retryn. | Strict target Project Config v20, Root Snapshot v13, role v10, composition v11, ExecutionSpec v12 ja fresh SQLite v16; `maxRetries` fixturet 0, 2 ja 5. | BB-003–BB-006, BB-015, RT-026, CON-015 | Snapshottaa traceable intent, dispatchaa numeric orderingilla, anna vain Validationin ohjata Work/retry/block ja estä seuraava State kunnes kaikki Actionit johtuvat done-tilaan. | Duplicate/non-positive order/priority tuottaa 0 Runia; permutation dispatch = 100 % ascending; ennenaikaisia State-dispatcheja = 0; precheck sallii vain done, delegate tai blocked; Work vain completed tai needs_input; postwork vain done, retry tai blocked; yrityksiä enintään 1/3/6; invalidi enum/provider failure kuluttaa semantic retryä 0; standalone State/Action Runeja = 0. | 1 | EVID-028 | accepted target; implementation evidence pending |
+| QS-029 | goal-022 | Action blokkaantuu tai retry loppuu, ja lease-suojattu Critic tuottaa proposalin, jota agentti tai ihminen yrittää käsitellä. | Transactionaalinen SQLite v16, Feedback v1, Critic v1 schedule/proposal ja human approval boundary. | BB-002, BB-005, BB-007, BB-015, RT-026, RT-027, CON-001, CON-015 | Committoi blocked+Feedback atomisesti; pidä Critic proposal read-only-tilassa ja hyväksy/hylkää se vain identity/revision-sidotulla ihmiskomennolla. | Blocked transactionissa status ja yksi causal Feedback syntyvät yhdessä, välitiloja/duplicateja 0; blockedin jälkeen dispatch = 0; proposal yksin lisää Feedbackiä/repository-kirjoituksia 0; agentti-/stale-/duplicate-approval vaikuttaa 0; yksi validi human approval tuottaa yhden päätöksen ja enintään yhden Feedback-entryn; restart/lease ei monista invocationia. | 1 | EVID-029 | accepted target; implementation evidence pending |
+| QS-030 | goal-022 | Ihminen hyväksyy Refinement proposalin, jonka exact diff, base commit ja preimage-hashit ovat joko ajantasaiset tai driftanneet. | Managed worktree, allowed-path allowlist, shared Skill impact closure, active-run authoring lock ja continuation service. | BB-003–BB-007, BB-015, RT-028, CON-015, DEP-002 | Säilytä proposal read-onlyna ennen human approvalia; revalidoi atomisesti ja luo validissa tapauksessa yksi commit, immutable continuation Run ja factual Product Snapshot. | Pre-approval kirjoituksia 0; allowlistin ulkopuolisia muutoksia 0; stale base/diff/preimage tai active lock tuottaa file/commit/Run-muutoksia 0; validi approval tuottaa yhden commitin ja child Runin täsmäävällä lineage-ketjulla; parent-muutoksia 0; worktree säilyy, kunnes Critic/refinement-evidenssi on durable. | 1 | EVID-030 | accepted target; implementation evidence pending |
+| QS-031 | goal-022 | Operaattori authoroi targetia ja käsittelee Run gate-, Feedback-, Critic-, Refinement- ja Product Snapshot -näkymiä desktopilla ja narrow-laitteella. | Isolated `/vnext` phaseissa 07–08, canonical target phase 09:n jälkeen; 1440×900 ja 390×844, keyboard ja reduced motion. | BB-001, BB-002, BB-015, RT-026–RT-028, DEP-001, DEP-005, CON-005, CON-015 | Näytä factual ordered Environment ja approval-rajat nykyisillä design-tokeneilla ilman freeform graphia tai reward/policy-matriisia. | Kaikki target-workspacet ja primary actionit ovat keyboard/focus-käytettäviä; status/approval ei nojaa vain väriin; page overflow, clipped core action ja console error = 0 molemmissa viewporteissa; UI-derived control state/provider-proosasta päätelty status = 0. | 1 | EVID-031 | accepted target; implementation evidence pending |
+| QS-032 | goal-022 | Phase-09 strict cutover ja target release candidate validoidaan. | Fresh Project Config v20/SQLite v16, canonical target API/UI, package/install/startup-ympäristö. | BB-001–BB-008, BB-010, BB-015, RT-026–RT-028, DEP-001–DEP-005, CON-015 | Canonicalisoi target ja poista Graph/Reward-MDP/vNext-pinnat ilman compatibilityä, migraatiota tai dual-writeä. | Removal-manifestin aktiivikoodi/config-grep-osumia 0 kaikille nimetyille termeille; `/api/vnext`, `/vnext`, vanhat canonical Graph-reitit, migration/reader/alias/dual-write-polut = 0; strict version assertions täsmäävät 100 %; test/lint/build/arc42/DESIGN/package/install/API/UI/release smoke/latest/startup läpäisee ja tree on clean. | 1 | EVID-032 | accepted target; implementation evidence pending |
 <!-- quality-scenarios:end -->
 
 ## Priorisoinnin tulkinta
@@ -78,10 +88,11 @@ flowchart TD
 - Prioriteetti 1 estää acceptance-väitteen, jos kriteeriä ei ole osoitettu tai rajoitusta hyväksytty eksplisiittisesti.
 - Historiallinen rivi säilyttää trace-ID:n; se ei ole aktiivinen release-portti.
 - Testin läpäisy todentaa nimetyn ympäristön, ei tuotantokaltaista pilottia tai ulkoista vaikutusta.
+- Targetin `accepted` päätösstatus ei tarkoita implementation acceptancea; QS-028–QS-032 pysyvät pending, kunnes niiden exact kriteerit ja ihmisrajat on todennettu.
 
 ## Kanoniset lähteet ja evidenssi
 
-Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot ja [TRACEABILITY](TRACEABILITY.md) niiden päätös/rakenne/test/evidence-ketjut. Aktiivisen cutin päätös on `adr-033`; `adr-025`/`adr-027` omistavat protected Action flow'n. `EVID-027` päivitetään vain ajetuista porteista, ja tuotantokaltainen pilotti säilyy erillisenä pending-evidenssinä.
+Goalit omistavat quality intention. Tämä osio omistaa mitattavat skenaariot ja [TRACEABILITY](TRACEABILITY.md) niiden päätös/rakenne/test/evidence-ketjut. Aktiivisen v19-cutin päätös on `adr-033`; targetin päätös on `adr-034`. `EVID-028`–`EVID-032` päivitetään vain ajetuista porteista, eikä dokumenttivalidointia muuteta implementation-evidenssiksi.
 
 ## Avoimet kysymykset
 

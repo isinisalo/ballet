@@ -3,8 +3,8 @@ id: ballet-architecture-entrypoint
 title: Balletin arkkitehtuurin aloituspiste
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 24
+updatedAt: '2026-08-29'
+version: 25
 tags:
   - architecture
   - arc42
@@ -32,9 +32,17 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - UI säilyttää capability-first-kortit ja ADR-025/027:n protected Action Node flow'n. Graph ja GraphNode näyttävät semanttisen CSS-grid 5×5/N×N Q(s,a)-matriisin, vihreän `+reward`-, punertavan `−cost`- ja amber `≈estimate`-semantiikan sekä exact micros/ppm-detailin.
 - Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen.
 
+## Hyväksytty target ja transition
+
+`goal-022` ja `adr-034` hyväksyvät strict targetin Environment → State → Action, approved Use Caset, Validation-led precheck/Work/postwork-loopin, runtime-statuksesta johdetut `done`/`blocked`-portit, Feedback/Critic/Refinement-human approval -rajat sekä immutable continuation/Product Snapshot -evidenssin. Target matrix on Project Config v20, Snapshot v13, Task/outcome v10, composition v11, ExecutionSpec v12, SQLite v16 ja Feedback/Critic/Refinement v1; Reward-MDP/Graph/GraphNode/ActionNode/policy/acceptance ledger/Graph Node Module poistuvat lopputilasta.
+
+Toteutusbaseline pysyy yllä kuvattuna strict v19:nä phase 09:n atomiseen cutoveriin asti. Phases 02–08 saavat käyttää vain dataeristettyä vNext-namespacea, `/api/vnext`-API:a ja `/vnext`-UI:ta. V19 ja vNext eivät lue tai kirjoita toisiaan, dual-writeä/compatibility readeria/migraatiota/route aliasia ei ole, ja phase 09 poistaa sekä vanhan aktiivipolun että kaikki vNext-prefixit. Targetin kanoninen rajaus on [Target Contract](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md).
+
 ## Supersession
 
 `goal-021` supersedoi `goal-020`:n single-policy/ledger-state/array-order-osat. `adr-033` supersedoi vastaavat ADR-031:n osat ja ADR-032:n 62-state landscape/pulse/horizon -projektion. Vanhat tiedostot säilyvät audit trailina. ADR-031:n deterministic outcome-aware reward/authorization, ADR-032:n ihmisyksiköt/värisemantiikka ja ADR-025/027:n Action flow säilyvät.
+
+Accepted `goal-022` / `adr-034` supersedoi phase 09:n final cutissa `goal-021`:n ja ADR-016/023/025/027/029/031/032/033:n nimeämät Graph/module/policy/matrix/control-osat. Ennen phase 09:ää tämä on hyväksytty target-päätös, ei väite toteutetusta runtime-cutista. Checkout-local-, provider-, worktree-, immutable evidence-, security-, design token- ja external-write-periaatteet säilyvät.
 
 ## Kanoniset lähteet
 
@@ -47,6 +55,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 - [ADR-indeksi](.ballet/arc42/09-architecture-decisions.md)
 - [UI-designjärjestelmä](DESIGN.md)
 - [Hierarchical Reward-MDP initiative](.ballet/arc42/initiatives/hierarchical-reward-mdp/BRIEF.md)
+- [Environment orchestration target](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md)
 
 ## Omistajuus
 
@@ -59,7 +68,7 @@ Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallitt
 
 ## Evidenssi ja avoin riski
 
-`npm run validate:arc42` tarkistaa dokumentti-, trace-, resource- ja strict-v19 hierarchical Reward-MDP -sopimuksen. Testit, lint, build, module-smoket, platform boundary, `make latest` ja käynnistyssmoke muodostavat teknisen acceptance-portin. Tuotantokaltaista Root Run -pilottia ei ole suoritettu; sitä ei saa päätellä hermetic testeistä.
+`npm run validate:arc42` tarkistaa tällä hetkellä dokumentti-, trace-, resource- ja strict-v19 hierarchical Reward-MDP -sopimuksen. `EVID-028`–`EVID-032` ovat pending, joten accepted targetista ei päätellä toteutusta. Testit, lint, build, manifestin removal-gatet, platform boundary, `make latest` ja käynnistyssmoke muodostavat tulevan teknisen acceptance-portin.
 
 ## Seuraava katselmointiperuste
 

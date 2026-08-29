@@ -3,8 +3,8 @@ id: arc42-section-05
 title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 24
+updatedAt: '2026-08-29'
+version: 25
 tags:
   - arc42
   - building-blocks
@@ -19,7 +19,7 @@ Tämä osio kuvaa Balletin arkkitehtonisesti merkittävän staattisen jaon, vast
 
 ## Tila
 
-BB-001–BB-010 säilyvät yleisinä vastuualueina. BB-011/012 ovat historiallista scoped-policy/learning-jakoa ja BB-013 historiallinen single-policy-raja. BB-014 omistaa aktiivisen hierarchical Reward-MDP compiler/runtime/UI-rajan. ADR-025/027:n Action Node flow säilyy.
+BB-001–BB-010 säilyvät yleisinä vastuualueina. BB-011/012 ovat historiallista scoped-policy/learning-jakoa ja BB-013 historiallinen single-policy-raja. BB-014 omistaa aktiivisen hierarchical Reward-MDP compiler/runtime/UI-rajan phase-09 cutoveriin asti. BB-015 määrittää hyväksytyn Environment-targetin vastuujaon; sille ei vielä väitetä tuotantokoodiankkureita.
 
 ## Taso 1: Balletin rakennusosat
 
@@ -56,6 +56,7 @@ flowchart LR
 | BB-012 | Historiallinen superseded offline learning/promotion -pinta. | Ei active runtime -rajapintaa. | Säilyy vain audit trailina. | Historiallinen `goal-019` / `adr-030` evidence | REQ-019 |
 | BB-013 | Historiallinen single Graph Reward-MDP subsystem. | Ei aktiivista single-policy-rajapintaa. | Outcome-aware reward/authorization-periaatteet siirtyvät BB-014:ään. | Historiallinen `goal-020` / `adr-031` evidence | REQ-020 |
 | BB-014 | Hierarchical Reward-MDP subsystem johtaa node-ID:t scopeista, canonicalisoi sparse branchit, compileeraa global/local Q/V-policyt, tarkistaa absorptionin ja portittaa local-terminalin acceptance-effectit. | Decision Model v4, Root Snapshot v12, policy decision/observation v5, BB-005:n facts ja BB-001:n 5×5/N×N read model. | Rajattu state-avaruus, deterministic branch, reward hacking -suoja, hard authorization ja selkeä control owner per scope. | `backend/policy/PolicyScope.ts`, `backend/policy/RewardMdpCompiler.ts`, `backend/runtime/RuntimeFlowCoordinator.ts`, `frontend/src/workspace/automation/DecisionModelWorkspace.tsx` | REQ-021 |
+| BB-015 | Target Environment orchestration omistaa approved Use Case → immutable Environment Run → ordered State/Action → Validation-led execution → Feedback/Critic/Refinement/continuation/Product Snapshot -ketjun. | Project Config v20, Root Snapshot v13, Task/role v10, composition v11, ExecutionSpec v12, SQLite v16 sekä Feedback/Critic/Refinement v1. | Ei ennenaikaista State-etenemistä, typed approval boundary, exact refinement -turvallisuus ja immutable audit trail ilman Reward-MDP:tä. | Vaiheissa 02–08 eristetty vNext namespace; canonical lähdekoodiankkurit nimetään phase-09 cutoverissa. | REQ-022 |
 
 ## Rajapinta- ja riippuvuussäännöt
 
@@ -107,6 +108,18 @@ Graph/Graph Node käyttävät responsive stable-order card gridia 1/5/40 GraphNo
 | Reward solver | Laskee branchikohtaisen potential/rewardin ja deterministic discounted value iterationin stable orderissa kerran. | Finite model + per-state admissible actions → Q/V/policy/iterations/residual/hash. | Ei wall-clock-decision timeoutia, runtime re-solvea tai online mutationia. |
 | Policy evidence projection | Näyttää scope/current state-, reward-, PPM/prior-, Q/V-, selected action- ja factual execution-faktat 5×5/N×N-matriisissa. | Persisted global/local decision/observation → read-only evidence. | Projektio ei ole control state; acceptance ei lisää policy-rivejä. |
 
+## BB-015 target whitebox: Environment orchestration
+
+| Target-osa | Vastuu | Input/output | Fail-closed-raja |
+| --- | --- | --- | --- |
+| Direction ja Use Case catalog | Lukee Goals/ADR/Constraints-kontekstin ja ihmisen hyväksymät Use Caset Project Config v20:stä. | Project truth → traceable approved execution intent. | Draft/rejected/puutteellisesti jäljitettävä Use Case ei käynnistä Runia. |
+| Environment planner ja snapshot | Validoi unique ascending State `order`- ja Action `priority` -arvot, resource closuren, oikeudet sekä active-run lockin ja jäädyttää Root Snapshot v13:n. | Approved Environment → immutable Run snapshot tai typed preflight issue. | V19-dataa ei lueta; invalidi ordering, resource tai permission tuottaa nolla queuea/worktreetä. |
+| Validation-led coordinator | Johtaa runtime-statuksesta Actionin precheck→Work→postwork-syklin, retry-rajan ja State/Environment-portin. | Validation/Work v10 outcomes → atominen status, Feedback tai seuraava eligible Action. | Provider ei valitse seuraavaa Actionia, hyväksyntää tai refinementiä; blocked estää Environmentin etenemisen. |
+| Feedback, Critic ja approval service | Persistoi blocker-feedbackin atomisesti, ajaa lease-suojatun Critic-schedulen ja toteuttaa erilliset human approval -komennot. | Runtime/critic facts + expected revision → Feedback v1 tai proposal decision. | Critic proposal ei ole Feedback ennen hyväksyntää; agentti ei voi hyväksyä omaa proposaliaan. |
+| Refinement, continuation ja Product Snapshot | Muodostaa read-only exact diff/hash -ehdotuksen, tarkistaa sallitut polut/preimaget ja luo hyväksynnästä managed-worktree-commitin sekä continuation Runin. | Approved proposal → commit lineage, immutable snapshot ja artifact/evidence-projektio. | Ei kirjoitusta ennen hyväksyntää, hash-konfliktissa nolla osakirjoitusta, eikä onnistunutta worktreetä siivota ennen Critic/refinement-evidenssin säilymistä. |
+
+BB-015 käyttää BB-001/002/006/007/008/010:n adaptoitavia UI-, HTTP-security-, provider-, worktree-, resource- ja tracker-rajoja. BB-003–005 ja BB-009 muuttuvat target-vastuiksi vaiheissa 02–06. BB-014 ja Graph Node Module -pinta poistuvat phase-09 removal-manifestin mukaan. Vaiheissa 02–08 BB-015:n mahdollinen toteutus on CTR-012:n eristämä eikä muodosta compatibility-rajapintaa aktiiviseen v19:ään.
+
 ## BB-009 whitebox: Graph Node Module v7
 
 1. **Inspect:** rajoita koko, parsi UTF-8 JSON, validoi strict v7 mukaan lukien local policy, canonicalisoi ja laske SHA-256.
@@ -116,15 +129,15 @@ Graph/Graph Node käyttävät responsive stable-order card gridia 1/5/40 GraphNo
 
 ## Kanoniset lähteet
 
-Shared contractit ja lähdekoodi omistavat suoritettavan käyttäytymisen. `adr-033` omistaa BB-014:n ja strict runtime-rajan, `adr-025`/`adr-027` Action-canvasprojektion, `DESIGN.md` visuaalisen järjestelmän ja tämä osio rakennusosajaon.
+Shared contractit ja lähdekoodi omistavat aktiivisen suoritettavan käyttäytymisen. `adr-033` omistaa BB-014:n phase-09 cutoveriin asti; `adr-034` ja Target Contract omistavat BB-015:n hyväksytyn tavoitejaon. `DESIGN.md` omistaa visuaalisen järjestelmän ja target-appendixin.
 
 ## Relevantit päätökset
 
-`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin ja `adr-033`.
+`adr-001`–`adr-003`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin, aktiivinen `adr-033` ja target `adr-034`.
 
 ## Evidenssi
 
-`TEST-027` / `EVID-027` kattavat aktiiviset domain-, snapshot-, compiler-, runtime-, persistence-, module- ja UI-rajat. BB-011–013:n vanha evidenssi säilyy historiallisissa initiativeissa. Tuotantokaltainen pilotti ja lopullinen ihmisvisual verdict ovat avoimia.
+`TEST-027` / `EVID-027` kattavat aktiiviset domain-, snapshot-, compiler-, runtime-, persistence-, module- ja UI-rajat. BB-015:n `TEST-028`–`TEST-032` / `EVID-028`–`EVID-032` ovat pending. BB-011–013:n vanha evidenssi säilyy historiallisissa initiativeissa.
 
 ## Avoimet kysymykset
 

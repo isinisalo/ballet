@@ -3,8 +3,8 @@ id: arc42-section-04
 title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 16
+updatedAt: '2026-08-29'
+version: 17
 tags:
   - arc42
   - solution-strategy
@@ -32,6 +32,15 @@ Tämä osio kokoaa aktiiviset perustavat ratkaisut, joilla Ballet vastaa hyväks
 | STRAT-009 | Capability-first Graph/GraphNode-authoring ja protected Action flow näyttävät vain canonical project/runtime-totuuden. | goal-007, goal-018 / REQ-007, REQ-018 | QS-013, QS-024 | adr-025, adr-027, adr-029 säilyvin osin | UI ei luo rinnakkaista topologyä, runtime statea tai numeerista LLM-progressia. |
 | STRAT-013 | Historiallinen single Graph Reward-MDP -strategia. | goal-020 / REQ-020 | QS-026 | adr-031 | Outcome-aware reward, hard authorization ja immutable compiler säilyvät STRAT-014:ssa; single-policy/ledger-state/array-order eivät. |
 | STRAT-014 | Graph ja jokainen GraphNode compileerataan erillisinä node-ID-omisteisina Reward-MDP-scopeina samaan immutable snapshotiin. Acceptance on Graphin erillinen ledger-portti. | goal-021 / REQ-021 | QS-027 | adr-033 | Default Graph 15/25, PLAN 3/4 ja DESIGN 78/144 solua; typed outcome valitsee branchin; local terminal emittoi GraphNode-outcomen; duplicate/unbound/split progress-reward = 0. |
+| STRAT-015 | Strict Environment→State→Action-cutover rakentuu Validation-led-loopin, runtime-statusjohdannaisten, ihmisen hyväksymien proposal-siirtymien ja immutable continuation Runin ympärille. | goal-022 / REQ-022 | QS-028–QS-032 | adr-034 | Target rakentuu eristettynä vaiheissa 02–08; phase 09 poistaa Reward-MDP/Graph-domainin ja kaikki vNext-prefixit yhdellä strict canonical cutilla. |
+
+## Hyväksytty Environment-target ja transition
+
+ADR-034 hyväksyy Environment→State→Action-mallin lopulliseksi domainiksi, mutta ei aktivoi sitä dokumenttimuutoksella. Environmentin Stateja suoritetaan unique ascending `order` -järjestyksessä ja Staten Actioneita unique ascending `priority` -järjestyksessä. Validation on controller: precheck sallii vain `done | delegate | blocked`, delegoitu Work toimii dynaamisella promptilla, ja postwork sallii vain `done | retry | blocked`. `maxRetries` laskee ensimmäisen Work-yrityksen jälkeiset lisäyritykset. Blocked-siirtymä ja Feedback-entry commitoidaan atomisesti; State-eteneminen odottaa kaikkien Actionien johdettua `done=true`-tilaa.
+
+Critic- ja Refinement-ehdotukset ovat read-only, kunnes ihminen suorittaa erillisen typed approval -komennon. Refinement sitoutuu exact diffiin, base-committiin ja preimage-hasheihin; hyväksyntä luo managed-worktree-commitin ja uuden immutable continuation Runin. Product Snapshot on commit/artifact/evidence-projektio, ei toinen projektitotuus.
+
+Välivaiheen buildattavuus perustuu CTR-012:een: vNext elää vaiheissa 02–08 eristetyssä namespace/hakemistossa, `/api/vnext`-API:ssa, `/vnext`-UI:ssa ja v15-datasta erillisessä persistence-pinnassa. Suuntien välillä ei ole read/writeä, dual-writeä, migraatiota, compatibility readeria eikä route-aliasta. Phase 09 canonicalisoi targetin ja poistaa sekä vanhan aktiivipolun että vNext-prefixit; manifestin nollaosumaiset grep-gatet ovat hyväksymisehto.
 
 ## Hierarkkisen Reward-MDP:n ratkaisu
 
@@ -62,16 +71,16 @@ Acceptance-ledgerin stable ID:t ja painot sekä erillinen authorization snapshot
 
 ## Platformin ja projektin raja
 
-Platform toteuttaa vain geneeriset Graph-, GraphNode-, ActionNode-, Work-, Validation-, Reward-MDP-, acceptance-, authorization-, snapshot-, provider-, persistence-, tracker- ja module-primitivet. DESIGN/PLAN/BUILD/DEPLOY/VERIFY-nimet, arc42-menetelmä, release-säännöt, outcome-katalogit, probabilityt ja reward-parametrit ovat project-local-dataa.
+Phase-09 cutoveriin asti platform toteuttaa aktiiviset geneeriset Graph-, GraphNode-, ActionNode-, Work-, Validation-, Reward-MDP-, acceptance-, authorization-, snapshot-, provider-, persistence-, tracker- ja module-primitivet. Target-platform toteuttaa geneeriset Environment-, State-, Action-, Validation-led-, Feedback-, Critic-, Refinement-, continuation-, snapshot-, provider-, persistence- ja tracker-primitivet. DESIGN/PLAN/BUILD/DEPLOY/VERIFY-nimet, arc42-menetelmä, release-säännöt ja hyväksytyt Use Caset ovat project-local-dataa kummassakin vaiheessa.
 
 ## Kanoniset lähteet
 
-`goal-021` omistaa aktiivisen WHAT/WHY:n ja `adr-033` päätöksen. `DESIGN.md` omistaa visuaalisen järjestelmän, shared contractit suoritettavan sopimuksen ja osiot 5/6/8 rakenteen, runtime-skenaariot ja poikkileikkaavat invariantit.
+`goal-021` / `adr-033` omistavat aktiivisen v19-toteutuksen phase-09 cutoveriin asti. `goal-022`, `adr-034` ja initiative Target Contract omistavat hyväksytyn targetin. `DESIGN.md` omistaa yhteisen visuaalisen järjestelmän ja target-appendixin; osiot 5/6/8 kuvaavat rakenteet, runtime-skenaariot ja poikkileikkaavat invariantit.
 
 ## Evidenssi ja avoin raja
 
-`TEST-027` / `EVID-027` todentavat strict contractin, scopekohtaiset compilerit, absorptionin, authorizationin, acceptance-portin, hierarchical runtimen, persistence/UI:n ja final portit. Tuotantokaltainen pilotti pysyy avoimena; priorista ei johdeta kalibrointiväitettä.
+`TEST-027` / `EVID-027` todentavat aktiivisen strict-v19-contractin. Targetin `TEST-028`–`TEST-032` / `EVID-028`–`EVID-032` ovat pending, kunnes vaiheet 02–11 tuottavat nimetyn implementation-, persistence-, UI-, removal- ja release-evidenssin. Tuotantokaltainen pilotti pysyy avoimena.
 
 ## Seuraava katselmointiperuste
 
-Uusi ADR vaaditaan, jos reward- tai authorization-semantikka, online learning, POMDP, node-ID-omistajuus, branch-valinta, automaattinen external write tai control owner muuttuu.
+Uusi ADR vaaditaan, jos Environment-ordering, Action-priority, Validation-control, retry-semantikka, approval integrity, refinement-write-raja, continuation lineage, automaattinen external write tai strict cutover -strategia muuttuu.

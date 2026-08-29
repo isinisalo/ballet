@@ -3,8 +3,8 @@ id: arc42-section-12
 title: Sanasto
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 20
+updatedAt: '2026-08-29'
+version: 21
 tags:
   - arc42
   - glossary
@@ -15,11 +15,31 @@ arc42Section: 12
 
 ## Tarkoitus
 
-Tämä osio määrittää aktiivisen hierarchical Reward-MDP-, authoring-, runtime-, persistence-, module- ja evidenssisanaston.
+Tämä osio erottaa aktiivisen strict-v19-sanaston hyväksytystä Environment-target-sanastosta. Target-termi ei muutu aktiiviseksi toteutusfaktaksi ennen phase-09 strict cutoveria.
 
 ## Aktiivinen strict cut
 
 Project Config v19, Decision Model v4, Graph Node Module v7, Root Snapshot v12, Task Envelope/Outcome v9, composition v10, ExecutionSpec v11, policy decision/observation v5 ja SQLite v15.
+
+## Hyväksytty target strict cut
+
+Project Config v20, Root Snapshot v13, Task Envelope/role outcome v10, prompt composition v11, ExecutionSpec v12, SQLite v16 sekä Feedback-, Critic- ja Refinement-contract v1. Decision Model-, Graph Node Module- ja policy decision/observation -versioita ei ole targetissa.
+
+| Target-termi | Määritelmä |
+| --- | --- |
+| Environment | Approved Use Casen project-local execution definition, joka omistaa unique ascending `order` -arvoilla järjestetyt Statet. Ei freeform graph eikä policy. |
+| State (target) | Environmentin ordered execution unit. Omistaa unique ascending `priority` -arvoilla järjestetyt Actionit; seuraava State ei dispatchaannu ennen nykyisen kaikkien Actionien johdettua `done=true`-tilaa. Eri käsite kuin aktiivisen v19:n bounded `GraphEngineeringStateV1`. |
+| Action (target) | Staten priority-ordered execution unit, jolla on Validation, subordinate Work, `maxRetries` ja canonical runtime status. Ei standalone Run -target. |
+| Action runtime status | Canonical enum-siirtymä, josta `done` ja `blocked` johdetaan; boolean-arvoja ei tallenneta project configiin itsenäiseksi totuudeksi. |
+| Validation precheck | Actionin controller-kutsu ennen Workia; sallittu tulos on vain `done | delegate | blocked`. |
+| Validation postwork | Workin jälkeen ajettava controller-kutsu; sallittu tulos on vain `done | retry | blocked`. |
+| `maxRetries` (target) | Ensimmäisen Work-yrityksen jälkeen sallittujen lisäyritysten määrä; Work-yritysten enimmäismäärä on `1 + maxRetries`. |
+| Feedback Box | Canonical Feedback v1 -kokoelma hyväksytyistä ihmisen palautteista ja runtime-blockereista. Critic proposal ei ole Feedback ennen human approvalia. |
+| Critic proposal | Scheduled Criticin read-only, revisionoitu ehdotus, joka voi tulla Feedbackiksi vain erillisellä ihmisen approval-komennolla. |
+| Refinement proposal | Read-only exact diff, joka on sidottu base-committiin, diff-hashiin ja sallittujen polkujen preimage-hasheihin. |
+| Continuation Run | Hyväksytyn refinement-commitin uusi immutable Environment Run, jonka lineage viittaa parent Runiin, Feedbackiin, proposaliin, approvaliin ja committiin. Parentia ei mutatoida in-place. |
+| Product Snapshot | Read-only commit/artifact/evidence-projektio; ei project truth eikä dispatch authority. |
+| vNext transition | Phaseissa 02–08 käytetty määräaikainen eristys namespace/hakemisto-, `/api/vnext`-, `/vnext`- ja erillisen runtime-store-rajan takana. Ei compatibility layer; kaikki prefixit poistuvat phase 09:ssä. |
 
 ## Domain ja authoring
 
@@ -83,7 +103,7 @@ Project Config v19, Decision Model v4, Graph Node Module v7, Root Snapshot v12, 
 | Materialisointi | Inspect→plan→commit-kopio project-local-resursseiksi config-last-periaatteella. Package ei ole live runtime dependency. |
 | Platform primitive | Geneerinen Graph/GraphNode/ActionNode/Work/Validation/Reward-MDP/ledger/auth/snapshot/runtime/provider/store-ominaisuus. |
 | Project-local data | Default-nodejen nimet, arc42/release/deploy-menettely, instructions, skills, outcomes ja Reward-MDP-rivit repositoryssä. |
-| Strict cut | Producerit ja consumerit vaihtuvat yhdessä; vanhaa readeria, migraatiota, aliasia tai dual-writeä ei jää. |
+| Strict cut | Producerit ja consumerit vaihtuvat yhdessä; vanhaa readeria, migraatiota, aliasia tai dual-writeä ei jää. Target-cut poistaa myös kaikki vNext-prefixit ja vanhan Graph/Reward-MDP-pinnan. |
 
 ## Historiallinen sanasto
 
@@ -91,7 +111,7 @@ Project Config v19, Decision Model v4, Graph Node Module v7, Root Snapshot v12, 
 
 ## Kanoniset lähteet
 
-`goal-021`, `adr-033`, shared strict contracts, [STATE-CONTRACT](STATE-CONTRACT.md), [DESIGN](../../DESIGN.md) ja [Hierarchical Reward-MDP initiative](initiatives/hierarchical-reward-mdp/BRIEF.md).
+Aktiivinen sanasto: `goal-021`, `adr-033`, shared strict contracts, [STATE-CONTRACT](STATE-CONTRACT.md) ja [Hierarchical Reward-MDP initiative](initiatives/hierarchical-reward-mdp/BRIEF.md). Target-sanasto: `goal-022`, `adr-034`, [TARGET-CONTRACT](initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md) ja [DESIGN target appendix](../../DESIGN.md).
 
 ## Review-trigger
 

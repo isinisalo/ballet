@@ -1,10 +1,10 @@
 ---
 id: environment-state-action-orchestration-audit
 title: Environment State Action orchestration baseline audit
-status: draft
+status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -200,6 +200,7 @@ Because every orchestration identity and all strict producer/consumer shapes cha
 8. Current provider failures bypass semantic retry and fail the Root Run; this matches the requested distinction but needs explicit target wording.
 9. Current system execution instruction still says “ordered Job execution”, and Codex/Copilot adapter tests contain `role: "job"` fixtures even though the active domain contract is Work/Validation. These are baseline cleanup findings.
 10. Current instructions are valid free-form Markdown; there is no machine-enforced required-section contract.
+11. `README.md`'s security section said a Graph Node Module cannot contain a local policy, while the active v7 package contract and implementation require the owning GraphNode's complete local policy. The current-contract wording is corrected in the architecture phase; this is documentation drift, not a runtime change.
 11. Current shared Skill selection has multi-consumer impact that is not represented as a refinement proposal graph.
 12. The prompt references 13 Use Cases without enumerating IDs. The target contract must define a stable UC-01..UC-13 catalog from the supplied semantics before implementation traceability is claimed.
 

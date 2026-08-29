@@ -3,8 +3,8 @@ id: arc42-section-11
 title: Riskit ja tekninen velka
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 18
+updatedAt: '2026-08-29'
+version: 19
 tags:
   - arc42
   - risks
@@ -20,7 +20,7 @@ Tämä osio ylläpitää arkkitehtuurin kannalta merkittävät riskit, teknisen 
 
 ## Tila
 
-RISK-001–RISK-021 säilyttävät nykyiset tai historialliset riskit; RISK-021:n single-policy/ledger-state-osuus on superseded. RISK-022 omistaa hierarchical policy -scopejen, acceptance-portin, incomplete-matriisin ja scale-UI:n aktiiviset riskit.
+RISK-001–RISK-021 säilyttävät nykyiset tai historialliset riskit; RISK-022 omistaa aktiivisen v19:n riskit phase-09 cutoveriin asti. RISK-023 omistaa hyväksytyn Environment-targetin transition-, approval-, refinement- ja artifact-lifetime-riskit; se on avoin, koska implementation-evidenssi puuttuu.
 
 ## Riskirekisteri
 
@@ -48,6 +48,7 @@ RISK-001–RISK-021 säilyttävät nykyiset tai historialliset riskit; RISK-021:
 | RISK-020 | learning/promotion governance failure | Unknown cost voi muuttua nollaksi, global/local inclusive cost double-countata, biased/insufficient dataset promotoitua, shadow action tulkita counterfactualiksi tai live/running model vaihtua ilman exact approvalia. | korkea / mahdollinen | Accepted ADR-030: versioned dimensions, hierarchy attribution, immutable dataset/model/report lineage, explicit priors/thresholds, held-out+sensitivity evaluation, zero-shadow-dispatch, human activation/rollback ja snapshot immutability. QS-025/TEST-025/EVID-025. | Phase 2 unknown/attribution controlled; Phases 3–7 open |
 | RISK-021 | Reward-MDP misspecification, reward hacking ja puuttuva pilotti | Heikko default-priori, puuttuva Markov-feature, väärä outcome/penalty tai acceptance-obligaation huono granulariteetti voi valita inspectable mutta huonon policyn; tekninen hermetic Run ei todista tuotantokelpoisuutta. | korkea / mahdollinen | ADR-031, potential-based acceptance reward, immutable ID/paino, exact PPM/provenance, hard authorization, deterministic solver/absorption/tie/hash, bounded cardinality ja TEST-026. Tuotantokaltainen pilotti jää erilliseksi GRM-evid-005-portiksi. | compiler/runtime controls implemented; final gates and pilot open |
 | RISK-022 | Hierarchical scope drift, acceptance mismatch ja matrix scale | Global/local viitteet voivat driftata CRUDissa, incomplete cell estää ajon, terminal effect voi poiketa Validation-ledgeristä tai 40×40/64×64-matriisi voi leikata ydintoiminnon. | korkea / mahdollinen | ADR-033, node-derived ID:t, atomic rename/reference-blocked delete, per-scope absorption, exact effect gate `needs_input`, internal scroll/virtualization ja TEST-027. | implementation/browser/package controls passed; operational pilot open |
+| RISK-023 | Environment strict-cut isolation, approval integrity ja refinement artifact lifetime | Välivaiheen v19/vNext-data voi sekoittua; v16 replacement tai snapshot/continuation voi jäädä osittaiseksi; tracker/schedule-recovery voi monistaa vaikutuksen; agentti voi ohittaa human approvalin; stale exact diff tai shared Skill -muutos voi laajentaa vaikutusta; active-run authoring tai ennenaikainen successful-worktree cleanup voi rikkoa audit trailin. | erittäin korkea / mahdollinen | ADR-034, CTR-012, CON-015, DEP-005, erillinen vNext store, immutable snapshots, expected revision + human identity, exact base/diff/preimage hash, path allowlist + shared Skill reverse-impact preview, active-run lock, lease/idempotency, durable lineage before cleanup, TEST-028–TEST-032 ja phase-09 removal manifest. | accepted controls; implementation and fault-injection evidence pending |
 
 ## Riskien arviointiperiaate
 
@@ -81,6 +82,7 @@ RISK-011 ei valtuuta sivutehtävänä tehtävää laajaa refaktorointia. Warning
 | RISK-020 | Historiallinen TEST-025/EVID-025 audit trail | Superseded learning/promotion päätetään palauttaa. |
 | RISK-021 | TEST-026/EVID-026, MH-POLICY/MH-REWARD ja production-like Root Run | Reward, obligation, feature/action/outcome-katalogi, prior, authorization, solver bound tai strict version matrix muuttuu; pilotti poikkeaa olennaisesti mallista. |
 | RISK-022 | TEST-027/EVID-027, scope-tagged missit, incomplete-cell readiness ja 40/64 desktop/narrow QA | Node-ID/target/effect/reward/scope/version muuttuu; acceptance mismatch toistuu; matriisi overflowaa tai ydintoiminto leikkautuu. |
+| RISK-023 | TEST-028–TEST-032/EVID-028–EVID-032, v19/vNext cross-store sentinel, approval/revision/hash fault injection, schedule lease/restart, shared Skill reverse-impact, worktree retention ja removal grep-gatet | Target contract/version/path muuttuu; cross-read/write havaitaan; duplicate effect syntyy; proposal kirjoittaa ennen hyväksyntää; continuation lineage tai Critic read access puuttuu; phase-09 grep löytää aktiivisen old/vNext-pinnan. |
 
 ## Kanoniset lähteet
 
@@ -88,7 +90,7 @@ Tämä osio omistaa project-level-arkkitehtuuririskit. Initiative-kohtaiset risk
 
 ## Relevantit päätökset
 
-`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-022`, `adr-025`, `adr-027`, `adr-029` säilyvin osin ja `adr-033`.
+`adr-005`, `adr-006`, `adr-008`, `adr-011`, `adr-015`, `adr-016`, `adr-022`, `adr-025`, `adr-027`, `adr-029` säilyvin osin, aktiivinen `adr-033` ja target `adr-034`.
 
 ## Evidenssi
 
@@ -103,6 +105,7 @@ Migration-findingit, validoinnit, Root Run -outcomet, lint-outputit ja initiativ
 - RISK-015 on teknisesti kontrolloitu final gateillä. RISK-016:n live-smoke, RISK-017:n ihmisvisual review ja kaikkien kolmen tuotantokaltainen pilotointi pysyvät avoimina.
 - RISK-018/020 ovat superseded arkkitehtuurin historiallisia riskejä. RISK-019 pysyy open-tilassa final desktop/narrow-browser- ja ihmisusability-review'hun asti.
 - RISK-022 pysyy open-tilassa final gatejen jälkeenkin, kunnes tuotantokaltainen hierarchical Root Run ja sen scope/outcome/reward/acceptance-evidenssi on arvioitu.
+- RISK-023 pysyy open-tilassa, kunnes strict cutoverin cross-store-, approval-, fault-injection-, shared Skill impact-, retention- ja removal-evidenssi sekä rollback checkpoint on katselmoitu.
 
 ## Seuraava katselmointiperuste
 

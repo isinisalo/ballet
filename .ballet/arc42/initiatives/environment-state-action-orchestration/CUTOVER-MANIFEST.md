@@ -1,10 +1,10 @@
 ---
 id: environment-state-action-orchestration-cutover-manifest
 title: Environment State Action orchestration cutover manifest
-status: draft
+status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative

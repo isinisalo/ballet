@@ -3,8 +3,8 @@ id: arc42-section-08
 title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 20
+updatedAt: '2026-08-29'
+version: 21
 tags:
   - arc42
   - concepts
@@ -19,7 +19,7 @@ Tämä osio selittää useaan rakennusosaan vaikuttavat, laatutavoitteista johde
 
 ## Tila
 
-CON-001–CON-010 säilyvät yleisinä tai historiallisina konsepteina. CON-011/012 ovat vanhaa routing/learning-jakoa ja CON-013 single-policy-raja. CON-014 omistaa strict-v19 hierarchical Reward-MDP:n, erillisen acceptance-portin ja node-ID-omistajuuden.
+CON-001–CON-010 säilyvät yleisinä tai historiallisina konsepteina. CON-011/012 ovat vanhaa routing/learning-jakoa ja CON-013 single-policy-raja. CON-014 omistaa aktiivisen strict-v19 hierarchical Reward-MDP:n phase-09 cutoveriin asti. CON-015 omistaa hyväksytyn Validation-led Environment-targetin poikkileikkaavat invariantit.
 
 ## Konseptikartta
 
@@ -39,6 +39,7 @@ CON-001–CON-010 säilyvät yleisinä tai historiallisina konsepteina. CON-011/
 | CON-012 | Finite policy boundary: Capability Model omistaa outcomes/actions/hard guards; bounded Decision State projisoi Markov-relevantit canonical factsit; Decision Model omistaa `P(outcome,nextState|state,action)`/cost/terminalit; sama solver tuottaa global/local Q/V/actionin; actual state tulee aina projectorilta. Policy Projection on derived evidence ja Execution Graph factual observations. Hard controls poistavat actionin `A(s)`:stä, probabilityt/costit eivät mutatoidu runtime-observationista. | BB-001–BB-005, BB-011, BB-012 | QS-002, QS-012, QS-013, QS-021–QS-025 | ADR-026, ADR-028, ADR-030, config v17/snapshot v10/observation v3/SQLite v13, RT-016/RT-019 |
 | CON-013 | Historiallinen single Graph Reward-MDP boundary. Outcome-aware reward, immutable authorization ja deterministic compiler säilyvät CON-014:ssä; ledger-state-katalogi ja single policy eivät. | BB-013 | QS-026 | ADR-031, RT-020 |
 | CON-014 | Hierarchical node-owned policy boundary: `S=A` johdetaan GraphNode- tai ActionNode-ID:istä; terminalit ovat branch targetteja; Graph/local policyt compileerataan erikseen; observed typed outcome valitsee branchin; acceptance-ledger/effectit portitetaan Graph-rajalla eikä niitä mallinneta local stateksi/rewardiksi. | BB-001–BB-005, BB-009, BB-014 | QS-002, QS-003, QS-012, QS-013, QS-027 | ADR-033, config v19/snapshot v12/decision+observation v5/SQLite v15, RT-025 |
+| CON-015 | Validation-led Environment integrity: approved Use Case ja immutable snapshot rajaavat Runin; unique State order / Action priority määräävät etenemisen; runtime status johtaa `done`/`blocked`-arvot; Validation yksin ohjaa precheck/Work/postwork/retryn; blocked+Feedback on atominen; Critic/Refinement vaativat typed human approvalin; exact hash -apply luo immutable continuation Runin. | BB-001–BB-008, BB-010, BB-015 | QS-028–QS-032 | ADR-034, Project Config v20 / Snapshot v13 / role v10 / composition v11 / ExecutionSpec v12 / SQLite v16 / Feedback-Critic-Refinement v1, RT-026–RT-028 |
 
 ## Turvallisuus ja auktorisointi
 
@@ -65,6 +66,9 @@ Authentication-palvelua ei lisätä loopback-arkkitehtuuriin implisiittisesti. T
 | `tk` adapteri | Capability probe, strict JSONL/Markdown, external-ref, parent/dependency, cycle, cwd/store, timeout ja output limit. | Preflight issue tai pending/error outbox. | Root Run/provider/transition ei etene; ulkoinen osittainen vaikutus sovitetaan Resume/startupissa. |
 | UI projection | Shared DTO ja exhaustive presentation mapping. | Unknown/explicit unavailable; ei arvattua tilaa. | Display-only; canonical data ei muutu. |
 | Draft Reward-MDP | Node-derived ID:t, explicit initial, sparse required cells, unique outcomes, exact ppm, targetit, local emit, guards, integer rewardit, absorption ja stable tie-break per scope. | Typed model/state/solver issue. | Action/dispatch = 0 ja project model ennallaan. |
+| Target Environment | Approved Use Case trace, unique positive `order`/`priority`, instruction headings, resource closure, permissions ja active-run lock. | Typed vNext/target issue phaseen mukaan. | Run/queue/worktree = 0; v19-dataa ei lueta tai kirjoiteta. |
+| Target Validation/outcome | Roolikohtainen enum, attempt/revision, `1 + maxRetries`, status transition ja atomic Feedback invariantti. | Typed semantic tai provider failure; niitä ei muunneta toisikseen. | Invalidi outcome = 0 statusmuutosta; blocked/retry exhaustion = yksi status+Feedback-commit. |
+| Critic/Refinement approval | Proposal state, human identity, expected revision, base/diff/preimage hash, allowed path ja authoring lock. | Conflict/rejected/expired/approved typed result. | Ennen hyväksyntää tai driftissä repository/Feedback/continuation-muutoksia 0. |
 
 Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logirivi tai providerin teksti ei yksinään muuta control flow’ta. Retry on rajattu runtime-sääntö, ei yleinen “catch and try again” -käytäntö.
 
@@ -83,6 +87,8 @@ Virheet ovat domain-faktoja vain, kun ne on persistentoitu oikeaan storeen. Logi
 Compositionin järjestys, resolved resource -sisältö, role schema, Task Envelope ja hash ovat osa suoritusevidenssiä. Provider tai adapteri ei valitse toista profiilia, mallia, instructionia tai skilliä puuttuvan tilalle. Runtime muodostaa hard `A(s)`:n immutable authorization-snapshotista; providerin teksti tai project State ei voi laajentaa joukkoa. Graph Node Module canonicalization tuottaa sisältöpohjaisen hashin; asennettu provenance kertoo, mistä materialisoitu project-local-sisältö on peräisin. Immutable Root Run -snapshot estää myöhempää config-muutosta muuttamasta ajon selitystä.
 
 CON-014 ulottaa saman provenance-periaatteen jokaiseen policy-scopeen: canonical node-ID/action/outcome/target/reward/solver JSON tuottaa scopekohtaisen model hashin. Integer-mikroyksiköt, exact PPM, iteration count, residual sekä Q/V/policy hash ovat decision evidenceä. Scope-tagged observation viittaa immutableen modeliin mutta ei mutatoi sitä.
+
+CON-015 korvaa phase-09 cutoverissa policy-provenancen execution-lineagella: approved Use Case, target config hash, Root Snapshot, Action status revision, Validation/Work invocationit, Feedback, proposal, human approval, exact diff/preimage, commit ja continuation parent ovat append-only-viitteitä. Product Snapshot projisoi tämän lineage-ketjun mutta ei omista sitä.
 
 ## Evidenssi, observability ja tietoluokitus
 
@@ -116,6 +122,7 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 - Visuaalinen card status tai Job-flow artwork/yhteys auttaa lukemista mutta ei muodosta uutta runtime-tilaa.
 - Draft policy UI erottaa Configure-owned Capability/Reward Decision Modelin Run-owned Decision State/acceptance/policy evidence/Execution Graphista. Compiled policy -projektio ei ole tallennettu Current Plan eikä dispatch authority UI:ssa.
 - Prosenttia, ETA:a, elapsed-telemetriaa tai provider-tekstistä pääteltyä statusta ei esitetä, ellei tuleva kanoninen sopimus ja ADR sitä erikseen määritä.
+- Target UI käyttää DESIGN target appendixia: Direction, Use Cases, ordered Environment/State/Action, Validation-led flow, Run Gate, Feedback Box, Critic review, exact refinement approval ja Product Snapshot. Se ei näytä freeform graph topologyä tai reward/policy-matriisia. Phaseissa 02–08 tämä projektio pysyy `/vnext`-reitillä eikä muuta aktiivista v19-projektiota.
 
 ## Versiointi ja yhteensopivuus
 
@@ -125,6 +132,7 @@ Lokit tukevat diagnoosia, mutta vakaat ID:t ja canonical store -faktat tukevat h
 - SQLite schema v15 käyttää GraphNode-/ActionNode-/Work/Validation-invocationeja sekä append-only scope-tagged policy decision/observation/acceptance-evidenssiä. Vanhaa tietokantaa ei migroida automaattisesti, vaan käynnistys antaa täsmällisen remediation-ohjeen ja epäonnistuu suljetusti.
 - Arc42/frontmatter stable ID säilyy sisältöpäivityksessä; `version` kasvaa vain semanttisesta dokumenttimuutoksesta.
 - Hyväksytty ADR ei muutu hiljaisesti; uusi päätös supersedoi sen eksplisiittisesti.
+- Target käyttää strict Project Config v20 / Snapshot v13 / Task+role v10 / composition v11 / ExecutionSpec v12 / SQLite v16 / Feedback-Critic-Refinement v1 -matriisia. Phaseissa 02–08 se ei lue tai kirjoita v19/v15-dataa; phase 09 poistaa old/vNext-pinnat yhtä aikaa ilman migraatiota, readeria, aliasia tai dual-writeä.
 
 ## Kanoniset lähteet
 
@@ -132,13 +140,15 @@ ADR:t omistavat päätökset, `DESIGN.md` UI-järjestelmän, source/shared schem
 
 ## Relevantit päätökset
 
-`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-020`, `adr-025` ja `adr-033`. ADR-023:n sekä ADR-026–032:n supersedoidut osat säilyvät vain historiallisena audit trailina.
+`adr-002`, `adr-005`–`adr-008`, `adr-011`–`adr-016`, `adr-020`, `adr-025`, aktiivinen `adr-033` ja target `adr-034`. ADR-023:n sekä ADR-026–032:n supersedoidut osat säilyvät vain historiallisena audit trailina.
 
 ## Evidenssi
 
 Konseptit mapittuvat BB-, RT-, DEP- ja QS-tunnisteisiin. TRACEABILITY nimeää testit ja evidenssit; tämän dokumentaatiotyön conformance review tarkistaa, ettei kuvaus väitä runtime-sopimuksen muutosta.
 
 CON-014:n toteutusevidenssi on TEST-027/EVID-027-ketjussa; tuotantokaltainen Reward-MDP-pilotti pysyy avoimena.
+
+CON-015:n target-evidenssi on TEST-028–TEST-032/EVID-028–EVID-032-ketjussa ja vielä pending.
 
 ## Avoimet kysymykset
 

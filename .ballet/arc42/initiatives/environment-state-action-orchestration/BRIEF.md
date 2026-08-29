@@ -1,10 +1,10 @@
 ---
 id: environment-state-action-orchestration-brief
 title: Environment State Action orchestration initiative brief
-status: draft
+status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -13,48 +13,55 @@ tags:
 
 # Environment State Action orchestration BRIEF
 
-## Purpose and status
+## Purpose and decision
 
-Define and deliver a strict semantic cut from the accepted hierarchical Reward-MDP baseline to human-directed, approved-Use-Case orchestration whose canonical project hierarchy is Environment → State → Action and whose runtime is Validation-led. This copy begins `draft`; implementation is not authorized by the audit phase.
+Deliver the project-owner-approved strict semantic cut from hierarchical Reward-MDP orchestration to human-directed, approved-Use-Case orchestration whose canonical project hierarchy is Environment → State → Action and whose runtime is Validation-led. `goal-022`, `adr-034` and [TARGET-CONTRACT.md](TARGET-CONTRACT.md) own WHAT/WHY, architecture and bounded target semantics.
 
-## Fact
+## Facts
 
-The verified baseline is strict v19 hierarchical Graph/GraphNode/ActionNode orchestration. Exact symbols, tests, routes and removal surfaces are recorded in [AUDIT.md](AUDIT.md) and [CUTOVER-MANIFEST.md](CUTOVER-MANIFEST.md).
-
-## Decision
-
-The project owner supplied the target WHAT/WHY, strict no-migration/no-alias/no-dual-write boundary and local-commit authority on 2026-08-29. The architecture Goal, superseding ADR, measurable quality scenarios and target contract are created in the following architecture phase before production code changes.
+- **ESAO-F-001:** the baseline is commit `13d9c8d93acb56d569613aa7aa1bd5027317cce1`, strict v19/v4/v7/v12/v9/v10/v11/v5/v15 and Work-first Graph/GraphNode policy runtime.
+- **ESAO-F-002:** [AUDIT.md](AUDIT.md) binds exact symbols, routes, tests, project data, release smoke and drift; [CUTOVER-MANIFEST.md](CUTOVER-MANIFEST.md) owns phase/removal surfaces.
+- **ESAO-F-003:** active baseline has no Critic schedule, Feedback Box, refinement approval/apply or continuation-run domain.
 
 ## Stakeholders and expectations
 
-- Human project owner: approves Use Cases, architecture decisions, Critic proposals and exact refinement applications.
-- Operator: sees deterministic State/Action order, gates, blocked Feedback and immutable continuation/Product Snapshot evidence.
-- Validation Agent: controls precheck, Work delegation, postwork retry and blocked decisions within strict output schemas.
-- Work Agent: performs only delegated work under the immutable execution permission boundary.
+- Human project owner approves Use Cases, architecture choices, Critic proposals and exact refinement effects.
+- Operator sees deterministic ordering, factual gates, blocked Feedback, approvals, continuation lineage and Product Snapshot evidence.
+- Validation Agent controls precheck, Work delegation, postwork retry/block and cannot approve proposals.
+- Work Agent performs only the delegated dynamic prompt inside immutable permissions.
 
 ## Scope
 
-Target contracts v20/v13/v10/v11/v12/v16, ordered project/runtime model, Feedback/Critic/Refinement v1, strict persistence/API/UI cut, target project data and instructions, responsive UI, removal manifest and full release/startup validation.
+- UC-01..UC-13 in the Target Contract.
+- Project Config v20, Snapshot v13, Task/outcome v10, composition v11, ExecutionSpec v12, SQLite v16 and Feedback/Critic/Refinement v1.
+- Direction, approved Use Cases, ordered authoring/runtime, human approval commands, exact refinement, immutable continuation and Product Snapshot.
+- Isolated phases 02–08, atomic phase 09 canonical cut, project/release/docs phase 10 and full acceptance phase 11.
 
 ## Non-goals
 
-No migration, compatibility reader, route alias, dual-write, autonomous human approval, standalone State/Action Run, merge, push, release or deploy. Historical Goal/ADR/initiative evidence remains in Git.
+No migration, compatibility reader, route alias, dual-write, autonomous human approval, standalone State/Action Run, mutable in-place refinement, merge, push, release or deploy. Historical Goal/ADR/initiative evidence remains in Git.
 
 ## Constraints and context interfaces
 
-Preserve checkout-local operation, immutable snapshots, provider neutrality, ExecutionProfiles, managed worktrees, resource hashes, queue/events, strict SQLite replacement, loopback/origin security, factual SSE, explicit external-write authority and the existing dark design tokens.
+Preserve checkout-local operation, provider neutrality, ExecutionProfiles, immutable snapshots, managed-worktree isolation, explicit resource composition/hashes, queue/events, strict SQLite replacement, loopback/origin security, factual SSE, tracker reconciliation, external-write authority and existing design tokens. VNext and v19 are data-isolated and never dual-write.
 
-## Quality intent
+## Quality goals
 
-Priority-1 criteria will require deterministic unique ordering, zero premature State dispatch, exact `1 + maxRetries`, atomic blocked+Feedback exhaustion, zero unapproved Critic/refinement writes, exact path/preimage-hash refinement, immutable continuation lineage, zero active legacy/vNext surfaces and zero clipped core action/page overflow at 1440×900 and 390×844. Evidence remains pending until the named tests run.
+- `QS-028`: exact ordering, no premature State progression, Validation-first role restrictions and `1 + maxRetries`.
+- `QS-029`: atomic Feedback, Critic schedule idempotency and human-only approval.
+- `QS-030`: read-only exact refinement, stale no-write and immutable commit/continuation lineage.
+- `QS-031`: factual, keyboard-accessible, overflow-free target UI at 1440×900 and 390×844.
+- `QS-032`: exact target versions and zero active legacy/vNext surface after cutover.
+
+All are priority 1. Their complete stimulus/response/criteria live in arc42 section 10; `TEST-028`–`TEST-032` and `EVID-028`–`EVID-032` own verification status.
 
 ## Assumptions, findings and open questions
 
-- **Assumption ESAO-A-001:** the 13 supplied semantic user outcomes can be normalized into stable UC-01..UC-13 without expanding product scope.
-- **Finding ESAO-F-001:** successful worktree cleanup currently precedes any Critic read lifecycle.
-- **Finding ESAO-F-002:** active runtime has no schedule or approval command primitive.
-- **Open question ESAO-OQ-001:** none blocks the architecture phase because the owner has already fixed the target semantics and version policy; implementation-specific choices must remain inside the approved contract.
+- **Assumption ESAO-A-001:** no production database must be preserved; strict fail-closed replacement is authorized.
+- **Finding ESAO-F-004:** successful Run worktree cleanup must be reconciled with Critic-readable immutable artifact evidence in phase 06.
+- **Finding ESAO-F-005:** the seven shared arc42 Skills require reverse-impact closure for refinement safety.
+- **Open question:** none blocks phases 02–11 inside the accepted Target Contract. Any scope-changing choice returns `needs_input` and requires a new human decision/ADR.
 
-## Acceptance intent and next action
+## Acceptance intent and authority
 
-The next approved action is architecture/governance definition only: create the accepted Goal/ADR, Target Contract, traceability and bounded transition exception. Production behavior remains unchanged until phase 02.
+Completion requires every priority-1 QS, UC trace, manifest removal gate, full repository gate, browser viewport, release/install/startup smoke and clean status. Compilation alone is insufficient. The owner's 2026-08-29 request approves this audit/architecture work and its two local documentation commits only; phase 02+ production-code work requires a later explicit request. Merge, push, release and deploy remain unauthorized.

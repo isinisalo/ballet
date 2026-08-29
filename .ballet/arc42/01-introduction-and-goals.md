@@ -3,8 +3,8 @@ id: arc42-section-01
 title: Johdanto ja tavoitteet
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-23'
-version: 18
+updatedAt: '2026-08-29'
+version: 19
 tags:
   - arc42
   - requirements
@@ -19,6 +19,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 
 ## Tila ja väitteiden luokittelu
 
+- **Hyväksytty tavoite:** `goal-022` / `REQ-022`, `adr-034` ja initiative `environment-state-action-orchestration` määrittävät strict Environment→State→Action -cutoverin. Ne ovat hyväksytty arkkitehtuurisopimus, mutta eivät vielä aktiivinen runtime.
 - **Hyväksytty päätös:** `goal-021` / `REQ-021` ja `adr-033` omistavat aktiivisen hierarkkisen Graph/GraphNode Reward-MDP:n. `goal-020` / `adr-031` / `adr-032` ovat superseded niiden eksplisiittisesti nimetyiltä osilta.
 - **Toteutettu fakta:** nykyinen työpuu sisältää strict-v19 Graph/GraphNode/ActionNode-domainin, Snapshot v12 / decision+observation v5 / SQLite v15 -runtime-evidenssin, erikseen compiled global/local-policyt ja 5×5/N×N-authoringin.
 - **Hyväksytty domain:** viisi GraphNodea ja 17 ActionNodea ovat project-local baseline. Graph Node Module v7 kantaa kokonaisen local policyn; peer-GraphNode-matriisi ja acceptance pysyvät project-globalina.
@@ -50,6 +51,7 @@ Ballet on yhteen Git-checkoutiin rajattu komentokeskus, jolla projektin omistaja
 | REQ-019 | goal-019 | Historiallinen offline calibration/promotion -vaihe. | Superseded; observations ovat immutable audit evidenceä eivätkä muuta tai promotoi mallia. | QS-025 (historical) |
 | REQ-020 | goal-020 | Historiallinen yhden Graph Reward-MDP:n vaihe. | Outcome-aware reward, hard authorization ja deterministic compiler säilyvät ADR-033:ssa; single-policy/ledger-state/array-order ovat superseded. | QS-026 (historical) |
 | REQ-021 | goal-021 | Valitse GraphNode globaalilla node-ID-policylla ja ActionNode GraphNoden omalla node-ID-policylla niin, että acceptance-ledger säilyy erillisenä evidenssiporttina. | Strict v19/v4/v7/v12/v5/v15, erilliset immutable global/local-policyt, exact local-terminal→Graph-outcome→ledger-portti ja semanttinen 5×5/N×N CSS-grid. | QS-027 |
+| REQ-022 | goal-022 | Ohjaa hyväksyttyjen Use Casejen toteutusta järjestetyllä Environment→State→Action-mallilla, Validation-led-laatuportilla, näkyvällä Feedbackillä sekä ihmisen hyväksymillä Critic- ja Refinement-siirtymillä ilman ennenaikaista State-etenemistä. | Target Contract, ADR-034, immutable Environment Run, johdetut runtime-tilat, exact refinement -hyväksyntä ja strict phase-09 cutover. | QS-028–QS-032 |
 
 Täydelliset mitattavat skenaariot ja evidenssistatukset ovat [osiossa 10](10-quality-requirements.md), ja päästä päähän -ketjut ovat [TRACEABILITYssa](TRACEABILITY.md).
 
@@ -76,7 +78,7 @@ Prioriteettijärjestys on hyväksytty Goal- ja ADR-korpuksessa. Yksittäinen ini
 
 ## Rajaus
 
-Ballet omistaa yleiset Graph-, GraphNode-, aggregate Action Node-, Work/Validation-, scopekohtaiset Reward-MDP-, acceptance-, authorization-, runtime-, provider-, persistence- ja authoring-primitivet. Roadmap-, milestone-, release- ja arc42-menettelyt ovat project-local-dataa. Tilit, keskitetty control plane, schedule, standalone Action Node Run, vapaa policy-state-katalogi, Repair-rooli, automaattinen merge/push sekä yleinen projektinhallintapalvelu ovat rajauksen ulkopuolella.
+Aktiivinen v19 omistaa yleiset Graph-, GraphNode-, aggregate Action Node-, Work/Validation-, scopekohtaiset Reward-MDP-, acceptance-, authorization-, runtime-, provider-, persistence- ja authoring-primitivet phase-09 cutoveriin asti. Hyväksytty tavoite korvaa nämä Environment-, State-, Action-, Validation-led-, Feedback-, Critic-, Refinement-, continuation- ja Product Snapshot -primitiveillä; standalone State- tai Action-runeja ei tule. Roadmap-, milestone-, release- ja arc42-menettelyt pysyvät project-local-datana. Tilit, keskitetty control plane, automaattinen agenttihyväksyntä, automaattinen merge/push sekä yleinen projektinhallintapalvelu ovat rajauksen ulkopuolella.
 
 ## Kanoniset lähteet
 
@@ -87,7 +89,7 @@ Ballet omistaa yleiset Graph-, GraphNode-, aggregate Action Node-, Work/Validati
 
 ## Relevantit päätökset
 
-`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin sekä `adr-033`.
+`adr-001`, `adr-002`, `adr-011`, `adr-015`, `adr-016`, `adr-025`, `adr-027`, `adr-029` säilyvin osin, aktiivinen `adr-033` phase-09 cutoveriin asti sekä hyväksytty tavoitepäätös `adr-034`.
 
 ## Evidenssi
 

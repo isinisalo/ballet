@@ -21,6 +21,14 @@ Nämä ohjeet koskevat koko repositoriota. Noudata niitä aina, kun muutat, suun
 - Käytä Graph/Graph Node -canvaksilla deterministic multi-ring-layoutia, Decision Modeleissa sticky/scrollattavaa ja yli 20 rivillä virtualisoitua semantic CSS-gridiä sekä Action-tasolla deterministic wide/narrow-flow-layoutia. Hyväksymisfixturet ovat 1/5/40 GraphNodea ja 1/17/64 ActionNodea; tavoite on nolla node-overlapia, nolla sivutason vaakaylivuotoa ja nolla leikattua ydintoimintoa desktop- ja narrow-viewporteissa.
 - Domain-, runtime-, schema-, reititys- tai terminologiamuutos ei itsessään oikeuta canvas-kielen vaihtoon. Uusi tarkoituksellinen visualisointipäätös vaatii supersedoivan ADR:n, `DESIGN.md`-päivityksen ja desktop/narrow ennen/jälkeen-selain-QA:n.
 
+## Määräaikainen Environment transition
+
+- `goal-022`, `adr-034` ja `.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md` hyväksyvät Environment → State → Action- ja Validation-led-targetin. Nykyinen strict-v19 Graph/Reward-MDP-toteutus ja yllä oleva suojattu UI pysyvät canonical baseline -pintana phase 09:n atomiseen cutoveriin asti.
+- Phases 02–08 saavat toteuttaa targetin vain eristetyssä vNext-namespace/hakemistossa sekä väliaikaisilla `/api/vnext`- ja `/vnext`-routeilla. VNext ei saa lukea eikä kirjoittaa v19-dataa, eikä v19 saa lukea tai kirjoittaa vNext-dataa. Dual-write, compatibility reader, migraatio ja route alias ovat kiellettyjä.
+- Väliaikainen vNext-koodi ei ole compatibility layer. Jokaisella väliaikaisella tyypillä, taululla, reitillä, testillä ja UI-pinnalla on `.ballet/arc42/initiatives/environment-state-action-orchestration/CUTOVER-MANIFEST.md`:n phase 09 removal/canonicalization gate.
+- Phase 09 poistaa vanhan active Graph/GraphNode/ActionNode-, Reward-MDP-, policy-, acceptance-ledger- ja Graph Node Module -pinnan sekä canonicalisoi vNextin yhdessä leikkauksessa. Lopullisessa branchissa ei saa olla vNext-prefixiä tai vanhaa aktiivipolkua.
+- Phases 07–08:n vNext-UI saa käyttää `DESIGN.md`:n Target design appendix -authoritya. Se säilyttää nykyiset dark tokenit, typografian, spacingin, radiukset, densityn ja saavutettavuusperiaatteet, mutta ei muuta protected v19 Graph-canvaksia sivutehtävänä.
+
 ## Validointi
 
 - Aja `npm run validate:arc42`, kun muutos vaikuttaa `.ballet/arc42/**`, `.ballet/project.json`, `.ballet/instructions/**`, `.agents/skills/**` tai arkkitehtuurin source-of-truth-sopimukseen.
