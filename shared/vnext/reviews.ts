@@ -1,6 +1,6 @@
 import type { TimestampedApproval } from "./primitives.js";
 
-export type FeedbackSource = "validation_blocked" | "retry_exhaustion" | "approved_critic_proposal";
+export type FeedbackSource = "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal";
 
 export interface FeedbackEntry {
   id: string;

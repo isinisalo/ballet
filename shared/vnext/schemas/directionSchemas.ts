@@ -3,7 +3,7 @@ import { hasValidUseCaseApproval } from "../direction.js";
 import { VNEXT_LIMITS } from "../limits.js";
 import { idListSchema, idSchema, nonEmptyTextSchema, sha256Schema, timestampSchema } from "./common.js";
 
-const directionReferenceSchema = z.object({
+export const directionReferenceSchema = z.object({
   id: idSchema,
   name: nonEmptyTextSchema,
   status: z.enum(["draft", "accepted", "superseded"])

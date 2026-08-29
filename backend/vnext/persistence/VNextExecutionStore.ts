@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type {
-  CreateAgentRunInput, ExecutionEventSeed, ExecutionTaskSeed, JsonValue, StoredAgentRun
+  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV12, ExecutionTaskSeed, JsonValue, StoredAgentRun
 } from "../../../shared/vnext/index.js";
 import { canonicalJson, sha256 } from "../../../shared/vnext/primitives.js";
 import { executionSpecV12Schema } from "../../../shared/vnext/schemas/executionSchemas.js";
@@ -14,6 +14,14 @@ export interface AppliedAgentOutcome {
   applied: boolean;
 }
 
+export interface StoredExecutionTask {
+  taskId: string;
+  agentRunId: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  providerOutcomeKey?: string;
+  spec: ExecutionSpecV12;
+}
+
 export class VNextExecutionStore {
   constructor(private readonly connection: () => Database.Database) {}
 
@@ -25,12 +33,12 @@ export class VNextExecutionStore {
     assertHash(envelope, input.taskEnvelopeHash, "Task Envelope");
     this.connection().prepare(`
       INSERT INTO agent_runs (
-        agent_run_id, environment_run_id, action_execution_id, critic_run_id, refinement_run_id,
+        agent_run_id, environment_run_id, action_execution_id, parent_agent_run_id, critic_run_id, refinement_run_id,
         role, phase, status, attempt, task_envelope_version, task_envelope_json, task_envelope_hash,
         input_json, context_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, 10, ?, ?, ?, ?, ?, ?)
-    `).run(input.agentRunId, input.environmentRunId, input.actionExecutionId ?? null, input.criticRunId ?? null,
-      input.refinementRunId ?? null, input.role, input.phase, input.attempt, canonical(envelope),
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, 10, ?, ?, ?, ?, ?, ?)
+    `).run(input.agentRunId, input.environmentRunId, input.actionExecutionId ?? null, input.parentAgentRunId ?? null,
+      input.criticRunId ?? null, input.refinementRunId ?? null, input.role, input.phase, input.attempt, canonical(envelope),
       input.taskEnvelopeHash, json(input.input), json(input.context), input.createdAt, input.createdAt);
     return this.requireAgent(input.agentRunId);
   }
@@ -68,6 +76,20 @@ export class VNextExecutionStore {
     return { agent: this.requireAgent(agentRunId), applied: true };
   }
 
+  failAgent(agentRunId: string, providerOutcomeKey: string, errorCode: string, errorMessage: string, at: string): boolean {
+    const existing = this.requireAgent(agentRunId);
+    if (["completed", "failed", "cancelled", "interrupted"].includes(existing.status)) {
+      if (existing.status === "failed" && existing.providerOutcomeKey === providerOutcomeKey) return false;
+      throw new VNextConflictError(`Agent Run ${agentRunId} already has a different terminal outcome.`);
+    }
+    const updated = this.connection().prepare(`
+      UPDATE agent_runs SET status = 'failed', revision = revision + 1, provider_outcome_key = ?,
+        error_code = ?, error_message = ?, completed_at = ?, updated_at = ?
+      WHERE agent_run_id = ? AND revision = ? AND status IN ('queued','running')
+    `).run(providerOutcomeKey, errorCode, errorMessage, at, at, agentRunId, existing.revision);
+    return updated.changes === 1;
+  }
+
   createTask(input: ExecutionTaskSeed): void {
     const spec = executionSpecV12Schema.parse(input.spec);
     assertHash(spec, input.specHash, "ExecutionSpec");
@@ -89,6 +111,27 @@ export class VNextExecutionStore {
       `).run(spec.taskId, spec.createdAt, spec.agentRunId);
       if (attached.changes !== 1) throw new VNextConflictError(`Agent Run ${spec.agentRunId} cannot accept a task.`);
     })();
+  }
+
+  requireTask(executionTaskId: string): StoredExecutionTask {
+    const row = this.connection().prepare(`
+      SELECT execution_task_id, agent_run_id, status, provider_outcome_key, spec_json
+      FROM execution_tasks WHERE execution_task_id = ?
+    `).get(executionTaskId) as Record<string, unknown> | undefined;
+    if (!row) throw new VNextNotFoundError(`Execution task ${executionTaskId} was not found.`);
+    return {
+      taskId: String(row.execution_task_id), agentRunId: String(row.agent_run_id),
+      status: row.status as StoredExecutionTask["status"],
+      providerOutcomeKey: row.provider_outcome_key === null ? undefined : String(row.provider_outcome_key),
+      spec: executionSpecV12Schema.parse(JSON.parse(String(row.spec_json)))
+    };
+  }
+
+  pendingTasks(): StoredExecutionTask[] {
+    const rows = this.connection().prepare(`
+      SELECT execution_task_id FROM execution_tasks WHERE status = 'queued' ORDER BY created_at, execution_task_id
+    `).all() as Array<{ execution_task_id: string }>;
+    return rows.map(({ execution_task_id }) => this.requireTask(execution_task_id));
   }
 
   appendEvent(executionTaskId: string, event: ExecutionEventSeed): void {

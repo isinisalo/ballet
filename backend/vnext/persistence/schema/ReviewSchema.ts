@@ -24,7 +24,7 @@ export const vNextReviewSchema = `
 
   CREATE TABLE feedback_entries (
     feedback_entry_id TEXT PRIMARY KEY,
-    source TEXT NOT NULL CHECK (source IN ('validation_blocked','retry_exhaustion','approved_critic_proposal')),
+    source TEXT NOT NULL CHECK (source IN ('validation_blocked','retry_exhaustion','system_invalid_output','approved_critic_proposal')),
     category TEXT NOT NULL,
     target_type TEXT NOT NULL CHECK (target_type IN ('environment','state','action','resource')),
     target_id TEXT NOT NULL,

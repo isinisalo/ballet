@@ -42,6 +42,7 @@ export interface CreateAgentRunInput {
   actionExecutionId?: string;
   criticRunId?: string;
   refinementRunId?: string;
+  parentAgentRunId?: string;
   role: AgentRunRole;
   phase: AgentRunPhase;
   attempt: number;
@@ -54,7 +55,7 @@ export interface CreateAgentRunInput {
 
 export interface FeedbackSeed {
   feedbackEntryId: string;
-  source: "validation_blocked" | "retry_exhaustion" | "approved_critic_proposal";
+  source: "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal";
   category: string;
   targetType: "environment" | "state" | "action" | "resource";
   targetId: string;

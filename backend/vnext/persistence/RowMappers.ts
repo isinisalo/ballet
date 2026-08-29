@@ -35,6 +35,7 @@ const actionRowSchema = z.object({
 
 const agentRowSchema = z.object({
   agent_run_id: z.string(), environment_run_id: z.string(), action_execution_id: nullableString,
+  parent_agent_run_id: nullableString,
   critic_run_id: nullableString, refinement_run_id: nullableString,
   role: z.enum(["validation", "work", "critic", "refinement"]), phase: z.enum(["precheck", "work", "postwork", "proposal"]),
   status: z.enum(["queued", "running", "completed", "failed", "cancelled", "interrupted"]),
@@ -86,6 +87,7 @@ export const toAgentRun = (value: unknown): StoredAgentRun => {
   const row = agentRowSchema.parse(value);
   return {
     agentRunId: row.agent_run_id, environmentRunId: row.environment_run_id,
+    parentAgentRunId: optional(row.parent_agent_run_id),
     actionExecutionId: optional(row.action_execution_id), criticRunId: optional(row.critic_run_id),
     refinementRunId: optional(row.refinement_run_id), role: row.role, phase: row.phase, status: row.status,
     revision: row.revision, attempt: row.attempt, providerOutcomeKey: optional(row.provider_outcome_key),

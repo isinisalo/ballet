@@ -80,6 +80,7 @@ export const vNextCoreSchema = `
     agent_run_id TEXT PRIMARY KEY,
     environment_run_id TEXT NOT NULL REFERENCES environment_runs(environment_run_id) ON DELETE CASCADE,
     action_execution_id TEXT REFERENCES action_executions(action_execution_id) ON DELETE CASCADE,
+    parent_agent_run_id TEXT REFERENCES agent_runs(agent_run_id) ON DELETE RESTRICT,
     critic_run_id TEXT REFERENCES critic_runs(critic_run_id) ON DELETE CASCADE,
     refinement_run_id TEXT REFERENCES refinement_runs(refinement_run_id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('validation','work','critic','refinement')),
@@ -115,7 +116,7 @@ export const vNextCoreSchema = `
     environment_run_id TEXT NOT NULL REFERENCES environment_runs(environment_run_id) ON DELETE CASCADE,
     sequence INTEGER NOT NULL CHECK (sequence >= 1),
     kind TEXT NOT NULL CHECK (kind IN (
-      'environment_started','state_activated','action_selected','validation_precheck_dispatched',
+      'environment_started','state_activated','action_selected','action_imported','validation_precheck_dispatched',
       'validation_precheck_done','work_dispatched','work_completed','validation_postwork_dispatched',
       'validation_done','validation_retry','action_blocked','feedback_created','state_completed',
       'environment_completed','environment_blocked','environment_cancelled','execution_interrupted',

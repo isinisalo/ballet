@@ -92,12 +92,14 @@ describe("Validation-led Action transactions", () => {
     });
     let current = context.outcomes.applyPrecheck({
       agentRunId: "precheck-1", providerOutcomeKey: "precheck-terminal", expectedActionRevision: 2,
-      outcome: delegated, nextWork: agentRunInput("work-1", "work", 1), completedAt: TEST_AT
+      outcome: delegated, nextWork: { ...agentRunInput("work-1", "work", 1), parentAgentRunId: "precheck-1" }, completedAt: TEST_AT
     });
     expect(current).toMatchObject({ status: "working", workAttempt: 1 });
     current = context.outcomes.applyWork({
       agentRunId: "work-1", providerOutcomeKey: "work-terminal", expectedActionRevision: current.revision,
-      outcome: workOutcome(), nextValidation: agentRunInput("postwork-1", "postwork", 1), completedAt: TEST_AT
+      outcome: workOutcome(), nextValidation: {
+        ...agentRunInput("postwork-1", "postwork", 1), parentAgentRunId: "work-1"
+      }, completedAt: TEST_AT
     });
     expect(current.status).toBe("postchecking");
     const done = validationOutcome({ phase: "postwork", decision: "done", evidence: {} });
@@ -122,11 +124,17 @@ describe("Validation-led Action transactions", () => {
     action = context.outcomes.applyPrecheck({
       agentRunId: "precheck-1", providerOutcomeKey: "precheck-terminal", expectedActionRevision: 2,
       outcome: validationOutcome({ phase: "precheck", decision: "delegate", workPrompt: "Perform the work", evidence: {} }),
-      nextWork: agentRunInput("work-1", "work", 1, action.actionExecutionId, "run-1", "Perform the work", 0), completedAt: TEST_AT
+      nextWork: {
+        ...agentRunInput("work-1", "work", 1, action.actionExecutionId, "run-1", "Perform the work", 0),
+        parentAgentRunId: "precheck-1"
+      }, completedAt: TEST_AT
     });
     action = context.outcomes.applyWork({
       agentRunId: "work-1", providerOutcomeKey: "work-terminal", expectedActionRevision: action.revision,
-      outcome: workOutcome(), nextValidation: agentRunInput("postwork-1", "postwork", 1, action.actionExecutionId, "run-1", "Perform the work", 0),
+      outcome: workOutcome(), nextValidation: {
+        ...agentRunInput("postwork-1", "postwork", 1, action.actionExecutionId, "run-1", "Perform the work", 0),
+        parentAgentRunId: "work-1"
+      },
       completedAt: TEST_AT
     });
     action = context.outcomes.applyPostwork({

@@ -31,6 +31,15 @@ export class EnvironmentRunStore {
         input.transitionLimit, input.createdAt, input.createdAt);
       this.insertStates(input);
       this.events.append(input.environmentRunId, "environment_started", {}, input.createdAt);
+      for (const state of input.states) for (const action of state.actions) {
+        if (action.importedDoneEvidence !== undefined) this.events.append(input.environmentRunId, "action_imported", {
+          stateExecutionId: state.stateExecutionId, actionExecutionId: action.actionExecutionId,
+          data: {
+            originatingRunId: action.originatingRunId ?? null,
+            priorActionExecutionId: action.priorActionExecutionId ?? null
+          }
+        }, input.createdAt);
+      }
       return this.require(input.environmentRunId);
     })();
   }

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { VNEXT_ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
+import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
+import { environmentDefinitionSchema, executionProfileSchema } from "./environmentSchemas.js";
 
 export const rootSnapshotV13Schema = z.object({
   version: z.literal(VNEXT_ROOT_SNAPSHOT_VERSION),
@@ -9,6 +11,36 @@ export const rootSnapshotV13Schema = z.object({
   directionSha256: sha256Schema,
   environmentSha256: sha256Schema,
   resourceSha256: sha256Schema,
+  environment: environmentDefinitionSchema,
+  approvedUseCases: z.array(z.object({ useCase: useCaseSchema, contentSha256: sha256Schema }).strict()),
+  direction: z.object({
+    goals: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
+    adrs: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
+    constraints: z.array(constraintSchema.extend({ contentSha256: sha256Schema }).strict())
+  }).strict(),
+  executionProfiles: z.array(executionProfileSchema),
+  runtimeCapabilities: z.array(z.object({
+    executionProfileId: idSchema,
+    provider: z.enum(["codex", "copilot"]),
+    cliVersion: z.string().trim().min(1),
+    supportedModels: z.array(z.string().trim().min(1)),
+    supportedReasoningEfforts: z.array(z.string().trim().min(1)),
+    supportsReadOnly: z.boolean(),
+    supportsWorkspaceWrite: z.boolean(),
+    capabilitySha256: sha256Schema
+  }).strict()),
+  resources: z.array(z.object({
+    kind: z.enum(["instruction", "skill"]), id: idSchema, relativePath: z.string().trim().min(1),
+    content: z.string(), sourceSha256: sha256Schema
+  }).strict()),
+  permissions: z.array(z.object({
+    role: z.enum(["validation", "work", "critic", "refinement"]), actionId: idSchema.optional(),
+    toolPolicy: z.enum(["read_only", "workspace_write"]), networkAccess: z.boolean(), approvalPolicy: z.literal("never")
+  }).strict()),
+  lineage: z.object({
+    parentRootRunId: idSchema, refinementProposalId: idSchema, refinementApprovalId: idSchema,
+    refinementCommitSha: gitObjectIdSchema
+  }).strict().optional(),
   createdAt: timestampSchema
 }).strict();
 
@@ -50,6 +82,7 @@ const agentRunBase = {
   id: idSchema,
   actionExecutionId: idSchema.optional(),
   environmentRunId: idSchema,
+  parentAgentRunId: idSchema.optional(),
   status: z.enum(["queued", "running", "completed", "failed", "cancelled", "interrupted"]),
   attempt: z.number().int().positive(),
   outcome: z.json().optional(),
@@ -88,7 +121,7 @@ export const controlFlowEventSchema = z.object({
   actionExecutionId: idSchema.optional(),
   sequence: z.number().int().positive(),
   kind: z.enum([
-    "environment_started", "state_activated", "action_selected", "validation_precheck_dispatched",
+    "environment_started", "state_activated", "action_selected", "action_imported", "validation_precheck_dispatched",
     "validation_precheck_done", "work_dispatched", "work_completed", "validation_postwork_dispatched",
     "validation_done", "validation_retry", "action_blocked", "feedback_created", "state_completed",
     "environment_completed", "environment_blocked", "environment_cancelled", "execution_interrupted",

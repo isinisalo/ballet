@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative evidence
 status: draft
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 4
+version: 5
 tags:
   - arc42
   - initiative
@@ -21,6 +21,7 @@ tags:
 | ESAO-evid-002 | goal-022 / REQ-022; QS-028–QS-032 | Goal/ADR/target/transition/trace/design architecture contract and bounded conformance review | `goal-022`, `adr-034`, `TARGET-CONTRACT.md`, `PLAN.md`, 12 arc42 sections, TRACEABILITY, AGENTS and DESIGN | passed: `npm run validate:arc42`; DESIGN lint 0 errors/0 warnings; `git diff --check`; conformance review found 0 unresolved mismatches | 2026-08-29 local repository | Proves documentation consistency only; target implementation evidence remains pending. |
 | ESAO-evid-003 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated vNext Direction, Environment/State/Action, task/outcome, approval-hash, ordering/gating, refinement-impact and boundary-schema contracts | `shared/vnext/**`; `backend/vnext/domain/*.test.ts` | passed: 59 focused tests; `npm run test` 50 files/240 tests; zero-warning lint; production build; arc42 validation; diff check | 2026-08-29 local repository | Pure contracts only: no loader, DB, HTTP, provider or UI wiring. Does not advance EVID-028..032 to passed. |
 | ESAO-evid-004 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated strict-v16 schema, stores and transactional flow/review coordinators | `backend/vnext/persistence/**`; `shared/vnext/persistence*.ts` | passed: 23 persistence tests; 7 vNext files/82 tests; `npm run test` 54 files/263 tests; zero-warning lint; production build; arc42 validation; diff check; conformance review found no active-v15, route or frontend coupling | 2026-08-29 temp SQLite databases | Synchronous same-process duplicate/re-entrant evidence only; no claim of a distributed lock, server wiring or provider scheduling. |
+| ESAO-evid-005 | REQ-022; partial QS-028/QS-030/QS-032 | Immutable v13 closure planning, six-part v11 prompt, strict v10 output, provider-neutral permissions, Validation-led Environment loop, durable enqueue/reconcile, parent-agent lineage, Product Snapshot and safe continuation seeding | `backend/vnext/runtime/**`; `shared/vnext/runtime.ts`; `agent_runs.parent_agent_run_id`; `TEST-028` integration scenarios 1–18 | passed: 22 runtime/planner/provider tests and complete focused vNext suite; full repository gates recorded in the phase-03 commit | 2026-08-29 deterministic fake provider and temporary v16 databases | Isolated transition namespace only; no public HTTP/startup/frontend registration and no real provider invocation. Managed refinement apply remains phase 05. |
 | EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | pending | phases 02–04/11 | ESAO-evid-003/004 prove isolated contracts and transactions; canonical dispatcher/provider integration is pending. |
 | EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | pending | phases 05/08/11 | ESAO-evid-004 proves storage and exact-once decisions; schedule worker and product UI are pending. |
 | EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | pending | phases 06–08/11 | ESAO-evid-004 proves strict storage/preimage/link invariants; no managed-worktree Git effect has run. |
@@ -54,6 +55,37 @@ The isolated v16 inventory is exactly: `metadata`, `environment_runs`, `state_ex
 The tested transaction boundaries create a complete ordered run aggregate; select only one active Action; bind Validation precheck, Work and Validation postwork Agent Runs; make blocked+Feedback indivisible; preserve `maxRetries` as additional attempts; gate State and Environment completion; create the Product Snapshot with terminal Environment status; stop active work without later dispatch; deduplicate Critic due instants; decide Critic and Refinement proposals exactly once against expected hashes; detect stale refinement preimages; and record an applied refinement plus immutable continuation link atomically. Partial unique indexes enforce one active State and Action per Environment and one active Agent per Action. Foreign keys cascade owned aggregate data, while continuation ancestry remains protected.
 
 `VNextConnection` creates only an empty v16 database, reopens a complete v16 inventory, and fails closed for v15, unknown or incomplete inventories with archive/remove guidance. No `ALTER`, copy, reader, alias or dual-write path exists. Current `LocalDatabase` v15 startup is not imported or modified; every v16 test uses a newly created temporary database.
+
+## Phase 03 Validation-led runtime evidence
+
+The tested transaction/queue sequence is:
+
+```text
+create Environment
+  -> select lowest ordered State / lowest priority pending Action
+  -> commit Validation precheck Agent + task
+  -> enqueue after commit
+  -> done | delegate Work(parent=Validation) | atomic blocked+Feedback
+  -> Work terminal -> postwork Validation(parent=Work), including Work failed/blocked
+  -> done | retry Work(parent=postwork Validation) | atomic blocked+Feedback
+  -> all Actions done -> State done -> next State
+  -> all States done -> finalization + Product Snapshot
+```
+
+Each semantic coordinator transaction creates at most one new dispatch. `agent_runs.parent_agent_run_id` proves Ballet-owned control lineage without provider multi-agent delegation. Queue reconciliation derives pending tasks from v16 and uses an in-memory dedupe boundary; cancellation makes queued tasks ineligible before provider execution. Invalid JSON, wrappers, unknown fields, enum drift and phase drift block the Action with `system_invalid_output` Feedback rather than retrying.
+
+| Action runtime status | Permitted next controller effect | Derived fact |
+| --- | --- | --- |
+| `pending` | ordered selection only after prior gate | neither done nor blocked |
+| `prechecking` | Validation `done \| delegate \| blocked` | neither done nor blocked |
+| `working` | Work terminal always queues postwork Validation | neither done nor blocked |
+| `postchecking` | Validation `done \| retry \| blocked`; retry exhaustion converts atomically | neither done nor blocked |
+| `done` | skipped visibly by continuation/selection; may complete State | `done=true` |
+| `blocked` | stops Environment dispatch and owns Feedback provenance | `blocked=true` |
+
+Snapshot v13 contains Project Config/base hashes, full Environment definition, approved Use Case semantic hashes, accepted Goal/ADR/Constraint hashes, execution profiles, preflight capability hashes, full instruction/Skill contents and hashes, exact role permission rows and optional refinement lineage. Its canonical JSON hash is stored with the run. Composition v11 uses exactly: system/role, Action/domain context, hard constraints/approvals, Task Envelope, Skills and exact output requirement. Codex read-only receives no writable root; Work receives only the managed worktree; network remains profile-owned and provider approval is always `never`.
+
+Continuation tests prove that only prior `done` Actions with unchanged definition and relevant resource hashes outside target/impact scope import evidence. Target/impact Actions remain pending, and a changed shared Skill invalidates import for every referencing Action. The parent run is never updated.
 
 ## Open evidence gaps
 

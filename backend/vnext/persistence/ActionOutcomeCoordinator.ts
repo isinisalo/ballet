@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type {
   ApplyPostworkInput, ApplyPrecheckInput, ApplyWorkInput, CreateAgentRunInput,
-  StoredActionExecution, StoredAgentRun
+  FeedbackSeed, StoredActionExecution, StoredAgentRun
 } from "../../../shared/vnext/index.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { EnvironmentRunStore } from "./EnvironmentRunStore.js";
@@ -22,6 +22,7 @@ export class ActionOutcomeCoordinator {
     return this.connection().transaction(() => {
       const action = this.requireAction(actionExecutionId, expectedRevision, "prechecking");
       assertAgentInput(input, action, "validation", "precheck", action.workAttempt + 1);
+      if (input.parentAgentRunId) throw new VNextConflictError("Precheck Validation cannot have a parent Agent Run.");
       const agent = this.execution.createAgent(input);
       this.updateActiveAgent(action, agent, "prechecking", input.createdAt, false);
       this.events.append(action.environmentRunId, "validation_precheck_dispatched", {
@@ -51,6 +52,9 @@ export class ActionOutcomeCoordinator {
       }
       if (!input.nextWork) throw new VNextConflictError("Delegated precheck requires a Work Agent Run.");
       assertAgentInput(input.nextWork, action, "work", "work", action.workAttempt + 1);
+      if (input.nextWork.parentAgentRunId !== input.agentRunId) {
+        throw new VNextConflictError("Work Agent Run must reference its delegating Validation Agent Run.");
+      }
       if (input.nextWork.taskEnvelope.role !== "work" || input.nextWork.taskEnvelope.dynamicPrompt !== decision.workPrompt) {
         throw new VNextConflictError("Delegated Work prompt differs from Validation output.");
       }
@@ -72,6 +76,9 @@ export class ActionOutcomeCoordinator {
       const action = this.requireAction(existingAgent.actionExecutionId!, input.expectedActionRevision, "working");
       if (existingAgent.phase !== "work") throw new VNextConflictError("Work application requires a Work Agent Run.");
       assertAgentInput(input.nextValidation, action, "validation", "postwork", action.workAttempt);
+      if (input.nextValidation.parentAgentRunId !== input.agentRunId) {
+        throw new VNextConflictError("Postwork Validation must reference its Work Agent Run.");
+      }
       const validation = this.execution.createAgent(input.nextValidation);
       this.updateActiveAgent(action, validation, "postchecking", input.completedAt, false);
       this.events.append(action.environmentRunId, "work_completed", {
@@ -105,6 +112,9 @@ export class ActionOutcomeCoordinator {
       }
       if (!input.nextWork) throw new VNextConflictError("Validation retry requires another Work Agent Run.");
       assertAgentInput(input.nextWork, action, "work", "work", action.workAttempt + 1);
+      if (input.nextWork.parentAgentRunId !== input.agentRunId) {
+        throw new VNextConflictError("Retry Work must reference its postwork Validation Agent Run.");
+      }
       if (input.nextWork.taskEnvelope.role !== "work" || input.nextWork.taskEnvelope.dynamicPrompt !== decision.workPrompt) {
         throw new VNextConflictError("Retry Work prompt differs from Validation output.");
       }
@@ -119,6 +129,46 @@ export class ActionOutcomeCoordinator {
         targetAgentRunId: work.agentRunId
       }, input.completedAt);
       return this.runs.requireAction(action.actionExecutionId);
+    })();
+  }
+
+  applyWorkFailure(input: {
+    agentRunId: string; providerOutcomeKey: string; errorMessage: string;
+    expectedActionRevision: number; nextValidation: CreateAgentRunInput; completedAt: string;
+  }): StoredActionExecution {
+    return this.connection().transaction(() => {
+      const agent = this.execution.requireAgent(input.agentRunId);
+      const applied = this.execution.failAgent(input.agentRunId, input.providerOutcomeKey, "provider_failure", input.errorMessage, input.completedAt);
+      if (!applied) return this.runs.requireAction(agent.actionExecutionId!);
+      const action = this.requireAction(agent.actionExecutionId!, input.expectedActionRevision, "working");
+      if (agent.role !== "work" || agent.phase !== "work") throw new VNextConflictError("Only Work failures enter postwork Validation.");
+      assertAgentInput(input.nextValidation, action, "validation", "postwork", action.workAttempt);
+      if (input.nextValidation.parentAgentRunId !== input.agentRunId) throw new VNextConflictError("Postwork Validation parent differs from failed Work.");
+      const validation = this.execution.createAgent(input.nextValidation);
+      this.updateActiveAgent(action, validation, "postchecking", input.completedAt, false);
+      this.events.append(action.environmentRunId, "work_completed", {
+        stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
+        sourceAgentRunId: input.agentRunId, data: { providerFailure: true }
+      }, input.completedAt);
+      this.events.append(action.environmentRunId, "validation_postwork_dispatched", {
+        stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
+        sourceAgentRunId: input.agentRunId, targetAgentRunId: validation.agentRunId
+      }, input.completedAt);
+      return this.runs.requireAction(action.actionExecutionId);
+    })();
+  }
+
+  blockInvalidOutput(input: {
+    agentRunId: string; providerOutcomeKey: string; expectedActionRevision: number;
+    errorMessage: string; feedback: FeedbackSeed; completedAt: string;
+  }): StoredActionExecution {
+    return this.connection().transaction(() => {
+      const agent = this.execution.requireAgent(input.agentRunId);
+      const applied = this.execution.failAgent(input.agentRunId, input.providerOutcomeKey, "invalid_structured_output", input.errorMessage, input.completedAt);
+      if (!applied) return this.runs.requireAction(agent.actionExecutionId!);
+      const action = this.runs.requireAction(agent.actionExecutionId!);
+      if (action.revision !== input.expectedActionRevision) throw new VNextStaleStateError(`Action ${action.actionExecutionId} revision is stale.`);
+      return this.blockAction(action, input.feedback, input.completedAt, input.agentRunId, "system_invalid_output");
     })();
   }
 
@@ -174,7 +224,7 @@ export class ActionOutcomeCoordinator {
     feedback: ApplyPrecheckInput["feedback"],
     at: string,
     agentRunId: string,
-    expectedSource: "validation_blocked" | "retry_exhaustion"
+    expectedSource: "validation_blocked" | "retry_exhaustion" | "system_invalid_output"
   ): StoredActionExecution {
     if (!feedback || feedback.source !== expectedSource || feedback.actionExecutionId !== action.actionExecutionId) {
       throw new VNextConflictError(`Blocked Action requires ${expectedSource} Feedback bound to the Action.`);

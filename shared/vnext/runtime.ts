@@ -1,4 +1,6 @@
 import type { JsonValue } from "./primitives.js";
+import type { EnvironmentDefinition, ExecutionProfile, RuntimeProvider } from "./environment.js";
+import type { Constraint, DirectionReference, UseCase } from "./direction.js";
 import { VNEXT_ROOT_SNAPSHOT_VERSION } from "./versions.js";
 
 export type EnvironmentRunStatus = "pending" | "running" | "blocked" | "completed" | "cancelled" | "interrupted";
@@ -15,7 +17,51 @@ export interface RootSnapshotV13 {
   directionSha256: string;
   environmentSha256: string;
   resourceSha256: string;
+  environment: EnvironmentDefinition;
+  approvedUseCases: Array<{ useCase: UseCase; contentSha256: string }>;
+  direction: {
+    goals: Array<DirectionReference & { contentSha256: string }>;
+    adrs: Array<DirectionReference & { contentSha256: string }>;
+    constraints: Array<Constraint & { contentSha256: string }>;
+  };
+  executionProfiles: ExecutionProfile[];
+  runtimeCapabilities: RuntimeCapabilitySnapshot[];
+  resources: RuntimeResourceSnapshot[];
+  permissions: RuntimePermissionSnapshot[];
+  lineage?: {
+    parentRootRunId: string;
+    refinementProposalId: string;
+    refinementApprovalId: string;
+    refinementCommitSha: string;
+  };
   createdAt: string;
+}
+
+export interface RuntimeCapabilitySnapshot {
+  executionProfileId: string;
+  provider: RuntimeProvider;
+  cliVersion: string;
+  supportedModels: string[];
+  supportedReasoningEfforts: string[];
+  supportsReadOnly: boolean;
+  supportsWorkspaceWrite: boolean;
+  capabilitySha256: string;
+}
+
+export interface RuntimeResourceSnapshot {
+  kind: "instruction" | "skill";
+  id: string;
+  relativePath: string;
+  content: string;
+  sourceSha256: string;
+}
+
+export interface RuntimePermissionSnapshot {
+  role: AgentRunRole;
+  actionId?: string;
+  toolPolicy: "read_only" | "workspace_write";
+  networkAccess: boolean;
+  approvalPolicy: "never";
 }
 
 export interface EnvironmentRun {
@@ -57,6 +103,7 @@ export interface AgentRun {
   environmentRunId: string;
   role: AgentRunRole;
   phase: AgentRunPhase;
+  parentAgentRunId?: string;
   status: AgentRunStatus;
   attempt: number;
   outcome?: JsonValue;
@@ -86,6 +133,7 @@ export type ControlFlowEventKind =
   | "environment_started"
   | "state_activated"
   | "action_selected"
+  | "action_imported"
   | "validation_precheck_dispatched"
   | "validation_precheck_done"
   | "work_dispatched"

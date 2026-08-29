@@ -12,6 +12,12 @@ import { VNextConnection } from "./VNextConnection.js";
 export const TEST_AT = "2026-08-29T10:00:00.000Z";
 export const TEST_SHA = "a".repeat(40);
 export const HASH_A = "a".repeat(64);
+export const VALID_INSTRUCTION = [
+  "## Task\nExecute the bounded Action.", "## Role\nFollow the assigned role.",
+  "## Goals\nSatisfy approved goals.", "## Priorities\nPreserve quality and safety.",
+  "## Method\nUse supplied evidence.", "## Output contract\nReturn strict JSON.",
+  "## Tool policy\nRespect the supplied policy.", "## Acceptance evidence\nReport checks and evidence."
+].join("\n\n");
 
 export interface TestDatabase {
   manager: VNextConnection;
@@ -72,7 +78,24 @@ export const environmentSeed = (options: {
   const snapshot: RootSnapshotV13 = {
     version: 13, projectHeadSha: TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
-    resourceSha256: "d".repeat(64), createdAt: TEST_AT
+    resourceSha256: "d".repeat(64),
+    environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
+    approvedUseCases: [], direction: { goals: [], adrs: [], constraints: [] },
+    executionProfiles: [{
+      id: "profile", name: "Test Profile", provider: "codex", model: "test-model", reasoningEffort: "high", networkAccess: false
+    }],
+    runtimeCapabilities: [{
+      executionProfileId: "profile", provider: "codex", cliVersion: "1.0.0", supportedModels: ["test-model"],
+      supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
+    }],
+    resources: [{
+      kind: "instruction", id: "instruction", relativePath: ".ballet/instructions/test.md",
+      content: VALID_INSTRUCTION, sourceSha256: hash(VALID_INSTRUCTION)
+    }],
+    permissions: [
+      { role: "validation", actionId: "action-1", toolPolicy: "read_only", networkAccess: false, approvalPolicy: "never" },
+      { role: "work", actionId: "action-1", toolPolicy: "workspace_write", networkAccess: false, approvalPolicy: "never" }
+    ], createdAt: TEST_AT
   };
   return {
     environmentRunId: runId,

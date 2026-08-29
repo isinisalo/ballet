@@ -62,6 +62,7 @@ export interface StoredAgentRun {
   actionExecutionId?: string;
   criticRunId?: string;
   refinementRunId?: string;
+  parentAgentRunId?: string;
   role: AgentRunRole;
   phase: AgentRunPhase;
   status: "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
