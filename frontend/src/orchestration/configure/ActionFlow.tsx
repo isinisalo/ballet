@@ -1,10 +1,40 @@
+import { useId, type CSSProperties, type ReactNode } from "react";
 import type { ActionDefinition } from "@shared/orchestration/environment";
-import { OperationalStatus } from "@/components/shared/workspace-ui";
+import { projectActionFlow, type ActionFlowTone } from "./actionFlowProjection";
+import "./ActionFlow.css";
 
 export function ActionFlow({ action }: { action: ActionDefinition }) {
-  return <section aria-label={`Validation-led flow for Action ${action.id}`} className="orchestration-flow rounded-md border bg-card p-4"><h2 className="mb-4 font-semibold">Validation-led authoring flow</h2><div className="mx-auto flex max-w-2xl flex-col items-center gap-2 text-center"><FlowNode label="Start" detail={action.id} /><Connector label="begins with" /><FlowNode main label="Validation · main controller" detail="Precheck: done, delegate, or blocked · read-only" /><div className="grid w-full gap-2 sm:grid-cols-2"><Branch label="valid → Done" tone="done" /><Branch label="delegate dynamic prompt" tone="delegate" /></div><Connector label="only delegate enters subordinate execution" /><FlowNode label="Work · subordinate" detail="Workspace-write · completed or needs input" /><Connector label="returns evidence to controller" /><FlowNode main label="Validation · main controller" detail="Postwork: done, retry, or blocked · read-only" /><div className="grid w-full gap-2 sm:grid-cols-3"><Branch label="valid → Done" tone="done" /><Branch label="retry → Work" tone="retry" /><Branch label="blocked → Feedback Box" tone="blocked" /></div></div><p className="mt-4 text-xs text-muted-foreground">This is an authoring projection, not runtime control. Current attempts appear only in Run.</p></section>;
+  const flow = projectActionFlow();
+  const markerPrefix = useId().replaceAll(":", "");
+  const point = (key: keyof typeof flow.points) => ({ left: flow.points[key].x, top: flow.points[key].y });
+  return <section aria-label={`Validation-led flow for Action ${action.id}`} className="orchestration-flow action-flow-grid rounded-md border bg-card">
+    <div className="action-flow-legend">ACTION FLOW <span>· authoring projection, not runtime control</span></div>
+    <div className="action-flow-scroll"><div className="action-flow-stage" style={{ width: flow.width, height: flow.height }}>
+      <FlowEdges edges={flow.edges} markerPrefix={markerPrefix} width={flow.width} height={flow.height} />
+      <FlowCard label="START" kind="start" style={point("start")} />
+      <FlowCard label="Work · subordinate" detail="agent · workspace-write" kind="work" style={point("work")} />
+      <FlowCard label="Validation · main controller" detail="agent · read-only" kind="validation" style={point("validation")} />
+      <Decision label="done?" style={point("done")} />
+      <FlowCard label="Done" detail="continue State gate" kind="complete" style={point("complete")} />
+      <Decision label="work?" detail="delegate / retry" style={point("retry")} />
+      <FlowCard label="Blocked" detail="Feedback" kind="blocked" style={point("blocked")} />
+      <FlowCard label={`${action.maxRetries} additional retries`} detail={`${1 + action.maxRetries} total Work attempts`} kind="retry-count" style={point("retryCount")} />
+    </div></div>
+    <p className="action-flow-caption">Precheck may finish, block, or delegate. Only postwork Validation retry consumes the additional retry budget.</p>
+  </section>;
 }
 
-function FlowNode({ label, detail, main = false }: { label: string; detail: string; main?: boolean }) { return <div className={`w-full rounded-md border p-3 ${main ? "border-secondary/70 bg-secondary/10" : "bg-background"}`}><strong>{label}</strong><div className="font-mono text-xs text-muted-foreground">{detail}</div>{main ? <OperationalStatus compact label="Controller role" tone="healthy" /> : null}</div>; }
-function Connector({ label }: { label: string }) { return <div aria-label={label} className="flex flex-col items-center font-mono text-[0.68rem] text-muted-foreground"><span aria-hidden="true" className="h-5 border-l-2 border-secondary" />{label}</div>; }
-function Branch({ label, tone }: { label: string; tone: "done" | "delegate" | "retry" | "blocked" }) { return <div className={`rounded-sm border p-2 text-sm ${tone === "blocked" ? "border-destructive/60" : tone === "retry" ? "border-tertiary/60" : "border-secondary/50"}`}>{label}</div>; }
+function FlowEdges({ edges, markerPrefix, width, height }: { edges: ReturnType<typeof projectActionFlow>["edges"]; markerPrefix: string; width: number; height: number }) {
+  const tones: ActionFlowTone[] = ["flow", "attention", "fail", "neutral"];
+  return <svg className="action-flow-edges" width={width} height={height} aria-hidden="true"><defs>{tones.map((tone) => <marker key={tone} id={`${markerPrefix}-${tone}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" className={`action-flow-marker action-flow-marker--${tone}`} /></marker>)}</defs>
+    {edges.map((edge) => <g key={edge.id}><path d={edge.path} className={`action-flow-edge action-flow-edge--${edge.tone}`} data-dashed={edge.dashed ? "true" : "false"} markerEnd={edge.id === "retry-count" ? undefined : `url(#${markerPrefix}-${edge.tone})`} />{edge.label ? <text x={edge.labelX} y={edge.labelY} className={`action-flow-edge-label action-flow-edge-label--${edge.tone}`}>{edge.label}</text> : null}</g>)}
+  </svg>;
+}
+
+function FlowCard({ label, detail, kind, style }: { label: string; detail?: ReactNode; kind: "start" | "work" | "validation" | "complete" | "blocked" | "retry-count"; style: CSSProperties }) {
+  return <div className={`action-flow-card action-flow-card--${kind}`} style={style} aria-label={detail ? `${label}, ${String(detail)}` : label}><strong>{label}</strong>{detail ? <small>{detail}</small> : null}</div>;
+}
+
+function Decision({ label, detail, style }: { label: string; detail?: string; style: CSSProperties }) {
+  return <div className="action-flow-decision" style={style} aria-label={detail ? `${label}, ${detail}` : label}><span aria-hidden="true" /><strong>{label}</strong>{detail ? <small>{detail}</small> : null}</div>;
+}

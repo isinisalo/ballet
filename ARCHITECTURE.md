@@ -4,13 +4,13 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 23
+version: 24
 tags: [architecture, arc42, environment]
 ---
 
 # Ballet architecture
 
-Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). The accepted strict replacement for authoring and execution placement is [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) and its [target contract](.ballet/arc42/initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md).
+Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). The accepted strict replacement for authoring and execution placement is [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) and its [target contract](.ballet/arc42/initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md). [ADR-036](.ballet/adr/adr-036-loop-engineering-space-and-action-flow-projections.md) owns the shared State/Action canvas and Action workflow projection without changing those runtime contracts.
 
 The active implementation is the atomic v21/v17 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized.
 
@@ -72,7 +72,7 @@ flowchart TB
 | Governance | Critic scheduling, proposal decisions, exact Refinement apply and continuation | `backend/orchestration/governance/**` |
 | Persistence | SQLite v17 schema, transactions, events, Feedback, reviews and Run Evidence | `backend/orchestration/persistence/**` |
 | API/security | canonical routes, strict request schemas, loopback/origin/body limits and trusted actor boundary | `backend/orchestration/http/**`, `backend/server/createBalletServer.ts` |
-| UI | Loop Engineering, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback and reviews | `frontend/src/orchestration/**` |
+| UI | deterministic Loop Engineering State/Action canvas and Action flow, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback and reviews | `frontend/src/orchestration/**` |
 
 ## Truth and ownership
 

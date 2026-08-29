@@ -98,15 +98,15 @@ spacing:
 
 Ballet is a dense, calm cyber-industrial command center. Dark tonal surfaces support long sessions; mint marks validated/safe state, amber marks attention and retry, red marks blocking failure, and blue marks selection or primary action. Every semantic color has a text label or icon-and-label equivalent.
 
-Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact metadata. The spacing rhythm is 4 px and panels use restrained radii and one-pixel boundaries. There are no decorative gradients, freeform topology canvases, ornamental space art or reward/policy matrices.
+Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact metadata. The spacing rhythm is 4 px and panels use restrained radii and one-pixel boundaries. Freeform topology canvases, ad hoc palettes and reward/policy matrices are forbidden. Loop Engineering is the bounded exception for token-derived radial planet shading and station artwork: geometry is deterministic, ordered and navigational rather than ornamental or user-positioned.
 
 ## Information architecture
 
 - **Goals** and **ADRs** are separate Markdown workspaces; Constraints, Use Cases and Instructions use the same direct Markdown editor/preview contract.
 - **Use Cases** keeps a compact list and makes approval status, semantic hash and Given/When/Then evidence explicit without a parallel form-owned truth.
-- **Loop Engineering** presents Environment, States and Actions in ascending deterministic lanes/sections inside one engineering canvas shell.
-- **State** presents Actions in ascending priority with stable IDs, role resources, retry budget and factual status.
-- **Action flow** makes Validation the primary controller and Work subordinate: precheck -> optional Work -> postwork -> done/retry/blocked.
+- **Loop Engineering** keeps one ordered space canvas visible across Environment, State and Action routes. States run top-to-bottom by `order`; selecting a State reveals only its Actions left-to-right by `priority` on the same canvas.
+- **State** selection is URL-owned and presents Actions as derived sun/planet/station artwork with stable text IDs. Artwork is order language, never runtime status.
+- **Action flow** is a dark industrial workflow: START -> Validation -> done?, with delegate/retry through subordinate Work, evidence returning to Validation, and explicit done/blocked-Feedback terminals plus `1 + maxRetries` text.
 - **Run Gate** explains why a State or Action can or cannot advance without inventing client-owned control state.
 - **Feedback Box** asks a human only for Category and comment; trusted runtime provenance stays visible but is not editable.
 - **Critic review** separates a read-only proposal from the human decision that may create Feedback.
@@ -130,7 +130,7 @@ Back/forward restores the same selected entity. An invalid or malformed ID rende
 
 ## Layout contracts
 
-At 1440x900, a persistent compact sidebar and multi-column workbench may coexist, but the primary Action or review remains readable without page-level horizontal scrolling. At 390x844, navigation collapses, cards stack in semantic order, code/diff regions scroll internally and every essential control remains reachable.
+At 1440x900, a persistent compact sidebar and multi-column workbench may coexist, but the primary Action or review remains readable without page-level horizontal scrolling. Loop Engineering uses a balanced canvas/editor split. At 390x844, navigation collapses, the canvas precedes the stacked editor, and wide canvas/workflow stages scroll inside their labelled regions while the page itself remains viewport-wide.
 
 Controls are at least 40 px high on narrow screens. Focus is visible, tab order follows reading order, headings are hierarchical and live updates do not steal focus. Drag interaction always has keyboard controls. `prefers-reduced-motion` removes non-essential transitions.
 
@@ -147,7 +147,7 @@ Controls are at least 40 px high on narrow screens. Focus is visible, tab order 
 
 ## Action flow and status language
 
-Validation is visually primary and labelled `main/controller`; Work is indented or connected as `subordinate`. Precheck appears before optional Work, postcheck after it, and retry returns only to Work. The UI displays `1 + maxRetries` total attempts and distinguishes an operational provider failure from a semantic Validation retry.
+Validation is visually primary and labelled `main/controller`; Work is connected as `subordinate`. START enters Validation, Work returns evidence to the same controller, and retry returns only to Work. The authoring projection exposes done, delegate/retry and blocked/Feedback branches without acting as a runtime control. The UI displays `1 + maxRetries` total attempts and distinguishes an operational provider failure from a semantic Validation retry.
 
 Mint means validated or safe, amber means attention/retry, red means blocked/failure and blue means selection/primary action. Each appears with explicit text and, where useful, an icon. Runtime status is read from the API. Client components never synthesize `done`, `blocked`, percent complete, ETA or a next target.
 
@@ -165,4 +165,4 @@ Route changes move focus to the new workspace heading or announce it without ste
 
 ## Implementation boundary
 
-Use existing React, Vite, Tailwind and shadcn primitives. Tokens in this frontmatter are the source of truth. Intentional changes to palette, type, rhythm, radii or component language require this file and architecture evidence to change together.
+Use existing React, Vite, Tailwind and shadcn primitives. Tokens in this frontmatter are the source of truth. Pure TypeScript owns deterministic Loop Engineering geometry, ordering, edges, dimensions and derived artwork; React only renders it and forwards canonical navigation. Intentional changes to palette, type, rhythm, radii or component language require this file and architecture evidence to change together.

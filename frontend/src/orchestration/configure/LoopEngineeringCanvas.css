@@ -1,0 +1,141 @@
+.loop-engineering-canvas {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--divider-strong);
+  border-radius: .375rem;
+  background: var(--background);
+}
+
+.loop-engineering-legend {
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--divider-strong);
+  color: var(--tertiary);
+  font-family: var(--font-mono);
+  font-size: .625rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+}
+
+.loop-engineering-legend span,
+.loop-engineering-caption {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.loop-engineering-scroll {
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.loop-engineering-stage {
+  position: relative;
+  min-width: 100%;
+  background-color: var(--background);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 52%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 52%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.loop-engineering-edges { position: absolute; inset: 0; pointer-events: none; }
+.loop-engineering-edge { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.loop-engineering-edge--state { stroke: color-mix(in srgb, var(--secondary) 62%, var(--ballet-outline-variant)); stroke-dasharray: 7 7; }
+.loop-engineering-edge--action { stroke: color-mix(in srgb, var(--secondary) 76%, var(--foreground)); }
+.loop-engineering-connection { fill: color-mix(in srgb, var(--secondary) 45%, var(--foreground)); filter: drop-shadow(0 0 4px var(--secondary)); }
+
+.loop-engineering-state,
+.loop-engineering-action {
+  position: absolute;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.loop-engineering-state {
+  display: flex;
+  width: 164px;
+  min-height: 44px;
+  align-items: center;
+  gap: .625rem;
+  padding: 0;
+  text-align: left;
+}
+
+.loop-engineering-state-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--divider-strong);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  color: var(--tertiary);
+}
+
+.loop-engineering-state-artwork { width: 28px; height: 28px; overflow: visible; }
+.loop-engineering-state-artwork path,
+.loop-engineering-state-artwork circle { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.loop-engineering-state[data-selected="true"] .loop-engineering-state-icon { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
+
+.loop-engineering-state-label,
+.loop-engineering-action-label { display: grid; min-width: 0; font-family: var(--font-mono); }
+.loop-engineering-state-label small,
+.loop-engineering-action-label small { color: var(--muted-foreground); font-size: .55rem; letter-spacing: .05em; }
+.loop-engineering-state-label strong,
+.loop-engineering-action-label strong { overflow: hidden; color: var(--tertiary); font-size: .7rem; text-overflow: ellipsis; white-space: nowrap; }
+.loop-engineering-state-label code,
+.loop-engineering-action-label code { overflow: hidden; color: var(--muted-foreground); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.loop-engineering-action {
+  display: grid;
+  width: 160px;
+  min-height: 132px;
+  place-items: center;
+  padding: .5rem;
+  transform: translate(-50%, -50%);
+}
+
+.loop-engineering-planet {
+  display: block;
+  width: var(--action-planet-size);
+  height: var(--action-planet-size);
+  border-radius: 9999px;
+  transition: filter 140ms ease, box-shadow 140ms ease;
+}
+
+.loop-engineering-planet--sol {
+  border: 1px solid color-mix(in srgb, var(--tertiary) 72%, var(--foreground));
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--foreground) 72%, var(--tertiary)) 0 5%, var(--tertiary) 32%, var(--tertiary-container) 72%, color-mix(in srgb, var(--tertiary-container) 44%, var(--background)) 100%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--tertiary) 30%, transparent), inset -10px -12px 18px color-mix(in srgb, var(--background) 42%, transparent);
+}
+
+.loop-engineering-planet--terra {
+  border: 1px solid color-mix(in srgb, var(--secondary) 62%, var(--foreground));
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--foreground) 58%, var(--secondary)) 0 5%, var(--secondary) 26%, var(--secondary-container) 62%, color-mix(in srgb, var(--secondary-container) 24%, var(--background)) 100%);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--secondary) 26%, transparent), inset -9px -10px 16px color-mix(in srgb, var(--background) 54%, transparent);
+}
+
+.loop-engineering-planet--station { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tertiary) 35%, transparent)); }
+.loop-engineering-planet--station svg { width: 100%; height: 100%; overflow: visible; }
+.loop-engineering-planet--station svg > circle:first-child { fill: color-mix(in srgb, var(--ballet-surface-highest) 82%, var(--tertiary)); stroke: var(--ballet-outline-variant); stroke-width: 1; }
+.loop-engineering-planet--station svg path:nth-of-type(1) { fill: none; stroke: color-mix(in srgb, var(--background) 66%, var(--ballet-outline-variant)); stroke-width: .85; }
+.loop-engineering-planet--station svg path:nth-of-type(2) { fill: color-mix(in srgb, var(--background) 76%, var(--primary)); stroke: var(--tertiary); stroke-width: .9; }
+.loop-engineering-planet--station svg circle:last-child { fill: var(--secondary); }
+
+.loop-engineering-action-label { width: 150px; margin-top: .5rem; text-align: center; }
+.loop-engineering-action[data-selected="true"] .loop-engineering-planet { box-shadow: 0 0 0 3px var(--primary), 0 0 18px color-mix(in srgb, var(--primary) 42%, transparent); }
+.loop-engineering-action[data-selected="true"] .loop-engineering-planet--station { filter: drop-shadow(0 0 3px var(--primary)) drop-shadow(0 0 10px color-mix(in srgb, var(--primary) 48%, transparent)); }
+.loop-engineering-state:focus-visible,
+.loop-engineering-action:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: var(--radius-sm); }
+.loop-engineering-state:hover .loop-engineering-state-icon,
+.loop-engineering-action:hover .loop-engineering-planet { filter: brightness(1.12); }
+
+.loop-engineering-caption { margin: 0; padding: .5rem 1rem; border-top: 1px solid var(--divider-strong); font-family: var(--font-mono); font-size: .625rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .loop-engineering-planet { transition: none; }
+}

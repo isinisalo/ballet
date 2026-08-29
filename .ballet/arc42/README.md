@@ -4,13 +4,13 @@ title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 25
+version: 26
 tags: [arc42, architecture, index]
 ---
 
 # Balletin arc42-arkkitehtuuri-indeksi
 
-Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -> Action ja Validation-led execution. Hyväksytty strict replacement target on `goal-023` / `adr-035`: Markdown-authoring, Agent + paired daemon, Feedback/Refinement v2 ja Run Evidence ilman Product-entityä.
+Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -> Action ja Validation-led execution. Hyväksytty strict replacement target on `goal-023` / `adr-035`: Markdown-authoring, Agent + paired daemon, Feedback/Refinement v2 ja Run Evidence ilman Product-entityä. `adr-036` määrittää Loop Engineeringin yhteisen ordered State/Action -canvasin ja Action workflow -projektion.
 
 1. [Johdanto ja tavoitteet](01-introduction-and-goals.md)
 2. [Rajoitteet](02-constraints.md)
@@ -25,4 +25,4 @@ Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -
 11. [Riskit ja tekninen velka](11-risks-and-technical-debt.md)
 12. [Sanasto](12-glossary.md)
 
-Tukilähteet: [STATUS](STATUS.md), [TRACEABILITY](TRACEABILITY.md), [METHOD-HEALTH](METHOD-HEALTH.md), [runtime state contract](STATE-CONTRACT.md) ja [active target contract](initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md). Historialliset initiativet ja superseded ADR:t ovat audit trailia, eivät aktiivinen vaihtoehtoinen arkkitehtuuri.
+Tukilähteet: [STATUS](STATUS.md), [TRACEABILITY](TRACEABILITY.md), [METHOD-HEALTH](METHOD-HEALTH.md), [runtime state contract](STATE-CONTRACT.md), [active target contract](initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md) ja [Loop Engineering visual initiative](initiatives/loop-engineering-space-and-action-flow/BRIEF.md). Historialliset initiativet ja superseded ADR:t ovat audit trailia, eivät aktiivinen vaihtoehtoinen arkkitehtuuri.
