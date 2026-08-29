@@ -44,7 +44,7 @@ export const probeCommandVersion = (
   const child = spawn(command, [...args], {
     stdio: ["ignore", "pipe", "pipe"],
     signal,
-    env: process.env
+    env: providerChildEnvironment()
   });
   let stdout = "";
   let stderr = "";
@@ -90,5 +90,9 @@ export const resolveCommandPath = async (command: string): Promise<string> => {
 };
 
 export const providerChildEnvironment = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => {
-  return { ...process.env, ...extra };
+  const inherited = Object.fromEntries([
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE",
+    "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "CODEX_HOME", "COPILOT_HOME", "TERM", "COLORTERM"
+  ].flatMap((key) => process.env[key] === undefined ? [] : [[key, process.env[key]]])) as NodeJS.ProcessEnv;
+  return { ...inherited, ...extra };
 };

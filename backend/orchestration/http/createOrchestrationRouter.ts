@@ -8,7 +8,9 @@ import {
   directionDecisionSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
   idParamsSchema, putActionSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
   putResourceSchema, putStateSchema, refinementDecisionSchema, removeDirectionSchema,
-  removeResourceSchema, reorderSchema, runParamsSchema, startRunSchema, stateParamsSchema
+  removeResourceSchema, reorderSchema, runParamsSchema, startRunSchema, stateParamsSchema,
+  workInputResponseSchema,
+  useCaseApprovalDecisionSchema
 } from "../../../shared/orchestration/httpContracts.js";
 
 export interface OrchestrationRouterOptions {
@@ -24,7 +26,7 @@ export const createOrchestrationRouter = ({ controller, actor }: OrchestrationRo
   }));
   registerDocumentRoutes(router, controller, actor);
   registerEnvironmentRoutes(router, controller);
-  registerRunRoutes(router, controller);
+  registerRunRoutes(router, controller, actor);
   registerFeedbackRoutes(router, controller, actor);
   registerReviewRoutes(router, controller, actor);
   router.get("/events", (req, res, next) => {
@@ -80,8 +82,8 @@ const registerDocumentRoutes = (
     }));
   }
   router.post("/use-cases/:id/approve", route(async (req, res) => {
-    const { id } = parseParams(idParamsSchema, req); const input = parseBody(directionDecisionSchema, req);
-    res.json(controller.approveUseCase(id, input.expectedConfigHash, actor()));
+    const { id } = parseParams(idParamsSchema, req); const input = parseBody(useCaseApprovalDecisionSchema, req);
+    res.json(controller.approveUseCase(id, input.expectedConfigHash, input.expectedContentHash, actor()));
   }));
   router.post("/use-cases/:id/return-to-draft", route(async (req, res) => {
     const { id } = parseParams(idParamsSchema, req); const input = parseBody(directionDecisionSchema, req);
@@ -134,7 +136,9 @@ const registerEnvironmentRoutes = (router: express.Router, controller: ApiContro
   }));
 };
 
-const registerRunRoutes = (router: express.Router, controller: ApiController): void => {
+const registerRunRoutes = (
+  router: express.Router, controller: ApiController, actor: () => TrustedHumanActor
+): void => {
   router.post("/environment-runs", route(async (req, res) => {
     const input = parseBody(startRunSchema, req);
     res.status(201).json(await controller.startRun(input.environmentId, input.expectedConfigHash, input.input));
@@ -142,7 +146,11 @@ const registerRunRoutes = (router: express.Router, controller: ApiController): v
   router.get("/environment-runs", route(async (_req, res) => res.json(controller.listRuns())));
   router.get("/environment-runs/:runId", route(async (req, res) => res.json(controller.run(parseParams(runParamsSchema, req).runId))));
   router.post("/environment-runs/:runId/cancel", route(async (req, res) => {
-    parseBody(emptySchema, req); res.json(controller.cancelRun(parseParams(runParamsSchema, req).runId));
+    parseBody(emptySchema, req); res.json(await controller.cancelRun(parseParams(runParamsSchema, req).runId));
+  }));
+  router.post("/environment-runs/:runId/work-input", route(async (req, res) => {
+    const input = parseBody(workInputResponseSchema, req);
+    res.json(controller.answerWorkInput(parseParams(runParamsSchema, req).runId, input, actor()));
   }));
   router.get("/environment-runs/:runId/product", route(async (req, res) =>
     res.json(controller.product(parseParams(runParamsSchema, req).runId))));

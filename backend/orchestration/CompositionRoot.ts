@@ -94,8 +94,8 @@ export const createCompositionRoot = async (options: CompositionOptions) => {
     workspace: worktrees, feedback, scheduler, governance, refinementApply, invalidations, nextId, now });
   const router = createOrchestrationRouter({ controller, actor: localActor });
 
-  environment.reconcile();
-  governance.reconcile();
+  await environment.reconcile();
+  await governance.reconcile();
   await configureScheduler(projects, scheduler, governance, database);
   let stopped = false;
   let pumping = false;

@@ -86,7 +86,7 @@ export const coreSchema = `
     refinement_run_id TEXT REFERENCES refinement_runs(refinement_run_id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('validation','work','critic','refinement')),
     phase TEXT NOT NULL CHECK (phase IN ('precheck','work','postwork','proposal')),
-    status TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled','interrupted')),
+    status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','completed','failed','cancelled','interrupted')),
     revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
     attempt INTEGER NOT NULL CHECK (attempt >= 1),
     task_envelope_version INTEGER NOT NULL CHECK (task_envelope_version = 10),
@@ -119,6 +119,7 @@ export const coreSchema = `
     kind TEXT NOT NULL CHECK (kind IN (
       'environment_started','state_activated','action_selected','action_imported','validation_precheck_dispatched',
       'validation_precheck_done','work_dispatched','work_completed','validation_postwork_dispatched',
+      'work_waiting_for_input','work_resumed',
       'validation_done','validation_retry','action_blocked','feedback_created','state_completed',
       'environment_completed','environment_blocked','environment_cancelled','execution_interrupted',
       'continuation_created'
@@ -140,5 +141,5 @@ export const coreSchema = `
     WHERE status IN ('prechecking','working','postchecking');
   CREATE UNIQUE INDEX one_active_agent_per_action
     ON agent_runs(action_execution_id)
-    WHERE action_execution_id IS NOT NULL AND status IN ('queued','running');
+    WHERE action_execution_id IS NOT NULL AND status IN ('queued','running','waiting_for_input');
 `;

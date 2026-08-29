@@ -94,7 +94,7 @@ describe("Validation-led Action transactions", () => {
       agentRunId: "precheck-1", providerOutcomeKey: "precheck-terminal", expectedActionRevision: 2,
       outcome: delegated, nextWork: { ...agentRunInput("work-1", "work", 1), parentAgentRunId: "precheck-1" }, completedAt: TEST_AT
     });
-    expect(current).toMatchObject({ status: "working", workAttempt: 1 });
+    expect(current).toMatchObject({ status: "working", workAttempt: 0 });
     current = context.outcomes.applyWork({
       agentRunId: "work-1", providerOutcomeKey: "work-terminal", expectedActionRevision: current.revision,
       outcome: workOutcome(), nextValidation: {

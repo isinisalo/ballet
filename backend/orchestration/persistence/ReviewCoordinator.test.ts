@@ -67,6 +67,7 @@ describe("Refinement exact proposal and continuation", () => {
     const context = completedContext();
     const proposal = createRefinement(context, "refinement-1", "refinement-proposal-1", "feedback-1");
     context.reviews.decideRefinement(proposal.refinementProposalId, refinementDecision(proposal), actor);
+    claimApply(context, "apply-1", proposal.refinementProposalId);
     const result = context.reviews.recordApply({
       refinementApplyId: "apply-1", refinementProposalId: proposal.refinementProposalId,
       status: "applied", worktreePath: "/tmp/refinement", branch: "codex/refinement",
@@ -75,7 +76,7 @@ describe("Refinement exact proposal and continuation", () => {
     });
     expect(result).toBe("stale");
     expect(context.reviews.reviews.requireRefinementProposal(proposal.refinementProposalId).status).toBe("stale");
-    expect(context.database.connection.prepare("SELECT COUNT(*) AS count FROM refinement_applies").get()).toEqual({ count: 0 });
+    expect(context.database.connection.prepare("SELECT status FROM refinement_applies").get()).toEqual({ status: "stale" });
   });
 
   it("records approved apply, immutable continuation, restart persistence, and rejects a cycle", () => {
@@ -87,13 +88,20 @@ describe("Refinement exact proposal and continuation", () => {
     context.reviews.decideRefinement(proposal.refinementProposalId, decision, actor);
     expect(() => context.reviews.decideRefinement(proposal.refinementProposalId, decision, actor)).toThrow(/already decided/);
     const commitSha = "c".repeat(40);
+    const rawContinuation = environmentSeed({
+      environmentRunId: "run-2", source: "continuation", previousRunId: "run-1",
+      baseCommit: commitSha, stateCount: 1
+    });
+    rawContinuation.executionSnapshot = { ...rawContinuation.executionSnapshot, lineage: {
+      parentRootRunId: "run-1", refinementProposalId: proposal.refinementProposalId,
+      refinementApprovalId: `${proposal.refinementProposalId}:decision`, refinementCommitSha: commitSha
+    } };
+    rawContinuation.executionSnapshotHash = hash(rawContinuation.executionSnapshot);
     const continuation = {
-      ...environmentSeed({
-        environmentRunId: "run-2", source: "continuation", previousRunId: "run-1",
-        baseCommit: commitSha, stateCount: 1
-      }),
+      ...rawContinuation,
       continuationLinkId: "continuation-1"
     };
+    claimApply(context, "apply-1", proposal.refinementProposalId);
     const result = context.reviews.recordApply({
       refinementApplyId: "apply-1", refinementProposalId: proposal.refinementProposalId,
       status: "applied", worktreePath: "/tmp/refinement", branch: "codex/refinement",
@@ -199,3 +207,13 @@ const refinementDecision = (proposal: ReturnType<typeof proposalInput>) => ({
   expectedImpactActionIds: ["action-1"], acknowledgeLocalCommitAndContinuation: true,
   decidedAt: TEST_AT
 });
+
+const claimApply = (
+  context: ReturnType<typeof completedContext>, refinementApplyId: string, refinementProposalId: string
+): void => {
+  context.database.connection.prepare(`
+    INSERT INTO refinement_applies (
+      refinement_apply_id, refinement_proposal_id, status, worktree_path, branch, created_at
+    ) VALUES (?, ?, 'running', '/tmp/refinement', 'codex/refinement', ?)
+  `).run(refinementApplyId, refinementProposalId, TEST_AT);
+};

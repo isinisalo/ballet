@@ -47,7 +47,17 @@ export const environmentDefinitionSchema = z.object({
   name: nonEmptyTextSchema,
   description: nonEmptyTextSchema,
   states: z.array(stateDefinitionSchema).min(1).max(CONTRACT_LIMITS.states)
-}).strict();
+}).strict().superRefine((environment, context) => {
+  const stateIds = new Set<string>(); const actionIds = new Set<string>();
+  for (const [stateIndex, state] of environment.states.entries()) {
+    if (stateIds.has(state.id)) context.addIssue({ code: "custom", path: ["states", stateIndex, "id"], message: "State IDs must be unique" });
+    stateIds.add(state.id);
+    for (const [actionIndex, action] of state.actions.entries()) {
+      if (actionIds.has(action.id)) context.addIssue({ code: "custom", path: ["states", stateIndex, "actions", actionIndex, "id"], message: "Action IDs must be unique across the Environment" });
+      actionIds.add(action.id);
+    }
+  }
+});
 
 const localTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 const criticScheduleSchema = z.discriminatedUnion("kind", [

@@ -10,13 +10,15 @@ import { ConfigureHeader } from "./ConfigureHeader";
 type Kind = "goals" | "adrs" | "constraints";
 type Item = DirectionReference | Constraint;
 
-export function DirectionWorkspace({ direction, documents, references, locked, onSave, onDelete }: {
+export function DirectionWorkspace({ direction, documents, references, locked, selectedId, onSave, onDelete }: {
   direction: { goals: DirectionReference[]; adrs: DirectionReference[]; constraints: Constraint[] };
   documents: Partial<Record<Kind, ResourceDocument[]>>; references: ReferenceEntry[]; locked: boolean;
+  selectedId?: string;
   onSave(kind: Kind, item: Item, markdown: string, creating: boolean): Promise<void>;
   onDelete(kind: Kind, item: Item): Promise<void>;
 }) {
-  const [selection, setSelection] = useState<{ kind: Kind; id: string }>();
+  const initialKind = (["goals", "adrs", "constraints"] as Kind[]).find((kind) => direction[kind].some(({ id }) => id === selectedId));
+  const [selection, setSelection] = useState<{ kind: Kind; id: string } | undefined>(initialKind && selectedId ? { kind: initialKind, id: selectedId } : undefined);
   const selected = selection ? direction[selection.kind].find((item) => item.id === selection.id) : undefined;
   const source = selection ? documents[selection.kind]?.find((item) => item.id === selection.id)?.content ?? "" : "";
   const usage = useMemo(() => selected ? references.find((entry) => entry.id === selected.id)?.references ?? [] : [], [references, selected]);
@@ -37,6 +39,7 @@ function DirectionEditor({ kind, item, source, usage, locked, onSave, onDelete }
   const [markdown, setMarkdown] = useState(source || "# New direction entry\n");
   const field = (key: "id" | "name") => <div><Label htmlFor={`direction-${key}`}>{key === "id" ? "Exact ID" : "Name"}</Label><Input id={`direction-${key}`} value={draft[key]} disabled={Boolean(item)} onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} /></div>;
   return <form className="space-y-4 rounded-md border bg-card p-4" onSubmit={(event) => { event.preventDefault(); void onSave(kind, draft, markdown, !item); }}><div><h2 className="font-semibold">{item ? `Edit ${item.id}` : `Create ${kind.slice(0, -1)}`}</h2><p className="text-sm text-muted-foreground">Referenced by {usage.length} owner{usage.length === 1 ? "" : "s"}. Delete and rename are blocked while referenced.</p></div>{field("id")}{field("name")}
+    <div><Label htmlFor="direction-status">Human decision status</Label><select id="direction-status" className="h-10 w-full rounded-sm border bg-background px-2" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as Item["status"] })}><option value="draft">Draft</option><option value="accepted">Accepted</option><option value="superseded">Superseded</option></select></div>
     {constraint ? <><div><Label htmlFor="constraint-kind">Constraint semantics</Label><select id="constraint-kind" className="h-10 w-full rounded-sm border bg-background px-2" value={(draft as Constraint).kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value as Constraint["kind"] } as Constraint)}><option value="required">Required</option><option value="prohibited">Prohibited</option></select></div><div><Label htmlFor="constraint-description">Description</Label><Input id="constraint-description" value={(draft as Constraint).description} onChange={(event) => setDraft({ ...draft, description: event.target.value } as Constraint)} /></div></> : null}
     <div><Label htmlFor="direction-markdown">Markdown source</Label><textarea id="direction-markdown" className="min-h-48 w-full rounded-sm border bg-background p-3 font-mono text-sm" value={markdown} onChange={(event) => setMarkdown(event.target.value)} /></div><div className="flex flex-wrap gap-2"><Button type="submit" disabled={locked || !draft.id || !draft.name}>Save</Button>{item ? <Button type="button" variant="destructive" disabled={locked || usage.length > 0} onClick={() => void onDelete(kind, item)}>Delete</Button> : null}</div>
     {usage.length ? <ul className="text-xs text-muted-foreground">{usage.map((reference) => <li key={`${reference.ownerType}:${reference.ownerId}:${reference.field}`}>{reference.ownerType} <code>{reference.ownerId}</code> · {reference.field}</li>)}</ul> : null}</form>;

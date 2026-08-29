@@ -42,11 +42,12 @@ describe("EnvironmentRunPlanner immutable closure", () => {
 describe("strict orchestration provider output", () => {
   test("rejects markdown wrappers, unknown fields, invalid enum and phase mismatch", () => {
     const valid = JSON.stringify({
-      version: 10, role: "validation", summary: "done", checks: [],
+      version: 10, role: "validation", summary: "done",
+      checks: [{ name: "fixture", status: "passed", evidenceRefs: ["test:fixture"] }],
       result: { phase: "precheck", decision: "done", evidence: {} }
     });
     expect(parseOrchestrationStructuredOutput(`\`\`\`json\n${valid}\n\`\`\``, { role: "validation", phase: "precheck" }).success).toBe(false);
-    expect(parseOrchestrationStructuredOutput(valid.replace('"checks":[]', '"checks":[],"extra":true'), { role: "validation", phase: "precheck" }).success).toBe(false);
+    expect(parseOrchestrationStructuredOutput(valid.replace('"summary":"done"', '"summary":"done","extra":true'), { role: "validation", phase: "precheck" }).success).toBe(false);
     expect(parseOrchestrationStructuredOutput(valid.replace('"decision":"done"', '"decision":"continue"'), { role: "validation", phase: "precheck" }).success).toBe(false);
     expect(parseOrchestrationStructuredOutput(valid, { role: "validation", phase: "postwork" }).success).toBe(false);
   });

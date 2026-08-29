@@ -74,7 +74,6 @@ export class EnvironmentWorkspaceManager implements OrchestrationWorkspacePort, 
       "-m", `chore(ballet): complete environment run ${safeId(run.environmentRunId)}`
     ], { cwd: run.worktreePath });
     const resultCommit = (await runGit(["rev-parse", "HEAD"], { cwd: run.worktreePath })).stdout.trim();
-    await runGit(["worktree", "remove", "--force", run.worktreePath], { cwd: this.root });
     return {
       productSnapshotId: this.nextId("product-snapshot"), environmentRunId: run.environmentRunId,
       branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit, resultCommit,
@@ -87,6 +86,12 @@ export class EnvironmentWorkspaceManager implements OrchestrationWorkspacePort, 
       validationSummary: { completedActions: run.executionSnapshot.environment.states.reduce((count, state) => count + state.actions.length, 0) },
       createdAt: at
     };
+  }
+
+  async cleanup(run: StoredEnvironmentRun): Promise<void> {
+    await runGit(["worktree", "remove", "--force", run.worktreePath], {
+      cwd: this.root, allowedExitCodes: [1, 128]
+    });
   }
 }
 

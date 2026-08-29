@@ -30,7 +30,7 @@ export interface WorkspaceNavigationBlocker {
 
 export interface WorkspaceNavigation {
   route: RouteState;
-  navigate: (path: string, options?: { bypassBlocker?: boolean }) => void;
+  navigate: (path: string, options?: { bypassBlocker?: boolean; replace?: boolean }) => void;
   setNavigationBlocker: (blocker: WorkspaceNavigationBlocker | null) => void;
 }
 
@@ -51,13 +51,13 @@ export const useWorkspaceNavigation = (): WorkspaceNavigation => {
     return !blocker?.isDirty || window.confirm(blocker.message ?? defaultNavigationBlockerMessage);
   }, []);
 
-  const navigate = useCallback((path: string, options?: { bypassBlocker?: boolean }) => {
+  const navigate = useCallback((path: string, options?: { bypassBlocker?: boolean; replace?: boolean }) => {
     const url = new URL(path, window.location.origin);
     const nextPath = `${url.pathname}${url.search}`;
     if (nextPath === currentPathRef.current || (!options?.bypassBlocker && !confirmNavigation())) return;
 
-    const nextHistoryIndex = currentHistoryIndexRef.current + 1;
-    window.history.pushState(indexedHistoryState(nextHistoryIndex), "", path);
+    const nextHistoryIndex = options?.replace ? currentHistoryIndexRef.current : currentHistoryIndexRef.current + 1;
+    window.history[options?.replace ? "replaceState" : "pushState"](indexedHistoryState(nextHistoryIndex), "", path);
     currentHistoryIndexRef.current = nextHistoryIndex;
     currentPathRef.current = nextPath;
     setRoute(routeFromPath(path));

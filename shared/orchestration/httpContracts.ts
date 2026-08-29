@@ -29,8 +29,15 @@ export const putDirectionSchema = z.object({
   value: z.union([directionReferenceSchema, constraintSchema, useCaseAuthoringSchema])
 }).strict();
 export const directionDecisionSchema = z.object({ expectedConfigHash: sha256Schema }).strict();
+export const useCaseApprovalDecisionSchema = z.object({
+  expectedConfigHash: sha256Schema, expectedContentHash: sha256Schema
+}).strict();
 export const startRunSchema = z.object({ environmentId: idSchema, expectedConfigHash: sha256Schema,
   input: z.string().max(CONTRACT_LIMITS.text).optional() }).strict();
+export const workInputResponseSchema = z.object({
+  expectedAgentRunId: idSchema, expectedAgentRevision: z.number().int().nonnegative(),
+  answer: z.string().trim().min(1).max(32768)
+}).strict();
 export const putEnvironmentSchema = z.object({ expectedConfigHash: sha256Schema, environment: environmentDefinitionSchema }).strict();
 export const putStateSchema = z.object({ expectedConfigHash: sha256Schema, state: stateDefinitionSchema }).strict();
 export const putActionSchema = z.object({ expectedConfigHash: sha256Schema, action: actionDefinitionSchema }).strict();
@@ -52,7 +59,7 @@ export const feedbackDecisionSchema = z.object({
 export const criticDecisionSchema = z.object({
   decision: z.enum(["approved", "rejected"]), expectedContentHash: sha256Schema, expectedVersion: z.literal(1),
   rationale: nonEmptyTextSchema.optional(), feedback: z.object({
-    feedbackEntryId: idSchema, environmentRunId: idSchema, title: nonEmptyTextSchema,
+    feedbackEntryId: idSchema, title: nonEmptyTextSchema,
     description: nonEmptyTextSchema, correctiveActions: z.array(nonEmptyTextSchema).min(1).max(32),
     evidenceRefs: z.array(nonEmptyTextSchema).max(64).optional()
   }).strict().optional()

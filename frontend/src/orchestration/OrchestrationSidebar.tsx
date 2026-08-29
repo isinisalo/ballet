@@ -1,5 +1,5 @@
 import { Box, ClipboardCheck, Compass, FileCheck2, ListChecks, MessageSquareWarning, Play, Settings2, Sparkles } from "lucide-react";
-import { Sidebar, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Sidebar, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import type { RouteState } from "@/workspace/types";
 
 const configure = [
@@ -18,6 +18,7 @@ const run = [
 ] as const;
 
 export function OrchestrationSidebar({ route, navigate }: { route: RouteState; navigate(path: string): void }) {
+  const { isMobile, setOpenMobile } = useSidebar();
   const activePath = typeof window === "undefined" ? "" : window.location.pathname;
   return (
     <Sidebar>
@@ -29,7 +30,7 @@ export function OrchestrationSidebar({ route, navigate }: { route: RouteState; n
           <section key={String(title)} aria-label={String(title)}>
             <div className="px-2 py-1 font-mono text-[0.68rem] uppercase tracking-wider text-muted-foreground">{String(title)}</div>
             <ul className="flex flex-col gap-0.5">{(items as typeof configure).map(([label, path, Icon]) => (
-              <SidebarMenuItem key={path}><SidebarMenuButton isActive={activePath === path || activePath.startsWith(`${path}/`)} onClick={() => navigate(path)}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
+              <SidebarMenuItem key={path}><SidebarMenuButton aria-current={activePath === path || activePath.startsWith(`${path}/`) ? "page" : undefined} isActive={activePath === path || activePath.startsWith(`${path}/`)} onClick={() => { navigate(path); if (isMobile) setOpenMobile(false); }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
             ))}</ul>
           </section>
         ))}

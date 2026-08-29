@@ -65,7 +65,7 @@ export class AgentDispatchFactory {
     } : {
       ...base, role: "validation", phase: "postwork", workAttempt: input.attempt,
       retriesRemaining: Math.max(0, input.action.maxRetries - Math.max(0, input.attempt - 1)),
-      workOutcome: (input.workOutcome ?? failedWorkOutcome("Work outcome unavailable")) as unknown as JsonValue
+      workOutcome: requiredOutcome(input.workOutcome) as unknown as JsonValue
     };
     const parsedEnvelope = taskEnvelopeV10Schema.parse(envelope);
     const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition });
@@ -100,10 +100,6 @@ export class AgentDispatchFactory {
   }
 }
 
-export const failedWorkOutcome = (summary: string): WorkOutcome => ({
-  version: 10, role: "work", state: "failed", summary, checks: [], artifacts: {}
-});
-
 const findDefinitions = (run: StoredEnvironmentRun, actionId: string): { state: StateDefinition; action: ActionDefinition } => {
   for (const state of run.executionSnapshot.environment.states) {
     const action = state.actions.find(({ id }) => id === actionId);
@@ -120,5 +116,9 @@ const requireInstruction = (run: StoredEnvironmentRun, composition: AgentComposi
 };
 const required = (value: string | undefined, message: string): string => {
   if (!value?.trim()) throw new Error(message);
+  return value;
+};
+const requiredOutcome = (value: WorkOutcome | undefined): WorkOutcome => {
+  if (!value) throw new Error("Postwork Validation requires a persisted Work outcome.");
   return value;
 };

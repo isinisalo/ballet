@@ -57,7 +57,7 @@ export interface CreateAgentRunInput {
 
 export interface FeedbackSeed {
   feedbackEntryId: string;
-  source: "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal" | "human";
+  source: "validation_blocked" | "retry_exhaustion" | "provider_failure" | "system_invalid_output" | "approved_critic_proposal" | "human";
   category: FeedbackCategory;
   targetType: FeedbackTargetType;
   targetId: string;

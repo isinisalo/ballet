@@ -4,7 +4,7 @@ title: Validation-led Environment State Action target contract
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 3
+version: 4
 tags:
   - arc42
   - initiative
@@ -224,6 +224,8 @@ Product Snapshot is a read-only projection with version, source Run/snapshot/com
 ## API approval boundaries
 
 Canonical target API exposes explicit commands for Use Case approve/reject, Critic proposal approve/reject and Refinement proposal approve/reject. Each body contains expected revision and relevant content/preimage hash; server authentication is the existing loopback/same-origin human UI boundary. Agent task tokens/outputs cannot call approval services.
+
+A durable Work `needs_input` boundary uses `POST /api/environment-runs/:runId/work-input`. Its body is bound to the exact active Work Agent ID and revision plus the bounded human answer; a stale or cross-Agent response is rejected and cannot consume a retry or create a new Work attempt.
 
 Refinement apply is an internal/application command that consumes an already recorded approval; no public route accepts “approved=true” plus a diff. All mutations use Zod validation, exact conflict errors and one transaction. Canonical endpoints live under `/api`; there are no aliases.
 

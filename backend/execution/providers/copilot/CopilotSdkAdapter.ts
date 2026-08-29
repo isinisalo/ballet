@@ -263,7 +263,8 @@ const enforceCopilotSandbox = async (
         },
         network: {
           allowOutbound: request.policy.network,
-          allowLocalNetwork: request.policy.network
+          // A provider must never reach Ballet's human-command loopback API.
+          allowLocalNetwork: false
         },
         seatbelt: { keychainAccess: false }
       }

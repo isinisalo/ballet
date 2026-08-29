@@ -1,15 +1,14 @@
 import type Database from "better-sqlite3";
-import { execFile } from "node:child_process";
 import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { isAllowedCanonicalRefinementPath } from "../../../shared/orchestration/refinement.js";
 import { ReviewCoordinator } from "../persistence/ReviewCoordinator.js";
 import { ReviewStore } from "../persistence/ReviewStore.js";
+import { ConflictError } from "../persistence/PersistenceErrors.js";
+import { runGit } from "../../execution/git/gitProcess.js";
 
-const runFile = promisify(execFile);
 export type RefinementValidationId = "instruction_contract" | "resource_contract" | "relevant_tests";
 
 export interface RefinementValidationRunner {
@@ -31,7 +30,7 @@ export class RefinementApplyService {
   private readonly coordinator: ReviewCoordinator;
 
   constructor(
-    connection: () => Database.Database,
+    private readonly connection: () => Database.Database,
     private readonly projectRoot: string,
     private readonly worktreesRoot: string,
     private readonly validations: RefinementValidationRunner,
@@ -51,8 +50,19 @@ export class RefinementApplyService {
     const worktreePath = path.join(this.worktreesRoot, safeId(refinementApplyId));
     const at = this.now();
     const observed: Record<string, string> = {};
-    try {
+    this.connection().transaction(() => {
       this.reviews.assertRefinementApplyAuthorized(refinementProposalId);
+      const existing = this.connection().prepare(
+        "SELECT status FROM refinement_applies WHERE refinement_proposal_id = ?"
+      ).get(refinementProposalId);
+      if (existing) throw new ConflictError("Refinement Proposal already has an apply operation.");
+      this.connection().prepare(`
+        INSERT INTO refinement_applies (
+          refinement_apply_id, refinement_proposal_id, status, worktree_path, branch, created_at
+        ) VALUES (?, ?, 'running', ?, ?, ?)
+      `).run(refinementApplyId, refinementProposalId, worktreePath, branch, at);
+    })();
+    try {
       await git(this.projectRoot, ["cat-file", "-e", `${String(proposal.expected_base_commit)}^{commit}`]);
       await mkdir(this.worktreesRoot, { recursive: true, mode: 0o700 });
       await git(this.projectRoot, ["worktree", "add", "-b", branch, worktreePath, String(proposal.expected_base_commit)]);
@@ -139,7 +149,7 @@ const assertNoSymlinkChain = async (root: string, relativePath: string): Promise
   }
 };
 const git = async (cwd: string, args: string[]): Promise<string> => {
-  const result = await runFile("git", args, { cwd, encoding: "utf8", maxBuffer: 4 * 1024 * 1024 });
+  const result = await runGit(args, { cwd });
   return result.stdout.trim();
 };
 const safeId = (value: string): string => value.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 80);

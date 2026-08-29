@@ -46,7 +46,7 @@ Standalone State/Action Run, autonominen ihmisapproval, runtime DB migration, co
 9. Stale preimage, muuttunut base commit, puuttuva shared Skill -impact tai väärä human approval revision tuottaa 0 tiedostomuutosta ja 0 continuation-runia.
 10. Hyväksytty validi refinement tuottaa yhden managed-worktree-commitin ja yhden continuation-runin, jonka Snapshot v13 viittaa parent Runiin, proposaliin, approvaliin ja commit SHA:han; alkuperäinen snapshot muuttuu 0 tavua.
 11. Product Snapshotin jokainen status, hash, approval, Feedback- ja evidence-viite voidaan johtaa canonical project/runtime-totuudesta; provider-proosasta keksittyjä kenttiä on 0.
-12. Lopullisissa active source/config/API/UI/release-pinnoissa on 0 Reward-MDP-, Graph/GraphNode/ActionNode-, policy-, acceptance-ledger-, Graph Node Module- tai vNext-prefix-osumaa manifestin gateillä.
+12. Lopullisissa active source/config/API/UI/release-pinnoissa on 0 korvatun domainin tai väliaikaisen namespace-prefixin osumaa manifestin gateillä.
 13. Target-UI:ssa page-level horizontal overflow, clipped core action ja pelkkään väriin nojaava status ovat 0 sekä 1440×900- että 390×844-viewporteissa; keyboard-polku kattaa kaikki hyväksyntäkomennot.
 
 ## Supersession

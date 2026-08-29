@@ -67,11 +67,36 @@ export class GovernanceExecutionService {
     } catch (error) { await this.workspaces.releaseReadOnly(taskId); throw error; }
   }
 
-  reconcile(): number {
+  async reconcile(): Promise<number> {
+    this.execution.recoverAfterRestart(this.now());
+    this.connection().prepare(`
+      UPDATE critic_runs SET status = 'queued', agent_run_id = NULL, updated_at = ?
+      WHERE status = 'running' AND NOT EXISTS (
+        SELECT 1 FROM agent_runs agent JOIN execution_tasks task ON task.agent_run_id = agent.agent_run_id
+        WHERE agent.critic_run_id = critic_runs.critic_run_id
+          AND agent.status IN ('queued','running') AND task.status IN ('queued','running','succeeded','failed')
+      )
+    `).run(this.now());
+    this.connection().prepare(`
+      UPDATE refinement_runs SET status = 'queued', agent_run_id = NULL, updated_at = ?
+      WHERE status = 'running' AND NOT EXISTS (
+        SELECT 1 FROM agent_runs agent JOIN execution_tasks task ON task.agent_run_id = agent.agent_run_id
+        WHERE agent.refinement_run_id = refinement_runs.refinement_run_id
+          AND agent.status IN ('queued','running') AND task.status IN ('queued','running','succeeded','failed')
+      )
+    `).run(this.now());
     let count = 0;
-    for (const task of this.execution.pendingTasks().filter(({ spec }) => ["critic", "refinement"].includes(spec.evidence.role))) {
+    for (const task of this.execution.recoverableTasks().filter(({ spec }) => ["critic", "refinement"].includes(spec.evidence.role))) {
       if (!this.queue.has(task.taskId)) { this.queue.enqueue(task.taskId); count += 1; }
     }
+    const critics = this.connection().prepare(`
+      SELECT critic_run_id FROM critic_runs WHERE status = 'queued' AND agent_run_id IS NULL ORDER BY created_at
+    `).all() as Array<{ critic_run_id: string }>;
+    for (const { critic_run_id } of critics) { await this.queueCritic(critic_run_id); count += 1; }
+    const refinements = this.connection().prepare(`
+      SELECT refinement_run_id FROM refinement_runs WHERE status = 'queued' AND agent_run_id IS NULL ORDER BY created_at
+    `).all() as Array<{ refinement_run_id: string }>;
+    for (const { refinement_run_id } of refinements) { await this.queueRefinement(refinement_run_id); count += 1; }
     return count;
   }
 
@@ -80,6 +105,10 @@ export class GovernanceExecutionService {
     const taskId = this.queue.next();
     if (!taskId) return false;
     const task = this.execution.requireTask(taskId);
+    if (["succeeded", "failed"].includes(task.status)) {
+      this.applyPersistedTerminal(task);
+      return true;
+    }
     if (task.status !== "queued" || !this.execution.claimTask(taskId, this.now())) return true;
     this.activeTaskId = taskId;
     try {
@@ -135,6 +164,26 @@ export class GovernanceExecutionService {
     if (parsed.outcome.role === "critic") return this.applyCritic(agent.criticRunId!, parsed.outcome, at);
     this.applyRefinement(agent.refinementRunId!, parsed.outcome, at);
     return "proposal";
+  }
+
+  private applyPersistedTerminal(task: ReturnType<AgentExecutionStore["requireTask"]>): void {
+    const agent = this.execution.requireAgent(task.agentRunId);
+    if (!task.providerOutcomeKey) throw new Error(`Governance task ${task.taskId} lacks a provider outcome key.`);
+    const at = this.now();
+    if (task.status === "failed") {
+      this.execution.failAgent(agent.agentRunId, task.providerOutcomeKey,
+        task.errorCode ?? "provider_failure", task.errorMessage ?? "Provider failed.", at);
+      this.failGovernanceRun(agent.criticRunId, agent.refinementRunId, at);
+      return;
+    }
+    if (!task.outcome || (Reflect.get(task.outcome as object, "role") !== "critic"
+      && Reflect.get(task.outcome as object, "role") !== "refinement")) {
+      throw new Error(`Governance task ${task.taskId} lacks its persisted role outcome.`);
+    }
+    const outcome = task.outcome as CriticOutcome | RefinementOutcome;
+    this.execution.completeAgent(agent.agentRunId, task.providerOutcomeKey, outcome, at);
+    if (outcome.role === "critic") this.applyCritic(agent.criticRunId!, outcome, at);
+    else this.applyRefinement(agent.refinementRunId!, outcome, at);
   }
 
   private persistGovernanceDispatch(

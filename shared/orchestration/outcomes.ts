@@ -30,7 +30,6 @@ export interface ValidationOutcome extends OutcomeBase {
 export type WorkOutcome = OutcomeBase & { role: "work" } & (
   | { state: "completed"; artifacts: Record<string, JsonValue> }
   | { state: "needs_input"; artifacts: Record<string, JsonValue>; question: string; context: string }
-  | { state: "blocked" | "failed"; artifacts: Record<string, JsonValue> }
 );
 
 export interface CriticProposal {

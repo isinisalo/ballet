@@ -6,5 +6,5 @@ export function ActionFlow({ action }: { action: ActionDefinition }) {
 }
 
 function FlowNode({ label, detail, main = false }: { label: string; detail: string; main?: boolean }) { return <div className={`w-full rounded-md border p-3 ${main ? "border-secondary/70 bg-secondary/10" : "bg-background"}`}><strong>{label}</strong><div className="font-mono text-xs text-muted-foreground">{detail}</div>{main ? <OperationalStatus compact label="Controller role" tone="healthy" /> : null}</div>; }
-function Connector({ label }: { label: string }) { return <div aria-label={label} className="flex flex-col items-center font-mono text-[0.68rem] text-muted-foreground"><span aria-hidden="true" className="h-5 border-l-2 border-canvas-flow" />{label}</div>; }
+function Connector({ label }: { label: string }) { return <div aria-label={label} className="flex flex-col items-center font-mono text-[0.68rem] text-muted-foreground"><span aria-hidden="true" className="h-5 border-l-2 border-secondary" />{label}</div>; }
 function Branch({ label, tone }: { label: string; tone: "done" | "delegate" | "retry" | "blocked" }) { return <div className={`rounded-sm border p-2 text-sm ${tone === "blocked" ? "border-destructive/60" : tone === "retry" ? "border-tertiary/60" : "border-secondary/50"}`}>{label}</div>; }

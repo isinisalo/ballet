@@ -76,7 +76,7 @@ export const environmentSeed = (options: {
     };
   });
   const snapshot: RootSnapshotV13 = {
-    version: 13, projectHeadSha: TEST_SHA, projectConfigSha256: HASH_A,
+    version: 13, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
@@ -136,7 +136,7 @@ export const agentRunInput = (
     envelope = {
       ...base, role: "validation", phase, workAttempt: attempt,
       retriesRemaining: Math.max(0, maxRetries - Math.max(0, attempt - 1)),
-      workOutcome: { version: 10, role: "work", state: "completed", summary: "Work complete", checks: [], artifacts: {} }
+      workOutcome: { version: 10, role: "work", state: "completed", summary: "Work complete", checks: [testCheck], artifacts: {} }
     };
   }
   return {
@@ -173,13 +173,14 @@ export const validationOutcome = (
     | { phase: "postwork"; decision: "done"; evidence: EmptyEvidence }
     | { phase: "postwork"; decision: "retry"; workPrompt: string; feedback: string; expectedCorrection: string; evidence: EmptyEvidence }
     | { phase: "postwork"; decision: "blocked"; reason: string; correctiveActions: string[]; evidence: EmptyEvidence }
-) => ({ version: 10 as const, role: "validation" as const, summary: "Validation complete", checks: [], result });
+) => ({ version: 10 as const, role: "validation" as const, summary: "Validation complete", checks: [testCheck], result });
 
 export const workOutcome = () => ({
   version: 10 as const, role: "work" as const, state: "completed" as const,
-  summary: "Work complete", checks: [], artifacts: {}
+  summary: "Work complete", checks: [testCheck], artifacts: {}
 });
 
 export const hash = (value: unknown): string => sha256(canonicalJson(JSON.parse(JSON.stringify(value))));
 
 type EmptyEvidence = Record<string, never>;
+const testCheck = { name: "fixture", status: "passed" as const, evidenceRefs: ["test:fixture"] };

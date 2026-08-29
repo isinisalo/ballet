@@ -19,6 +19,22 @@ export class EnvironmentRunStore {
     const snapshot = rootSnapshotV13Schema.parse(input.executionSnapshot);
     assertHash(snapshot, input.executionSnapshotHash, "execution snapshot");
     if (input.states.length === 0) throw new ConflictError("Environment Run requires at least one State.");
+    if (snapshot.environment.id !== input.environmentDefinitionId || snapshot.projectHeadSha !== input.baseCommit) {
+      throw new ConflictError("Environment Run identity differs from its immutable snapshot.");
+    }
+    const snapshotDefinitions = canonical(snapshot.environment.states);
+    const seededDefinitions = canonical([...input.states].sort((left, right) => left.definition.order - right.definition.order)
+      .map(({ definition }) => definition));
+    if (snapshotDefinitions !== seededDefinitions) throw new ConflictError("Environment Run seeds differ from its immutable snapshot.");
+    if (input.source === "continuation") {
+      const parent = input.previousRunId ? this.get(input.previousRunId) : undefined;
+      if (!parent || !["completed", "blocked", "cancelled", "interrupted"].includes(parent.status)
+        || snapshot.lineage?.parentRootRunId !== parent.environmentRunId) {
+        throw new ConflictError("Continuation lineage requires the exact terminal parent Run.");
+      }
+    } else if (snapshot.lineage) {
+      throw new ConflictError("Manual Environment Run cannot carry continuation lineage.");
+    }
     return this.connection().transaction(() => {
       this.connection().prepare(`
         INSERT INTO environment_runs (
@@ -78,6 +94,47 @@ export class EnvironmentRunStore {
     const row = this.connection().prepare("SELECT * FROM action_executions WHERE action_execution_id = ?").get(actionExecutionId);
     if (!row) throw new NotFoundError(`Action Execution ${actionExecutionId} was not found.`);
     return toActionExecution(row);
+  }
+
+  recoverFinalizations(at: string): number {
+    return this.connection().prepare(`
+      UPDATE environment_runs SET finalization_status = 'failed', revision = revision + 1, updated_at = ?
+      WHERE status = 'running' AND finalization_status = 'running'
+    `).run(at).changes;
+  }
+
+  finalizableRuns(): StoredEnvironmentRun[] {
+    const rows = this.connection().prepare(`
+      SELECT environment_run_id FROM environment_runs
+      WHERE status = 'running' AND active_state_execution_id IS NULL
+        AND active_action_execution_id IS NULL AND active_agent_run_id IS NULL
+        AND (finalization_status IS NULL OR finalization_status = 'failed')
+        AND NOT EXISTS (SELECT 1 FROM state_executions state
+          WHERE state.environment_run_id = environment_runs.environment_run_id AND state.status <> 'done')
+      ORDER BY created_at
+    `).all() as Array<{ environment_run_id: string }>;
+    return rows.map(({ environment_run_id }) => this.require(environment_run_id));
+  }
+
+  claimFinalization(environmentRunId: string, expectedRevision: number, at: string): StoredEnvironmentRun {
+    const changed = this.connection().prepare(`
+      UPDATE environment_runs SET finalization_status = 'running', finalization_json = NULL,
+        revision = revision + 1, updated_at = ?
+      WHERE environment_run_id = ? AND revision = ? AND status = 'running'
+        AND active_state_execution_id IS NULL AND active_action_execution_id IS NULL AND active_agent_run_id IS NULL
+        AND (finalization_status IS NULL OR finalization_status = 'failed')
+    `).run(at, environmentRunId, expectedRevision);
+    if (changed.changes !== 1) throw new ConflictError(`Environment Run ${environmentRunId} cannot claim finalization.`);
+    return this.require(environmentRunId);
+  }
+
+  failFinalization(environmentRunId: string, expectedRevision: number, error: string, at: string): void {
+    const changed = this.connection().prepare(`
+      UPDATE environment_runs SET finalization_status = 'failed', error_code = 'finalization_failed',
+        error_message = ?, revision = revision + 1, updated_at = ?
+      WHERE environment_run_id = ? AND revision = ? AND status = 'running' AND finalization_status = 'running'
+    `).run(error, at, environmentRunId, expectedRevision);
+    if (changed.changes !== 1) throw new ConflictError(`Environment Run ${environmentRunId} finalization state changed.`);
   }
 
   private insertStates(input: CreateEnvironmentRunInput): void {

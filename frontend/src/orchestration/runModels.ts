@@ -21,10 +21,10 @@ export const timelineForAction = (events: JsonRow[], actionExecutionId: string) 
 const tones = { done: "healthy", completed: "healthy", applied: "healthy", validating: "active", prechecking: "active", postchecking: "active", working: "active", running: "active", retrying: "attention", pending: "neutral", queued: "neutral", blocked: "danger", failed: "danger", apply_failed: "danger", interrupted: "danger", cancelled: "neutral", rejected: "neutral", skipped: "neutral", applying: "active" } as const;
 export const statusPresentation = (status: string) => ({ label: status.replaceAll("_", " "), tone: tones[status as keyof typeof tones] ?? "neutral" as const });
 
-export const criticDecisionRequest = (proposal: JsonRow, decision: "approved" | "rejected", runId: string) => {
+export const criticDecisionRequest = (proposal: JsonRow, decision: "approved" | "rejected") => {
   const content = parseJson(proposal.content_json); const id = String(proposal.critic_proposal_id);
   return { decision, expectedContentHash: String(proposal.content_hash), expectedVersion: 1 as const,
-    ...(decision === "approved" ? { feedback: { feedbackEntryId: `feedback-${id}`, environmentRunId: runId,
+    ...(decision === "approved" ? { feedback: { feedbackEntryId: `feedback-${id}`,
       title: String(content.title ?? "Critic finding"), description: String(content.finding ?? "Critic finding"),
       correctiveActions: strings(content.recommendedCorrectiveActions), evidenceRefs: strings(content.evidenceRefs) } } : {}) };
 };
@@ -36,9 +36,32 @@ export const refinementDecisionRequest = (proposal: JsonRow, decision: "approved
   acknowledgeLocalCommitAndContinuation: decision === "approved"
 });
 
-export const diffPresentation = (file: JsonRow) => ({ operation: String(file.operation), path: String(file.relative_path),
-  preimage: String(file.expected_preimage_hash), result: String(file.proposed_content_hash),
-  lines: typeof file.proposed_content === "string" ? file.proposed_content.split("\n").map((text, index) => ({ line: index + 1, marker: "+", text })) : [] });
+export const diffPresentation = (file: JsonRow) => {
+  const operation = String(file.operation); const before = typeof file.preimage_content === "string" ? file.preimage_content : "";
+  const after = typeof file.proposed_content === "string" ? file.proposed_content : "";
+  return { operation, path: String(file.relative_path), preimage: String(file.expected_preimage_hash),
+    result: String(file.proposed_content_hash), lines: exactLineDiff(before, after) };
+};
+
+type ExactDiffLine = { key: string; oldLine?: number; newLine?: number; marker: " " | "+" | "-"; text: string };
+
+const exactLineDiff = (before: string, after: string): ExactDiffLine[] => {
+  const previous = before ? before.split("\n") : []; const proposed = after ? after.split("\n") : [];
+  let prefix = 0;
+  while (prefix < previous.length && prefix < proposed.length && previous[prefix] === proposed[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < previous.length - prefix && suffix < proposed.length - prefix
+    && previous[previous.length - 1 - suffix] === proposed[proposed.length - 1 - suffix]) suffix += 1;
+  const rows: ExactDiffLine[] = [];
+  for (let index = 0; index < prefix; index += 1) rows.push({ key: `=${index}`, oldLine: index + 1, newLine: index + 1, marker: " ", text: previous[index]! });
+  for (let index = prefix; index < previous.length - suffix; index += 1) rows.push({ key: `-${index}`, oldLine: index + 1, marker: "-", text: previous[index]! });
+  for (let index = prefix; index < proposed.length - suffix; index += 1) rows.push({ key: `+${index}`, newLine: index + 1, marker: "+", text: proposed[index]! });
+  for (let offset = suffix; offset > 0; offset -= 1) {
+    const oldIndex = previous.length - offset; const newIndex = proposed.length - offset;
+    rows.push({ key: `=${oldIndex}:${newIndex}`, oldLine: oldIndex + 1, newLine: newIndex + 1, marker: " ", text: previous[oldIndex]! });
+  }
+  return rows;
+};
 
 export const reconcileRows = <T extends JsonRow>(current: T[], incoming: T[], id: keyof T): T[] => {
   const values = new Map(current.map((row) => [String(row[id]), row])); for (const row of incoming) values.set(String(row[id]), row);

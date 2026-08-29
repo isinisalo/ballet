@@ -104,7 +104,7 @@ export class LocalServerService {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         await this.options.launchd.installAndStart(state, settings);
-        await this.waitUntilReady(state, this.options.startupTimeoutMs ?? 20_000);
+        await this.waitUntilReady(state, this.options.startupTimeoutMs ?? 60_000);
         return state;
       } catch (error) {
         const portHealth = await this.probe(state);
@@ -131,7 +131,10 @@ export class LocalServerService {
     if (health && this.matches(health, state)) {
       const response = await this.fetchImpl(this.url(state, "/api/local/shutdown"), {
         method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        headers: {
+          Accept: "application/json", "Content-Type": "application/json",
+          Origin: `http://127.0.0.1:${state.port}`
+        },
         body: "{}",
         signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, 5_000)))
       });

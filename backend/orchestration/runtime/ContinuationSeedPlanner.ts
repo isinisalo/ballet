@@ -38,7 +38,8 @@ export const planContinuationSeed = (input: ContinuationSeedInput): CreateEnviro
       const previous = prior.get(action.definition.id);
       const safe = previous?.status === "done" && previous.definitionSnapshotHash === action.definitionHash
         && !impacted.has(action.definition.id)
-        && relevantResourceHash(input.parent, action.definition.id) === relevantResourceHash({ executionSnapshot: snapshot }, action.definition.id);
+        && relevantExecutionContextHash(input.parent, action.definition.id)
+          === relevantExecutionContextHash({ executionSnapshot: snapshot }, action.definition.id);
       return safe ? {
         ...action,
         originatingRunId: input.parent.environmentRunId,
@@ -47,7 +48,7 @@ export const planContinuationSeed = (input: ContinuationSeedInput): CreateEnviro
           sourceRunId: input.parent.environmentRunId,
           sourceActionExecutionId: previous.actionExecutionId,
           definitionHash: previous.definitionSnapshotHash,
-          resourceHash: relevantResourceHash(input.parent, action.definition.id)
+          resourceHash: relevantExecutionContextHash(input.parent, action.definition.id)
         } as JsonValue
       } : action;
     })
@@ -62,7 +63,7 @@ export const planContinuationSeed = (input: ContinuationSeedInput): CreateEnviro
   };
 };
 
-const relevantResourceHash = (
+const relevantExecutionContextHash = (
   source: Pick<StoredEnvironmentRun, "executionSnapshot">,
   actionId: string
 ): string => {
@@ -72,8 +73,19 @@ const relevantResourceHash = (
     action.validation.instructionResource, ...action.validation.skillResources,
     action.work.instructionResource, ...action.work.skillResources
   ]);
-  return contentHash(source.executionSnapshot.resources.filter(({ id }) => ids.has(id)).map(
-    ({ kind, id, sourceSha256 }) => ({ kind, id, sourceSha256 })
-  ));
+  const profileIds = new Set([action.validation.executionProfileId, action.work.executionProfileId]);
+  const state = source.executionSnapshot.environment.states.find(({ actions }) => actions.some(({ id }) => id === actionId));
+  const useCaseIds = new Set([...(state?.useCaseIds ?? []), ...action.useCaseIds]);
+  return contentHash({
+    directionSha256: source.executionSnapshot.directionSha256,
+    useCases: source.executionSnapshot.approvedUseCases.filter(({ useCase }) => useCaseIds.has(useCase.id))
+      .map(({ useCase, contentSha256 }) => ({ id: useCase.id, contentSha256 })),
+    profiles: source.executionSnapshot.executionProfiles.filter(({ id }) => profileIds.has(id)),
+    capabilities: source.executionSnapshot.runtimeCapabilities.filter(({ executionProfileId }) => profileIds.has(executionProfileId)),
+    permissions: source.executionSnapshot.permissions.filter(({ actionId: scopedActionId }) => !scopedActionId || scopedActionId === actionId),
+    resources: source.executionSnapshot.resources.filter(({ id }) => ids.has(id)).map(
+      ({ kind, id, sourceSha256 }) => ({ kind, id, sourceSha256 })
+    )
+  });
 };
 const contentHash = (value: unknown): string => sha256(canonicalJson(JSON.parse(JSON.stringify(value))));

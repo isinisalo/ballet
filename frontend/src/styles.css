@@ -75,16 +75,16 @@
 }
 
 @media (max-width: 767px) {
-  .orchestration-workspace button,
-  .orchestration-workspace input,
-  .orchestration-workspace select,
-  .orchestration-workspace textarea {
-    min-height: 40px;
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
   }
 
-  .orchestration-workspace input,
-  .orchestration-workspace select,
-  .orchestration-workspace textarea {
+  input,
+  select,
+  textarea {
     font-size: 16px;
   }
 }

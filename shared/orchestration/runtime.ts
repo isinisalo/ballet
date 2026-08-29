@@ -8,7 +8,7 @@ export type StateExecutionStatus = "pending" | "running" | "blocked" | "done" | 
 export type ActionExecutionStatus = "pending" | "prechecking" | "working" | "postchecking" | "blocked" | "done" | "cancelled" | "interrupted";
 export type AgentRunRole = "validation" | "work" | "critic" | "refinement";
 export type AgentRunPhase = "precheck" | "work" | "postwork" | "proposal";
-export type AgentRunStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+export type AgentRunStatus = "queued" | "running" | "waiting_for_input" | "completed" | "failed" | "cancelled" | "interrupted";
 
 export interface RootSnapshotV13 {
   version: typeof ROOT_SNAPSHOT_VERSION;
@@ -138,6 +138,8 @@ export type ControlFlowEventKind =
   | "validation_precheck_dispatched"
   | "validation_precheck_done"
   | "work_dispatched"
+  | "work_waiting_for_input"
+  | "work_resumed"
   | "work_completed"
   | "validation_postwork_dispatched"
   | "validation_done"

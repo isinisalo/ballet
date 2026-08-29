@@ -1,15 +1,16 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, max-lines-per-function */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
+import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
 import { ActionOutcomeCoordinator } from "../persistence/ActionOutcomeCoordinator.js";
 import { FeedbackStore } from "../persistence/FeedbackStore.js";
 import { FlowCoordinator } from "../persistence/FlowCoordinator.js";
 import {
-  HASH_A, TEST_AT, VALID_INSTRUCTION, agentRunInput, environmentSeed, feedbackSeed,
+  HASH_A, TEST_AT, VALID_INSTRUCTION, agentRunInput, environmentSeed, feedbackSeed, hash,
   openTestDatabase, productSnapshotSeed, validationOutcome, type TestDatabase
 } from "../persistence/PersistenceTestFixtures.js";
 import { ReviewCoordinator } from "../persistence/ReviewCoordinator.js";
@@ -141,7 +142,8 @@ describe("read-only governance proposal execution", () => {
       rationale: "Validation evidence", confidence: 0.9
     };
     expect(execution.applyProviderOutput(taskId, "critic-terminal", JSON.stringify({
-      version: 10, role: "critic", summary: "Reviewed", checks: [], proposal
+      version: 10, role: "critic", summary: "Reviewed",
+      checks: [{ name: "fixture", status: "passed", evidenceRefs: ["test:fixture"] }], proposal
     }))).toBe("proposal");
     expect(context.reviews.reviews.requireCriticProposal("critic-proposal").status).toBe("pending_human_review");
     expect(new FeedbackStore(() => context.db.connection).list("run-1")).toEqual([]);
@@ -191,14 +193,19 @@ describe("exact Refinement approval and managed apply", () => {
     const service = new RefinementApplyService(
       () => context.db.connection, repository.root, repository.worktrees,
       { run: async (id) => { validationCalls.push(id); } },
-      async ({ commitSha }) => {
+      async ({ commitSha, refinementProposalId }) => {
         const continuation = environmentSeed({
           environmentRunId: "run-2", source: "continuation", previousRunId: "run-1", baseCommit: commitSha, stateCount: 1
         });
+        bindContinuationLineage(continuation, refinementProposalId, commitSha);
         return { ...continuation, continuationLinkId: "continuation-1", continuationSnapshotHash: continuation.executionSnapshotHash };
       }, () => TEST_AT
     );
-    expect(await service.apply(proposal.refinementProposalId, "apply-1")).toBe("applied");
+    const applyResult = await service.apply(proposal.refinementProposalId, "apply-1");
+    const applyRow = context.db.connection.prepare(
+      "SELECT error_message FROM refinement_applies WHERE refinement_apply_id = 'apply-1'"
+    ).get() as { error_message: string | null };
+    expect(applyResult, applyRow.error_message ?? undefined).toBe("applied");
     expect(git(repository.root, ["rev-parse", "HEAD"])).toBe(repository.head);
     expect(git(path.join(repository.worktrees, "apply-1"), ["rev-parse", "HEAD"])).not.toBe(repository.head);
     expect(git(repository.root, ["remote"])).toBe("");
@@ -207,6 +214,34 @@ describe("exact Refinement approval and managed apply", () => {
     completeContinuation(context, "run-2");
     expect(new FeedbackResolutionService(() => context.db.connection).reconcileContinuation("run-2", TEST_AT)).toBe("resolved");
     expect(new FeedbackStore(() => context.db.connection).require("feedback-1").status).toBe("resolved");
+  });
+
+  test("claims an approved Refinement exactly once before any asynchronous project write", async () => {
+    const repository = gitRepository();
+    const context = completedDb(repository.head);
+    const proposal = createApprovedRefinement(context, repository.head, VALID_INSTRUCTION,
+      `${VALID_INSTRUCTION}\n\nOne apply only.`, ["instruction_contract"]);
+    let releaseValidation!: () => void;
+    const validationGate = new Promise<void>((resolve) => { releaseValidation = resolve; });
+    let validationStarted!: () => void;
+    const started = new Promise<void>((resolve) => { validationStarted = resolve; });
+    const service = new RefinementApplyService(
+      () => context.db.connection, repository.root, repository.worktrees,
+      { run: async () => { validationStarted(); await validationGate; } },
+      async ({ commitSha, refinementProposalId }) => {
+        const continuation = environmentSeed({ environmentRunId: "run-concurrent", source: "continuation",
+          previousRunId: "run-1", baseCommit: commitSha, stateCount: 1 });
+        bindContinuationLineage(continuation, refinementProposalId, commitSha);
+        return { ...continuation, continuationLinkId: "continuation-concurrent",
+          continuationSnapshotHash: continuation.executionSnapshotHash };
+      }, () => TEST_AT
+    );
+    const first = service.apply(proposal.refinementProposalId, "apply-first");
+    await started;
+    await expect(service.apply(proposal.refinementProposalId, "apply-second")).rejects.toThrow(/already has an apply/);
+    releaseValidation();
+    expect(await first).toBe("applied");
+    expect(context.db.connection.prepare("SELECT COUNT(*) AS count FROM refinement_applies").get()).toEqual({ count: 1 });
   });
 
   test("applies from the approved immutable product commit without rewinding a newer checkout", async () => {
@@ -220,9 +255,10 @@ describe("exact Refinement approval and managed apply", () => {
     const newerHead = git(repository.root, ["rev-parse", "HEAD"]);
     const service = new RefinementApplyService(
       () => context.db.connection, repository.root, repository.worktrees,
-      { run: async () => undefined }, async ({ commitSha }) => {
+      { run: async () => undefined }, async ({ commitSha, refinementProposalId }) => {
         const continuation = environmentSeed({ environmentRunId: "run-2", source: "continuation",
           previousRunId: "run-1", baseCommit: commitSha, stateCount: 1 });
+        bindContinuationLineage(continuation, refinementProposalId, commitSha);
         return { ...continuation, continuationLinkId: "continuation-1", continuationSnapshotHash: continuation.executionSnapshotHash };
       }, () => TEST_AT
     );
@@ -283,9 +319,10 @@ describe("exact Refinement approval and managed apply", () => {
       `${VALID_INSTRUCTION}\nRefined.`, ["instruction_contract"]);
     const service = new RefinementApplyService(
       () => context.db.connection, repository.root, repository.worktrees,
-      { run: async () => undefined }, async ({ commitSha }) => {
+      { run: async () => undefined }, async ({ commitSha, refinementProposalId }) => {
         const continuation = environmentSeed({ environmentRunId: "run-2", source: "continuation",
           previousRunId: "run-1", baseCommit: commitSha, stateCount: 1 });
+        bindContinuationLineage(continuation, refinementProposalId, commitSha);
         return { ...continuation, continuationLinkId: "continuation-1", continuationSnapshotHash: continuation.executionSnapshotHash };
       }, () => TEST_AT
     );
@@ -365,6 +402,16 @@ const completeContinuation = (context: ReturnType<typeof completedDb>, runId: st
   context.flow.completeEnvironment({
     ...productSnapshotSeed(runId), branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit
   }, run.revision);
+};
+
+const bindContinuationLineage = (
+  seed: CreateEnvironmentRunInput, refinementProposalId: string, commitSha: string
+): void => {
+  seed.executionSnapshot = { ...seed.executionSnapshot, lineage: {
+    parentRootRunId: "run-1", refinementProposalId,
+    refinementApprovalId: `${refinementProposalId}:decision`, refinementCommitSha: commitSha
+  } };
+  seed.executionSnapshotHash = hash(seed.executionSnapshot);
 };
 
 const gitRepository = (symlink = false) => {

@@ -33,6 +33,7 @@ export const useCaseAuthoringSchema = z.object({
   goalIds: idListSchema.min(1),
   adrIds: idListSchema.min(1),
   constraintIds: idListSchema.min(1),
+  approvalRevision: z.number().int().nonnegative().optional(),
   approval: z.object({
     approvedBy: idSchema,
     approvedAt: timestampSchema,

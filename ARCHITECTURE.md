@@ -163,6 +163,7 @@ Successful work must remain Critic-readable through immutable commit/artifact ev
 - Default profiles use Codex `gpt-5.6-sol`, high/xhigh reasoning and network off.
 - Prompts and retained events must exclude secrets; provider child environments use an explicit allowlist.
 - Internal Git operations disable user/repository hooks. Ballet never merges, pushes, publishes or deploys automatically.
+- Loopback health and persisted recovery do not wait for authenticated provider discovery; provider status remains fail closed at Run preflight until discovery completes.
 
 ## Project/platform boundary
 

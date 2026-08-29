@@ -5,6 +5,10 @@ type ErrorResponseBody = {
   issues?: Array<{ path?: string; message?: string }>;
 };
 
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message); this.name = "ApiRequestError"; }
+}
+
 const parseJsonBody = async <T,>(response: Response): Promise<T | undefined> => {
   const text = await response.text();
   if (!text.trim()) return undefined;
@@ -25,9 +29,9 @@ export const request = async <T>(url: string, init: RequestInit = {}): Promise<T
       ?.map((issue) => [issue.path, issue.message].filter(Boolean).join(": "))
       .filter(Boolean)
       .join("; ");
-    throw new Error(issueMessage
+    throw new ApiRequestError(issueMessage
       ? `${body.error ?? `Request failed with ${response.status}`}: ${issueMessage}`
-      : body.error ?? `Request failed with ${response.status}`);
+      : body.error ?? `Request failed with ${response.status}`, response.status);
   }
   if (response.status === 204) return undefined as T;
   return (await parseJsonBody<T>(response)) as T;

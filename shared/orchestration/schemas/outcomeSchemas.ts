@@ -30,7 +30,7 @@ export const validationDecisionSchema = z.union([precheckDecisionSchema, postwor
 const outcomeBase = {
   version: z.literal(ROLE_OUTCOME_VERSION),
   summary: nonEmptyTextSchema,
-  checks: z.array(checkEvidenceSchema).max(CONTRACT_LIMITS.evidenceItems)
+  checks: z.array(checkEvidenceSchema).min(1).max(CONTRACT_LIMITS.evidenceItems)
 };
 
 export const validationOutcomeSchema = z.object({
@@ -42,9 +42,7 @@ export const validationOutcomeSchema = z.object({
 const workBase = { ...outcomeBase, role: z.literal("work"), artifacts: z.record(z.string(), z.json()) };
 export const workOutcomeSchema = z.discriminatedUnion("state", [
   z.object({ ...workBase, state: z.literal("completed") }).strict(),
-  z.object({ ...workBase, state: z.literal("needs_input"), question: nonEmptyTextSchema, context: nonEmptyTextSchema }).strict(),
-  z.object({ ...workBase, state: z.literal("blocked") }).strict(),
-  z.object({ ...workBase, state: z.literal("failed") }).strict()
+  z.object({ ...workBase, state: z.literal("needs_input"), question: nonEmptyTextSchema, context: nonEmptyTextSchema }).strict()
 ]);
 
 const criticProposalSchema = z.object({

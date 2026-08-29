@@ -116,7 +116,7 @@ The default project demonstrates:
 
 ## Validation-first execution
 
-Validation precheck returns only `done | delegate | blocked`. `delegate` includes a specific dynamic Work prompt. Work returns only its strict subordinate outcome and cannot mark the Action done. Validation postwork returns only `done | retry | blocked`.
+Validation precheck returns only `done | delegate | blocked`. `delegate` includes a specific dynamic Work prompt. Work returns only `completed | needs_input` and cannot mark the Action done. `needs_input` persists one bounded question and resumes the same Work attempt only after a human response bound to the exact Agent revision. Validation postwork returns only `done | retry | blocked`.
 
 `maxRetries` counts additional Work attempts after the first. For example, `maxRetries: 0` permits one Work attempt and `maxRetries: 3` permits four. A provider failure is an operational failure boundary, not a silent semantic retry.
 
@@ -141,7 +141,7 @@ Refinement proposal generation is read-only. It records exact allowlisted paths,
 | Critic / Refinement review | `/reviews/critic/:id`, `/reviews/refinement/:id` |
 | Product Snapshot | `/products`, `/products/:id` |
 
-JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. There are no route aliases.
+JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. Key boundaries are `GET /api/project`, `GET /api/environment`, whole-Environment `POST /api/environment-runs`, exact human Work response `POST /api/environment-runs/:runId/work-input`, Feedback commands under `/api/feedback`, human Critic decisions under `/api/critic/proposals/:id/decision`, and exact Refinement decision/apply state under `/api/refinement/proposals/:id/*`. There are no route aliases or standalone State/Action Run commands.
 
 ## Strict local state
 

@@ -20,6 +20,7 @@ export interface StoredEnvironmentRun {
   activeAgentRunId?: string;
   transitionCount: number;
   transitionLimit: number;
+  finalizationStatus?: "running" | "completed" | "failed";
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -66,7 +67,7 @@ export interface StoredAgentRun {
   parentAgentRunId?: string;
   role: AgentRunRole;
   phase: AgentRunPhase;
-  status: "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+  status: "queued" | "running" | "waiting_for_input" | "completed" | "failed" | "cancelled" | "interrupted";
   revision: number;
   attempt: number;
   providerOutcomeKey?: string;

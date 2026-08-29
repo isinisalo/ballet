@@ -1,10 +1,11 @@
-/* eslint-disable max-lines-per-function */
+/* eslint-disable max-lines, max-lines-per-function */
 import { afterEach, describe, expect, test } from "vitest";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { EnvironmentRunStore } from "../persistence/EnvironmentRunStore.js";
 import { FeedbackStore } from "../persistence/FeedbackStore.js";
+import { AgentExecutionStore } from "../persistence/AgentExecutionStore.js";
 import {
   actionDefinition, environmentSeed, hash, openTestDatabase, TEST_AT, TEST_SHA, type TestDatabase
 } from "../persistence/PersistenceTestFixtures.js";
@@ -51,6 +52,28 @@ describe("orchestration validation-led Environment runtime", () => {
     expect(workCalls[1]!.spec.evidence.prompt).toContain("second");
   });
 
+  test("Work needs_input waits durably and resumes the same semantic attempt after exact human response", async () => {
+    const harness = createHarness([
+      output(precheck("delegate", "first")), output(workNeedsInput("Choose a bounded value", "Only A or B")),
+      output(work("completed")), output(postwork("done"))
+    ]);
+    await harness.start(); await harness.drain();
+    const waiting = database!.connection.prepare(
+      "SELECT agent_run_id, revision, status FROM agent_runs WHERE status = 'waiting_for_input'"
+    ).get() as { agent_run_id: string; revision: number; status: string };
+    expect(waiting.status).toBe("waiting_for_input");
+    expect(database!.connection.prepare("SELECT status FROM execution_tasks WHERE agent_run_id = ?").get(waiting.agent_run_id))
+      .toEqual({ status: "waiting_for_input" });
+    expect(harness.run()).toMatchObject({ status: "running", activeAgentRunId: waiting.agent_run_id });
+    harness.service.answerWorkInput({ environmentRunId: "run-1", expectedAgentRunId: waiting.agent_run_id,
+      expectedAgentRevision: waiting.revision, answer: "A", actorId: "human-1" });
+    await harness.drain();
+    expect(harness.provider.calls.filter(({ spec }) => spec.evidence.role === "work")).toHaveLength(2);
+    expect(harness.provider.calls[2]!.spec.evidence.prompt).toContain("Human response (human-1)");
+    expect(database!.connection.prepare("SELECT work_attempt FROM action_executions").get()).toEqual({ work_attempt: 1 });
+    expect(harness.run().status).toBe("completed");
+  });
+
   test("maxRetries zero converts retry to atomic blocked Feedback", async () => {
     const harness = createHarness([
       output(precheck("delegate", "first")), output(work("completed")), output(postwork("retry", "second"))
@@ -71,14 +94,14 @@ describe("orchestration validation-led Environment runtime", () => {
     expect(harness.run().status).toBe("blocked");
   });
 
-  test("Work provider failure still dispatches postwork Validation", async () => {
+  test("Work provider failure blocks without consuming a semantic retry", async () => {
     const harness = createHarness([
       output(precheck("delegate", "work")), { kind: "failure", providerOutcomeKey: "failure-1", errorMessage: "provider exited" },
-      output(postwork("blocked"))
     ]);
     await harness.start(); await harness.drain();
-    expect(harness.provider.calls.map(({ spec }) => spec.evidence.phase)).toEqual(["precheck", "work", "postwork"]);
+    expect(harness.provider.calls.map(({ spec }) => spec.evidence.phase)).toEqual(["precheck", "work"]);
     expect(harness.run().status).toBe("blocked");
+    expect(database!.connection.prepare("SELECT work_attempt FROM action_executions").get()).toEqual({ work_attempt: 0 });
   });
 
   test("invalid Validation output fails closed with system Feedback", async () => {
@@ -122,7 +145,7 @@ describe("orchestration validation-led Environment runtime", () => {
     const harness = createHarness([output(precheck("delegate", "work"))]);
     await harness.start();
     await harness.service.processNext();
-    harness.service.cancel("run-1");
+    await harness.service.cancel("run-1");
     await harness.service.processNext();
     expect(harness.provider.calls).toHaveLength(1);
     expect(harness.run().status).toBe("cancelled");
@@ -154,10 +177,52 @@ describe("orchestration validation-led Environment runtime", () => {
       () => database!.connection, replacementQueue, first.provider, first.finalizer,
       sequenceIds("restart"), () => TEST_AT
     );
-    expect(replacement.reconcile()).toBe(1);
-    expect(replacement.reconcile()).toBe(0);
+    expect(await replacement.reconcile()).toBe(1);
+    expect(await replacement.reconcile()).toBe(0);
     await replacement.processNext();
     expect(first.run().status).toBe("completed");
+  });
+
+  test("restart applies a provider terminal persisted before its domain transition", async () => {
+    const first = createHarness([]);
+    await first.start();
+    const row = database!.connection.prepare("SELECT execution_task_id FROM execution_tasks").get() as { execution_task_id: string };
+    const execution = new AgentExecutionStore(() => database!.connection);
+    expect(execution.claimTask(row.execution_task_id, TEST_AT)).toBe(true);
+    execution.finishTask(row.execution_task_id, "persisted-terminal", "succeeded", { outcome: precheck("done") }, TEST_AT);
+    const replacement = new EnvironmentRuntimeService(
+      () => database!.connection, new DeterministicExecutionQueue(), first.provider, first.finalizer,
+      sequenceIds("terminal-restart"), () => TEST_AT
+    );
+    expect(await replacement.reconcile()).toBe(1);
+    await replacement.processNext();
+    expect(first.provider.calls).toHaveLength(0);
+    expect(first.run().status).toBe("completed");
+  });
+
+  test("restart retries failed finalization before Product worktree cleanup", async () => {
+    let fails = true;
+    const finalizer: ProductFinalizationPort = {
+      finalize: async (run, at) => {
+        if (fails) throw new Error("simulated crash after finalization claim");
+        return { productSnapshotId: "product-recovered", environmentRunId: run.environmentRunId,
+          branch: run.branch, worktreePath: run.worktreePath, baseCommit: run.baseCommit,
+          resultCommit: "b".repeat(40), changedFiles: [], artifactRefs: [], resourceHashes: {},
+          definitionHashes: {}, validationSummary: { status: "passed" }, createdAt: at };
+      }
+    };
+    const first = createHarness([output(precheck("done"))], environmentSeed({ stateCount: 1 }), finalizer);
+    await first.start();
+    await expect(first.drain()).rejects.toThrow(/simulated crash/);
+    expect(first.run()).toMatchObject({ status: "running", finalizationStatus: "failed" });
+    fails = false;
+    const replacement = new EnvironmentRuntimeService(
+      () => database!.connection, new DeterministicExecutionQueue(), first.provider, finalizer,
+      sequenceIds("finalization-restart"), () => TEST_AT
+    );
+    expect(await replacement.reconcile()).toBe(1);
+    expect(first.run().status).toBe("completed");
+    expect(database!.connection.prepare("SELECT COUNT(*) AS count FROM product_snapshots").get()).toEqual({ count: 1 });
   });
 
   test("read-only provider permission denies write and has no writable root", () => {
@@ -212,7 +277,9 @@ describe("orchestration validation-led Environment runtime", () => {
     expect(result.states[0]!.actions[0]!.importedDoneEvidence).toBeUndefined();
   });
 
-  function createHarness(script: ProviderTerminal[], seed = environmentSeed({ stateCount: 1 })) {
+  function createHarness(
+    script: ProviderTerminal[], seed = environmentSeed({ stateCount: 1 }), suppliedFinalizer?: ProductFinalizationPort
+  ) {
     database = openTestDatabase();
     const queue = new DeterministicExecutionQueue();
     const provider = new ScriptedRuntimeProvider(script);
@@ -228,11 +295,12 @@ describe("orchestration validation-led Environment runtime", () => {
         };
       }
     };
+    const activeFinalizer = suppliedFinalizer ?? finalizer;
     const service = new EnvironmentRuntimeService(
-      () => database!.connection, queue, provider, finalizer, sequenceIds("runtime"), () => TEST_AT
+      () => database!.connection, queue, provider, activeFinalizer, sequenceIds("runtime"), () => TEST_AT
     );
     return {
-      service, queue, provider, finalizer, finalized,
+      service, queue, provider, finalizer: activeFinalizer, finalized,
       start: () => service.start(seed),
       drain: async () => { while (await service.processNext()) { /* deterministic queue */ } },
       run: () => new EnvironmentRunStore(() => database!.connection).require(seed.environmentRunId)
@@ -244,20 +312,25 @@ let outcomeSequence = 0;
 const output = (value: unknown): ProviderTerminal => ({
   kind: "output", providerOutcomeKey: `outcome-${++outcomeSequence}`, raw: JSON.stringify(value)
 });
+const testCheck = { name: "fixture", status: "passed" as const, evidenceRefs: ["test:fixture"] };
 const precheck = (decision: "done" | "delegate" | "blocked", prompt = "work") => ({
-  version: 10, role: "validation", summary: "precheck", checks: [],
+  version: 10, role: "validation", summary: "precheck", checks: [testCheck],
   result: decision === "done" ? { phase: "precheck", decision, evidence: {} }
     : decision === "delegate" ? { phase: "precheck", decision, workPrompt: prompt, evidence: {} }
       : { phase: "precheck", decision, reason: "blocked", correctiveActions: ["correct"], evidence: {} }
 });
 const postwork = (decision: "done" | "retry" | "blocked", prompt = "retry") => ({
-  version: 10, role: "validation", summary: "postwork", checks: [],
+  version: 10, role: "validation", summary: "postwork", checks: [testCheck],
   result: decision === "done" ? { phase: "postwork", decision, evidence: {} }
     : decision === "retry" ? { phase: "postwork", decision, workPrompt: prompt, feedback: "fix", expectedCorrection: "pass", evidence: {} }
       : { phase: "postwork", decision, reason: "blocked", correctiveActions: ["correct"], evidence: {} }
 });
-const work = (state: "completed" | "failed") => ({
-  version: 10, role: "work", state, summary: "work", checks: [], artifacts: {}
+const work = (state: "completed") => ({
+  version: 10, role: "work", state, summary: "work", checks: [testCheck], artifacts: {}
+});
+const workNeedsInput = (question: string, context: string) => ({
+  version: 10, role: "work", state: "needs_input", summary: "input required", checks: [testCheck],
+  artifacts: {}, question, context
 });
 const sequenceIds = (prefix: string) => {
   let sequence = 0;
@@ -267,10 +340,10 @@ const sequenceIds = (prefix: string) => {
 const twoActionSeed = (stateCount = 1, runId = "run-1", baseCommit = TEST_SHA): CreateEnvironmentRunInput => {
   const seed = environmentSeed({ stateCount, environmentRunId: runId, baseCommit });
   const first = seed.states[0]!;
-  const second = actionDefinition("action-2", 2, 1);
+  const second = actionDefinition(stateCount === 1 ? "action-2" : "action-extra", 2, 1);
   first.definition = { ...first.definition, actions: [first.definition.actions[0]!, second] };
   first.definitionHash = hash(first.definition);
-  first.actions.push({ actionExecutionId: `${runId}:action:action-2`, definition: second, definitionHash: hash(second) });
+  first.actions.push({ actionExecutionId: `${runId}:action:${second.id}`, definition: second, definitionHash: hash(second) });
   seed.executionSnapshot = {
     ...seed.executionSnapshot,
     projectHeadSha: baseCommit,

@@ -4,7 +4,7 @@ title: Ballet arc42 method health
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 12
+version: 13
 tags: [arc42, method, evidence]
 ---
 
@@ -14,10 +14,10 @@ The current initiative keeps one stable target chain (`goal-022` / `REQ-022` -> 
 
 | Signal | Current observation | Next measurement |
 | --- | --- | --- |
-| Trace completeness | all five target QS rows have owner, test and evidence IDs | final validator after cutover commit |
-| Independent review | conformance review required after canonical gates | record unresolved findings in initiative REVIEW |
-| Operational evidence | deterministic local tests cover restart, retry and approvals | one real-provider Environment occurrence |
-| UI evidence | isolated desktop/narrow evidence exists | canonical desktop/narrow browser verdict |
+| Trace completeness | all five target QS and all 13 canonical Use Cases have executable evidence owners and passed verdicts | revalidate on the next accepted semantic change |
+| Independent review | four bounded workstreams produced findings that were corrected and independently reverified | repeat at the next initiative acceptance boundary |
+| Operational evidence | deterministic local tests cover restart, retry, approvals and finalization; local package/startup passes | optional separately authorized real-provider occurrence |
+| UI evidence | nine canonical views passed desktop and narrow semantic browser QA | repeat when route/layout semantics change |
 | External effects | none authorized | keep separate human authorization gate |
 
 Method changes require repeated measured evidence, not a single implementation preference. See [TRACEABILITY](TRACEABILITY.md), [STATUS](STATUS.md) and [risks](11-risks-and-technical-debt.md).

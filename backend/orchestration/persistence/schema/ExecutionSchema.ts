@@ -6,7 +6,7 @@ export const executionSchema = `
     provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
     role TEXT NOT NULL CHECK (role IN ('validation','work','critic','refinement')),
     kind TEXT NOT NULL CHECK (kind = 'agent_execution'),
-    status TEXT NOT NULL CHECK (status IN ('queued','running','succeeded','failed','cancelled')),
+    status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','succeeded','failed','cancelled')),
     spec_version INTEGER NOT NULL CHECK (spec_version = 12),
     spec_json TEXT NOT NULL,
     spec_hash TEXT NOT NULL,

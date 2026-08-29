@@ -64,7 +64,10 @@ export class EnvironmentRunPlanner {
       capabilities.push(capability);
     }
     const permissions = permissionSnapshot(config, capabilities, loaded.checkoutRoot);
-    const approvedUseCases = config.direction.useCases.map((useCase) => ({
+    const referencedUseCaseIds = new Set(config.environment.states.flatMap((state) => [
+      ...state.useCaseIds, ...state.actions.flatMap((action) => action.useCaseIds)
+    ]));
+    const approvedUseCases = config.direction.useCases.filter(({ id }) => referencedUseCaseIds.has(id)).map((useCase) => ({
       useCase, contentSha256: useCaseApprovalHash(useCase)
     })).sort((left, right) => left.useCase.id.localeCompare(right.useCase.id));
     const direction = {

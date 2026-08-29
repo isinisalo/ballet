@@ -1,10 +1,10 @@
 ---
 id: environment-state-action-orchestration-evidence
 title: Environment State Action orchestration initiative evidence
-status: draft
+status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 11
+version: 12
 tags:
   - arc42
   - initiative
@@ -27,7 +27,8 @@ tags:
 | ESAO-evid-008 | REQ-022; partial QS-028/QS-029/QS-031 | Isolated vNext Configure UI for Direction, Use Cases, ordered Environment/State/Action authoring, resources, profiles and Critic configuration | `frontend/src/vnext/{configure/**,authoringModels.ts,vNextApi.ts,useVNext*}`; `frontend/tests/vnext{AuthoringModels,Routing,ConfigureUi}.test.*`; `evidence/configure-{environment-1440x900,action-390x844}.png` | passed: 39 focused tests; real API browser snapshots at 1440×900 and 390×844; overflow 0; URL back/forward preserved Action deep link; keyboard reorder and color-independent status inspected | 2026-08-29 local loopback service | Configure half of phase 08 only. Run/Feedback/review/Product UI and final target verdict remain pending. |
 | ESAO-evid-009 | REQ-022; partial QS-028–QS-031 | Isolated vNext Environment Run gate, Validation/Work timeline, Feedback, Critic and Refinement exact-approval review, continuation and Product Snapshot UI | `frontend/src/vnext/{run/**,runModels.ts,runTypes.ts,useVNextGovernanceData.ts}`; `frontend/tests/vnext{RunModels,GovernanceUi,Routing}.test.*`; `evidence/run-gate-{1440x900,390x844}.png` | passed: 53 focused tests; built-browser factual fixture at 1440×900 and 390×844; page overflow 0; narrow controls at least 40 px; 0 console errors/warnings; no old-domain text | 2026-08-29 local loopback service with bounded browser-only Run facts | Browser fixture is not a provider-backed product occurrence. Canonical routes and final quality verdict remain phase 09/11 work. |
 | ESAO-evid-010 | REQ-022 / QS-028–QS-032 | Atomic canonical cutover, strict removal, responsive canonical UI, packaged release smoke and local install/startup | `shared/orchestration/**`, `backend/orchestration/**`, `frontend/src/orchestration/**`, `scripts/check-cutover-removal.mjs`, `evidence/canonical-{environment-1440x900,action-390x844}.png` | passed: 27 files/254 tests; zero-warning lint; production build; 219-file removal gate; arc42/design/diff checks; packaged v20/v16 API smoke; `make latest`; healthy launchd service | 2026-08-29 local checkout, deterministic fake providers and real production bundle browser | No merge, push, release or deploy. A production-like real-provider continuation remains future operational evidence, not a cutover blocker. |
-| ESAO-evid-011 | UC-01–UC-13 / QS-031, QS-032 | Canonical default project, approved Use Case documents/hashes, five-State/fourteen-Action Environment, role profiles/instructions, shared Skills, compact fixture, active docs and editable flow diagram | `.ballet/project.json`, `.ballet/{constraints,use-cases,instructions}/**`, `.agents/skills/**`, `.fixture-ballet-project/**`, README, ARCHITECTURE, DESIGN, `ballet.drawio`, `.ballet/tests/defaultProjectResources.test.ts` | passed: resource validator; 28 files/260 tests; zero-warning lint; production build; design lint 0/0; draw.io XML; 219-file cutover gate; diff check | 2026-08-29 local repository; phase 10 default-resource commit | Proves project-data and documentation readiness. Runtime/security/frontend conformance findings from the bounded final audit remain phase 11 correction work. |
+| ESAO-evid-011 | UC-01–UC-13 / QS-031, QS-032 | Canonical default project, approved Use Case documents/hashes, five-State/fourteen-Action Environment, role profiles/instructions, shared Skills, compact fixture, active docs and editable flow diagram | `.ballet/project.json`, `.ballet/{constraints,use-cases,instructions}/**`, `.agents/skills/**`, `.fixture-ballet-project/**`, README, ARCHITECTURE, DESIGN, `ballet.drawio`, `.ballet/tests/defaultProjectResources.test.ts` | passed: resource validator; 28 files/260 tests; zero-warning lint; production build; design lint 0/0; draw.io XML; 219-file cutover gate; diff check | 2026-08-29 local repository; phase 10 default-resource commit | Proves project-data and documentation readiness. Runtime/security/frontend conformance findings were closed by ESAO-evid-012. |
+| ESAO-evid-012 | UC-01–UC-13 / QS-028–QS-032 | Baseline-to-HEAD four-workstream conformance audit, in-scope fixes, full gates, local package/install/start/restart/stop smoke and canonical 18-cell browser matrix | runtime/governance/API/frontend regression tests; `scripts/check-cutover-removal.mjs`; release archive; Playwright semantic snapshots | passed: 30 files/267 tests; zero-warning lint; production build; 477-file strict-cut gate; zero dependency vulnerabilities; local artifact/install/launchd health; 1440×900 and 390×844 page overflow 0 | 2026-08-29 local repository, temporary databases/worktrees, fake providers and production bundle | No real-provider call or external write was authorized; that operational occurrence is not an acceptance dependency. |
 | EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | passed locally | phases 02–04/07/09/11 | strict schema, planner, transaction, runtime, API and fake-provider completion/blocking tests plus ESAO-evid-010. |
 | EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | passed locally | phases 05/07–09/11 | atomic/restart/schedule/approval/API/UI tests plus ESAO-evid-010. |
 | EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | passed locally | phases 06–09/11 | safe-path/hash/impact/Git/lineage/API/UI tests plus ESAO-evid-010. |
@@ -41,6 +42,24 @@ tags:
 ## Evidence policy
 
 ESAO-evid-003–009 preserve the isolated build phases as historical evidence. ESAO-evid-010 is the canonical cutover record. Full command logs remain transient; this index records exact commands/results and limitations without turning deterministic fake-provider checks into a real-provider product occurrence.
+
+## Canonical Use Case executable coverage
+
+| Use Case | Automated evidence type | Test file and exact test name | Manual/e2e evidence | Goal / ADR | Status | Limitation |
+| --- | --- | --- | --- | --- | --- | --- |
+| UC-01 | resource + API integration | `.ballet/tests/defaultProjectResources.test.ts` — `loads a runnable five-State Environment with 13 exact approved Use Cases`; `backend/orchestration/http/Api.integration.test.ts` — `enforces 77 project, run, feedback, review, routing, and security scenarios` | Direction at both browser viewports | goal-002, goal-022 / adr-002, adr-034 | passed | none |
+| UC-02 | unit + persistence + component + API | `backend/orchestration/domain/direction.test.ts` — `produces a deterministic hash independent of approval timestamps and set ordering`; `backend/orchestration/project/ProjectPersistence.test.ts` — `invalidates Use Case approval on a semantic Markdown authoring edit`; `frontend/tests/orchestrationConfigureUi.test.tsx` — `requires explicit Use Case approval confirmation with hash` | Use Cases at both browser viewports | goal-022 / adr-008, adr-034 | passed | none |
+| UC-03 | planner + resource validation | `backend/orchestration/runtime/EnvironmentRunPlanner.test.ts` — `resolves approved direction, resources, capabilities, permissions and canonical snapshot`; `.ballet/tests/defaultProjectResources.test.ts` — `resolves every selected instruction and Skill with no orphan runtime resource` | Action editor displays exact role/resources at both viewports | goal-009, goal-022 / adr-011, adr-013, adr-034 | passed | none |
+| UC-04 | schema + persistence + component + API | `backend/orchestration/persistence/FlowCoordinator.test.ts` — `seeds ordered States and Actions from one immutable aggregate`; `frontend/tests/orchestrationConfigureUi.test.tsx` — `supports keyboard activation for State reorder` | Environment ordered lanes at both viewports | goal-002, goal-022 / adr-034 | passed | none |
+| UC-05 | runtime + persistence + component | `backend/orchestration/runtime/EnvironmentRuntimeService.test.ts` — `first Action done selects second priority Action` and `State two starts only after State one completes`; `frontend/tests/orchestrationGovernanceUi.test.tsx` — `renders State gate and Actions in ascending deterministic order` | Run retry gate at both viewports | goal-022 / adr-034 | passed | none |
+| UC-06 | readiness + component + resource validation | `backend/orchestration/runtime/EnvironmentRunPlanner.test.ts` — `fails before provider work on missing resource or invalid instruction sections`; `frontend/tests/orchestrationConfigureUi.test.tsx` — `presents Validation as main and Work as subordinate`; `.ballet/tests/defaultProjectResources.test.ts` — `resolves every selected instruction and Skill with no orphan runtime resource` | Action editor at both viewports | goal-002, goal-022 / adr-012, adr-013, adr-034 | passed | none |
+| UC-07 | runtime + component | `backend/orchestration/runtime/EnvironmentRuntimeService.test.ts` — `precheck done skips Work and finalizes Product Snapshot`; `frontend/tests/orchestrationGovernanceUi.test.tsx` — `renders precheck done without inventing a Work step` | Run gate at both viewports | goal-022 / adr-034 | passed | none |
+| UC-08 | runtime + permission + UI | `backend/orchestration/runtime/EnvironmentRuntimeService.test.ts` — `delegate queues exact subordinate Work and postwork done` and `Work permission allows only managed worktree paths`; `frontend/tests/orchestrationGovernanceUi.test.tsx` — `renders the durable human Work boundary and resumes with an exact Agent revision` | Run gate at both viewports | goal-005, goal-022 / adr-005, adr-006, adr-012, adr-034 | passed | none |
+| UC-09 | transaction + runtime + UI | `backend/orchestration/runtime/EnvironmentRuntimeService.test.ts` — `maxRetries zero converts retry to atomic blocked Feedback`, `maxRetries three permits exactly four Work attempts`, and `restart applies a provider terminal persisted before its domain transition`; `backend/orchestration/persistence/FlowCoordinator.test.ts` — `rolls back blocked state when Feedback creation fails, then commits both atomically` | retry Run and blocked Feedback at both viewports | goal-006, goal-022 / adr-007, adr-034 | passed | none |
+| UC-10 | transaction + runtime + UI | `backend/orchestration/persistence/FlowCoordinator.test.ts` — `completes Environment and Product Snapshot atomically only after every State is done`; `backend/orchestration/runtime/EnvironmentRuntimeService.test.ts` — `restart retries failed finalization before Product worktree cleanup`; `frontend/tests/orchestrationGovernanceUi.test.tsx` — `renders Product Snapshot evidence and local-only review boundary` | Product Snapshot at both viewports | goal-006, goal-022 / adr-006, adr-007, adr-034 | passed | none |
+| UC-11 | schedule + governance + UI | `backend/orchestration/governance/GovernanceWorkflows.test.ts` — `calculates daily and weekly due instants across DST deterministically`, `disabled creates no run; missed due creates only one skipped run and no burst`, and `Critic callback creates only pending human proposal, never Feedback or approval`; `frontend/tests/orchestrationConfigureUi.test.tsx` — `renders Critic disabled by default` | Critic review at both viewports | goal-006, goal-022 / adr-007, adr-034 | passed | none |
+| UC-12 | transaction + governance + UI | `backend/orchestration/persistence/ReviewCoordinator.test.ts` — `deduplicates schedule due instants and creates Feedback only after exact approval`; `backend/orchestration/governance/GovernanceWorkflows.test.ts` — `human source is assigned by the trusted service and target is validated`; `frontend/tests/orchestrationGovernanceUi.test.tsx` — `confirms Critic approval against exact hash and consequence` | Critic approval dialog fits and keeps keyboard focus at 390×844 | goal-022 / adr-008, adr-034 | passed | none |
+| UC-13 | governance + Git + continuation + UI | `backend/orchestration/governance/GovernanceWorkflows.test.ts` — `claims an approved Refinement exactly once before any asynchronous project write` and `exact approval creates one local commit and continuation without merge, push, or early resolution`; `backend/orchestration/runtime/EnvironmentRuntimeService.test.ts` — `changed shared Skill hash prevents unsafe done import`; `frontend/tests/orchestrationGovernanceUi.test.tsx` — `renders exact Refinement changes, hashes, impact, and text diff markers` | exact diff and approval dialog at both viewports | goal-005, goal-006, goal-022 / adr-006, adr-034 | passed | none |
 
 ## Historical phase 02 contract bounds and refinements
 
@@ -200,10 +219,57 @@ The governance data hook uses only `/api/vnext`, refreshes from bounded invalida
 
 Browser QA used the production bundle and a bounded Playwright route fixture only for Run/governance facts; project/configuration requests continued to the isolated local `/api/vnext` service. At 1440×900 and 390×844, page/body horizontal overflow was 0, the narrow minimum interactive height was 40 px, factual statuses remained text-visible without color, old Graph/MDP language was absent, and the browser console contained 0 errors/warnings. The screenshots are `evidence/run-gate-1440x900.png` and `evidence/run-gate-390x844.png`.
 
-## Open evidence gaps
+## Phase 11 command evidence
 
-The strict cutover, package/install/startup and canonical browser gates passed locally. One production-like real-provider Environment occurrence and continuation remain open operational evidence; deterministic fake-provider and managed-worktree tests are not represented as that occurrence.
+| Command/check | Result |
+| --- | --- |
+| `npm ci` | passed from the committed lockfile |
+| `npm audit --audit-level=low` | passed, 0 vulnerabilities after lockfile-only transitive refresh |
+| `npm run validate:arc42` | passed, including canonical resources, hashes, trace links and draw.io XML |
+| `npm run validate:cutover` | passed; 477 active/repository-governance files scanned |
+| `npm run test` | passed; 30 files, 267 tests |
+| `npm run lint -- --max-warnings=0` | passed |
+| `npm run build` | passed; production frontend and server bundles |
+| `npx @google/design.md lint DESIGN.md` | passed, 0 errors and 0 warnings |
+| project-workflow hardcode grep | passed, 0 generic-platform matches |
+| `git diff --check` | passed |
 
-## Next review basis
+## Release and startup smoke
 
-The next evidence-producing action is a separately authorized real-provider Environment occurrence followed by independent review of its persisted Product Snapshot and continuation lineage. Merge, push, release and deploy remain outside this initiative authorization.
+`make latest` passed without publishing. It built and locally installed `release/ballet_0.1.0_darwin_arm64.tar.gz` with SHA-256 `be65207f4dba24da94acfe8222d4fede2c890790ef0b2a63178757d3e7ff3612`, verified the embedded Node/native SQLite/UI bundle and version command, and started the checkout-specific launchd service. `ballet status` reported healthy version `0.1.0` at `127.0.0.1:53321`; `ballet stop` then produced a clean unloaded service.
+
+| Required smoke fact | Evidence |
+| --- | --- |
+| fresh/absent old DB | packaged smoke creates a temporary Git project and fresh `.git/ballet/state.sqlite`; strict v15 rejection test leaves old bytes unchanged |
+| service starts and health succeeds | packaged foreground smoke plus installed launchd restart/status |
+| canonical config and readiness projection load | packaged `/api/project` and `/api/environment` assertions prove v20, approved Use Case, State order and Action priority |
+| canonical frontend shell opens | embedded `dist/index.html` assertion plus production-bundle Playwright QA |
+| fake Environment reaches terminal | `EnvironmentRuntimeService.test.ts` completion and API integration fake-provider scenarios |
+| blocked Run creates Feedback | runtime retry-exhaustion and API blocked/Feedback scenarios |
+| restart reconciles | queued task, persisted terminal and failed-finalization restart tests |
+| clean shutdown | packaged process trap and installed `ballet stop`; launchd loaded/running both false |
+| no external network/write | release smoke uses missing provider paths, empty temporary HOME and asserts no HOME writes; provider child environment and hook-isolation tests pass |
+
+Provider discovery was moved off the health critical path after launchd attempts exposed that local authenticated CLI probing and launchd scheduling could exceed the original 20-second control-plane readiness window. The bounded readiness window is now 60 seconds, while Run preflight remains fail closed until provider status is ready.
+
+## Canonical browser matrix
+
+Playwright drove the locally installed production bundle. Direction, Use Cases, Environment and Action editor used the real canonical API. Run retry, blocked Feedback, Critic, Refinement and Product views used bounded browser-route facts matching the tested DTOs; they did not create runtime truth.
+
+| View | 1440×900 | 390×844 |
+| --- | --- | --- |
+| Direction | heading/active route correct; overflow 0 | overflow 0; status unclipped; navigation Sheet usable |
+| Use Cases | 13 approved entries visible; overflow 0 | overflow 0; core entries visible |
+| Environment | ordered lanes and core actions visible; overflow 0 | overflow 0; reorder/open controls visible |
+| Action editor | Validation-main/Work-subordinate composition; overflow 0 | overflow 0; State and Save controls visible |
+| Run detail retry | retry count and ordered gate visible; overflow 0 | overflow 0; Run controls/status visible |
+| Blocked Feedback | exact reason/corrections/evidence visible; overflow 0 | overflow 0; refinement/human controls visible |
+| Critic approval | exact consequence/hash review visible; overflow 0 | overflow 0; approval controls visible |
+| Refinement diff | hashes/impact/diff visible; overflow 0 | page overflow 0; diff `overflow-x:auto`; approval dialog fully inside viewport |
+| Product Snapshot | immutable/local-only evidence visible; overflow 0 | overflow 0; lineage and product controls visible |
+
+The mobile navigation Sheet retained focus inside navigation after Tab. The Refinement dialog focused its acknowledgment control, fit entirely inside 390×844 and disabled final approval before acknowledgment. Browser console reported no warning/error in the real configure views.
+
+## Known limitations and next operational evidence
+
+No accepted Target Contract limitation remains. A real-provider Environment occurrence was intentionally not executed because external provider use was unnecessary for deterministic acceptance and no production credentials/external effects were authorized. It remains optional operational evidence, not a merge-readiness condition. Merge, push, release publication and deploy remain separately authorized actions.

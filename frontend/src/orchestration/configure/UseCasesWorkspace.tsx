@@ -11,11 +11,12 @@ import { ConfigureHeader } from "./ConfigureHeader";
 
 const emptyUseCase = (): UseCase => ({ id: "", name: "", status: "draft", examples: [{ given: "", when: "", then: "" }], successGoals: [], failureGoals: [], expectedOutcomes: [], goalIds: [], adrIds: [], constraintIds: [] });
 
-export function UseCasesWorkspace({ useCases, documents, locked, environmentUsage, onSave, onApprove, onDraft }: {
+export function UseCasesWorkspace({ useCases, documents, locked, environmentUsage, selectedId: initialSelectedId, onSave, onApprove, onDraft }: {
   useCases: UseCase[]; documents: ResourceDocument[]; locked: boolean; environmentUsage: string[];
+  selectedId?: string;
   onSave(value: UseCase, markdown: string, creating: boolean): Promise<void>; onApprove(value: UseCase): Promise<void>; onDraft(value: UseCase): Promise<void>;
 }) {
-  const [filter, setFilter] = useState<"all" | UseCase["status"]>("all"); const [selectedId, setSelectedId] = useState<string>();
+  const [filter, setFilter] = useState<"all" | UseCase["status"]>("all"); const [selectedId, setSelectedId] = useState<string | undefined>(initialSelectedId);
   const [creating, setCreating] = useState(false);
   const filtered = useMemo(() => useCases.filter((item) => filter === "all" || item.status === filter), [filter, useCases]);
   const selected = useCases.find((item) => item.id === selectedId);
@@ -27,6 +28,7 @@ export function UseCasesWorkspace({ useCases, documents, locked, environmentUsag
 function UseCaseEditor({ value, source, creating, locked, used, onSave, onApprove, onDraft }: { value: UseCase; source: string; creating: boolean; locked: boolean; used: boolean; onSave(value: UseCase, markdown: string, creating: boolean): Promise<void>; onApprove(value: UseCase): Promise<void>; onDraft(value: UseCase): Promise<void> }) {
   const [draft, setDraft] = useState(value); const [markdown, setMarkdown] = useState(source); const [confirming, setConfirming] = useState(false);
   const approvalInvalidated = value.status === "approved" && useCaseApprovalHash(value) !== useCaseApprovalHash(draft);
+  const hasUnsavedContent = useCaseApprovalHash(value) !== useCaseApprovalHash(draft) || markdown !== source;
   const setList = (key: "successGoals" | "failureGoals" | "expectedOutcomes" | "goalIds" | "adrIds" | "constraintIds", text: string) => setDraft({ ...draft, [key]: text.split(",").map((item) => item.trim()).filter(Boolean) });
   const setExample = (index: number, next: UseCaseExample) => setDraft({ ...draft, examples: draft.examples.map((example, current) => current === index ? next : example) });
   return <form className="space-y-4 rounded-md border bg-card p-4" onSubmit={(event) => { event.preventDefault(); void onSave(draft, markdown, creating); }}><div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-semibold">{creating ? "New draft" : draft.name}</h2><code className="text-xs text-tertiary">{draft.id || "ID required"}</code></div><OperationalStatus label={approvalInvalidated ? "Approval will be invalidated" : draft.status} tone={approvalInvalidated ? "danger" : draft.status === "approved" ? "healthy" : "attention"} /></div>
@@ -36,7 +38,8 @@ function UseCaseEditor({ value, source, creating, locked, used, onSave, onApprov
     {(["successGoals", "failureGoals", "expectedOutcomes", "goalIds", "adrIds", "constraintIds"] as const).map((key) => <div key={key}><Label htmlFor={`uc-${key}`}>{key} · comma separated exact values</Label><Input id={`uc-${key}`} value={draft[key].join(", ")} onChange={(event) => setList(key, event.target.value)} /></div>)}
     <div><Label htmlFor="uc-markdown">Markdown source</Label><textarea id="uc-markdown" className="min-h-32 w-full rounded-sm border bg-background p-3 font-mono text-sm" value={markdown} onChange={(event) => setMarkdown(event.target.value)} /></div>
     <div className="text-xs text-muted-foreground">Environment usage: {used ? "Referenced" : "Not referenced"}. Approval hash: <code className="break-all">{useCaseApprovalHash(draft)}</code>{value.approval ? <> · approved {value.approval.approvedAt} by {value.approval.approvedBy}, revision {value.approval.revision}</> : null}</div>
-    <div className="flex flex-wrap gap-2"><Button type="submit" disabled={locked || !draft.id || !draft.name}>Save draft content</Button>{!creating && value.status === "draft" ? <Button type="button" disabled={locked} onClick={() => setConfirming(true)}>Approve…</Button> : null}{value.status === "approved" ? <Button type="button" variant="outline" disabled={locked} onClick={() => void onDraft(value)}>Return to draft</Button> : null}</div>
-    <Dialog open={confirming} onOpenChange={setConfirming}><DialogContent><DialogHeader><DialogTitle>Approve {draft.id}?</DialogTitle><DialogDescription>This human operation approves content version 1 with hash <code className="break-all">{useCaseApprovalHash(draft)}</code>. Saving alone never approves.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setConfirming(false)}>Cancel</Button><Button onClick={() => { setConfirming(false); void onApprove(draft); }}>Approve exact content</Button></DialogFooter></DialogContent></Dialog>
+    {value.status === "draft" && hasUnsavedContent ? <p role="status" className="text-sm text-tertiary">Save these edits before approval so the reviewed hash matches persisted content.</p> : null}
+    <div className="flex flex-wrap gap-2"><Button type="submit" disabled={locked || !draft.id || !draft.name}>Save draft content</Button>{!creating && value.status === "draft" ? <Button type="button" disabled={locked || hasUnsavedContent} onClick={() => setConfirming(true)}>Approve…</Button> : null}{value.status === "approved" ? <Button type="button" variant="outline" disabled={locked} onClick={() => void onDraft(value)}>Return to draft</Button> : null}</div>
+    <Dialog open={confirming} onOpenChange={setConfirming}><DialogContent><DialogHeader><DialogTitle>Approve {value.id}?</DialogTitle><DialogDescription>This human operation approves the persisted content with hash <code className="break-all">{useCaseApprovalHash(value)}</code>. Saving alone never approves.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setConfirming(false)}>Cancel</Button><Button onClick={() => { setConfirming(false); void onApprove(value); }}>Approve exact content</Button></DialogFooter></DialogContent></Dialog>
   </form>;
 }

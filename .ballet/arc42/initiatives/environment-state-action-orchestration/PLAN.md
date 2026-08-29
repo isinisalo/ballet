@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative plan
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 3
+version: 4
 tags:
   - arc42
   - initiative
@@ -22,7 +22,7 @@ tags:
 | 08 Configure and Run/governance UI | completed | ESAO-evid-008/009 |
 | 09 atomic canonical cutover | completed | ESAO-evid-010, EVID-028–EVID-032 |
 | 10 project/docs/release surfaces | completed as part of strict cutover | canonical v20 config, active docs and packaged smoke |
-| 11 local acceptance gates | completed for deterministic/local scope | full suite, browser QA, `make latest` and healthy startup; real-provider occurrence remains operational evidence |
+| 11 local acceptance gates | completed and accepted | four-workstream findings closed; full suite, browser QA, `make latest`, healthy startup and clean stop; real-provider occurrence remains optional operational evidence |
 
 No phase authorized merge, push, release or deploy.
 

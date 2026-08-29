@@ -39,7 +39,7 @@ const agentRowSchema = z.object({
   parent_agent_run_id: nullableString,
   critic_run_id: nullableString, refinement_run_id: nullableString,
   role: z.enum(["validation", "work", "critic", "refinement"]), phase: z.enum(["precheck", "work", "postwork", "proposal"]),
-  status: z.enum(["queued", "running", "completed", "failed", "cancelled", "interrupted"]),
+  status: z.enum(["queued", "running", "waiting_for_input", "completed", "failed", "cancelled", "interrupted"]),
   revision: z.number().int(), attempt: z.number().int(), task_envelope_version: z.number().int(),
   task_envelope_json: z.string(), task_envelope_hash: z.string(), execution_task_id: nullableString,
   provider_outcome_key: nullableString, input_json: nullableString, context_json: nullableString, outcome_json: nullableString,
@@ -57,6 +57,7 @@ export const toEnvironmentRun = (value: unknown): StoredEnvironmentRun => {
     executionSnapshotHash: row.execution_snapshot_hash, activeStateExecutionId: optional(row.active_state_execution_id),
     activeActionExecutionId: optional(row.active_action_execution_id), activeAgentRunId: optional(row.active_agent_run_id),
     transitionCount: row.transition_count, transitionLimit: row.transition_limit,
+    finalizationStatus: optional(row.finalization_status) as StoredEnvironmentRun["finalizationStatus"],
     createdAt: row.created_at, updatedAt: row.updated_at, completedAt: optional(row.completed_at)
   };
 };

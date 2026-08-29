@@ -146,8 +146,8 @@ export class ApiController {
     const configHash = this.dependencies.project.removeDirection(input); this.changed("project_changed", input.id);
     return { configHash };
   }
-  approveUseCase(id: string, hash: string, actor: TrustedHumanActor): unknown {
-    const configHash = this.dependencies.project.approveUseCase(id, hash, actor, this.dependencies.now());
+  approveUseCase(id: string, hash: string, contentHash: string, actor: TrustedHumanActor): unknown {
+    const configHash = this.dependencies.project.approveUseCase(id, hash, contentHash, actor, this.dependencies.now());
     this.changed("project_changed", id); return { configHash };
   }
   revokeUseCase(id: string, hash: string): unknown {
@@ -276,10 +276,14 @@ export class ApiController {
         done: actions.length > 0 && actions.every(({ status }) => status === "done"),
         blocked: actions.some(({ status }) => status === "blocked") };
     });
-    const activeAgent = run.activeAgentRunId ? this.dependencies.connection().prepare(`
-      SELECT agent_run_id, role, phase, status, attempt, parent_agent_run_id, created_at, updated_at
+    const activeAgentRow = run.activeAgentRunId ? this.dependencies.connection().prepare(`
+      SELECT agent_run_id, role, phase, status, revision, attempt, parent_agent_run_id, outcome_json, created_at, updated_at
       FROM agent_runs WHERE agent_run_id = ?
     `).get(run.activeAgentRunId) : undefined;
+    const activeAgent = activeAgentRow ? { ...(activeAgentRow as Record<string, unknown>),
+      outcome: Reflect.get(activeAgentRow as object, "outcome_json")
+        ? JSON.parse(String(Reflect.get(activeAgentRow as object, "outcome_json"))) : undefined,
+      outcome_json: undefined } : undefined;
     const product = run.status === "completed" ? this.products.requireByRun(id) : undefined;
     return { ...publicRun(run), activeAgent, states, events: this.eventFacts(id, 0), product };
   }
@@ -289,8 +293,14 @@ export class ApiController {
     ).all() as Array<{ environment_run_id: string }>;
     return rows.map(({ environment_run_id }) => publicRun(this.runs.require(environment_run_id)));
   }
-  cancelRun(id: string): unknown {
-    const run = publicRun(this.dependencies.runtime.cancel(id)); this.changed("run_changed", id); return run;
+  async cancelRun(id: string): Promise<unknown> {
+    const run = publicRun(await this.dependencies.runtime.cancel(id)); this.changed("run_changed", id); return run;
+  }
+  answerWorkInput(id: string, input: {
+    expectedAgentRunId: string; expectedAgentRevision: number; answer: string;
+  }, actor: TrustedHumanActor): unknown {
+    const run = this.dependencies.runtime.answerWorkInput({ environmentRunId: id, ...input, actorId: actor.id });
+    this.changed("run_changed", id); return publicRun(run);
   }
   product(id: string): unknown { this.runs.require(id); return this.products.requireByRun(id); }
   eventFacts(id: string, after: number): unknown[] {
@@ -355,11 +365,20 @@ export class ApiController {
   }
   decideCritic(id: string, input: {
     decision: "approved" | "rejected"; expectedContentHash: string; expectedVersion: 1; rationale?: string;
-    feedback?: { feedbackEntryId: string; environmentRunId: string; title: string; description: string; correctiveActions: string[]; evidenceRefs?: string[] };
+    feedback?: { feedbackEntryId: string; title: string; description: string; correctiveActions: string[]; evidenceRefs?: string[] };
   }, actor: TrustedHumanActor): void {
     const proposal = this.reviewStore.requireCriticProposal(id);
+    const owner = this.dependencies.connection().prepare(`
+      SELECT ps.environment_run_id FROM critic_proposals cp
+      JOIN critic_runs cr ON cr.critic_run_id = cp.critic_run_id
+      JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+      WHERE cp.critic_proposal_id = ?
+    `).get(id) as { environment_run_id: string } | undefined;
+    if (input.decision === "approved" && !owner) {
+      throw new ConflictError("Critic proposal has no immutable Product Snapshot owner.");
+    }
     const feedback = input.decision === "approved" && input.feedback ? {
-      ...input.feedback, source: "approved_critic_proposal" as const,
+      ...input.feedback, environmentRunId: owner!.environment_run_id, source: "approved_critic_proposal" as const,
       category: proposal.category as FeedbackCategory, targetType: proposal.target_type as FeedbackTargetType,
       targetId: String(proposal.target_id), criticProposalId: id,
       provenance: { proposalContentHash: input.expectedContentHash }, createdAt: this.dependencies.now()
@@ -383,7 +402,22 @@ export class ApiController {
     return this.dependencies.connection().prepare(query).all() as unknown[];
   }
   refinementProposal(id: string): unknown {
-    return { ...this.reviewStore.requireRefinementProposal(id), files: this.reviewStore.refinementFiles(id) };
+    const proposal = this.reviewStore.requireRefinementProposal(id);
+    const row = this.dependencies.connection().prepare(`
+      SELECT er.execution_snapshot_json FROM refinement_runs rr
+      JOIN environment_runs er ON er.environment_run_id = rr.source_environment_run_id
+      WHERE rr.refinement_run_id = ?
+    `).get(proposal.refinement_run_id) as { execution_snapshot_json: string } | undefined;
+    if (!row) throw new ConflictError("Refinement proposal has no immutable source snapshot.");
+    const snapshot = JSON.parse(row.execution_snapshot_json) as {
+      resources?: Array<{ relativePath: string; content: string }>;
+    };
+    const resources = new Map((snapshot.resources ?? []).map((resource) => [resource.relativePath, resource.content]));
+    const files = this.reviewStore.refinementFiles(id).map((file) => ({
+      ...file,
+      preimage_content: String(file.operation) === "create" ? null : resources.get(String(file.relative_path)) ?? null
+    }));
+    return { ...proposal, files };
   }
   refinementApplyStatus(id: string): unknown {
     const row = this.dependencies.connection().prepare(

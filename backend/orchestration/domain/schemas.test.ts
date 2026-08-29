@@ -151,6 +151,9 @@ describe("Project Configuration v20 boundary", () => {
     };
     expect(projectConfigurationV20Schema.safeParse(config).success).toBe(true);
     expect(projectConfigurationV20Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
+    const duplicateAction = structuredClone(config);
+    duplicateAction.environment.states.push({ ...duplicateAction.environment.states[0]!, id: "state-2", order: 2 });
+    expect(projectConfigurationV20Schema.safeParse(duplicateAction).success).toBe(false);
     expect(projectConfigurationV20Schema.safeParse({
       ...config,
       critic: { ...config.critic, schedules: [{ ...config.critic.schedules[0], timeZone: "Mars/Olympus" }] }

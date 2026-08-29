@@ -22,7 +22,8 @@ export const runGit = (
   args: readonly string[],
   options: { cwd?: string; signal?: AbortSignal; allowedExitCodes?: readonly number[] } = {}
 ): Promise<GitResult> => new Promise((resolve, reject) => {
-  const child = spawn("git", [...args], {
+  const safeArgs = ["-c", "core.hooksPath=/dev/null", ...args];
+  const child = spawn("git", safeArgs, {
     cwd: options.cwd,
     signal: options.signal,
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },

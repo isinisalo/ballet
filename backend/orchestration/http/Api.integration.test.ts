@@ -8,6 +8,7 @@ import express from "express";
 import { afterEach, describe, expect, test } from "vitest";
 import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
 import type { UseCase } from "../../../shared/orchestration/direction.js";
+import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import { isAllowedRefinementPath } from "../../../shared/orchestration/refinement.js";
 import { sendKnownHttpError } from "../../http/errors.js";
@@ -37,12 +38,13 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { await Promise.all(cleanups.splice(0).map((cleanup) => cleanup())); });
 
 describe("orchestration HTTP integration", () => {
-  test("enforces 76 project, run, feedback, review, routing, and security scenarios", async () => {
+  test("enforces 77 project, run, feedback, review, routing, and security scenarios", async () => {
     const fixture = await startFixture();
     let scenarios = 0;
     const request = (route: string, init?: RequestInit) => fetch(`${fixture.base}${route}`, init);
     const json = (method: string, body: unknown): RequestInit => ({
-      method, headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+      method, headers: { "content-type": "application/json", origin: "http://127.0.0.1:4317",
+        "sec-fetch-site": "same-origin" }, body: JSON.stringify(body)
     });
 
     let response = await request("/project");
@@ -72,16 +74,18 @@ describe("orchestration HTTP integration", () => {
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: forged }));
     expect(response.status).toBe(409); scenarios += 1;
 
-    const draftUseCase = {
+    const draftUseCase: UseCase = {
       id: "UC-2", name: "Draft Use Case", status: "draft", examples: [{ given: "Draft", when: "Edited", then: "Reviewed" }],
       successGoals: ["Clear"], failureGoals: ["Ambiguous"], expectedOutcomes: ["Approved"],
       goalIds: ["goal-1"], adrIds: ["adr-1"], constraintIds: ["constraint-1"]
-    } as const;
+    };
     response = await request("/use-cases", json("POST", { expectedConfigHash: fixture.configHash,
       expectedDocumentHash: "absent", markdown: "# Draft Use Case\n", value: draftUseCase }));
     expect(response.status).toBe(201); let authoringHashes = await response.json() as { configHash: string; documentHash: string };
     fixture.configHash = authoringHashes.configHash; scenarios += 1;
-    response = await request("/use-cases/UC-2/approve", json("POST", { expectedConfigHash: fixture.configHash }));
+    response = await request("/use-cases/UC-2/approve", json("POST", {
+      expectedConfigHash: fixture.configHash, expectedContentHash: useCaseApprovalHash(draftUseCase)
+    }));
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
     response = await request("/use-cases/UC-2"); const approvedUseCase = await response.json() as {
       contentHash: string; value: UseCase;
@@ -196,7 +200,9 @@ describe("orchestration HTTP integration", () => {
     }));
     expect(response.status).toBe(409); scenarios += 1;
 
-    response = await request("/use-cases/UC-1/approve", json("POST", { expectedConfigHash: fixture.configHash }));
+    response = await request("/use-cases/UC-1/approve", json("POST", {
+      expectedConfigHash: fixture.configHash, expectedContentHash: useCaseApprovalHash(fixture.config.direction.useCases[0]!)
+    }));
     expect(response.status).toBe(409); scenarios += 1;
 
     response = await request("/use-cases/UC-1/return-to-draft", json("POST", { expectedConfigHash: fixture.configHash }));
@@ -208,11 +214,14 @@ describe("orchestration HTTP integration", () => {
     expect(response.status).toBe(409); scenarios += 1;
 
     response = await request("/use-cases/UC-1/approve", json("POST", {
-      expectedConfigHash: fixture.configHash, actor: { id: "forged" }
+      expectedConfigHash: fixture.configHash,
+      expectedContentHash: useCaseApprovalHash(fixture.config.direction.useCases[0]!), actor: { id: "forged" }
     }));
     expect(response.status).toBe(400); scenarios += 1;
 
-    response = await request("/use-cases/UC-1/approve", json("POST", { expectedConfigHash: fixture.configHash }));
+    response = await request("/use-cases/UC-1/approve", json("POST", {
+      expectedConfigHash: fixture.configHash, expectedContentHash: useCaseApprovalHash(fixture.config.direction.useCases[0]!)
+    }));
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
 
     response = await request("/environment-runs", json("POST", {
@@ -299,8 +308,11 @@ describe("orchestration HTTP integration", () => {
     reviewStore.createSchedule({ criticScheduleId: "manual", configHash: "a".repeat(64),
       config: { id: "manual", kind: "daily", timeZone: "UTC", localTimes: ["10:00"] },
       nextDueAt: TEST_AT, enabled: true, createdAt: TEST_AT });
+    const runProduct = fixture.database().prepare(
+      "SELECT product_snapshot_id FROM product_snapshots WHERE environment_run_id = ?"
+    ).get(run.environmentRunId) as { product_snapshot_id: string };
     reviewStore.createCriticDue({ criticRunId: "critic-run-manual", criticScheduleId: "manual",
-      dueAt: TEST_AT, dueKey: "manual:due", skipReason: "no_product_snapshot", createdAt: TEST_AT });
+      dueAt: TEST_AT, dueKey: "manual:due", productSnapshotId: runProduct.product_snapshot_id, createdAt: TEST_AT });
     const criticContent = { proposalId: "critic-proposal-manual", summary: "Improve product feedback" };
     const criticHash = hash(criticContent);
     reviewStore.createCriticProposal({ criticProposalId: "critic-proposal-manual", criticRunId: "critic-run-manual",
@@ -308,13 +320,13 @@ describe("orchestration HTTP integration", () => {
       category: "product", createdAt: TEST_AT });
     response = await request("/critic/proposals/critic-proposal-manual/decision", json("POST", {
       decision: "approved", expectedContentHash: "f".repeat(64), expectedVersion: 1,
-      feedback: { feedbackEntryId: "critic-feedback", environmentRunId: run.environmentRunId,
+      feedback: { feedbackEntryId: "critic-feedback",
         title: "Critic feedback", description: "Approved feedback", correctiveActions: ["Improve"] }
     }));
     expect(response.status).toBe(409); scenarios += 1;
     response = await request("/critic/proposals/critic-proposal-manual/decision", json("POST", {
       decision: "approved", expectedContentHash: criticHash, expectedVersion: 1,
-      feedback: { feedbackEntryId: "critic-feedback", environmentRunId: run.environmentRunId,
+      feedback: { feedbackEntryId: "critic-feedback",
         title: "Critic feedback", description: "Approved feedback", correctiveActions: ["Improve"] }
     }));
     expect(response.status).toBe(204);
@@ -385,12 +397,19 @@ describe("orchestration HTTP integration", () => {
     }, body: "{}" });
     expect(response.status).toBe(403); scenarios += 1;
 
-    response = await request("/project", { method: "PUT", headers: { "content-type": "application/json" }, body: `{"padding":"${"x".repeat(1_100_000)}"}` });
+    response = await fetch(`${fixture.base}/project`, { method: "PUT", headers: {
+      "content-type": "application/json"
+    }, body: "{}" });
+    expect(response.status).toBe(403); scenarios += 1;
+
+    response = await request("/project", { method: "PUT", headers: {
+      "content-type": "application/json", origin: "http://127.0.0.1:4317"
+    }, body: `{"padding":"${"x".repeat(1_100_000)}"}` });
     expect(response.status).toBe(413); scenarios += 1;
 
     response = await request("/instructions/extra", json("DELETE", { expectedHash: updatedExtra.contentHash }));
     expect(response.status).toBe(204); scenarios += 1;
-    expect(scenarios).toBe(76);
+    expect(scenarios).toBe(77);
   });
 });
 
@@ -490,5 +509,6 @@ const commitAll = (root: string, message: string): void => {
 };
 const providerOutput = (result: Record<string, unknown>) => ({
   kind: "output" as const, providerOutcomeKey: `provider:${String(result.decision)}`,
-  raw: JSON.stringify({ version: 10, role: "validation", summary: "Validated", checks: [], result })
+  raw: JSON.stringify({ version: 10, role: "validation", summary: "Validated",
+    checks: [{ name: "fixture", status: "passed", evidenceRefs: ["test:fixture"] }], result })
 });

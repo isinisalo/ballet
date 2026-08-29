@@ -17,8 +17,11 @@ export interface AppliedAgentOutcome {
 export interface StoredExecutionTask {
   taskId: string;
   agentRunId: string;
-  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  status: "queued" | "running" | "waiting_for_input" | "succeeded" | "failed" | "cancelled";
   providerOutcomeKey?: string;
+  outcome?: unknown;
+  errorCode?: string;
+  errorMessage?: string;
   spec: ExecutionSpecV12;
 }
 
@@ -115,7 +118,8 @@ export class AgentExecutionStore {
 
   requireTask(executionTaskId: string): StoredExecutionTask {
     const row = this.connection().prepare(`
-      SELECT execution_task_id, agent_run_id, status, provider_outcome_key, spec_json
+      SELECT execution_task_id, agent_run_id, status, provider_outcome_key, outcome_json,
+        error_code, error_message, spec_json
       FROM execution_tasks WHERE execution_task_id = ?
     `).get(executionTaskId) as Record<string, unknown> | undefined;
     if (!row) throw new NotFoundError(`Execution task ${executionTaskId} was not found.`);
@@ -123,6 +127,9 @@ export class AgentExecutionStore {
       taskId: String(row.execution_task_id), agentRunId: String(row.agent_run_id),
       status: row.status as StoredExecutionTask["status"],
       providerOutcomeKey: row.provider_outcome_key === null ? undefined : String(row.provider_outcome_key),
+      outcome: row.outcome_json === null ? undefined : roleOutcomeV10Schema.parse(JSON.parse(String(row.outcome_json))),
+      errorCode: row.error_code === null ? undefined : String(row.error_code),
+      errorMessage: row.error_message === null ? undefined : String(row.error_message),
       spec: executionSpecV12Schema.parse(JSON.parse(String(row.spec_json)))
     };
   }
@@ -130,6 +137,32 @@ export class AgentExecutionStore {
   pendingTasks(): StoredExecutionTask[] {
     const rows = this.connection().prepare(`
       SELECT execution_task_id FROM execution_tasks WHERE status = 'queued' ORDER BY created_at, execution_task_id
+    `).all() as Array<{ execution_task_id: string }>;
+    return rows.map(({ execution_task_id }) => this.requireTask(execution_task_id));
+  }
+
+  recoverAfterRestart(at: string): number {
+    return this.connection().transaction(() => {
+      const tasks = this.connection().prepare(`
+        UPDATE execution_tasks SET status = 'queued', started_at = NULL, updated_at = ?
+        WHERE status = 'running'
+      `).run(at).changes;
+      this.connection().prepare(`
+        UPDATE agent_runs SET status = 'queued', started_at = NULL, revision = revision + 1, updated_at = ?
+        WHERE status = 'running'
+      `).run(at);
+      return tasks;
+    })();
+  }
+
+  recoverableTasks(): StoredExecutionTask[] {
+    const rows = this.connection().prepare(`
+      SELECT task.execution_task_id
+      FROM execution_tasks task
+      JOIN agent_runs agent ON agent.agent_run_id = task.agent_run_id
+      WHERE task.status IN ('queued','succeeded','failed')
+        AND agent.status IN ('queued','running')
+      ORDER BY task.created_at, task.execution_task_id
     `).all() as Array<{ execution_task_id: string }>;
     return rows.map(({ execution_task_id }) => this.requireTask(execution_task_id));
   }
@@ -151,10 +184,20 @@ export class AgentExecutionStore {
   }
 
   claimTask(executionTaskId: string, at: string): boolean {
-    return this.connection().prepare(`
-      UPDATE execution_tasks SET status = 'running', started_at = ?, updated_at = ?
-      WHERE execution_task_id = ? AND status = 'queued'
-    `).run(at, at, executionTaskId).changes === 1;
+    return this.connection().transaction(() => {
+      const claimed = this.connection().prepare(`
+        UPDATE execution_tasks SET status = 'running', started_at = ?, updated_at = ?
+        WHERE execution_task_id = ? AND status = 'queued'
+      `).run(at, at, executionTaskId);
+      if (claimed.changes !== 1) return false;
+      const agent = this.connection().prepare(`
+        UPDATE agent_runs SET status = 'running', started_at = COALESCE(started_at, ?),
+          revision = revision + 1, updated_at = ?
+        WHERE execution_task_id = ? AND status = 'queued'
+      `).run(at, at, executionTaskId);
+      if (agent.changes !== 1) throw new ConflictError(`Execution task ${executionTaskId} has no claimable Agent Run.`);
+      return true;
+    })();
   }
 
   finishTask(
@@ -188,14 +231,53 @@ export class AgentExecutionStore {
     return true;
   }
 
+  waitForInput(executionTaskId: string, providerOutcomeKey: string, outcome: unknown, at: string): boolean {
+    const parsed = roleOutcomeV10Schema.parse(outcome);
+    if (parsed.role !== "work" || parsed.state !== "needs_input") {
+      throw new ConflictError("Only a Work needs_input outcome can enter the human waiting boundary.");
+    }
+    return this.connection().transaction(() => {
+      const task = this.requireTask(executionTaskId);
+      const agent = this.requireAgent(task.agentRunId);
+      if (task.status === "waiting_for_input" && agent.status === "waiting_for_input") {
+        if (task.providerOutcomeKey === providerOutcomeKey && canonical(task.outcome) === canonical(parsed)) return false;
+        throw new ConflictError("Waiting Work already has a different provider outcome.");
+      }
+      const taskUpdate = this.connection().prepare(`
+        UPDATE execution_tasks SET status = 'waiting_for_input', provider_outcome_key = ?, outcome_json = ?,
+          completed_at = ?, updated_at = ? WHERE execution_task_id = ? AND status IN ('queued','running')
+      `).run(providerOutcomeKey, canonical(parsed), at, at, executionTaskId);
+      const agentUpdate = this.connection().prepare(`
+        UPDATE agent_runs SET status = 'waiting_for_input', revision = revision + 1, provider_outcome_key = ?,
+          outcome_json = ?, evidence_json = ?, updated_at = ?
+        WHERE agent_run_id = ? AND revision = ? AND status IN ('queued','running')
+      `).run(providerOutcomeKey, canonical(parsed), canonical(parsed.checks), at, agent.agentRunId, agent.revision);
+      if (taskUpdate.changes !== 1 || agentUpdate.changes !== 1) throw new ConflictError("Work changed while entering the human waiting boundary.");
+      return true;
+    })();
+  }
+
+  resumeWaitingAgent(agentRunId: string, expectedRevision: number, at: string): void {
+    const updated = this.connection().prepare(`
+      UPDATE agent_runs SET status = 'completed', revision = revision + 1, completed_at = ?, updated_at = ?
+      WHERE agent_run_id = ? AND revision = ? AND status = 'waiting_for_input'
+    `).run(at, at, agentRunId, expectedRevision);
+    if (updated.changes !== 1) throw new ConflictError("Waiting Work Agent revision is stale.");
+    const task = this.connection().prepare(`
+      UPDATE execution_tasks SET status = 'succeeded', updated_at = ?
+      WHERE agent_run_id = ? AND status = 'waiting_for_input'
+    `).run(at, agentRunId);
+    if (task.changes !== 1) throw new ConflictError("Waiting Work task is not resumable.");
+  }
+
   cancelAgent(agentRunId: string, status: "cancelled" | "interrupted", at: string): void {
     this.connection().prepare(`
       UPDATE agent_runs SET status = ?, revision = revision + 1, completed_at = ?, updated_at = ?
-      WHERE agent_run_id = ? AND status IN ('queued','running')
+      WHERE agent_run_id = ? AND status IN ('queued','running','waiting_for_input')
     `).run(status, at, at, agentRunId);
     this.connection().prepare(`
       UPDATE execution_tasks SET status = 'cancelled', completed_at = ?, updated_at = ?
-      WHERE agent_run_id = ? AND status IN ('queued','running')
+      WHERE agent_run_id = ? AND status IN ('queued','running','waiting_for_input')
     `).run(at, at, agentRunId);
   }
 }

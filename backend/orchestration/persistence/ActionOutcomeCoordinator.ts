@@ -1,7 +1,8 @@
+/* eslint-disable max-lines -- Validation, Work waiting/resume, and postwork transitions stay in one transactional coordinator. */
 import type Database from "better-sqlite3";
 import type {
   ApplyPostworkInput, ApplyPrecheckInput, ApplyWorkInput, CreateAgentRunInput,
-  FeedbackSeed, StoredActionExecution, StoredAgentRun
+  FeedbackSeed, StoredActionExecution, StoredAgentRun, WorkOutcome
 } from "../../../shared/orchestration/index.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { EnvironmentRunStore } from "./EnvironmentRunStore.js";
@@ -59,7 +60,7 @@ export class ActionOutcomeCoordinator {
         throw new ConflictError("Delegated Work prompt differs from Validation output.");
       }
       const work = this.execution.createAgent(input.nextWork);
-      this.updateActiveAgent(action, work, "working", input.completedAt, true);
+      this.updateActiveAgent(action, work, "working", input.completedAt, false);
       this.events.append(action.environmentRunId, "work_dispatched", {
         stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
         sourceAgentRunId: input.agentRunId, targetAgentRunId: work.agentRunId
@@ -75,12 +76,12 @@ export class ActionOutcomeCoordinator {
       if (!completed.applied) return this.runs.requireAction(existingAgent.actionExecutionId!);
       const action = this.requireAction(existingAgent.actionExecutionId!, input.expectedActionRevision, "working");
       if (existingAgent.phase !== "work") throw new ConflictError("Work application requires a Work Agent Run.");
-      assertAgentInput(input.nextValidation, action, "validation", "postwork", action.workAttempt);
+      assertAgentInput(input.nextValidation, action, "validation", "postwork", action.workAttempt + 1);
       if (input.nextValidation.parentAgentRunId !== input.agentRunId) {
         throw new ConflictError("Postwork Validation must reference its Work Agent Run.");
       }
       const validation = this.execution.createAgent(input.nextValidation);
-      this.updateActiveAgent(action, validation, "postchecking", input.completedAt, false);
+      this.updateActiveAgent(action, validation, "postchecking", input.completedAt, true);
       this.events.append(action.environmentRunId, "work_completed", {
         stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
         sourceAgentRunId: input.agentRunId
@@ -89,6 +90,57 @@ export class ActionOutcomeCoordinator {
         stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
         sourceAgentRunId: input.agentRunId, targetAgentRunId: validation.agentRunId
       }, input.completedAt);
+      return this.runs.requireAction(action.actionExecutionId);
+    })();
+  }
+
+  waitForWorkInput(input: {
+    taskId: string; agentRunId: string; providerOutcomeKey: string; expectedActionRevision: number;
+    outcome: Extract<WorkOutcome, { state: "needs_input" }>;
+    completedAt: string;
+  }): StoredActionExecution {
+    return this.connection().transaction(() => {
+      const agent = this.execution.requireAgent(input.agentRunId);
+      const action = this.requireAction(agent.actionExecutionId!, input.expectedActionRevision, "working");
+      if (agent.role !== "work" || agent.phase !== "work" || action.activeAgentRunId !== agent.agentRunId) {
+        throw new ConflictError("Only the active Work Agent can wait for human input.");
+      }
+      const applied = this.execution.waitForInput(input.taskId, input.providerOutcomeKey, input.outcome, input.completedAt);
+      if (applied) this.events.append(action.environmentRunId, "work_waiting_for_input", {
+        stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
+        sourceAgentRunId: agent.agentRunId, data: { question: input.outcome.question }
+      }, input.completedAt);
+      return this.runs.requireAction(action.actionExecutionId);
+    })();
+  }
+
+  resumeWorkInput(input: {
+    agentRunId: string; expectedAgentRevision: number; expectedActionRevision: number;
+    nextWork: CreateAgentRunInput; actorId: string; resumedAt: string;
+  }): StoredActionExecution {
+    return this.connection().transaction(() => {
+      const waiting = this.execution.requireAgent(input.agentRunId);
+      const action = this.requireAction(waiting.actionExecutionId!, input.expectedActionRevision, "working");
+      if (waiting.status !== "waiting_for_input" || waiting.role !== "work" || waiting.phase !== "work"
+        || action.activeAgentRunId !== waiting.agentRunId) {
+        throw new ConflictError("Work input response does not match the active waiting Agent.");
+      }
+      assertAgentInput(input.nextWork, action, "work", "work", action.workAttempt + 1);
+      if (input.nextWork.parentAgentRunId !== waiting.agentRunId) {
+        throw new ConflictError("Resumed Work must reference the waiting Work Agent.");
+      }
+      this.execution.resumeWaitingAgent(waiting.agentRunId, input.expectedAgentRevision, input.resumedAt);
+      const resumed = this.execution.createAgent(input.nextWork);
+      this.updateActiveAgent(action, resumed, "working", input.resumedAt, false);
+      this.events.append(action.environmentRunId, "work_resumed", {
+        stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
+        sourceAgentRunId: waiting.agentRunId, targetAgentRunId: resumed.agentRunId,
+        data: { actorId: input.actorId }
+      }, input.resumedAt);
+      this.events.append(action.environmentRunId, "work_dispatched", {
+        stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
+        sourceAgentRunId: waiting.agentRunId, targetAgentRunId: resumed.agentRunId
+      }, input.resumedAt);
       return this.runs.requireAction(action.actionExecutionId);
     })();
   }
@@ -119,7 +171,7 @@ export class ActionOutcomeCoordinator {
         throw new ConflictError("Retry Work prompt differs from Validation output.");
       }
       const work = this.execution.createAgent(input.nextWork);
-      this.updateActiveAgent(action, work, "working", input.completedAt, true);
+      this.updateActiveAgent(action, work, "working", input.completedAt, false);
       this.events.append(action.environmentRunId, "validation_retry", {
         stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
         sourceAgentRunId: input.agentRunId, targetAgentRunId: work.agentRunId
@@ -134,27 +186,19 @@ export class ActionOutcomeCoordinator {
 
   applyWorkFailure(input: {
     agentRunId: string; providerOutcomeKey: string; errorMessage: string;
-    expectedActionRevision: number; nextValidation: CreateAgentRunInput; completedAt: string;
+    expectedActionRevision: number; feedback: FeedbackSeed; completedAt: string;
   }): StoredActionExecution {
     return this.connection().transaction(() => {
       const agent = this.execution.requireAgent(input.agentRunId);
       const applied = this.execution.failAgent(input.agentRunId, input.providerOutcomeKey, "provider_failure", input.errorMessage, input.completedAt);
       if (!applied) return this.runs.requireAction(agent.actionExecutionId!);
       const action = this.requireAction(agent.actionExecutionId!, input.expectedActionRevision, "working");
-      if (agent.role !== "work" || agent.phase !== "work") throw new ConflictError("Only Work failures enter postwork Validation.");
-      assertAgentInput(input.nextValidation, action, "validation", "postwork", action.workAttempt);
-      if (input.nextValidation.parentAgentRunId !== input.agentRunId) throw new ConflictError("Postwork Validation parent differs from failed Work.");
-      const validation = this.execution.createAgent(input.nextValidation);
-      this.updateActiveAgent(action, validation, "postchecking", input.completedAt, false);
+      if (agent.role !== "work" || agent.phase !== "work") throw new ConflictError("Only Work provider failures use this transition.");
       this.events.append(action.environmentRunId, "work_completed", {
         stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
         sourceAgentRunId: input.agentRunId, data: { providerFailure: true }
       }, input.completedAt);
-      this.events.append(action.environmentRunId, "validation_postwork_dispatched", {
-        stateExecutionId: action.stateExecutionId, actionExecutionId: action.actionExecutionId,
-        sourceAgentRunId: input.agentRunId, targetAgentRunId: validation.agentRunId
-      }, input.completedAt);
-      return this.runs.requireAction(action.actionExecutionId);
+      return this.blockAction(action, input.feedback, input.completedAt, input.agentRunId, "provider_failure");
     })();
   }
 
@@ -224,7 +268,7 @@ export class ActionOutcomeCoordinator {
     feedback: ApplyPrecheckInput["feedback"],
     at: string,
     agentRunId: string,
-    expectedSource: "validation_blocked" | "retry_exhaustion" | "system_invalid_output"
+    expectedSource: "validation_blocked" | "retry_exhaustion" | "provider_failure" | "system_invalid_output"
   ): StoredActionExecution {
     if (!feedback || feedback.source !== expectedSource || feedback.actionExecutionId !== action.actionExecutionId) {
       throw new ConflictError(`Blocked Action requires ${expectedSource} Feedback bound to the Action.`);

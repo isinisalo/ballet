@@ -5,7 +5,10 @@ import process from "node:process";
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const scanRoots = [
   "backend", "frontend", "shared",
-  ".ballet/project.json", ".fixture-ballet-project/.ballet/project.json",
+  ".ballet/project.json", ".ballet/goals", ".ballet/adr", ".ballet/constraints",
+  ".ballet/use-cases", ".ballet/instructions", ".ballet/releases", ".ballet/arc42",
+  ".agents/skills", ".fixture-ballet-project/.ballet",
+  "README.md", "ARCHITECTURE.md", "DESIGN.md", "AGENTS.md",
   "package.json", "vite.config.ts", "scripts"
 ];
 const prohibited = [
@@ -27,7 +30,9 @@ const prohibited = [
   "graph-node" + "-module",
   "/automation/" + "graph",
   "rootKind: \"" + "graph\"",
-  "rootKind: \"" + "graph_node\""
+  "rootKind: \"" + "graph_node\"",
+  "version" + ": 19",
+  "schemaVersion" + " = 15"
 ];
 const transitionMarker = "v" + "next";
 const self = path.resolve(import.meta.filename);
@@ -40,9 +45,12 @@ for (const filename of files) {
   if (source === undefined) continue;
   const relative = path.relative(repositoryRoot, filename);
   for (const term of prohibited) {
-    if (source.includes(term)) failures.push(`${relative}: prohibited term ${JSON.stringify(term)}`);
+    if (source.includes(term) && !allowedHistoricalMatch(relative, source, term)) {
+      failures.push(`${relative}: prohibited term ${JSON.stringify(term)}`);
+    }
   }
-  if (source.toLocaleLowerCase().includes(transitionMarker)) {
+  if (source.toLocaleLowerCase().includes(transitionMarker)
+    && !allowedHistoricalMatch(relative, source, transitionMarker)) {
     failures.push(`${relative}: transition namespace marker remains`);
   }
   if (relative.toLocaleLowerCase().includes(transitionMarker)) {
@@ -64,4 +72,25 @@ async function collect(target) {
     .filter((entry) => !["node_modules", "dist", "dist-server"].includes(entry.name))
     .map((entry) => collect(path.join(target, entry.name))));
   return nested.flat();
+}
+
+function allowedHistoricalMatch(relative, source, term) {
+  if (/^\.ballet\/(?:goals|adr)\/.+\.md$/.test(relative) && /^status:\s*superseded\s*$/m.test(source)) return true;
+  if (relative.startsWith(".ballet/arc42/initiatives/")
+    && !relative.startsWith(".ballet/arc42/initiatives/environment-state-action-orchestration/")) return true;
+  if ([
+    ".ballet/arc42/initiatives/environment-state-action-orchestration/AUDIT.md",
+    ".ballet/arc42/initiatives/environment-state-action-orchestration/CUTOVER-MANIFEST.md",
+    ".ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md",
+    ".ballet/arc42/initiatives/environment-state-action-orchestration/PLAN.md"
+  ].includes(relative)) return true;
+  if ([
+    ".ballet/tests/defaultProjectResources.test.ts",
+    ".ballet/tools/validate-arc42.mjs"
+  ].includes(relative)) return true;
+  if (term === "version: 19" && [
+    "backend/orchestration/http/Api.integration.test.ts",
+    "backend/orchestration/project/ProjectPersistence.test.ts"
+  ].includes(relative)) return true;
+  return false;
 }

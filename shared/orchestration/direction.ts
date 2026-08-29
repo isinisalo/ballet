@@ -32,6 +32,7 @@ export interface UseCase {
   goalIds: string[];
   adrIds: string[];
   constraintIds: string[];
+  approvalRevision?: number;
   approval?: TimestampedApproval;
 }
 
@@ -68,6 +69,7 @@ export const approveUseCase = (
 ): UseCase => ({
   ...useCase,
   status: "approved",
+  approvalRevision: approval.revision,
   approval: { ...approval, contentHash: useCaseApprovalHash(useCase) }
 });
 

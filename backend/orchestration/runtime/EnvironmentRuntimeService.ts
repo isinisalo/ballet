@@ -1,19 +1,23 @@
+/* eslint-disable max-lines -- One lifecycle service owns durable dispatch, recovery, cancellation, and finalization ordering. */
 import type Database from "better-sqlite3";
 import type { CreateEnvironmentRunInput, FeedbackSeed, ProductSnapshotSeed } from "../../../shared/orchestration/persistence.js";
 import type { ValidationOutcome, WorkOutcome } from "../../../shared/orchestration/outcomes.js";
 import type { StoredActionExecution, StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
+import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { ActionOutcomeCoordinator } from "../persistence/ActionOutcomeCoordinator.js";
 import { EnvironmentRunStore } from "../persistence/EnvironmentRunStore.js";
 import { FlowCoordinator } from "../persistence/FlowCoordinator.js";
 import { AgentExecutionStore, type StoredExecutionTask } from "../persistence/AgentExecutionStore.js";
-import { AgentDispatchFactory, failedWorkOutcome, type PreparedAgentDispatch } from "./AgentDispatchFactory.js";
+import { AgentDispatchFactory, type PreparedAgentDispatch } from "./AgentDispatchFactory.js";
 import type { ExecutionQueueBoundary } from "./ExecutionQueueBoundary.js";
 import { mapProviderPermissions } from "./ProviderPermissions.js";
 import type { OrchestrationRuntimeProvider } from "./RuntimeProvider.js";
 import { parseOrchestrationStructuredOutput } from "./StructuredOutputValidator.js";
+import { ConflictError } from "../persistence/PersistenceErrors.js";
 
 export interface ProductFinalizationPort {
   finalize(run: StoredEnvironmentRun, at: string): Promise<ProductSnapshotSeed>;
+  cleanup?(run: StoredEnvironmentRun): Promise<void>;
 }
 
 export class EnvironmentRuntimeService {
@@ -56,6 +60,10 @@ export class EnvironmentRuntimeService {
     const taskId = this.queue.next();
     if (!taskId) return false;
     const task = this.execution.requireTask(taskId);
+    if (["succeeded", "failed"].includes(task.status)) {
+      await this.applyPersistedTerminal(task);
+      return true;
+    }
     if (task.status !== "queued" || !this.execution.claimTask(taskId, this.now())) return true;
     const agent = this.execution.requireAgent(task.agentRunId);
     const run = this.runs.require(agent.environmentRunId);
@@ -64,6 +72,7 @@ export class EnvironmentRuntimeService {
     const terminal = await this.provider.execute(task.spec, permissionsFor(task));
     this.activeTaskId = undefined;
     if (this.stopping) return true;
+    if (!["pending", "running"].includes(this.runs.require(run.environmentRunId).status)) return true;
     const at = this.now();
     if (terminal.kind === "failure") {
       this.execution.finishTask(taskId, terminal.providerOutcomeKey, "failed", {
@@ -80,22 +89,89 @@ export class EnvironmentRuntimeService {
       this.blockInvalid(agent.agentRunId, terminal.providerOutcomeKey, parsed.error, at);
       return true;
     }
+    if (parsed.outcome.role === "work" && parsed.outcome.state === "needs_input") {
+      this.outcomes.waitForWorkInput({ taskId, agentRunId: agent.agentRunId,
+        providerOutcomeKey: terminal.providerOutcomeKey, expectedActionRevision: this.runs.requireAction(agent.actionExecutionId!).revision,
+        outcome: parsed.outcome, completedAt: at });
+      return true;
+    }
     this.execution.finishTask(taskId, terminal.providerOutcomeKey, "succeeded", { outcome: parsed.outcome }, at);
     await this.applyOutcome(agent.agentRunId, terminal.providerOutcomeKey, parsed.outcome, at);
     return true;
   }
 
-  reconcile(): number {
+  async reconcile(): Promise<number> {
+    this.execution.recoverAfterRestart(this.now());
+    this.runs.recoverFinalizations(this.now());
     let count = 0;
-    for (const task of this.execution.pendingTasks().filter(({ spec }) => ["validation", "work"].includes(spec.evidence.role))) {
+    for (const task of this.execution.recoverableTasks().filter(({ spec }) => ["validation", "work"].includes(spec.evidence.role))) {
       if (!this.queue.has(task.taskId)) { this.queue.enqueue(task.taskId); count += 1; }
+    }
+    for (const run of this.runs.finalizableRuns()) {
+      await this.progress(run.environmentRunId);
+      count += 1;
     }
     return count;
   }
 
-  cancel(environmentRunId: string): StoredEnvironmentRun {
+  private async applyPersistedTerminal(task: StoredExecutionTask): Promise<void> {
+    if (!task.providerOutcomeKey) throw new Error(`Terminal task ${task.taskId} lacks a provider outcome key.`);
+    const agent = this.execution.requireAgent(task.agentRunId);
+    if (task.status === "succeeded") {
+      if (!task.outcome) throw new Error(`Succeeded task ${task.taskId} lacks its structured outcome.`);
+      await this.applyOutcome(agent.agentRunId, task.providerOutcomeKey,
+        task.outcome as ValidationOutcome | WorkOutcome | { role: "critic" | "refinement" }, this.now());
+      return;
+    }
+    if (task.errorCode === "provider_failure") {
+      await this.applyProviderFailure(agent.agentRunId, task.providerOutcomeKey, task.errorMessage ?? "Provider failed.", this.now());
+      return;
+    }
+    this.blockInvalid(agent.agentRunId, task.providerOutcomeKey, task.errorMessage ?? "Invalid structured output.", this.now());
+  }
+
+  async cancel(environmentRunId: string): Promise<StoredEnvironmentRun> {
     const run = this.runs.require(environmentRunId);
+    if (this.activeTaskId) {
+      const task = this.execution.requireTask(this.activeTaskId);
+      if (task.spec.environmentRunId === environmentRunId) {
+        await this.provider.cancel?.(this.activeTaskId, "Environment Run was cancelled by the local operator.");
+      }
+    }
     return this.flow.stop(environmentRunId, run.revision, "cancelled", this.now());
+  }
+
+  answerWorkInput(input: {
+    environmentRunId: string; expectedAgentRunId: string; expectedAgentRevision: number;
+    answer: string; actorId: string;
+  }): StoredEnvironmentRun {
+    const run = this.runs.require(input.environmentRunId);
+    if (run.status !== "running" || run.activeAgentRunId !== input.expectedAgentRunId) {
+      throw new ConflictError("Environment Run no longer has the expected waiting Work Agent.");
+    }
+    const waiting = this.execution.requireAgent(input.expectedAgentRunId);
+    if (waiting.status !== "waiting_for_input" || waiting.role !== "work" || !waiting.actionExecutionId) {
+      throw new ConflictError("Expected Agent is not waiting for Work input.");
+    }
+    const row = this.connection().prepare(
+      "SELECT task_envelope_json FROM agent_runs WHERE agent_run_id = ?"
+    ).get(waiting.agentRunId) as { task_envelope_json: string };
+    const envelope = JSON.parse(row.task_envelope_json) as { dynamicPrompt?: string };
+    const resumedPrompt = `${envelope.dynamicPrompt ?? "Continue the delegated Work."}\n\nHuman response (${input.actorId}):\n${input.answer.trim()}`;
+    if (resumedPrompt.length > 131072) throw new ConflictError("Work response exceeds the bounded prompt contract.");
+    const action = this.runs.requireAction(waiting.actionExecutionId);
+    const at = this.now();
+    const next = this.dispatches.create({ run, action, role: "work", phase: "work",
+      attempt: action.workAttempt + 1, parentAgentRunId: waiting.agentRunId,
+      dynamicPrompt: resumedPrompt, at });
+    this.connection().transaction(() => {
+      this.outcomes.resumeWorkInput({ agentRunId: waiting.agentRunId,
+        expectedAgentRevision: input.expectedAgentRevision, expectedActionRevision: action.revision,
+        nextWork: next.agent, actorId: input.actorId, resumedAt: at });
+      this.execution.createTask(next.task);
+    })();
+    this.enqueueAfterCommit(next);
+    return this.runs.require(input.environmentRunId);
   }
 
   async shutdown(): Promise<void> {
@@ -120,8 +196,16 @@ export class EnvironmentRuntimeService {
       run = this.runs.require(environmentRunId);
     }
     if (this.runs.states(environmentRunId).every(({ status }) => status === "done")) {
-      const snapshot = await this.finalizer.finalize(run, this.now());
-      this.flow.completeEnvironment(snapshot, run.revision);
+      const claimed = this.runs.claimFinalization(environmentRunId, run.revision, this.now());
+      try {
+        const snapshot = this.withRuntimeEvidence(await this.finalizer.finalize(claimed, this.now()), claimed);
+        this.flow.completeEnvironment(snapshot, claimed.revision);
+      } catch (error) {
+        this.runs.failFinalization(environmentRunId, claimed.revision,
+          error instanceof Error ? error.message : String(error), this.now());
+        throw error;
+      }
+      await this.finalizer.cleanup?.(claimed);
       return;
     }
     const action = this.flow.advance(environmentRunId, run.revision, this.now());
@@ -147,7 +231,7 @@ export class EnvironmentRuntimeService {
     const run = this.runs.require(action.environmentRunId);
     if (outcome.role === "work") {
       const next = this.dispatches.create({ run, action, role: "validation", phase: "postwork",
-        attempt: action.workAttempt, parentAgentRunId: agentRunId, workOutcome: outcome, at });
+        attempt: action.workAttempt + 1, parentAgentRunId: agentRunId, workOutcome: outcome, at });
       this.connection().transaction(() => {
         this.outcomes.applyWork({ agentRunId, providerOutcomeKey, expectedActionRevision: action.revision,
           outcome, nextValidation: next.agent, completedAt: at });
@@ -200,16 +284,11 @@ export class EnvironmentRuntimeService {
       return;
     }
     const action = this.runs.requireAction(agent.actionExecutionId);
-    const next = this.dispatches.create({
-      run: this.runs.require(action.environmentRunId), action, role: "validation", phase: "postwork",
-      attempt: action.workAttempt, parentAgentRunId: agentRunId, workOutcome: failedWorkOutcome(message), at
-    });
     this.connection().transaction(() => {
       this.outcomes.applyWorkFailure({ agentRunId, providerOutcomeKey: key, errorMessage: message,
-        expectedActionRevision: action.revision, nextValidation: next.agent, completedAt: at });
-      this.execution.createTask(next.task);
+        expectedActionRevision: action.revision,
+        feedback: feedbackFor(action, agentRunId, "provider_failure", message, at), completedAt: at });
     })();
-    this.enqueueAfterCommit(next);
   }
 
   private blockInvalid(agentRunId: string, key: string, message: string, at: string): void {
@@ -223,6 +302,36 @@ export class EnvironmentRuntimeService {
   private enqueueAfterCommit(dispatch: PreparedAgentDispatch): void {
     this.queue.enqueue(dispatch.task.spec.taskId);
   }
+
+  private withRuntimeEvidence(seed: ProductSnapshotSeed, run: StoredEnvironmentRun): ProductSnapshotSeed {
+    const states = this.runs.states(run.environmentRunId).map((state) => ({
+      id: state.stateDefinitionId, order: state.order, status: state.status,
+      actions: this.runs.actions(state.stateExecutionId).map((action) => ({
+        id: action.actionDefinitionId, priority: action.priority, status: action.status,
+        workAttempts: action.workAttempt, maxRetries: action.maxRetries,
+        evidence: json(this.connection().prepare(`
+          SELECT agent_run_id, role, phase, attempt, status, evidence_json, outcome_json
+          FROM agent_runs WHERE action_execution_id = ? ORDER BY created_at, agent_run_id
+        `).all(action.actionExecutionId))
+      }))
+    }));
+    const feedback = json(this.connection().prepare(`
+      SELECT feedback_entry_id, source, category, target_type, target_id, status, evidence_refs_json
+      FROM feedback_entries WHERE environment_run_id = ? ORDER BY created_at, feedback_entry_id
+    `).all(run.environmentRunId));
+    return {
+      ...seed,
+      validationSummary: json({
+        orderedExecution: states,
+        feedback,
+        approvedUseCases: run.executionSnapshot.approvedUseCases.map(({ useCase, contentSha256 }) => ({
+          id: useCase.id, contentSha256, approval: useCase.approval ?? null
+        })),
+        lineage: run.executionSnapshot.lineage ?? null,
+        snapshotSha256: run.executionSnapshotHash
+      })
+    };
+  }
 }
 
 const feedbackFor = (
@@ -230,7 +339,8 @@ const feedbackFor = (
 ): FeedbackSeed => ({
   feedbackEntryId: `feedback:${agentRunId}`, source, category: source === "system_invalid_output" ? "system" : "product",
   targetType: "action_execution", targetId: action.actionExecutionId,
-  title: source === "retry_exhaustion" ? "Retry budget exhausted" : "Action blocked",
+  title: source === "retry_exhaustion" ? "Retry budget exhausted"
+    : source === "provider_failure" ? "Provider execution failed" : "Action blocked",
   description, correctiveActions: ["Review the recorded evidence and correct the Action input or resources."],
   environmentRunId: action.environmentRunId, stateExecutionId: action.stateExecutionId,
   actionExecutionId: action.actionExecutionId, agentRunId,
@@ -243,3 +353,5 @@ const permissionsFor = (task: StoredExecutionTask) => {
   return mapProviderPermissions({ provider: task.spec.runtime.provider, role, toolPolicy: policy,
     networkAccess: task.spec.runtime.networkAccess, worktreePath: task.spec.project.checkoutRoot });
 };
+
+const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;

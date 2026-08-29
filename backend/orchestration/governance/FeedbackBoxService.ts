@@ -62,7 +62,7 @@ export const validateFeedbackTarget = (
   if (!run) throw new ConflictError(`Feedback Environment Run ${environmentRunId} does not exist.`);
   const snapshot = JSON.parse(run.execution_snapshot_json) as Record<string, unknown>;
   const exists = type === "environment_run" ? id === environmentRunId
-    : type === "product_snapshot" ? hasRow(connection, "product_snapshots", "product_snapshot_id", id)
+    : type === "product_snapshot" ? hasOwnedProductSnapshot(connection, id, environmentRunId)
       : type === "state_execution" ? hasOwnedRow(connection, "state_executions", "state_execution_id", id, environmentRunId)
         : type === "action_execution" ? hasOwnedRow(connection, "action_executions", "action_execution_id", id, environmentRunId)
           : type === "environment_definition" ? Reflect.get(snapshot.environment as object, "id") === id
@@ -72,10 +72,8 @@ export const validateFeedbackTarget = (
   if (!exists) throw new ConflictError(`Feedback target ${type}:${id} does not exist in its immutable closure.`);
 };
 
-const hasRow = (db: Database.Database, table: string, key: string, id: string): boolean => {
-  if (`${table}:${key}` !== "product_snapshots:product_snapshot_id") throw new Error("Unsafe target selector.");
-  return Boolean(db.prepare(`SELECT 1 FROM ${table} WHERE ${key} = ?`).get(id));
-};
+const hasOwnedProductSnapshot = (db: Database.Database, id: string, runId: string): boolean =>
+  Boolean(db.prepare("SELECT 1 FROM product_snapshots WHERE product_snapshot_id = ? AND environment_run_id = ?").get(id, runId));
 const hasOwnedRow = (db: Database.Database, table: string, key: string, id: string, runId: string): boolean => {
   const allowed = new Set(["state_executions:state_execution_id", "action_executions:action_execution_id"]);
   if (!allowed.has(`${table}:${key}`)) throw new Error("Unsafe target selector.");

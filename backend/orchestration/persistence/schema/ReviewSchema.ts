@@ -24,7 +24,7 @@ export const reviewSchema = `
 
   CREATE TABLE feedback_entries (
     feedback_entry_id TEXT PRIMARY KEY,
-    source TEXT NOT NULL CHECK (source IN ('validation_blocked','retry_exhaustion','system_invalid_output','approved_critic_proposal','human')),
+    source TEXT NOT NULL CHECK (source IN ('validation_blocked','retry_exhaustion','provider_failure','system_invalid_output','approved_critic_proposal','human')),
     category TEXT NOT NULL CHECK (category IN ('product','system','architecture','code','design','documentation')),
     target_type TEXT NOT NULL CHECK (target_type IN (
       'product_snapshot','environment_definition','environment_run','state_definition',
@@ -184,15 +184,16 @@ export const reviewSchema = `
   CREATE TABLE refinement_applies (
     refinement_apply_id TEXT PRIMARY KEY,
     refinement_proposal_id TEXT NOT NULL UNIQUE REFERENCES refinement_proposals(refinement_proposal_id) ON DELETE CASCADE,
-    status TEXT NOT NULL CHECK (status IN ('applied','apply_failed')),
+    status TEXT NOT NULL CHECK (status IN ('running','applied','stale','apply_failed')),
     worktree_path TEXT NOT NULL,
     branch TEXT NOT NULL,
     commit_sha TEXT,
     error_message TEXT,
     created_at TEXT NOT NULL,
-    completed_at TEXT NOT NULL,
-    CHECK ((status = 'applied' AND commit_sha IS NOT NULL AND error_message IS NULL)
-      OR (status = 'apply_failed' AND commit_sha IS NULL AND error_message IS NOT NULL))
+    completed_at TEXT,
+    CHECK ((status = 'running' AND commit_sha IS NULL AND error_message IS NULL AND completed_at IS NULL)
+      OR (status = 'applied' AND commit_sha IS NOT NULL AND error_message IS NULL AND completed_at IS NOT NULL)
+      OR (status IN ('stale','apply_failed') AND commit_sha IS NULL AND error_message IS NOT NULL AND completed_at IS NOT NULL))
   );
 
   CREATE TABLE continuation_links (

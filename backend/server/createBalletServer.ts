@@ -35,7 +35,12 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     codexCommand: options.codexCommand ?? savedSettings.codexCommand,
     copilotCommand: options.copilotCommand ?? savedSettings.copilotCommand
   });
-  await runtime.start();
+  // Provider discovery can involve local authenticated CLIs and must not gate the
+  // loopback control plane or persisted-run recovery. Run preflight still reads
+  // the fail-closed provider status until discovery completes.
+  void runtime.start().catch((error) => {
+    logger.error("Local provider discovery failed during startup.", error instanceof Error ? { message: error.message } : error);
+  });
   const composition = await createCompositionRoot({ context, runtime });
 
   const app = express();
@@ -92,8 +97,8 @@ export const loopbackSecurity = (port: number): express.RequestHandler => (req, 
     const origin = req.get("origin");
     const fetchSite = req.get("sec-fetch-site");
     const allowed = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
-    if ((origin && !allowed.has(origin)) || (fetchSite && !["same-origin", "none"].includes(fetchSite))) {
-      res.status(403).json({ error: "Cross-origin mutation was blocked." }); return;
+    if (!origin || !allowed.has(origin) || (fetchSite && fetchSite !== "same-origin")) {
+      res.status(403).json({ error: "Mutation requires the same-origin Ballet browser session." }); return;
     }
   }
   next();

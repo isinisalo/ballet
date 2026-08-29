@@ -22,14 +22,17 @@ export const orchestrationApi = {
     }),
   deleteDirection: (collection: string, id: string, expectedConfigHash: string, expectedHash: string) =>
     request(`${base}/${collection}/${encodeURIComponent(id)}`, remove({ expectedConfigHash, expectedHash })),
-  approveUseCase: (id: string, expectedConfigHash: string) => request(`${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash })),
+  approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(
+    `${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash, expectedContentHash })),
   returnUseCaseToDraft: (id: string, expectedConfigHash: string) => request(`${base}/use-cases/${encodeURIComponent(id)}/return-to-draft`, body({ expectedConfigHash })),
   saveEnvironment: (environment: EnvironmentDefinition, expectedConfigHash: string) => request(`${base}/environment`, put({ environment, expectedConfigHash })),
   createState: (state: StateDefinition, expectedConfigHash: string) => request(`${base}/environment/states`, body({ state, expectedConfigHash })),
   updateState: (state: StateDefinition, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(state.id)}`, put({ state, expectedConfigHash })),
+  deleteState: (stateId: string, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}`, remove({ expectedConfigHash })),
   reorderStates: (orderedIds: string[], expectedConfigHash: string) => request(`${base}/environment/states/reorder`, body({ orderedIds, expectedConfigHash })),
   createAction: (stateId: string, action: ActionDefinition, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions`, body({ action, expectedConfigHash })),
   updateAction: (stateId: string, action: ActionDefinition, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(action.id)}`, put({ action, expectedConfigHash })),
+  deleteAction: (stateId: string, actionId: string, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}`, remove({ expectedConfigHash })),
   reprioritizeActions: (stateId: string, orderedIds: string[], expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/reprioritize`, body({ orderedIds, expectedConfigHash })),
   saveResource: (collection: "instructions" | "skills", id: string, content: string, expectedHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(id)}`}`, creating ? body({ id, content, expectedHash }) : put({ content, expectedHash })),
@@ -38,6 +41,8 @@ export const orchestrationApi = {
   run: (id: string) => request<RunDetail>(`${base}/environment-runs/${encodeURIComponent(id)}`),
   startRun: (environmentId: string, expectedConfigHash: string, input?: string) => request<RunSummary>(`${base}/environment-runs`, body({ environmentId, expectedConfigHash, ...(input ? { input } : {}) })),
   cancelRun: (id: string) => request<RunSummary>(`${base}/environment-runs/${encodeURIComponent(id)}/cancel`, body({})),
+  answerWorkInput: (id: string, expectedAgentRunId: string, expectedAgentRevision: number, answer: string) => request<RunSummary>(
+    `${base}/environment-runs/${encodeURIComponent(id)}/work-input`, body({ expectedAgentRunId, expectedAgentRevision, answer })),
   product: (runId: string) => request<JsonRow>(`${base}/environment-runs/${encodeURIComponent(runId)}/product`),
   feedback: (query = "") => request<JsonRow[]>(`${base}/feedback${query}`),
   feedbackDetail: (id: string) => request<JsonRow>(`${base}/feedback/${encodeURIComponent(id)}`),

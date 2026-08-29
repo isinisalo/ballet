@@ -60,9 +60,12 @@ export class ReviewStore extends CriticScheduleStore {
         ) VALUES (?, ?, 'queued', ?, ?)
       `).run(input.refinementRunId, input.sourceEnvironmentRunId, input.createdAt, input.createdAt);
       for (const feedbackEntryId of new Set(input.feedbackEntryIds)) {
-        const feedback = this.connection().prepare("SELECT status FROM feedback_entries WHERE feedback_entry_id = ?")
+        const feedback = this.connection().prepare(
+          "SELECT status, environment_run_id FROM feedback_entries WHERE feedback_entry_id = ?"
+        )
           .get(feedbackEntryId);
-        if (!feedback || readString(feedback, "status") !== "open") {
+        if (!feedback || readString(feedback, "status") !== "open"
+          || readString(feedback, "environment_run_id") !== input.sourceEnvironmentRunId) {
           throw new ConflictError(`Refinement requires open Feedback ${feedbackEntryId}.`);
         }
         this.connection().prepare(`
@@ -170,17 +173,32 @@ export class ReviewStore extends CriticScheduleStore {
   }
 
   recordApply(input: RefinementApplySeed): void {
-    this.connection().prepare(`
-      INSERT INTO refinement_applies (
-        refinement_apply_id, refinement_proposal_id, status, worktree_path, branch,
-        commit_sha, error_message, created_at, completed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(input.refinementApplyId, input.refinementProposalId, input.status, input.worktreePath,
-      input.branch, input.commitSha ?? null, input.errorMessage ?? null, input.completedAt, input.completedAt);
-    this.connection().prepare(`
+    const apply = this.connection().prepare(`
+      UPDATE refinement_applies SET status = ?, commit_sha = ?, error_message = ?, completed_at = ?
+      WHERE refinement_apply_id = ? AND refinement_proposal_id = ? AND status = 'running'
+    `).run(input.status, input.commitSha ?? null, input.errorMessage ?? null, input.completedAt,
+      input.refinementApplyId, input.refinementProposalId);
+    const proposal = this.connection().prepare(`
       UPDATE refinement_proposals SET status = ?, updated_at = ?
       WHERE refinement_proposal_id = ? AND status = 'applying'
     `).run(input.status, input.completedAt, input.refinementProposalId);
+    if (apply.changes !== 1 || proposal.changes !== 1) {
+      throw new ConflictError("Refinement apply changed before its exact terminal result was recorded.");
+    }
+  }
+
+  recordStaleApply(refinementApplyId: string, refinementProposalId: string, at: string): void {
+    const apply = this.connection().prepare(`
+      UPDATE refinement_applies SET status = 'stale', error_message = 'Preimage changed after approval', completed_at = ?
+      WHERE refinement_apply_id = ? AND refinement_proposal_id = ? AND status = 'running'
+    `).run(at, refinementApplyId, refinementProposalId);
+    const proposal = this.connection().prepare(`
+      UPDATE refinement_proposals SET status = 'stale', updated_at = ?
+      WHERE refinement_proposal_id = ? AND status = 'applying'
+    `).run(at, refinementProposalId);
+    if (apply.changes !== 1 || proposal.changes !== 1) {
+      throw new ConflictError("Refinement apply changed before its stale result was recorded.");
+    }
   }
 
   recordContinuation(input: {

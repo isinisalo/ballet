@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { Constraint, DirectionReference, UseCase } from "../../../shared/orchestration/direction.js";
-import { approveUseCase, invalidateUseCaseApproval } from "../../../shared/orchestration/direction.js";
+import { approveUseCase, invalidateUseCaseApproval, useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import type { ProjectConfigurationV20 } from "../../../shared/orchestration/environment.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
@@ -62,14 +62,15 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
     return saved.configHash;
   }
 
-  approveUseCase(id: string, expectedConfigHash: string, actor: TrustedHumanActor, at: string): string {
+  approveUseCase(id: string, expectedConfigHash: string, expectedContentHash: string, actor: TrustedHumanActor, at: string): string {
     const loaded = this.projects.load();
     if (loaded.configHash !== expectedConfigHash) throw new ConflictError("Project Config optimistic hash is stale.");
     const useCase = loaded.config.direction.useCases.find((candidate) => candidate.id === id);
     if (!useCase) throw new NotFoundError(`Use Case ${id} was not found.`);
     if (useCase.status === "approved") throw new ConflictError(`Use Case ${id} is already approved.`);
+    if (useCaseApprovalHash(useCase) !== expectedContentHash) throw new ConflictError(`Use Case ${id} approval content is stale.`);
     const approved = approveUseCase(useCase, {
-      approvedBy: actor.id, approvedAt: at, revision: (useCase.approval?.revision ?? 0) + 1
+      approvedBy: actor.id, approvedAt: at, revision: (useCase.approvalRevision ?? useCase.approval?.revision ?? 0) + 1
     });
     return this.projects.save(replaceUseCase(loaded.config, approved), expectedConfigHash).configHash;
   }
@@ -80,7 +81,8 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
     const useCase = loaded.config.direction.useCases.find((candidate) => candidate.id === id);
     if (!useCase) throw new NotFoundError(`Use Case ${id} was not found.`);
     if (useCase.status !== "approved") throw new ConflictError(`Use Case ${id} is not approved.`);
-    const draft = { ...useCase, status: "draft" as const, approval: undefined };
+    const draft = { ...useCase, status: "draft" as const,
+      approvalRevision: useCase.approval?.revision ?? useCase.approvalRevision ?? 0, approval: undefined };
     return this.projects.save(replaceUseCase(loaded.config, draft), expectedConfigHash).configHash;
   }
 

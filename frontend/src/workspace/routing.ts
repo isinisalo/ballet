@@ -1,6 +1,8 @@
 import type { RouteState, WorkspaceView } from "./types";
 
-const decode = (match: RegExpMatchArray, index: number) => decodeURIComponent(match[index]);
+const decode = (match: RegExpMatchArray, index: number): string | undefined => {
+  try { return decodeURIComponent(match[index]); } catch { return undefined; }
+};
 
 export const routeFromPath = (path: string): RouteState => {
   const url = new URL(path, "http://localhost");
@@ -37,12 +39,14 @@ export const routeFromPath = (path: string): RouteState => {
   for (const [pattern, workspaceView] of patterns) {
     const match = url.pathname.match(pattern);
     if (!match) continue;
-    if (workspaceView === "action") return { view: "orchestration", workspaceView, stateId: decode(match, 1), actionId: decode(match, 2) };
-    if (workspaceView === "run-action") return { view: "orchestration", workspaceView, entityId: decode(match, 1), stateId: decode(match, 2), actionId: decode(match, 3) };
-    if (workspaceView === "run-state") return { view: "orchestration", workspaceView, entityId: decode(match, 1), stateId: decode(match, 2) };
+    if (workspaceView === "action") { const stateId = decode(match, 1); const actionId = decode(match, 2); return stateId && actionId ? { view: "orchestration", workspaceView, stateId, actionId } : { view: "orchestration", workspaceView: "invalid" }; }
+    if (workspaceView === "run-action") { const entityId = decode(match, 1); const stateId = decode(match, 2); const actionId = decode(match, 3); return entityId && stateId && actionId ? { view: "orchestration", workspaceView, entityId, stateId, actionId } : { view: "orchestration", workspaceView: "invalid" }; }
+    if (workspaceView === "run-state") { const entityId = decode(match, 1); const stateId = decode(match, 2); return entityId && stateId ? { view: "orchestration", workspaceView, entityId, stateId } : { view: "orchestration", workspaceView: "invalid" }; }
+    const id = decode(match, 1);
+    if (!id) return { view: "orchestration", workspaceView: "invalid" };
     return workspaceView === "state"
-      ? { view: "orchestration", workspaceView, stateId: decode(match, 1) }
-      : { view: "orchestration", workspaceView, entityId: decode(match, 1) };
+      ? { view: "orchestration", workspaceView, stateId: id }
+      : { view: "orchestration", workspaceView, entityId: id };
   }
   return { view: "orchestration", workspaceView: "invalid" };
 };

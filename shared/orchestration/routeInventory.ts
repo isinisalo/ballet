@@ -20,6 +20,7 @@ export const OrchestrationRouteInventory = [
   "POST /api/environment/states/:stateId/actions/reprioritize",
   "POST /api/environment-runs", "GET /api/environment-runs",
   "GET /api/environment-runs/:runId", "POST /api/environment-runs/:runId/cancel",
+  "POST /api/environment-runs/:runId/work-input",
   "GET /api/environment-runs/:runId/events", "GET /api/environment-runs/:runId/product",
   "GET /api/feedback", "POST /api/feedback", "GET /api/feedback/:id",
   "POST /api/feedback/:id/decision",

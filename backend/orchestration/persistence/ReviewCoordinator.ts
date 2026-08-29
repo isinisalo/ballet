@@ -51,6 +51,15 @@ export class ReviewCoordinator {
       if (feedback.targetType !== proposal.target_type || feedback.targetId !== proposal.target_id) {
         throw new ConflictError("Critic Feedback target differs from its Proposal.");
       }
+      const owner = this.connection().prepare(`
+        SELECT ps.environment_run_id FROM critic_proposals cp
+        JOIN critic_runs cr ON cr.critic_run_id = cp.critic_run_id
+        JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+        WHERE cp.critic_proposal_id = ?
+      `).get(criticProposalId) as { environment_run_id: string } | undefined;
+      if (!owner || owner.environment_run_id !== feedback.environmentRunId) {
+        throw new ConflictError("Critic Feedback must belong to the Proposal Product Snapshot Run.");
+      }
       validateFeedbackTarget(this.connection(), feedback.environmentRunId, feedback.targetType, feedback.targetId);
       this.feedback.create({
         ...feedback,
@@ -98,10 +107,7 @@ export class ReviewCoordinator {
         input.observedPreimageHashes[String(file.relative_path)] !== file.expected_preimage_hash
       ));
       if (stale) {
-        this.connection().prepare(`
-          UPDATE refinement_proposals SET status = 'stale', updated_at = ?
-          WHERE refinement_proposal_id = ? AND status = 'applying'
-        `).run(input.completedAt, input.refinementProposalId);
+        this.reviews.recordStaleApply(input.refinementApplyId, input.refinementProposalId, input.completedAt);
         return "stale";
       }
       this.reviews.recordApply(input);
@@ -129,7 +135,7 @@ export class ReviewCoordinator {
         continuationSnapshotHash: continuation.continuationSnapshotHash,
         createdAt: input.completedAt
       });
-      this.events.append(source.environmentRunId, "continuation_created", {
+      this.events.append(continuation.environmentRunId, "continuation_created", {
         data: { continuationRunId: continuation.environmentRunId, refinementApplyId: input.refinementApplyId }
       }, input.completedAt);
       return "applied";
