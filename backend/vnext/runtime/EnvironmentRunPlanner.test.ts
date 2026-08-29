@@ -82,7 +82,7 @@ const definition = (): VNextProjectDefinition => {
         }]
       }]
     },
-    critic: { version: 1, enabled: false, schedule: { kind: "interval", intervalMinutes: 1_440 }, agent: agent("read_only") },
+    critic: { version: 1, enabled: false, schedules: [], agent: agent("read_only") },
     refinement: { version: 1, enabled: false, agent: agent("read_only"), allowedRoots: [".ballet/instructions", ".agents/skills"] }
   };
   return {

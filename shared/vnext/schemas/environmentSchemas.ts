@@ -49,12 +49,34 @@ export const environmentDefinitionSchema = z.object({
   states: z.array(stateDefinitionSchema).min(1).max(VNEXT_LIMITS.states)
 }).strict();
 
+const localTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+const criticScheduleSchema = z.discriminatedUnion("kind", [
+  z.object({ id: idSchema, kind: z.literal("daily"), timeZone: nonEmptyTextSchema,
+    localTimes: z.array(localTimeSchema).min(1).max(16) }).strict(),
+  z.object({ id: idSchema, kind: z.literal("weekly"), timeZone: nonEmptyTextSchema,
+    localTimes: z.array(localTimeSchema).min(1).max(16),
+    weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7) }).strict()
+]).superRefine((schedule, context) => {
+  try { new Intl.DateTimeFormat("en-US", { timeZone: schedule.timeZone }).format(); }
+  catch { context.addIssue({ code: "custom", path: ["timeZone"], message: "Invalid IANA timezone" }); }
+  if (new Set(schedule.localTimes).size !== schedule.localTimes.length) {
+    context.addIssue({ code: "custom", path: ["localTimes"], message: "Local times must be unique" });
+  }
+  if (schedule.kind === "weekly" && new Set(schedule.weekdays).size !== schedule.weekdays.length) {
+    context.addIssue({ code: "custom", path: ["weekdays"], message: "Weekdays must be unique" });
+  }
+});
+
 const criticConfigurationSchema = z.object({
   version: z.literal(1),
   enabled: z.boolean(),
-  schedule: z.object({ kind: z.literal("interval"), intervalMinutes: z.number().int().positive().max(525_600) }).strict(),
+  schedules: z.array(criticScheduleSchema).max(16),
   agent: agentCompositionSchema
-}).strict();
+}).strict().superRefine((config, context) => {
+  if (new Set(config.schedules.map(({ id }) => id)).size !== config.schedules.length) {
+    context.addIssue({ code: "custom", path: ["schedules"], message: "Critic Schedule IDs must be unique" });
+  }
+});
 
 const refinementConfigurationSchema = z.object({
   version: z.literal(1),

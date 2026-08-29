@@ -206,7 +206,8 @@ const feedbackFor = (
   action: StoredActionExecution, agentRunId: string, source: FeedbackSeed["source"], description: string, at: string
 ): FeedbackSeed => ({
   feedbackEntryId: `feedback:${agentRunId}`, source, category: source === "system_invalid_output" ? "system" : "product",
-  targetType: "action", targetId: action.actionDefinitionId, title: source === "retry_exhaustion" ? "Retry budget exhausted" : "Action blocked",
+  targetType: "action_execution", targetId: action.actionExecutionId,
+  title: source === "retry_exhaustion" ? "Retry budget exhausted" : "Action blocked",
   description, correctiveActions: ["Review the recorded evidence and correct the Action input or resources."],
   environmentRunId: action.environmentRunId, stateExecutionId: action.stateExecutionId,
   actionExecutionId: action.actionExecutionId, agentRunId,

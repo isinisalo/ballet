@@ -50,9 +50,18 @@ export const workOutcomeSchema = z.discriminatedUnion("state", [
 const criticProposalSchema = z.object({
   proposalId: idSchema,
   title: nonEmptyTextSchema,
-  rationale: nonEmptyTextSchema,
+  finding: nonEmptyTextSchema,
   evidenceRefs: idListSchema,
-  proposedText: nonEmptyTextSchema
+  category: z.enum(["product", "system", "architecture", "code", "design", "documentation"]),
+  targetType: z.enum(["product_snapshot", "environment_definition", "environment_run", "state_definition",
+    "state_execution", "action_definition", "action_execution", "resource"]),
+  targetId: idSchema,
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  priority: z.number().int().min(1).max(5),
+  recommendedCorrectiveActions: z.array(nonEmptyTextSchema).min(1).max(VNEXT_LIMITS.evidenceItems),
+  rationale: nonEmptyTextSchema,
+  confidence: z.number().min(0).max(1),
+  suggestedActionTarget: idSchema.optional()
 }).strict();
 
 export const criticOutcomeSchema = z.object({
@@ -62,10 +71,12 @@ export const criticOutcomeSchema = z.object({
 }).strict();
 
 const refinementFileProposalSchema = z.object({
+  operation: z.enum(["create", "replace", "delete"]),
   relativePath: nonEmptyTextSchema,
-  preimageSha256: sha256Schema,
-  proposedContentSha256: sha256Schema,
-  proposedContent: z.string().max(VNEXT_LIMITS.instruction),
+  preimageSha256: z.union([sha256Schema, z.literal("absent")]),
+  proposedContentSha256: z.union([sha256Schema, z.literal("absent")]),
+  proposedContent: z.string().max(VNEXT_LIMITS.instruction).optional(),
+  rationale: nonEmptyTextSchema,
   resourceId: idSchema.optional()
 }).strict();
 
@@ -74,15 +85,31 @@ export const refinementOutcomeSchema = z.object({
   role: z.literal("refinement"),
   proposalId: idSchema,
   rationale: nonEmptyTextSchema,
+  feedbackIds: idListSchema.min(1),
+  targetActionId: idSchema,
+  impactedActionIds: idListSchema.min(1),
+  mappingExplanation: nonEmptyTextSchema,
   files: z.array(refinementFileProposalSchema).min(1).max(VNEXT_LIMITS.proposalFiles),
-  sharedSkillImpact: z.array(z.object({ resourceId: idSchema, actionIds: idListSchema }).strict())
+  sharedSkillImpact: z.array(z.object({ resourceId: idSchema, actionIds: idListSchema }).strict()),
+  expectedBehavioralImprovement: nonEmptyTextSchema,
+  risks: z.array(nonEmptyTextSchema).max(VNEXT_LIMITS.evidenceItems),
+  validationPlan: z.array(z.enum(["instruction_contract", "resource_contract", "relevant_tests"]))
+    .min(1).max(VNEXT_LIMITS.evidenceItems),
+  rollback: nonEmptyTextSchema,
+  continuationInvalidationScope: idListSchema
 }).strict().superRefine((outcome, context) => {
   for (const [index, file] of outcome.files.entries()) {
     if (!isAllowedRefinementPath(file.relativePath)) {
       context.addIssue({ code: "custom", path: ["files", index, "relativePath"], message: "Refinement path is outside instruction/Skill scope" });
     }
-    if (sha256(file.proposedContent) !== file.proposedContentSha256) {
+    const contentMatches = file.operation === "delete"
+      ? file.proposedContent === undefined && file.proposedContentSha256 === "absent"
+      : file.proposedContent !== undefined && sha256(file.proposedContent) === file.proposedContentSha256;
+    if (!contentMatches) {
       context.addIssue({ code: "custom", path: ["files", index, "proposedContentSha256"], message: "Proposed content hash does not match" });
+    }
+    if ((file.operation === "create") !== (file.preimageSha256 === "absent")) {
+      context.addIssue({ code: "custom", path: ["files", index, "preimageSha256"], message: "Operation and preimage do not match" });
     }
   }
 });

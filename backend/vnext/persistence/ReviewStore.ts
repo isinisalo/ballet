@@ -1,49 +1,19 @@
-import type Database from "better-sqlite3";
 import type {
-  CriticDueSeed, CriticProposalSeed, CriticScheduleSeed, HumanDecision,
-  JsonValue, RefinementApplySeed, RefinementProposalSeed, RefinementRunSeed
+  CriticProposalSeed, HumanDecision, RefinementApplySeed, RefinementDecision, RefinementProposalSeed, RefinementRunSeed,
+  TrustedHumanActor
 } from "../../../shared/vnext/index.js";
-import { canonicalJson, sha256 } from "../../../shared/vnext/primitives.js";
+import { sha256 } from "../../../shared/vnext/primitives.js";
 import { isAllowedRefinementPath } from "../../../shared/vnext/refinement.js";
 import { VNextConflictError, VNextNotFoundError } from "./VNextErrors.js";
+import {
+  assertReviewHash as assertHash, canonicalReviewValue as canonical, impactActionIds,
+  readReviewString as readString, refinementChangeListHash
+} from "./ReviewIntegrity.js";
+import { CriticScheduleStore } from "./CriticScheduleStore.js";
 
-export class ReviewStore {
-  constructor(private readonly connection: () => Database.Database) {}
+export { refinementChangeListHash } from "./ReviewIntegrity.js";
 
-  createSchedule(input: CriticScheduleSeed): void {
-    this.connection().prepare(`
-      INSERT INTO critic_schedules (
-        critic_schedule_id, config_hash, next_due_at, enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(input.criticScheduleId, input.configHash, input.nextDueAt, input.enabled ? 1 : 0,
-      input.createdAt, input.createdAt);
-  }
-
-  createCriticDue(input: CriticDueSeed): string {
-    return this.connection().transaction(() => {
-      const existing = this.connection().prepare(`
-        SELECT critic_run_id FROM critic_runs
-        WHERE critic_schedule_id = ? AND (due_at = ? OR due_key = ?)
-      `).get(input.criticScheduleId, input.dueAt, input.dueKey);
-      if (existing) return readString(existing, "critic_run_id");
-      const schedule = this.connection().prepare(`
-        SELECT enabled FROM critic_schedules WHERE critic_schedule_id = ?
-      `).get(input.criticScheduleId);
-      if (!schedule) throw new VNextNotFoundError(`Critic Schedule ${input.criticScheduleId} was not found.`);
-      if (readInteger(schedule, "enabled") !== 1) throw new VNextConflictError("Disabled Critic Schedule cannot create a due run.");
-      this.connection().prepare(`
-        INSERT INTO critic_runs (
-          critic_run_id, critic_schedule_id, due_at, due_key, product_snapshot_id, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)
-      `).run(input.criticRunId, input.criticScheduleId, input.dueAt, input.dueKey,
-        input.productSnapshotId, input.createdAt, input.createdAt);
-      this.connection().prepare(`
-        UPDATE critic_schedules SET last_due_at = ?, last_run_id = ?, revision = revision + 1, updated_at = ?
-        WHERE critic_schedule_id = ?
-      `).run(input.dueAt, input.criticRunId, input.createdAt, input.criticScheduleId);
-      return input.criticRunId;
-    })();
-  }
+export class ReviewStore extends CriticScheduleStore {
 
   createCriticProposal(input: CriticProposalSeed): void {
     assertHash(input.content, input.contentHash, "Critic proposal");
@@ -52,7 +22,8 @@ export class ReviewStore {
         INSERT INTO critic_proposals (
           critic_proposal_id, critic_run_id, content_json, content_hash,
           target_type, target_id, category, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval', ?, ?)
+          ,version
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_human_review', ?, ?, 1)
       `).run(input.criticProposalId, input.criticRunId, canonical(input.content), input.contentHash,
         input.targetType, input.targetId, input.category, input.createdAt, input.createdAt);
       this.connection().prepare(`
@@ -62,19 +33,21 @@ export class ReviewStore {
     })();
   }
 
-  decideCritic(criticProposalId: string, input: HumanDecision): void {
+  decideCritic(criticProposalId: string, input: HumanDecision, actor: TrustedHumanActor): void {
     const proposal = this.requireCriticProposal(criticProposalId);
-    if (proposal.status !== "pending_approval") throw new VNextConflictError(`Critic Proposal ${criticProposalId} was already decided.`);
-    if (proposal.content_hash !== input.expectedContentHash) throw new VNextConflictError("Critic Proposal content hash is stale.");
+    if (proposal.status !== "pending_human_review") throw new VNextConflictError(`Critic Proposal ${criticProposalId} was already decided.`);
+    if (proposal.content_hash !== input.expectedContentHash || proposal.version !== input.expectedVersion) {
+      throw new VNextConflictError("Critic Proposal content hash or version is stale.");
+    }
     this.connection().prepare(`
       INSERT INTO critic_proposal_decisions (
-        critic_proposal_id, decision, expected_content_hash, decided_by, decided_at, rationale
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(criticProposalId, input.decision, input.expectedContentHash,
-      input.decidedBy, input.decidedAt, input.rationale ?? null);
+        critic_proposal_id, decision, expected_content_hash, expected_version, decided_by, decided_at, rationale
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(criticProposalId, input.decision, input.expectedContentHash, input.expectedVersion,
+      actor.id, input.decidedAt, input.rationale ?? null);
     this.connection().prepare(`
       UPDATE critic_proposals SET status = ?, updated_at = ?
-      WHERE critic_proposal_id = ? AND status = 'pending_approval'
+      WHERE critic_proposal_id = ? AND status = 'pending_human_review'
     `).run(input.decision, input.decidedAt, criticProposalId);
   }
 
@@ -95,33 +68,56 @@ export class ReviewStore {
         this.connection().prepare(`
           INSERT INTO refinement_run_feedback (refinement_run_id, feedback_entry_id) VALUES (?, ?)
         `).run(input.refinementRunId, feedbackEntryId);
+        this.connection().prepare(`
+          UPDATE feedback_entries SET status = 'in_refinement', updated_at = ?
+          WHERE feedback_entry_id = ? AND status = 'open'
+        `).run(input.createdAt, feedbackEntryId);
+        this.connection().prepare(`
+          INSERT INTO feedback_status_events (
+            feedback_entry_id, from_status, to_status, actor_type, actor_id, created_at
+          ) VALUES (?, 'open', 'in_refinement', 'refinement', ?, ?)
+        `).run(feedbackEntryId, input.refinementRunId, input.createdAt);
       }
     })();
   }
 
   createRefinementProposal(input: RefinementProposalSeed): void {
     if (input.files.length === 0) throw new VNextConflictError("Refinement Proposal requires a file change.");
+    if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(input.expectedBaseCommit)) {
+      throw new VNextConflictError("Refinement Proposal expected base commit is invalid.");
+    }
+    const allowedValidations = new Set(["instruction_contract", "resource_contract", "relevant_tests"]);
+    if (input.validationPlan.length === 0 || input.validationPlan.some((id) => !allowedValidations.has(id))) {
+      throw new VNextConflictError("Refinement validation plan contains a non-allowlisted command.");
+    }
     const expectedHash = refinementChangeListHash(input);
     if (expectedHash !== input.changeListHash) throw new VNextConflictError("Refinement change-list hash does not match.");
     this.connection().transaction(() => {
       this.connection().prepare(`
         INSERT INTO refinement_proposals (
-          refinement_proposal_id, refinement_run_id, target_action_id, impact_scope_json,
-          change_list_hash, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'pending_approval', ?, ?)
+          refinement_proposal_id, refinement_run_id, target_action_id, expected_base_commit,
+          impact_scope_json, change_list_hash, expected_behavioral_improvement, risks_json,
+          validation_plan_json, rollback, version, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'pending_human_review', ?, ?)
       `).run(input.refinementProposalId, input.refinementRunId, input.targetActionId,
-        canonical(input.impactScope), input.changeListHash, input.createdAt, input.createdAt);
+        input.expectedBaseCommit, canonical(input.impactScope), input.changeListHash,
+        input.expectedBehavioralImprovement, canonical(input.risks), canonical(input.validationPlan),
+        input.rollback, input.createdAt, input.createdAt);
       for (const file of input.files) {
-        if (!isAllowedRefinementPath(file.relativePath) || sha256(file.proposedContent) !== file.proposedContentHash) {
+        const validContent = file.operation === "delete"
+          ? file.proposedContent === undefined && file.proposedContentHash === "absent"
+          : file.proposedContent !== undefined && sha256(file.proposedContent) === file.proposedContentHash;
+        if (!isAllowedRefinementPath(file.relativePath) || !validContent
+          || (file.operation === "create") !== (file.expectedPreimageHash === "absent")) {
           throw new VNextConflictError(`Refinement file ${file.relativePath} is unsafe or has a mismatched hash.`);
         }
         this.connection().prepare(`
           INSERT INTO refinement_proposal_files (
-            refinement_proposal_id, relative_path, expected_preimage_hash,
-            proposed_content_hash, proposed_content, resource_id
-          ) VALUES (?, ?, ?, ?, ?, ?)
-        `).run(input.refinementProposalId, file.relativePath, file.expectedPreimageHash,
-          file.proposedContentHash, file.proposedContent, file.resourceId ?? null);
+            refinement_proposal_id, relative_path, operation, expected_preimage_hash,
+            proposed_content_hash, proposed_content, rationale, resource_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(input.refinementProposalId, file.relativePath, file.operation, file.expectedPreimageHash,
+          file.proposedContentHash, file.proposedContent ?? null, file.rationale, file.resourceId ?? null);
       }
       this.connection().prepare(`
         UPDATE refinement_runs SET status = 'completed', completed_at = ?, updated_at = ?
@@ -130,20 +126,47 @@ export class ReviewStore {
     })();
   }
 
-  decideRefinement(refinementProposalId: string, input: HumanDecision): void {
+  decideRefinement(refinementProposalId: string, input: RefinementDecision, actor: TrustedHumanActor): void {
     const proposal = this.requireRefinementProposal(refinementProposalId);
-    if (proposal.status !== "pending_approval") throw new VNextConflictError(`Refinement Proposal ${refinementProposalId} was already decided.`);
-    if (proposal.change_list_hash !== input.expectedContentHash) throw new VNextConflictError("Refinement Proposal hash is stale.");
+    if (proposal.status !== "pending_human_review") throw new VNextConflictError(`Refinement Proposal ${refinementProposalId} was already decided.`);
+    if (proposal.change_list_hash !== input.expectedContentHash || proposal.version !== input.expectedVersion) {
+      throw new VNextConflictError("Refinement Proposal hash or version is stale.");
+    }
+    const files = this.refinementFiles(refinementProposalId);
+    const hashes = files.map((file) => String(file.proposed_content_hash)).sort();
+    const impacts = impactActionIds(proposal.impact_scope_json);
+    if (canonical(hashes) !== canonical([...input.expectedChangeHashes].sort())
+      || canonical(impacts) !== canonical([...input.expectedImpactActionIds].sort())
+      || (input.decision === "approved" && !input.acknowledgeLocalCommitAndContinuation)) {
+      throw new VNextConflictError("Refinement approval does not match exact changes, impact, or acknowledgement.");
+    }
     this.connection().prepare(`
       INSERT INTO refinement_proposal_decisions (
-        refinement_proposal_id, decision, expected_change_list_hash, decided_by, decided_at, rationale
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `).run(refinementProposalId, input.decision, input.expectedContentHash,
-      input.decidedBy, input.decidedAt, input.rationale ?? null);
+        refinement_proposal_id, decision, expected_change_list_hash, expected_version,
+        expected_change_hashes_json, expected_impact_action_ids_json,
+        acknowledged_local_commit_and_continuation, decided_by, decided_at, rationale
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(refinementProposalId, input.decision, input.expectedContentHash, input.expectedVersion,
+      canonical([...input.expectedChangeHashes].sort()), canonical([...input.expectedImpactActionIds].sort()),
+      input.acknowledgeLocalCommitAndContinuation ? 1 : 0, actor.id, input.decidedAt, input.rationale ?? null);
     this.connection().prepare(`
       UPDATE refinement_proposals SET status = ?, updated_at = ?
-      WHERE refinement_proposal_id = ? AND status = 'pending_approval'
-    `).run(input.decision, input.decidedAt, refinementProposalId);
+      WHERE refinement_proposal_id = ? AND status = 'pending_human_review'
+    `).run(input.decision === "approved" ? "applying" : "rejected", input.decidedAt, refinementProposalId);
+    if (input.decision === "rejected") {
+      this.connection().prepare(`
+        INSERT INTO feedback_status_events (
+          feedback_entry_id, from_status, to_status, actor_type, actor_id, refinement_proposal_id, created_at
+        ) SELECT fe.feedback_entry_id, 'in_refinement', 'open', 'refinement', ?, ?, ?
+          FROM feedback_entries fe JOIN refinement_run_feedback rrf ON rrf.feedback_entry_id = fe.feedback_entry_id
+          WHERE rrf.refinement_run_id = ? AND fe.status = 'in_refinement'
+      `).run(refinementProposalId, refinementProposalId, input.decidedAt, String(proposal.refinement_run_id));
+      this.connection().prepare(`
+        UPDATE feedback_entries SET status = 'open', updated_at = ? WHERE feedback_entry_id IN (
+          SELECT feedback_entry_id FROM refinement_run_feedback WHERE refinement_run_id = ?
+        ) AND status = 'in_refinement'
+      `).run(input.decidedAt, String(proposal.refinement_run_id));
+    }
   }
 
   recordApply(input: RefinementApplySeed): void {
@@ -156,7 +179,7 @@ export class ReviewStore {
       input.branch, input.commitSha ?? null, input.errorMessage ?? null, input.completedAt, input.completedAt);
     this.connection().prepare(`
       UPDATE refinement_proposals SET status = ?, updated_at = ?
-      WHERE refinement_proposal_id = ? AND status = 'approved'
+      WHERE refinement_proposal_id = ? AND status = 'applying'
     `).run(input.status, input.completedAt, input.refinementProposalId);
   }
 
@@ -190,6 +213,24 @@ export class ReviewStore {
     `).all(id) as Array<Record<string, unknown>>;
   }
 
+  assertRefinementApplyAuthorized(id: string): void {
+    const proposal = this.requireRefinementProposal(id);
+    const decision = this.connection().prepare(`
+      SELECT * FROM refinement_proposal_decisions WHERE refinement_proposal_id = ?
+    `).get(id) as Record<string, unknown> | undefined;
+    if (!decision || decision.decision !== "approved" || decision.expected_change_list_hash !== proposal.change_list_hash
+      || decision.expected_version !== proposal.version || decision.acknowledged_local_commit_and_continuation !== 1) {
+      throw new VNextConflictError("Refinement apply has no exact operation-specific human authorization.");
+    }
+    const expectedHashes = JSON.parse(String(decision.expected_change_hashes_json)) as string[];
+    const currentHashes = this.refinementFiles(id).map((file) => String(file.proposed_content_hash)).sort();
+    const expectedImpacts = JSON.parse(String(decision.expected_impact_action_ids_json)) as string[];
+    if (canonical(expectedHashes) !== canonical(currentHashes)
+      || canonical(expectedImpacts) !== canonical(impactActionIds(proposal.impact_scope_json))) {
+      throw new VNextConflictError("Approved Refinement changes or impact no longer match.");
+    }
+  }
+
   private requireRow(table: string, key: string, id: string): Record<string, unknown> {
     const allowed = new Set(["critic_proposals:critic_proposal_id", "refinement_proposals:refinement_proposal_id"]);
     if (!allowed.has(`${table}:${key}`)) throw new Error("Invalid review row selector.");
@@ -210,24 +251,3 @@ export class ReviewStore {
     return Boolean(row);
   }
 }
-
-export const refinementChangeListHash = (input: RefinementProposalSeed): string => sha256(canonical({
-  targetActionId: input.targetActionId,
-  impactScope: input.impactScope,
-  files: [...input.files].sort((left, right) => left.relativePath.localeCompare(right.relativePath))
-}));
-
-const canonical = (value: unknown): string => canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue);
-const assertHash = (value: JsonValue, expected: string, label: string): void => {
-  if (sha256(canonical(value)) !== expected) throw new VNextConflictError(`${label} hash does not match.`);
-};
-const readString = (row: unknown, key: string): string => {
-  const value = typeof row === "object" && row !== null ? Reflect.get(row, key) : undefined;
-  if (typeof value !== "string") throw new Error(`SQLite returned invalid ${key}.`);
-  return value;
-};
-const readInteger = (row: unknown, key: string): number => {
-  const value = typeof row === "object" && row !== null ? Reflect.get(row, key) : undefined;
-  if (typeof value !== "number" || !Number.isSafeInteger(value)) throw new Error(`SQLite returned invalid ${key}.`);
-  return value;
-};

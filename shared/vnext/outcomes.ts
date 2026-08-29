@@ -36,9 +36,18 @@ export type WorkOutcome = OutcomeBase & { role: "work" } & (
 export interface CriticProposal {
   proposalId: string;
   title: string;
-  rationale: string;
+  finding: string;
   evidenceRefs: string[];
-  proposedText: string;
+  category: "product" | "system" | "architecture" | "code" | "design" | "documentation";
+  targetType: "product_snapshot" | "environment_definition" | "environment_run" | "state_definition"
+    | "state_execution" | "action_definition" | "action_execution" | "resource";
+  targetId: string;
+  severity: "low" | "medium" | "high" | "critical";
+  priority: number;
+  recommendedCorrectiveActions: string[];
+  rationale: string;
+  confidence: number;
+  suggestedActionTarget?: string;
 }
 
 export interface CriticOutcome extends OutcomeBase {
@@ -47,10 +56,12 @@ export interface CriticOutcome extends OutcomeBase {
 }
 
 export interface RefinementFileProposal {
+  operation: "create" | "replace" | "delete";
   relativePath: string;
-  preimageSha256: string;
-  proposedContentSha256: string;
-  proposedContent: string;
+  preimageSha256: string | "absent";
+  proposedContentSha256: string | "absent";
+  proposedContent?: string;
+  rationale: string;
   resourceId?: string;
 }
 
@@ -58,6 +69,15 @@ export interface RefinementOutcome extends OutcomeBase {
   role: "refinement";
   proposalId: string;
   rationale: string;
+  feedbackIds: string[];
+  targetActionId: string;
+  impactedActionIds: string[];
+  mappingExplanation: string;
   files: RefinementFileProposal[];
   sharedSkillImpact: Array<{ resourceId: string; actionIds: string[] }>;
+  expectedBehavioralImprovement: string;
+  risks: string[];
+  validationPlan: Array<"instruction_contract" | "resource_contract" | "relevant_tests">;
+  rollback: string;
+  continuationInvalidationScope: string[];
 }

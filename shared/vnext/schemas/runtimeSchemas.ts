@@ -2,7 +2,7 @@ import { z } from "zod";
 import { VNEXT_ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
 import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
-import { environmentDefinitionSchema, executionProfileSchema } from "./environmentSchemas.js";
+import { agentCompositionSchema, environmentDefinitionSchema, executionProfileSchema } from "./environmentSchemas.js";
 
 export const rootSnapshotV13Schema = z.object({
   version: z.literal(VNEXT_ROOT_SNAPSHOT_VERSION),
@@ -37,6 +37,7 @@ export const rootSnapshotV13Schema = z.object({
     role: z.enum(["validation", "work", "critic", "refinement"]), actionId: idSchema.optional(),
     toolPolicy: z.enum(["read_only", "workspace_write"]), networkAccess: z.boolean(), approvalPolicy: z.literal("never")
   }).strict()),
+  governance: z.object({ critic: agentCompositionSchema, refinement: agentCompositionSchema }).strict(),
   lineage: z.object({
     parentRootRunId: idSchema, refinementProposalId: idSchema, refinementApprovalId: idSchema,
     refinementCommitSha: gitObjectIdSchema

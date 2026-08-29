@@ -1,13 +1,15 @@
 import type Database from "better-sqlite3";
 import type {
   CriticDueSeed, CriticProposalSeed, FeedbackSeed, HumanDecision,
-  RefinementApplySeed, RefinementProposalSeed, RefinementRunSeed
+  RefinementApplySeed, RefinementDecision, RefinementProposalSeed, RefinementRunSeed, TrustedHumanActor
 } from "../../../shared/vnext/index.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { EnvironmentRunStore } from "./EnvironmentRunStore.js";
 import { FeedbackStore } from "./FeedbackStore.js";
 import { ReviewStore } from "./ReviewStore.js";
 import { VNextConflictError } from "./VNextErrors.js";
+import { validateFeedbackTarget } from "../governance/FeedbackBoxService.js";
+import { assertCompleteRefinementImpact } from "../governance/RefinementImpactResolver.js";
 
 export class ReviewCoordinator {
   constructor(
@@ -23,13 +25,22 @@ export class ReviewCoordinator {
   }
 
   createCriticProposal(input: CriticProposalSeed): void {
+    const owner = this.connection().prepare(`
+      SELECT ps.environment_run_id FROM critic_runs cr
+      JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
+      WHERE cr.critic_run_id = ?
+    `).get(input.criticRunId) as { environment_run_id: string } | undefined;
+    if (!owner) throw new VNextConflictError("Critic Proposal has no immutable Product Snapshot owner.");
+    validateFeedbackTarget(this.connection(), owner.environment_run_id, input.targetType, input.targetId);
     this.reviews.createCriticProposal(input);
   }
 
-  decideCritic(criticProposalId: string, decision: HumanDecision, feedback?: FeedbackSeed): void {
+  decideCritic(
+    criticProposalId: string, decision: HumanDecision, actor: TrustedHumanActor, feedback?: FeedbackSeed
+  ): void {
     this.connection().transaction(() => {
       const proposal = this.reviews.requireCriticProposal(criticProposalId);
-      this.reviews.decideCritic(criticProposalId, decision);
+      this.reviews.decideCritic(criticProposalId, decision, actor);
       if (decision.decision === "rejected") {
         if (feedback) throw new VNextConflictError("Rejected Critic Proposal cannot create Feedback.");
         return;
@@ -40,7 +51,13 @@ export class ReviewCoordinator {
       if (feedback.targetType !== proposal.target_type || feedback.targetId !== proposal.target_id) {
         throw new VNextConflictError("Critic Feedback target differs from its Proposal.");
       }
-      this.feedback.create(feedback);
+      validateFeedbackTarget(this.connection(), feedback.environmentRunId, feedback.targetType, feedback.targetId);
+      this.feedback.create({
+        ...feedback,
+        approval: { proposalId: criticProposalId, contentHash: decision.expectedContentHash, actorId: actor.id, decidedAt: decision.decidedAt },
+        createdBy: actor.id,
+        provenance: { criticProposalId, actor: { id: actor.id, source: actor.source }, evidence: feedback.provenance }
+      });
     })();
   }
 
@@ -49,32 +66,48 @@ export class ReviewCoordinator {
   }
 
   createRefinementProposal(input: RefinementProposalSeed): void {
-    this.reviews.createRefinementProposal(input);
+    const source = this.connection().prepare(`
+      SELECT er.execution_snapshot_json FROM refinement_runs rr
+      JOIN environment_runs er ON er.environment_run_id = rr.source_environment_run_id
+      WHERE rr.refinement_run_id = ?
+    `).get(input.refinementRunId) as { execution_snapshot_json: string } | undefined;
+    if (!source) throw new VNextConflictError("Refinement source snapshot is missing.");
+    const snapshot = JSON.parse(source.execution_snapshot_json) as { environment: Parameters<typeof assertCompleteRefinementImpact>[0] };
+    assertCompleteRefinementImpact(snapshot.environment, input);
+    this.connection().transaction(() => {
+      this.reviews.createRefinementProposal(input);
+      this.connection().prepare(`
+        UPDATE feedback_entries SET refinement_proposal_id = ?, updated_at = ?
+        WHERE feedback_entry_id IN (
+          SELECT feedback_entry_id FROM refinement_run_feedback WHERE refinement_run_id = ?
+        ) AND status = 'in_refinement'
+      `).run(input.refinementProposalId, input.createdAt, input.refinementRunId);
+    })();
   }
 
-  decideRefinement(refinementProposalId: string, decision: HumanDecision): void {
-    this.connection().transaction(() => this.reviews.decideRefinement(refinementProposalId, decision))();
+  decideRefinement(refinementProposalId: string, decision: RefinementDecision, actor: TrustedHumanActor): void {
+    this.connection().transaction(() => this.reviews.decideRefinement(refinementProposalId, decision, actor))();
   }
 
-  recordApply(input: RefinementApplySeed): "stale" | "applied" | "failed" {
+  recordApply(input: RefinementApplySeed): "stale" | "applied" | "apply_failed" {
     return this.connection().transaction(() => {
       const proposal = this.reviews.requireRefinementProposal(input.refinementProposalId);
-      if (proposal.status !== "approved") throw new VNextConflictError("Only an approved Refinement Proposal can be applied.");
+      if (proposal.status !== "applying") throw new VNextConflictError("Only an approved applying Refinement Proposal can be applied.");
       const files = this.reviews.refinementFiles(input.refinementProposalId);
-      const stale = files.some((file) => (
+      const stale = input.status === "applied" && files.some((file) => (
         input.observedPreimageHashes[String(file.relative_path)] !== file.expected_preimage_hash
       ));
       if (stale) {
         this.connection().prepare(`
           UPDATE refinement_proposals SET status = 'stale', updated_at = ?
-          WHERE refinement_proposal_id = ? AND status = 'approved'
+          WHERE refinement_proposal_id = ? AND status = 'applying'
         `).run(input.completedAt, input.refinementProposalId);
         return "stale";
       }
       this.reviews.recordApply(input);
-      if (input.status === "failed") {
+      if (input.status === "apply_failed") {
         if (input.continuation) throw new VNextConflictError("Failed Refinement apply cannot create a continuation.");
-        return "failed";
+        return "apply_failed";
       }
       if (!input.continuation || !input.commitSha) {
         throw new VNextConflictError("Applied Refinement requires a commit and continuation Environment Run.");

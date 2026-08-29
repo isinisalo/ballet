@@ -1,6 +1,10 @@
 import type { TimestampedApproval } from "./primitives.js";
 
-export type FeedbackSource = "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal";
+export type FeedbackSource = "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal" | "human";
+export type FeedbackCategory = "product" | "system" | "architecture" | "code" | "design" | "documentation";
+export type FeedbackTargetType =
+  | "product_snapshot" | "environment_definition" | "environment_run"
+  | "state_definition" | "state_execution" | "action_definition" | "action_execution" | "resource";
 
 export interface FeedbackEntry {
   id: string;
@@ -8,7 +12,7 @@ export interface FeedbackEntry {
   actionExecutionId?: string;
   source: FeedbackSource;
   sourceId: string;
-  status: "open" | "resolved";
+  status: "open" | "in_refinement" | "resolved" | "dismissed";
   message: string;
   evidenceRefs: string[];
   createdAt: string;
@@ -17,8 +21,8 @@ export interface FeedbackEntry {
 
 export interface CriticSchedule {
   id: string;
-  intervalMinutes: number;
   enabled: boolean;
+  configHash: string;
   nextDueAt: string;
   updatedAt: string;
 }
@@ -27,7 +31,7 @@ export interface CriticRun {
   id: string;
   scheduleId: string;
   dueAt: string;
-  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  status: "queued" | "running" | "completed" | "failed" | "cancelled" | "skipped";
   createdAt: string;
   updatedAt: string;
 }
@@ -35,7 +39,8 @@ export interface CriticRun {
 export interface CriticReviewProposal {
   id: string;
   criticRunId: string;
-  status: "pending_approval" | "approved" | "rejected";
+  status: "pending_human_review" | "approved" | "rejected";
+  version: 1;
   contentHash: string;
   proposedText: string;
   evidenceRefs: string[];
@@ -55,7 +60,7 @@ export interface RefinementRun {
 export interface RefinementReviewProposal {
   id: string;
   refinementRunId: string;
-  status: "pending_approval" | "approved" | "rejected" | "stale" | "applied";
+  status: "pending_human_review" | "applying" | "rejected" | "stale" | "applied" | "apply_failed";
   proposalHash: string;
   files: Array<{ relativePath: string; preimageSha256: string; proposedContentSha256: string }>;
   sharedSkillImpact: Array<{ resourceId: string; actionIds: string[] }>;

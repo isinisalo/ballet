@@ -51,9 +51,18 @@ export interface EnvironmentDefinition {
 export interface CriticConfiguration {
   version: 1;
   enabled: boolean;
-  schedule: { kind: "interval"; intervalMinutes: number };
+  schedules: CriticScheduleDefinition[];
   agent: AgentComposition;
 }
+
+export type CriticScheduleDefinition = {
+  id: string;
+  timeZone: string;
+  localTimes: string[];
+} & (
+  | { kind: "daily" }
+  | { kind: "weekly"; weekdays: number[] }
+);
 
 export interface RefinementConfiguration {
   version: 1;

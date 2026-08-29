@@ -44,7 +44,11 @@ describe("strict vNext outcome schemas", () => {
   it("keeps a Critic result as a proposal rather than Feedback", () => {
     const result = roleOutcomeV10Schema.safeParse({
       ...outcomeBase, role: "critic",
-      proposal: { proposalId: "proposal", title: "Finding", rationale: "Evidence", evidenceRefs: [], proposedText: "Improve this" }
+      proposal: {
+        proposalId: "proposal", title: "Finding", finding: "Quality gap", rationale: "Evidence", evidenceRefs: [],
+        category: "code", targetType: "action_definition", targetId: "action", severity: "medium", priority: 2,
+        recommendedCorrectiveActions: ["Improve this"], confidence: 0.9
+      }
     });
     expect(result.success).toBe(true);
     expect("feedback" in (result.success ? result.data : {})).toBe(false);
@@ -54,11 +58,16 @@ describe("strict vNext outcome schemas", () => {
     const proposedContent = "# Task\nNew content";
     const valid = {
       ...outcomeBase, role: "refinement", proposalId: "proposal", rationale: "Improve instruction",
+      feedbackIds: ["feedback"], targetActionId: "action", impactedActionIds: ["action"],
+      mappingExplanation: "Feedback maps to the Action instruction",
       files: [{
+        operation: "replace",
         relativePath: ".ballet/instructions/work.md", preimageSha256: "a".repeat(64),
-        proposedContentSha256: sha256(proposedContent), proposedContent
+        proposedContentSha256: sha256(proposedContent), proposedContent, rationale: "Clarify work"
       }],
-      sharedSkillImpact: []
+      sharedSkillImpact: [], expectedBehavioralImprovement: "Validation passes", risks: ["Prompt drift"],
+      validationPlan: ["instruction_contract"], rollback: "Discard local branch",
+      continuationInvalidationScope: ["action"]
     };
     expect(refinementOutcomeSchema.safeParse(valid).success).toBe(true);
     expect(refinementOutcomeSchema.safeParse({ ...valid, files: [{ ...valid.files[0], proposedContentSha256: "b".repeat(64) }] }).success).toBe(false);
@@ -139,11 +148,15 @@ describe("Project Configuration v20 boundary", () => {
           actions: [{ id: "action", name: "Action", description: "Description", priority: 1, useCaseIds: ["UC-1"], maxRetries: 1, validation: agent, work: { ...agent, toolPolicy: "workspace_write" } }]
         }]
       },
-      critic: { version: 1, enabled: true, schedule: { kind: "interval", intervalMinutes: 60 }, agent },
+      critic: { version: 1, enabled: true, schedules: [{ id: "daily-1", kind: "daily", timeZone: "Europe/Helsinki", localTimes: ["09:00"] }], agent },
       refinement: { version: 1, enabled: true, agent, allowedRoots: [".ballet/instructions", ".agents/skills"] }
     };
     expect(projectConfigurationV20Schema.safeParse(config).success).toBe(true);
     expect(projectConfigurationV20Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
+    expect(projectConfigurationV20Schema.safeParse({
+      ...config,
+      critic: { ...config.critic, schedules: [{ ...config.critic.schedules[0], timeZone: "Mars/Olympus" }] }
+    }).success).toBe(false);
   });
 });
 

@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative evidence
 status: draft
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 5
+version: 6
 tags:
   - arc42
   - initiative
@@ -22,6 +22,7 @@ tags:
 | ESAO-evid-003 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated vNext Direction, Environment/State/Action, task/outcome, approval-hash, ordering/gating, refinement-impact and boundary-schema contracts | `shared/vnext/**`; `backend/vnext/domain/*.test.ts` | passed: 59 focused tests; `npm run test` 50 files/240 tests; zero-warning lint; production build; arc42 validation; diff check | 2026-08-29 local repository | Pure contracts only: no loader, DB, HTTP, provider or UI wiring. Does not advance EVID-028..032 to passed. |
 | ESAO-evid-004 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated strict-v16 schema, stores and transactional flow/review coordinators | `backend/vnext/persistence/**`; `shared/vnext/persistence*.ts` | passed: 23 persistence tests; 7 vNext files/82 tests; `npm run test` 54 files/263 tests; zero-warning lint; production build; arc42 validation; diff check; conformance review found no active-v15, route or frontend coupling | 2026-08-29 temp SQLite databases | Synchronous same-process duplicate/re-entrant evidence only; no claim of a distributed lock, server wiring or provider scheduling. |
 | ESAO-evid-005 | REQ-022; partial QS-028/QS-030/QS-032 | Immutable v13 closure planning, six-part v11 prompt, strict v10 output, provider-neutral permissions, Validation-led Environment loop, durable enqueue/reconcile, parent-agent lineage, Product Snapshot and safe continuation seeding | `backend/vnext/runtime/**`; `shared/vnext/runtime.ts`; `agent_runs.parent_agent_run_id`; `TEST-028` integration scenarios 1–18 | passed: 22 runtime/planner/provider tests and complete focused vNext suite; full repository gates recorded in the phase-03 commit | 2026-08-29 deterministic fake provider and temporary v16 databases | Isolated transition namespace only; no public HTTP/startup/frontend registration and no real provider invocation. Managed refinement apply remains phase 05. |
+| ESAO-evid-006 | REQ-022; partial QS-029/QS-030/QS-032 | Human/Validation/system Feedback provenance; DST-aware durable Critic scheduling and read-only proposals; exact human decisions; safe-path agentless Refinement apply; shared-Skill impact; immutable continuation and evidence-gated Feedback resolution | `backend/vnext/governance/**`; `backend/vnext/persistence/Review*.ts`; `FeedbackStore.ts`; governance integration tests | passed: disabled/daily/weekly/DST/dedupe/overlap/catch-up/skip/shutdown, approval, target, symlink/preimage/hash/allowlist/Git/continuation/resolution/security scenarios; full repository gates recorded in the phase-05 commit | 2026-08-29 deterministic clock, fake provider boundary, temporary v16 DBs and temporary Git repositories | Local worktrees/branches are intentionally retained for audit; no merge, push, HTTP route or canonical service startup. Real provider occurrence remains pending. |
 | EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | pending | phases 02–04/11 | ESAO-evid-003/004 prove isolated contracts and transactions; canonical dispatcher/provider integration is pending. |
 | EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | pending | phases 05/08/11 | ESAO-evid-004 proves storage and exact-once decisions; schedule worker and product UI are pending. |
 | EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | pending | phases 06–08/11 | ESAO-evid-004 proves strict storage/preimage/link invariants; no managed-worktree Git effect has run. |
@@ -50,7 +51,7 @@ These are recorded deviations rather than hidden compatibility behavior. Phase 0
 
 ## Phase 02 strict-v16 inventory and invariants
 
-The isolated v16 inventory is exactly: `metadata`, `environment_runs`, `state_executions`, `action_executions`, `agent_runs`, `control_flow_events`, `product_snapshots`, `feedback_entries`, `critic_schedules`, `critic_runs`, `critic_proposals`, `critic_proposal_decisions`, `refinement_runs`, `refinement_run_feedback`, `refinement_proposals`, `refinement_proposal_files`, `refinement_proposal_decisions`, `refinement_applies`, `continuation_links`, `execution_tasks`, and `execution_events`. It contains no Graph, Reward, policy or acceptance tables.
+The isolated v16 inventory is exactly: `metadata`, `environment_runs`, `state_executions`, `action_executions`, `agent_runs`, `control_flow_events`, `product_snapshots`, `feedback_entries`, `feedback_status_events`, `critic_schedules`, `critic_runs`, `critic_proposals`, `critic_proposal_decisions`, `refinement_runs`, `refinement_run_feedback`, `refinement_proposals`, `refinement_proposal_files`, `refinement_proposal_decisions`, `refinement_applies`, `continuation_links`, `execution_tasks`, and `execution_events`. It contains no Graph, Reward, policy or acceptance tables.
 
 The tested transaction boundaries create a complete ordered run aggregate; select only one active Action; bind Validation precheck, Work and Validation postwork Agent Runs; make blocked+Feedback indivisible; preserve `maxRetries` as additional attempts; gate State and Environment completion; create the Product Snapshot with terminal Environment status; stop active work without later dispatch; deduplicate Critic due instants; decide Critic and Refinement proposals exactly once against expected hashes; detect stale refinement preimages; and record an applied refinement plus immutable continuation link atomically. Partial unique indexes enforce one active State and Action per Environment and one active Agent per Action. Foreign keys cascade owned aggregate data, while continuation ancestry remains protected.
 
@@ -86,6 +87,27 @@ Each semantic coordinator transaction creates at most one new dispatch. `agent_r
 Snapshot v13 contains Project Config/base hashes, full Environment definition, approved Use Case semantic hashes, accepted Goal/ADR/Constraint hashes, execution profiles, preflight capability hashes, full instruction/Skill contents and hashes, exact role permission rows and optional refinement lineage. Its canonical JSON hash is stored with the run. Composition v11 uses exactly: system/role, Action/domain context, hard constraints/approvals, Task Envelope, Skills and exact output requirement. Codex read-only receives no writable root; Work receives only the managed worktree; network remains profile-owned and provider approval is always `never`.
 
 Continuation tests prove that only prior `done` Actions with unchanged definition and relevant resource hashes outside target/impact scope import evidence. Target/impact Actions remain pending, and a changed shared Skill invalidates import for every referencing Action. The parent run is never updated.
+
+## Phase 05 governance evidence
+
+Approval state machines are explicit and provider-inaccessible:
+
+```text
+Critic proposal:     pending_human_review --human approve(hash,version)--> approved + Feedback
+                                          --human reject(hash,version)--> rejected (no Feedback)
+
+Refinement proposal: pending_human_review --human approve(proposal/change/impact hashes + ack)--> applying
+                                          --human reject(exact hash)--> rejected + Feedback open
+applying --agentless exact writer--> applied + local commit + continuation
+         --preimage mismatch------> stale
+         --security/validation----> apply_failed
+```
+
+The trusted actor is a separate service argument (`request_context | local_operator`), never an agent-selected source or body role. Feedback rows retain creator, evidence, Critic approval, Refinement proposal and continuation IDs; `feedback_status_events` records human/refinement/continuation transitions. Apply never resolves Feedback. A completed continuation resolves selected `in_refinement` entries; a blocked continuation reopens them.
+
+Critic schedules support bounded daily/weekly local times and IANA timezones. `@js-temporal/polyfill` resolves DST gaps/overlaps deterministically. Persisted `next_due_at`, schedule+instant keys, one active run, at-most-one catch-up, missing-snapshot `skipped`, config-hash replacement and shutdown claim release prevent overlap or restart bursts. Critic and Refinement proposal envelopes are read-only, use immutable Product Snapshot/run closure, and can create only `pending_human_review` proposals.
+
+Refinement changes are full-content `create | replace | delete` operations limited to `.ballet/instructions/**/*.md` and `.agents/skills/**/SKILL.md`. Absolute paths, `..`, `.git`, arbitrary docs/source, secret-like paths and any symlink chain are rejected. A shared Skill change requires every referencing Action in the exact approved impact list. Apply checks operation-specific human authorization, base commit, all preimages before writes, resulting hashes and a fixed validation-command allowlist. It then creates one local `ballet/refinement/*` branch/worktree commit with provenance trailers and persists one immutable continuation. It never invokes a proposal-supplied shell command, merges, pushes or mutates the current checkout. Failures retain the isolated worktree for diagnosis, leave the parent Run/current checkout unchanged and keep Feedback unresolved.
 
 ## Open evidence gaps
 

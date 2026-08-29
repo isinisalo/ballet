@@ -13,9 +13,9 @@ export const feedbackEntrySchema = z.object({
   id: idSchema,
   environmentRunId: idSchema,
   actionExecutionId: idSchema.optional(),
-  source: z.enum(["validation_blocked", "retry_exhaustion", "approved_critic_proposal"]),
+  source: z.enum(["validation_blocked", "retry_exhaustion", "system_invalid_output", "approved_critic_proposal", "human"]),
   sourceId: idSchema,
-  status: z.enum(["open", "resolved"]),
+  status: z.enum(["open", "in_refinement", "resolved", "dismissed"]),
   message: nonEmptyTextSchema,
   evidenceRefs: idListSchema,
   createdAt: timestampSchema,
@@ -24,8 +24,8 @@ export const feedbackEntrySchema = z.object({
 
 export const criticScheduleSchema = z.object({
   id: idSchema,
-  intervalMinutes: z.number().int().positive().max(525_600),
   enabled: z.boolean(),
+  configHash: sha256Schema,
   nextDueAt: timestampSchema,
   updatedAt: timestampSchema
 }).strict();
@@ -34,7 +34,7 @@ export const criticRunSchema = z.object({
   id: idSchema,
   scheduleId: idSchema,
   dueAt: timestampSchema,
-  status: z.enum(["queued", "running", "completed", "failed", "cancelled"]),
+  status: z.enum(["queued", "running", "completed", "failed", "cancelled", "skipped"]),
   createdAt: timestampSchema,
   updatedAt: timestampSchema
 }).strict();
@@ -42,7 +42,8 @@ export const criticRunSchema = z.object({
 export const criticReviewProposalSchema = z.object({
   id: idSchema,
   criticRunId: idSchema,
-  status: z.enum(["pending_approval", "approved", "rejected"]),
+  status: z.enum(["pending_human_review", "approved", "rejected"]),
+  version: z.literal(1),
   contentHash: sha256Schema,
   proposedText: nonEmptyTextSchema,
   evidenceRefs: idListSchema,
@@ -68,7 +69,7 @@ const refinementFileBindingSchema = z.object({
 export const refinementReviewProposalSchema = z.object({
   id: idSchema,
   refinementRunId: idSchema,
-  status: z.enum(["pending_approval", "approved", "rejected", "stale", "applied"]),
+  status: z.enum(["pending_human_review", "applying", "rejected", "stale", "applied", "apply_failed"]),
   proposalHash: sha256Schema,
   files: z.array(refinementFileBindingSchema).min(1).max(VNEXT_LIMITS.proposalFiles),
   sharedSkillImpact: z.array(z.object({ resourceId: idSchema, actionIds: idListSchema }).strict()),

@@ -1,5 +1,5 @@
 import type { JsonValue } from "./primitives.js";
-import type { EnvironmentDefinition, ExecutionProfile, RuntimeProvider } from "./environment.js";
+import type { AgentComposition, EnvironmentDefinition, ExecutionProfile, RuntimeProvider } from "./environment.js";
 import type { Constraint, DirectionReference, UseCase } from "./direction.js";
 import { VNEXT_ROOT_SNAPSHOT_VERSION } from "./versions.js";
 
@@ -28,6 +28,7 @@ export interface RootSnapshotV13 {
   runtimeCapabilities: RuntimeCapabilitySnapshot[];
   resources: RuntimeResourceSnapshot[];
   permissions: RuntimePermissionSnapshot[];
+  governance: { critic: AgentComposition; refinement: AgentComposition };
   lineage?: {
     parentRootRunId: string;
     refinementProposalId: string;

@@ -4,13 +4,15 @@ import { ActionOutcomeCoordinator } from "./ActionOutcomeCoordinator.js";
 import { FeedbackStore } from "./FeedbackStore.js";
 import { FlowCoordinator } from "./FlowCoordinator.js";
 import {
-  HASH_A, TEST_AT, agentRunInput, environmentSeed, feedbackSeed, hash,
+  HASH_A, TEST_AT, TEST_SHA, agentRunInput, environmentSeed, feedbackSeed, hash,
   openTestDatabase, productSnapshotSeed, validationOutcome, type TestDatabase
 } from "./PersistenceTestFixtures.js";
 import { ReviewCoordinator } from "./ReviewCoordinator.js";
 import { refinementChangeListHash } from "./ReviewStore.js";
 
 const databases: TestDatabase[] = [];
+const actor = { id: "human-1", source: "local_operator" as const };
+const scheduleConfig = { id: "schedule-1", kind: "daily" as const, timeZone: "Europe/Helsinki", localTimes: ["10:00"] };
 afterEach(() => databases.splice(0).forEach(({ cleanup }) => cleanup()));
 
 describe("Critic schedule and human approval", () => {
@@ -18,7 +20,7 @@ describe("Critic schedule and human approval", () => {
     const context = completedContext();
     context.reviews.reviews.createSchedule({
       criticScheduleId: "schedule-1", configHash: HASH_A, nextDueAt: TEST_AT,
-      enabled: true, createdAt: TEST_AT
+      config: scheduleConfig, enabled: true, createdAt: TEST_AT
     });
     const due = {
       criticRunId: "critic-run-1", criticScheduleId: "schedule-1", dueAt: TEST_AT,
@@ -30,21 +32,21 @@ describe("Critic schedule and human approval", () => {
     const content = { title: "Finding", proposedText: "Improve the instruction" };
     context.reviews.createCriticProposal({
       criticProposalId: "critic-proposal-1", criticRunId: "critic-run-1",
-      content, contentHash: hash(content), targetType: "action", targetId: "action-1",
-      category: "quality", createdAt: TEST_AT
+      content, contentHash: hash(content), targetType: "action_execution", targetId: "action-execution-1",
+      category: "code", createdAt: TEST_AT
     });
     expect(new FeedbackStore(() => context.database.connection).list("run-1")).toEqual([]);
     const decision = {
-      decision: "approved" as const, expectedContentHash: hash(content),
-      decidedBy: "human-1", decidedAt: TEST_AT
+      decision: "approved" as const, expectedContentHash: hash(content), expectedVersion: 1 as const,
+      decidedAt: TEST_AT
     };
     const feedback = feedbackSeed("critic-feedback", "approved_critic_proposal", {
       criticProposalId: "critic-proposal-1", agentRunId: undefined,
       approval: { approvedBy: "human-1", approvedAt: TEST_AT }, provenance: { criticRunId: "critic-run-1" }
     });
-    context.reviews.decideCritic("critic-proposal-1", decision, feedback);
+    context.reviews.decideCritic("critic-proposal-1", decision, actor, feedback);
     expect(new FeedbackStore(() => context.database.connection).list("run-1")).toHaveLength(1);
-    expect(() => context.reviews.decideCritic("critic-proposal-1", decision, feedback)).toThrow(/already decided/);
+    expect(() => context.reviews.decideCritic("critic-proposal-1", decision, actor, feedback)).toThrow(/already decided/);
     expect(context.database.connection.prepare("SELECT COUNT(*) AS count FROM critic_proposal_decisions").get())
       .toEqual({ count: 1 });
   });
@@ -53,8 +55,8 @@ describe("Critic schedule and human approval", () => {
     const context = completedContext();
     createCriticProposal(context);
     expect(() => context.reviews.decideCritic("critic-proposal-1", {
-      decision: "rejected", expectedContentHash: "f".repeat(64), decidedBy: "human", decidedAt: TEST_AT
-    })).toThrow(/hash is stale/);
+      decision: "rejected", expectedContentHash: "f".repeat(64), expectedVersion: 1, decidedAt: TEST_AT
+    }, actor)).toThrow(/stale/);
     expect(context.database.connection.prepare("SELECT COUNT(*) AS count FROM critic_proposal_decisions").get())
       .toEqual({ count: 0 });
   });
@@ -64,9 +66,7 @@ describe("Refinement exact proposal and continuation", () => {
   it("stores a stale preimage decision without applying any file result", () => {
     const context = completedContext();
     const proposal = createRefinement(context, "refinement-1", "refinement-proposal-1", "feedback-1");
-    context.reviews.decideRefinement(proposal.refinementProposalId, {
-      decision: "approved", expectedContentHash: proposal.changeListHash, decidedBy: "human", decidedAt: TEST_AT
-    });
+    context.reviews.decideRefinement(proposal.refinementProposalId, refinementDecision(proposal), actor);
     const result = context.reviews.recordApply({
       refinementApplyId: "apply-1", refinementProposalId: proposal.refinementProposalId,
       status: "applied", worktreePath: "/tmp/refinement", branch: "codex/refinement",
@@ -82,11 +82,10 @@ describe("Refinement exact proposal and continuation", () => {
     const context = completedContext();
     const proposal = createRefinement(context, "refinement-1", "refinement-proposal-1", "feedback-1");
     const decision = {
-      decision: "approved" as const, expectedContentHash: proposal.changeListHash,
-      decidedBy: "human", decidedAt: TEST_AT
+      ...refinementDecision(proposal)
     };
-    context.reviews.decideRefinement(proposal.refinementProposalId, decision);
-    expect(() => context.reviews.decideRefinement(proposal.refinementProposalId, decision)).toThrow(/already decided/);
+    context.reviews.decideRefinement(proposal.refinementProposalId, decision, actor);
+    expect(() => context.reviews.decideRefinement(proposal.refinementProposalId, decision, actor)).toThrow(/already decided/);
     const commitSha = "c".repeat(40);
     const continuation = {
       ...environmentSeed({
@@ -151,6 +150,7 @@ const completedContext = () => {
 const createCriticProposal = (context: ReturnType<typeof completedContext>) => {
   context.reviews.reviews.createSchedule({
     criticScheduleId: "schedule-1", configHash: HASH_A, nextDueAt: TEST_AT, enabled: true, createdAt: TEST_AT
+    ,config: scheduleConfig
   });
   context.reviews.createCriticDue({
     criticRunId: "critic-run-1", criticScheduleId: "schedule-1", dueAt: TEST_AT,
@@ -159,8 +159,8 @@ const createCriticProposal = (context: ReturnType<typeof completedContext>) => {
   const content = { proposedText: "Improve" };
   context.reviews.createCriticProposal({
     criticProposalId: "critic-proposal-1", criticRunId: "critic-run-1",
-    content, contentHash: hash(content), targetType: "action", targetId: "action-1",
-    category: "quality", createdAt: TEST_AT
+    content, contentHash: hash(content), targetType: "action_execution", targetId: "action-execution-1",
+    category: "code", createdAt: TEST_AT
   });
 };
 
@@ -182,10 +182,20 @@ const createRefinement = (
 
 const proposalInput = (refinementRunId: string, refinementProposalId: string, relativePath: string) => ({
   refinementProposalId, refinementRunId, targetActionId: "action-1",
-  impactScope: { actionIds: ["action-1"] }, changeListHash: "",
+  expectedBaseCommit: TEST_SHA, impactScope: { actionIds: ["action-1"] }, changeListHash: "",
+  expectedBehavioralImprovement: "Validation passes", risks: ["Prompt drift"],
+  validationPlan: ["instruction_contract" as const], rollback: "Discard local branch",
   files: [{
+    operation: "replace" as const,
     relativePath, expectedPreimageHash: HASH_A,
-    proposedContentHash: sha256("# Task\nChanged"), proposedContent: "# Task\nChanged"
+    proposedContentHash: sha256("# Task\nChanged"), proposedContent: "# Task\nChanged", rationale: "Clarify task"
   }],
   createdAt: TEST_AT
+});
+
+const refinementDecision = (proposal: ReturnType<typeof proposalInput>) => ({
+  decision: "approved" as const, expectedContentHash: proposal.changeListHash, expectedVersion: 1 as const,
+  expectedChangeHashes: proposal.files.map(({ proposedContentHash }) => proposedContentHash),
+  expectedImpactActionIds: ["action-1"], acknowledgeLocalCommitAndContinuation: true,
+  decidedAt: TEST_AT
 });

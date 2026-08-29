@@ -95,7 +95,7 @@ export const environmentSeed = (options: {
     permissions: [
       { role: "validation", actionId: "action-1", toolPolicy: "read_only", networkAccess: false, approvalPolicy: "never" },
       { role: "work", actionId: "action-1", toolPolicy: "workspace_write", networkAccess: false, approvalPolicy: "never" }
-    ], createdAt: TEST_AT
+    ], governance: { critic: agent("read_only"), refinement: agent("read_only") }, createdAt: TEST_AT
   };
   return {
     environmentRunId: runId,
@@ -151,7 +151,7 @@ export const feedbackSeed = (
   source: FeedbackSeed["source"],
   overrides: Partial<FeedbackSeed> = {}
 ): FeedbackSeed => ({
-  feedbackEntryId, source, category: "quality", targetType: "action", targetId: "action-1",
+  feedbackEntryId, source, category: "product", targetType: "action_execution", targetId: "action-execution-1",
   title: "Action blocked", description: "Validation blocked the Action", correctiveActions: ["Correct the failure"],
   environmentRunId: "run-1", stateExecutionId: "state-execution-1",
   actionExecutionId: "action-execution-1", agentRunId: "postwork-1",

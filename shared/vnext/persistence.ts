@@ -1,9 +1,10 @@
-import type { ActionDefinition, StateDefinition } from "./environment.js";
+import type { ActionDefinition, CriticScheduleDefinition, StateDefinition } from "./environment.js";
 import type { ExecutionSpecV12 } from "./execution.js";
 import type { JsonValue } from "./primitives.js";
 import type { AgentRunPhase, AgentRunRole, RootSnapshotV13 } from "./runtime.js";
 import type { TaskEnvelopeV10 } from "./taskEnvelopes.js";
 import type { ValidationOutcome, WorkOutcome } from "./outcomes.js";
+import type { FeedbackCategory, FeedbackTargetType } from "./reviews.js";
 
 export interface ActionExecutionSeed {
   actionExecutionId: string;
@@ -55,18 +56,22 @@ export interface CreateAgentRunInput {
 
 export interface FeedbackSeed {
   feedbackEntryId: string;
-  source: "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal";
-  category: string;
-  targetType: "environment" | "state" | "action" | "resource";
+  source: "validation_blocked" | "retry_exhaustion" | "system_invalid_output" | "approved_critic_proposal" | "human";
+  category: FeedbackCategory;
+  targetType: FeedbackTargetType;
   targetId: string;
   title: string;
   description: string;
   correctiveActions: string[];
+  evidenceRefs?: string[];
+  createdBy?: string;
   environmentRunId: string;
   stateExecutionId?: string;
   actionExecutionId?: string;
   agentRunId?: string;
   criticProposalId?: string;
+  refinementProposalId?: string;
+  continuationRunId?: string;
   approval?: JsonValue;
   provenance: JsonValue;
   createdAt: string;
@@ -90,6 +95,7 @@ export interface ProductSnapshotSeed {
 export interface CriticScheduleSeed {
   criticScheduleId: string;
   configHash: string;
+  config: CriticScheduleDefinition;
   nextDueAt: string;
   enabled: boolean;
   createdAt: string;
@@ -100,7 +106,8 @@ export interface CriticDueSeed {
   criticScheduleId: string;
   dueAt: string;
   dueKey: string;
-  productSnapshotId: string;
+  productSnapshotId?: string;
+  skipReason?: "no_product_snapshot";
   createdAt: string;
 }
 
@@ -109,18 +116,29 @@ export interface CriticProposalSeed {
   criticRunId: string;
   content: JsonValue;
   contentHash: string;
-  targetType: "environment" | "state" | "action" | "resource";
+  targetType: FeedbackTargetType;
   targetId: string;
-  category: string;
+  category: FeedbackCategory;
   createdAt: string;
 }
 
 export interface HumanDecision {
   decision: "approved" | "rejected";
   expectedContentHash: string;
-  decidedBy: string;
+  expectedVersion: 1;
   decidedAt: string;
   rationale?: string;
+}
+
+export interface TrustedHumanActor {
+  id: string;
+  source: "request_context" | "local_operator";
+}
+
+export interface RefinementDecision extends HumanDecision {
+  expectedChangeHashes: string[];
+  expectedImpactActionIds: string[];
+  acknowledgeLocalCommitAndContinuation: boolean;
 }
 
 export interface RefinementRunSeed {
@@ -134,13 +152,20 @@ export interface RefinementProposalSeed {
   refinementProposalId: string;
   refinementRunId: string;
   targetActionId: string;
+  expectedBaseCommit: string;
   impactScope: JsonValue;
   changeListHash: string;
+  expectedBehavioralImprovement: string;
+  risks: string[];
+  validationPlan: Array<"instruction_contract" | "resource_contract" | "relevant_tests">;
+  rollback: string;
   files: Array<{
+    operation: "create" | "replace" | "delete";
     relativePath: string;
-    expectedPreimageHash: string;
-    proposedContentHash: string;
-    proposedContent: string;
+    expectedPreimageHash: string | "absent";
+    proposedContentHash: string | "absent";
+    proposedContent?: string;
+    rationale: string;
     resourceId?: string;
   }>;
   createdAt: string;
@@ -149,7 +174,7 @@ export interface RefinementProposalSeed {
 export interface RefinementApplySeed {
   refinementApplyId: string;
   refinementProposalId: string;
-  status: "applied" | "failed";
+  status: "applied" | "apply_failed";
   worktreePath: string;
   branch: string;
   commitSha?: string;

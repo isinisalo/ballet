@@ -86,6 +86,7 @@ export class EnvironmentRunPlanner {
       runtimeCapabilities: capabilities,
       resources,
       permissions,
+      governance: { critic: config.critic.agent, refinement: config.refinement.agent },
       createdAt: this.now()
     };
     const snapshotSha256 = contentHash(snapshot);
