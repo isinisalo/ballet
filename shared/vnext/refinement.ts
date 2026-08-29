@@ -23,11 +23,22 @@ const isSafeRelativePath = (path: string): boolean => (
   path.length > 0 && !path.startsWith("/") && !path.includes("\\") && !path.split("/").includes("..")
 );
 
-export const isAllowedRefinementPath = (path: string): boolean => (
+export const isAllowedCanonicalRefinementPath = (path: string): boolean => (
   isSafeRelativePath(path) && (
     /^\.ballet\/instructions\/.+\.md$/.test(path)
     || /^\.agents\/skills\/[^/]+(?:\/[^/]+)*\/SKILL\.md$/.test(path)
   )
+);
+
+export const isAllowedVNextRefinementPath = (path: string): boolean => (
+  isSafeRelativePath(path) && (
+    /^\.ballet\/vnext\/instructions\/.+\.md$/.test(path)
+    || /^\.ballet\/vnext\/skills\/.+\.md$/.test(path)
+  )
+);
+
+export const isAllowedRefinementPath = (path: string): boolean => (
+  isAllowedCanonicalRefinementPath(path) || isAllowedVNextRefinementPath(path)
 );
 
 export const validateRefinementImpact = (input: RefinementImpactInput): ContractIssue[] => {

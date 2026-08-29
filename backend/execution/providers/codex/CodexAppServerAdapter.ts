@@ -185,7 +185,7 @@ export class CodexAppServerAdapter implements CliRuntimeAdapter {
       cwd: request.workingDirectory,
       model: providerSetting(request.model),
       approvalPolicy: "never",
-      sandbox: "workspace-write"
+      sandbox: request.workspaceAccess === "read-only" ? "read-only" : "workspace-write"
     };
     const started = await client.request("thread/start", common);
     const threadId = threadIdFromCodexResult(started);
@@ -227,14 +227,18 @@ export class CodexAppServerAdapter implements CliRuntimeAdapter {
   }
 }
 
-const codexSandboxPolicy = (request: RuntimeExecutionRequest): Record<string, unknown> => ({
-  type: "workspaceWrite",
-  writableRoots: [path.resolve(request.workingDirectory)],
-  readOnlyRoots: request.policy.readOnlyRoots.map((root) => path.resolve(root)),
-  networkAccess: request.policy.network,
-  excludeTmpdirEnvVar: true,
-  excludeSlashTmp: true
-});
+const codexSandboxPolicy = (request: RuntimeExecutionRequest): Record<string, unknown> => (
+  request.workspaceAccess === "read-only" ? {
+    type: "readOnly", networkAccess: request.policy.network
+  } : {
+    type: "workspaceWrite",
+    writableRoots: [path.resolve(request.workingDirectory)],
+    readOnlyRoots: request.policy.readOnlyRoots.map((root) => path.resolve(root)),
+    networkAccess: request.policy.network,
+    excludeTmpdirEnvVar: true,
+    excludeSlashTmp: true
+  }
+);
 
 const providerSetting = (value: string): string | undefined => value === "provider-default" ? undefined : value;
 

@@ -2,12 +2,14 @@ import type { ProjectConfigurationV20 } from "../../../shared/vnext/environment.
 import { projectConfigurationV20Schema } from "../../../shared/vnext/schemas/environmentSchemas.js";
 import { canonicalJson, sha256 } from "../../../shared/vnext/primitives.js";
 import { useCaseApprovalHash } from "../../../shared/vnext/direction.js";
+import { validateRunnableEnvironment } from "../../../shared/vnext/gates.js";
 import type {
   RootSnapshotV13, RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/vnext/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/vnext/persistence.js";
 import { mapProviderPermissions } from "./ProviderPermissions.js";
 import { resolveVNextResources, type ProjectResourceInput } from "./ResourceContextBuilder.js";
+import { VNextConflictError } from "../persistence/VNextErrors.js";
 
 export interface VNextProjectDefinition {
   config: ProjectConfigurationV20;
@@ -34,7 +36,7 @@ export interface PlannedEnvironmentRun {
   snapshot: RootSnapshotV13;
   snapshotSha256: string;
   createInput(input: {
-    environmentRunId: string; worktreePath: string; branch: string; createdAt: string;
+    environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
   }): CreateEnvironmentRunInput;
 }
 
@@ -48,6 +50,10 @@ export class EnvironmentRunPlanner {
   async plan(): Promise<PlannedEnvironmentRun> {
     const loaded = await this.projects.load();
     const config = projectConfigurationV20Schema.parse(loaded.config);
+    const readinessIssues = validateRunnableEnvironment(config.environment, config.direction);
+    if (readinessIssues.length > 0) {
+      throw new VNextConflictError(`Environment is not runnable: ${readinessIssues.map(({ code, path }) => `${code}@${path}`).join(", ")}.`);
+    }
     if (sha256(canonicalJson(config)) !== loaded.configSha256) throw new Error("Project Config hash differs from explicit input.");
     const resources = resolveVNextResources(config, loaded.resources);
     const profiles = [...config.executionProfiles].sort((left, right) => left.id.localeCompare(right.id));
@@ -92,8 +98,9 @@ export class EnvironmentRunPlanner {
     const snapshotSha256 = contentHash(snapshot);
     return {
       snapshot, snapshotSha256,
-      createInput: ({ environmentRunId, worktreePath, branch, createdAt }) => ({
+      createInput: ({ environmentRunId, worktreePath, branch, createdAt, input }) => ({
         environmentRunId, environmentDefinitionId: config.environment.id, source: "manual",
+        input,
         baseCommit: loaded.baseCommit, worktreePath, branch, executionSnapshot: snapshot,
         executionSnapshotHash: snapshotSha256, transitionLimit: transitionLimit(config),
         states: config.environment.states.map((state) => ({

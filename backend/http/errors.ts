@@ -11,6 +11,9 @@ import { ExecutionProfileConflictError, ExecutionProfileNotFoundError } from "..
 import { ProjectConfigurationSourceError } from "../project-config/ProjectConfigurationRepository.js";
 import { GraphRunConflictError, GraphRunNotFoundError, GraphRunStateError } from "../runtime/GraphRunErrors.js";
 import { HttpValidationError } from "./validation/httpValidation.js";
+import {
+  VNextConflictError, VNextNotFoundError, VNextSchemaVersionError
+} from "../vnext/persistence/VNextErrors.js";
 
 export const sendKnownHttpError = (error: unknown, res: express.Response): boolean => {
   if (isBodyParserError(error, 400, "entity.parse.failed")) {
@@ -21,6 +24,15 @@ export const sendKnownHttpError = (error: unknown, res: express.Response): boole
   }
   if (error instanceof HttpValidationError) {
     res.status(error.status).json({ error: error.message, issues: error.issues }); return true;
+  }
+  if (error instanceof VNextSchemaVersionError) {
+    res.status(409).json({ error: error.message }); return true;
+  }
+  if (error instanceof VNextConflictError) {
+    res.status(409).json({ error: error.message }); return true;
+  }
+  if (error instanceof VNextNotFoundError) {
+    res.status(404).json({ error: error.message }); return true;
   }
   if (error instanceof AutomationValidationError || error instanceof CanvasThemeValidationError) {
     res.status(400).json({ error: error.message, issues: error.issues }); return true;

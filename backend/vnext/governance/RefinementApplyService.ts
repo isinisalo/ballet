@@ -5,7 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { CreateEnvironmentRunInput } from "../../../shared/vnext/persistence.js";
 import { sha256 } from "../../../shared/vnext/primitives.js";
-import { isAllowedRefinementPath } from "../../../shared/vnext/refinement.js";
+import { isAllowedCanonicalRefinementPath } from "../../../shared/vnext/refinement.js";
 import { ReviewCoordinator } from "../persistence/ReviewCoordinator.js";
 import { ReviewStore } from "../persistence/ReviewStore.js";
 
@@ -36,7 +36,8 @@ export class RefinementApplyService {
     private readonly worktreesRoot: string,
     private readonly validations: RefinementValidationRunner,
     private readonly continuation: ContinuationFactory,
-    private readonly now: () => string
+    private readonly now: () => string,
+    private readonly allowedPath: (relativePath: string) => boolean = isAllowedCanonicalRefinementPath
   ) {
     this.reviews = new ReviewStore(connection);
     this.coordinator = new ReviewCoordinator(connection);
@@ -52,13 +53,12 @@ export class RefinementApplyService {
     const observed: Record<string, string> = {};
     try {
       this.reviews.assertRefinementApplyAuthorized(refinementProposalId);
-      const currentHead = await git(this.projectRoot, ["rev-parse", "HEAD"]);
-      if (currentHead !== proposal.expected_base_commit) throw new Error("Project base commit differs from approved Refinement Proposal.");
+      await git(this.projectRoot, ["cat-file", "-e", `${String(proposal.expected_base_commit)}^{commit}`]);
       await mkdir(this.worktreesRoot, { recursive: true, mode: 0o700 });
-      await git(this.projectRoot, ["worktree", "add", "-b", branch, worktreePath, currentHead]);
+      await git(this.projectRoot, ["worktree", "add", "-b", branch, worktreePath, String(proposal.expected_base_commit)]);
       for (const file of files) {
         const relativePath = String(file.relative_path);
-        assertSafePath(relativePath);
+        assertSafePath(relativePath, this.allowedPath);
         const absolutePath = path.join(worktreePath, relativePath);
         await assertNoSymlinkChain(worktreePath, relativePath);
         const existing = await readFile(absolutePath).catch((error) => {
@@ -122,8 +122,8 @@ const assertResultHash = async (root: string, file: Record<string, unknown>): Pr
   const observed = bytes ? sha256(bytes.toString("utf8")) : "absent";
   if (observed !== expected) throw new Error(`Result hash differs for ${String(file.relative_path)}.`);
 };
-const assertSafePath = (relativePath: string): void => {
-  if (!isAllowedRefinementPath(relativePath) || /(^|\/)(?:\.env|secrets?|credentials?)(?:\.|\/|$)/i.test(relativePath)) {
+const assertSafePath = (relativePath: string, allowedPath: (path: string) => boolean): void => {
+  if (!allowedPath(relativePath) || /(^|\/)(?:\.env|secrets?|credentials?)(?:\.|\/|$)/i.test(relativePath)) {
     throw new Error(`Unsafe Refinement path ${relativePath}.`);
   }
 };

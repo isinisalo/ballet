@@ -6,6 +6,7 @@ import { canonicalJson, sha256 } from "../../../shared/vnext/primitives.js";
 import type { WorkOutcome } from "../../../shared/vnext/outcomes.js";
 import type { StoredActionExecution, StoredEnvironmentRun } from "../../../shared/vnext/persistenceRecords.js";
 import type { TaskEnvelopeV10 } from "../../../shared/vnext/taskEnvelopes.js";
+import { taskEnvelopeV10Schema } from "../../../shared/vnext/schemas/taskEnvelopeSchemas.js";
 import { buildBoundedTaskContext } from "./TaskContextBuilder.js";
 import { composeVNextPrompt } from "./PromptComposer.js";
 import { mapProviderPermissions, type ProviderPermissionSpec } from "./ProviderPermissions.js";
@@ -43,7 +44,8 @@ export class AgentDispatchFactory {
     const context = buildBoundedTaskContext({
       snapshot: input.run.executionSnapshot, state, action, composition,
       actionStatus: input.action.status, workAttempt: input.action.workAttempt,
-      maxRetries: input.action.maxRetries, previousEvidence: input.workOutcome as unknown as JsonValue | undefined,
+      maxRetries: input.action.maxRetries, humanInput: input.run.input,
+      previousEvidence: input.workOutcome as unknown as JsonValue | undefined,
       approvalBoundary: { humanDecisionRequired: false }, outputSchemaId
     });
     const instruction = requireInstruction(input.run, composition);
@@ -65,7 +67,8 @@ export class AgentDispatchFactory {
       retriesRemaining: Math.max(0, input.action.maxRetries - Math.max(0, input.attempt - 1)),
       workOutcome: (input.workOutcome ?? failedWorkOutcome("Work outcome unavailable")) as unknown as JsonValue
     };
-    const evidence = composeVNextPrompt({ snapshot: input.run.executionSnapshot, envelope, composition });
+    const parsedEnvelope = taskEnvelopeV10Schema.parse(envelope);
+    const evidence = composeVNextPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition });
     const spec: ExecutionSpecV12 = {
       version: 12, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
@@ -85,7 +88,8 @@ export class AgentDispatchFactory {
         agentRunId, environmentRunId: input.run.environmentRunId,
         actionExecutionId: input.action.actionExecutionId, parentAgentRunId: input.parentAgentRunId,
         role: input.role, phase: input.phase, attempt: input.attempt,
-        taskEnvelope: envelope, taskEnvelopeHash: sha256(canonicalJson(envelope as unknown as JsonValue)), createdAt: input.at
+        taskEnvelope: parsedEnvelope,
+        taskEnvelopeHash: sha256(canonicalJson(parsedEnvelope as unknown as JsonValue)), createdAt: input.at
       },
       task: { spec, specHash: sha256(canonicalJson(spec as unknown as JsonValue)) },
       permissions: mapProviderPermissions({

@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative evidence
 status: draft
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 6
+version: 7
 tags:
   - arc42
   - initiative
@@ -23,9 +23,10 @@ tags:
 | ESAO-evid-004 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated strict-v16 schema, stores and transactional flow/review coordinators | `backend/vnext/persistence/**`; `shared/vnext/persistence*.ts` | passed: 23 persistence tests; 7 vNext files/82 tests; `npm run test` 54 files/263 tests; zero-warning lint; production build; arc42 validation; diff check; conformance review found no active-v15, route or frontend coupling | 2026-08-29 temp SQLite databases | Synchronous same-process duplicate/re-entrant evidence only; no claim of a distributed lock, server wiring or provider scheduling. |
 | ESAO-evid-005 | REQ-022; partial QS-028/QS-030/QS-032 | Immutable v13 closure planning, six-part v11 prompt, strict v10 output, provider-neutral permissions, Validation-led Environment loop, durable enqueue/reconcile, parent-agent lineage, Product Snapshot and safe continuation seeding | `backend/vnext/runtime/**`; `shared/vnext/runtime.ts`; `agent_runs.parent_agent_run_id`; `TEST-028` integration scenarios 1–18 | passed: 22 runtime/planner/provider tests and complete focused vNext suite; full repository gates recorded in the phase-03 commit | 2026-08-29 deterministic fake provider and temporary v16 databases | Isolated transition namespace only; no public HTTP/startup/frontend registration and no real provider invocation. Managed refinement apply remains phase 05. |
 | ESAO-evid-006 | REQ-022; partial QS-029/QS-030/QS-032 | Human/Validation/system Feedback provenance; DST-aware durable Critic scheduling and read-only proposals; exact human decisions; safe-path agentless Refinement apply; shared-Skill impact; immutable continuation and evidence-gated Feedback resolution | `backend/vnext/governance/**`; `backend/vnext/persistence/Review*.ts`; `FeedbackStore.ts`; governance integration tests | passed: disabled/daily/weekly/DST/dedupe/overlap/catch-up/skip/shutdown, approval, target, symlink/preimage/hash/allowlist/Git/continuation/resolution/security scenarios; full repository gates recorded in the phase-05 commit | 2026-08-29 deterministic clock, fake provider boundary, temporary v16 DBs and temporary Git repositories | Local worktrees/branches are intentionally retained for audit; no merge, push, HTTP route or canonical service startup. Real provider occurrence remains pending. |
-| EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | pending | phases 02–04/11 | ESAO-evid-003/004 prove isolated contracts and transactions; canonical dispatcher/provider integration is pending. |
-| EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | pending | phases 05/08/11 | ESAO-evid-004 proves storage and exact-once decisions; schedule worker and product UI are pending. |
-| EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | pending | phases 06–08/11 | ESAO-evid-004 proves strict storage/preimage/link invariants; no managed-worktree Git effect has run. |
+| ESAO-evid-007 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated v20 project/Markdown repositories, reference/blocker index, v16 service composition, 73-route typed HTTP contract, trusted human operations, factual SSE, immutable governance worktree capture and v15/v16 isolation | `backend/vnext/{VNextCompositionRoot.ts,project/**,http/**,runtime/VNextWorkspaceManager*}`; `shared/vnext/{httpContracts,routeInventory}.ts`; API/isolation/workspace tests | passed: API fixture asserts 76 lifecycle/security cases; route inventory equals mounted Express routes; focused suite 8 files/50 tests; full `npm run test` 62 files/320 tests; zero-warning lint; production build | 2026-08-29 temporary v20 project roots, v16 databases, fake provider and local Git worktrees | Transition `/api/vnext` only; current v19 API/UI remain canonical. No browser UI or real provider occurrence is claimed. |
+| EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | pending final cutover | phases 02–04/07/11 | ESAO-evid-003–005/007 prove the isolated contracts, transactions, runtime and API; canonical provider-backed evidence remains pending. |
+| EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | pending final cutover | phases 05/07/08/11 | ESAO-evid-004/006/007 prove exact decisions, durable scheduling and HTTP trust boundaries; product UI and real occurrence remain pending. |
+| EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | pending final cutover | phases 06–08/11 | ESAO-evid-004/006/007 prove managed Git effects, immutable Product-commit capture, continuation and API boundaries; UI/real occurrence remain pending. |
 | EVID-031 | REQ-022 / QS-031 | Target responsive/accessibility browser evidence | TEST-031 | pending | future phases 08/10/11 | No target UI exists yet. |
 | EVID-032 | REQ-022 / QS-032 | Strict versions, isolation, removal, release/install/startup | TEST-032 | pending | future phases 02–11 | Existing v19 baseline must remain active until phase 09. |
 
@@ -45,7 +46,7 @@ The phase-02 implementation follows three explicit refinements in the newer auth
 
 1. Action instructions require `Task`, `Role`, `Goals`, `Priorities`, `Method`, `Output contract`, `Tool policy` and `Acceptance evidence`; the earlier six-heading target list is not used by the vNext validator.
 2. Use Cases use non-empty Given/When/Then examples, success goals, failure goals and expected outcomes plus approved semantic-content hashes; the older title/description/acceptance-criteria draft shape is not retained as a compatibility shape.
-3. Refinement proposals are limited to `.ballet/instructions/**/*.md` and `.agents/skills/**/SKILL.md`; `.ballet/project.json` is rejected by the phase-02 pure scope validator. No broader apply permission is inferred.
+3. Canonical Refinement proposals are limited to `.ballet/instructions/**/*.md` and `.agents/skills/**/SKILL.md`; `.ballet/project.json` is rejected. Phase 07 additionally recognizes only the transition equivalents below `.ballet/vnext/{instructions,skills}` and makes the composition select exactly one namespace. No broader apply permission is inferred.
 
 These are recorded deviations rather than hidden compatibility behavior. Phase 03 composition and phase 06 refinement work must consume the implemented contracts, and the accepted architecture canon must be reconciled before phase 09 canonicalization if it still states the superseded details.
 
@@ -109,10 +110,66 @@ Critic schedules support bounded daily/weekly local times and IANA timezones. `@
 
 Refinement changes are full-content `create | replace | delete` operations limited to `.ballet/instructions/**/*.md` and `.agents/skills/**/SKILL.md`. Absolute paths, `..`, `.git`, arbitrary docs/source, secret-like paths and any symlink chain are rejected. A shared Skill change requires every referencing Action in the exact approved impact list. Apply checks operation-specific human authorization, base commit, all preimages before writes, resulting hashes and a fixed validation-command allowlist. It then creates one local `ballet/refinement/*` branch/worktree commit with provenance trailers and persists one immutable continuation. It never invokes a proposal-supplied shell command, merges, pushes or mutates the current checkout. Failures retain the isolated worktree for diagnosis, leave the parent Run/current checkout unchanged and keep Feedback unresolved.
 
+## Phase 07 project, composition and HTTP evidence
+
+The transition source paths are explicit and disjoint: vNext reads/writes `.ballet/vnext/project.json` and `.ballet/vnext/{goals,adrs,constraints,use-cases,instructions,skills}/**`; machine state is `.git/ballet/vnext/state.sqlite`. `VNextProjectRepository` has no v19 fallback and `VNextConnection` has no v15 import. `VNextCompositionIsolation.test.ts` proves byte-level cross-version DB non-interference in both directions, while `VNextProjectPersistence.test.ts` proves explicit-path-only config loading, atomic stable serialization, optimistic hashes, symlink rejection, snapshot locks and reference blockers.
+
+The shared refinement safety predicate recognizes canonical and transition roots for schema-level path rejection, but each composition injects one exact policy. `/api/vnext` permits only `.ballet/vnext/instructions/**/*.md` and `.ballet/vnext/skills/**/*.md`; it rejects canonical v19 resource paths. The API integration commits its vNext authoring baseline, applies an exact replacement to the transition instruction, replans from the refinement commit and verifies that the continuation snapshot contains the approved new resource hash. Phase 09 switches to the canonical policy and removes this transition namespace; there is no dual read or dual write.
+
+```text
+server startup
+  -> existing v19 composition + /api (unchanged canonical owner)
+  -> isolated vNext composition + /api/vnext
+       -> strict v20/Markdown repositories
+       -> fresh v16 connection and stores
+       -> Environment and governance queues reconcile idempotently
+       -> enabled valid v20 Critic schedule only
+       -> immutable Run worktree / Product commit
+       -> temporary detached read-only governance worktree
+       -> provider terminal / proposal persistence
+       -> governance worktree cleanup
+server shutdown
+  -> stop new pumping -> cancel/interrupt active work -> release schedule claims -> close v16
+  -> existing v19 shutdown remains independently responsible for v15
+```
+
+The shared `VNextRouteInventory` contains 73 unique method/path pairs and is compared directly with the mounted Express router in `VNextContractInventory.test.ts`; `VNextSchemaInventory` pins v20/v13/v10/v11/v12/v16 and governance v1. The backend parses every body, query and parameter through shared Zod contracts. POST is create-only, PUT is update-only, stale hashes are 409, missing entities are 404, list/detail evidence is bounded, and no State/Action standalone or body-selected continuation route exists.
+
+Human identity is constructed outside request bodies by the local server boundary (`local_operator:<uid>`); tests inject a trusted `request_context` actor. Use Case, Feedback, Critic and Refinement operations receive that separate actor value. Unknown body fields such as `actor`, `approvedBy`, `source` or arbitrary `patch` fail schema validation. Proposal decisions additionally require the operation-specific content/version/change/impact hashes, so a token or hash cannot authorize a different proposal or effect.
+
+| Mandatory scenario | Stable verification reference |
+| --- | --- |
+| 1. draft Use Case CRUD | `VNextApi.integration.test.ts`: collection POST, item GET/PUT/DELETE |
+| 2. approval hash/actor persisted | API integration: `/use-cases/UC-2/approve`; `VNextProjectPersistence.test.ts` |
+| 3. approved semantic edit returns draft | API integration and `VNextProjectPersistence.test.ts` approval invalidation |
+| 4. draft blocks start | API integration: draft UC then `POST /environment-runs` 409 |
+| 5. State order uniqueness/optimism | API integration: create/get/reorder, duplicate list and stale hash |
+| 6. Action priority uniqueness/optimism | API integration: create/get/reprioritize and duplicate list |
+| 7. whole Environment start | API integration: optional human input and Environment ID/hash |
+| 8. fake provider completion | API integration plus `EnvironmentRuntimeService.test.ts` |
+| 9. blocked Run exposes Feedback | API integration blocked fake outcome and Feedback row/read model |
+| 10. no standalone State/Action start | API 404 assertion and `VNextProhibitedRoutes` |
+| 11. human Feedback source not forgeable | API unknown `actor` rejection and trusted creator assertion |
+| 12. Critic proposal is not Feedback | `GovernanceWorkflows.test.ts` pending-proposal/no-Feedback assertion |
+| 13. exact Critic approval creates Feedback | API stale-hash rejection then approved Feedback creator/provenance |
+| 14. stale/repeated approval denied | API/review 409 and exact-once coordinator tests |
+| 15. Refinement proposal writes nothing | `GovernanceWorkflows.test.ts` read-only permission/current-tree assertions |
+| 16. exact apply and continuation | API apply/status/link plus managed-worktree continuation tests |
+| 17. unsafe refinement path denied | governance symlink/path/preimage tests and arbitrary-patch API 400 |
+| 18. active Run authoring lock | API config/resource 409 while immutable Run is active |
+| 19. SSE and invalidations | API bounded run-fact and invalidation streams; raw prompt absence |
+| 20. restart/reconcile | `EnvironmentRuntimeService.test.ts` and governance durable reconcile tests |
+| 21. scheduler enabled/disabled | `GovernanceWorkflows.test.ts` disabled/removal/due/dedupe/claim cases |
+| 22. v19 API unchanged | existing repository HTTP/runtime suite remains green; vNext mounts before the unchanged `/api` router |
+| 23. vNext never opens/writes v15 | `VNextCompositionIsolation.test.ts` byte-identical v15 assertion |
+| 24. v19 never opens/writes v16 | `VNextCompositionIsolation.test.ts` byte-identical v16 assertion |
+
+Successful Run worktrees may be removed after finalization because the Product Snapshot retains the result commit. Before Critic or Refinement execution, `VNextWorkspaceManager` creates a detached read-only worktree at that exact commit and removes it after provider capture. The workspace test proves a newer current checkout is neither read as the approved product base nor rewound. Refinement apply likewise branches from the exact approved reachable Product commit, never from an assumed current `HEAD`.
+
 ## Open evidence gaps
 
-Canonical runtime, browser, package/install and startup evidence is pending. Test-only Environment/Critic/Refinement records are not product occurrences. No managed-worktree refinement commit or provider-backed continuation Run exists; ESAO-evid-003/004 prove only isolated contracts and persistence.
+Canonical cutover, browser, package/install and real-provider evidence remain pending. Test-only Environment/Critic/Refinement records are not product occurrences. The managed-worktree tests prove local Git and continuation mechanics, but not a production-like provider-backed continuation.
 
 ## Next review basis
 
-The next evidence-producing action is phase 03 immutable resource composition and ExecutionSpec integration under the isolated transition exception.
+The next evidence-producing action is phase 08 isolated `/vnext` UI and fixed-viewport accessibility/browser verification under the transition exception.

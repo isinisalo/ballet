@@ -11,7 +11,7 @@ import {
 import { planContinuationSeed } from "./ContinuationSeedPlanner.js";
 import { DeterministicExecutionQueue } from "./ExecutionQueueBoundary.js";
 import { EnvironmentRuntimeService, type ProductFinalizationPort } from "./EnvironmentRuntimeService.js";
-import { authorizeProviderPath, mapProviderPermissions } from "./ProviderPermissions.js";
+import { authorizeProviderPath, authorizeProviderReadPath, mapProviderPermissions } from "./ProviderPermissions.js";
 import { ScriptedRuntimeProvider, type ProviderTerminal } from "./RuntimeProvider.js";
 
 describe("vNext validation-led Environment runtime", () => {
@@ -128,6 +128,14 @@ describe("vNext validation-led Environment runtime", () => {
     expect(harness.run().status).toBe("cancelled");
   });
 
+  test("shutdown interrupts durable active Runs before the database closes", async () => {
+    const harness = createHarness([]);
+    await harness.start();
+    await harness.service.shutdown();
+    expect(harness.run().status).toBe("interrupted");
+    expect(database!.connection.prepare("SELECT status FROM execution_tasks").get()).toEqual({ status: "cancelled" });
+  });
+
   test("duplicate provider terminal is an idempotent no-op", async () => {
     const harness = createHarness([output(precheck("done"))]);
     await harness.start();
@@ -157,6 +165,8 @@ describe("vNext validation-led Environment runtime", () => {
       networkAccess: false, worktreePath: "/tmp/worktree" });
     const audit: unknown[] = [];
     expect(spec.writableRoots).toEqual([]);
+    expect(authorizeProviderReadPath(spec, "/tmp/worktree/README.md")).toBe(true);
+    expect(authorizeProviderReadPath(spec, "/tmp/outside-secret")).toBe(false);
     expect(authorizeProviderPath(spec, "/tmp/worktree/file", (event) => audit.push(event))).toBe(false);
     expect(audit).toHaveLength(1);
   });

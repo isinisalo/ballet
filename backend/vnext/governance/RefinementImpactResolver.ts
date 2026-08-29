@@ -7,7 +7,7 @@ export const resolveRefinementImpact = (
   targetActionId: string
 ): string[] => {
   const actionIds = new Set([targetActionId]);
-  const skillIds = new Set(files.filter(({ relativePath }) => relativePath.startsWith(".agents/skills/"))
+  const skillIds = new Set(files.filter(({ relativePath }) => isSkillPath(relativePath))
     .map(({ resourceId }) => resourceId).filter((id): id is string => Boolean(id)));
   for (const state of environment.states) for (const action of state.actions) {
     if ([...skillIds].some((id) => action.validation.skillResources.includes(id) || action.work.skillResources.includes(id))) {
@@ -16,6 +16,10 @@ export const resolveRefinementImpact = (
   }
   return [...actionIds].sort();
 };
+
+const isSkillPath = (relativePath: string): boolean => (
+  relativePath.startsWith(".agents/skills/") || relativePath.startsWith(".ballet/vnext/skills/")
+);
 
 export const assertCompleteRefinementImpact = (
   environment: EnvironmentDefinition,

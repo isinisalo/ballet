@@ -22,11 +22,11 @@ export class EnvironmentRunStore {
     return this.connection().transaction(() => {
       this.connection().prepare(`
         INSERT INTO environment_runs (
-          environment_run_id, environment_definition_id, source, previous_run_id, status,
+          environment_run_id, environment_definition_id, source, previous_run_id, input_text, status,
           base_commit, worktree_path, branch, execution_snapshot_json, execution_snapshot_hash,
           transition_limit, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(input.environmentRunId, input.environmentDefinitionId, input.source, input.previousRunId ?? null,
+        ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(input.environmentRunId, input.environmentDefinitionId, input.source, input.previousRunId ?? null, input.input ?? null,
         input.baseCommit, input.worktreePath, input.branch, canonical(snapshot), input.executionSnapshotHash,
         input.transitionLimit, input.createdAt, input.createdAt);
       this.insertStates(input);

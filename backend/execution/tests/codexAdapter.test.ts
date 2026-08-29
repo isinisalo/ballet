@@ -40,13 +40,15 @@ rl.on("line", (line) => {
   if (message.method === "model/list") return send({ id: message.id, result: { data: [{ id: "gpt-5.4", displayName: "GPT-5.4", isDefault: true, supportedReasoningEfforts: [{ reasoningEffort: "medium", description: "Balanced" }, { reasoningEffort: "high", description: "Deep" }], defaultReasoningEffort: "medium" }] } });
   if (message.method === "thread/start") {
     if (JSON.stringify(message.params).includes('"developerInstructions"')) process.exit(13);
-    if (message.params.sandbox !== "workspace-write" || message.params.approvalPolicy !== "never") process.exit(7);
+    const expectedSandbox = fs.existsSync(path.join(process.cwd(), "read-only-mode")) ? "read-only" : "workspace-write";
+    if (message.params.sandbox !== expectedSandbox || message.params.approvalPolicy !== "never") process.exit(7);
     return send({ id: message.id, result: { thread: { id: "thread-1" } } });
   }
   if (message.method === "thread/resume") return send({ id: message.id, result: { thread: { id: message.params.threadId } } });
   if (message.method === "turn/start") {
     turnParams = message.params;
-    if (turnParams.sandboxPolicy?.type !== "workspaceWrite" || turnParams.sandboxPolicy?.networkAccess !== false) process.exit(8);
+    const expectedPolicy = fs.existsSync(path.join(process.cwd(), "read-only-mode")) ? "readOnly" : "workspaceWrite";
+    if (turnParams.sandboxPolicy?.type !== expectedPolicy || turnParams.sandboxPolicy?.networkAccess !== false) process.exit(8);
     if (turnParams.input?.[0]?.type !== "text" || !Array.isArray(turnParams.input[0].text_elements)) process.exit(10);
     if (!Buffer.from(turnParams.input[0].text, "utf8").equals(Buffer.from(expectedPrompt, "utf8"))) process.exit(11);
     send({ id: message.id, result: { turn: { id: "turn-1" } } });
@@ -117,6 +119,19 @@ describe("CodexAppServerAdapter", () => {
         defaultReasoning: "medium"
       })
     ]);
+  });
+
+  it("maps a vNext read-only request to read-only thread and turn sandboxes", async () => {
+    const context = await fixture();
+    await writeFile(path.join(context.root, "read-only-mode"), "");
+    const adapter = new CodexAppServerAdapter({ command: context.command });
+    const events = [];
+    for await (const event of adapter.execute({
+      executionId: "task-read-only", prompt: distinctivePrompt, workingDirectory: context.root,
+      model: "provider-default", reasoning: "provider-default", workspaceAccess: "read-only",
+      policy: { network: false, readOnlyRoots: [] }
+    })) events.push(event);
+    expect(events).toContainEqual(expect.objectContaining({ type: "execution.completed" }));
   });
 
   it("fails the event stream when app-server exits after turn/start", async () => {

@@ -12,46 +12,107 @@ import { VNextExecutionStore } from "../persistence/VNextExecutionStore.js";
 import type { ExecutionQueueBoundary } from "../runtime/ExecutionQueueBoundary.js";
 import { composeVNextPrompt } from "../runtime/PromptComposer.js";
 import { parseVNextStructuredOutput } from "../runtime/StructuredOutputValidator.js";
+import type { VNextRuntimeProvider } from "../runtime/RuntimeProvider.js";
+import { mapProviderPermissions } from "../runtime/ProviderPermissions.js";
 import { buildCriticEnvelope, buildRefinementEnvelope } from "./GovernanceEnvelopeBuilder.js";
+import { isAllowedCanonicalRefinementPath } from "../../../shared/vnext/refinement.js";
 
 export class GovernanceExecutionService {
   private readonly execution: VNextExecutionStore;
   private readonly runs: EnvironmentRunStore;
   private readonly reviews: ReviewCoordinator;
+  private activeTaskId?: string;
+  private stopping = false;
 
   constructor(
     private readonly connection: () => Database.Database,
     private readonly queue: ExecutionQueueBoundary,
     private readonly nextId: (kind: string) => string,
-    private readonly now: () => string
+    private readonly now: () => string,
+    private readonly workspaces: GovernanceWorkspaceBoundary = passthroughGovernanceWorkspace,
+    private readonly allowedRefinementPath: (relativePath: string) => boolean = isAllowedCanonicalRefinementPath
   ) {
     this.execution = new VNextExecutionStore(connection);
     this.runs = new EnvironmentRunStore(connection);
     this.reviews = new ReviewCoordinator(connection);
   }
 
-  queueCritic(criticRunId: string): string {
+  async queueCritic(criticRunId: string): Promise<string> {
     const row = this.connection().prepare(`
-      SELECT cr.product_snapshot_id, ps.environment_run_id FROM critic_runs cr
+      SELECT cr.product_snapshot_id, ps.environment_run_id, ps.result_commit FROM critic_runs cr
       JOIN product_snapshots ps ON ps.product_snapshot_id = cr.product_snapshot_id
       WHERE cr.critic_run_id = ? AND cr.status = 'queued'
-    `).get(criticRunId) as { environment_run_id: string } | undefined;
+    `).get(criticRunId) as { environment_run_id: string; result_commit: string } | undefined;
     if (!row) throw new Error(`Critic Run ${criticRunId} is not queueable.`);
     const run = this.runs.require(row.environment_run_id);
     const taskId = this.nextId("critic-task");
-    const envelope = buildCriticEnvelope({ connection: this.connection(), criticRunId, taskId, snapshotSha256: run.executionSnapshotHash });
-    return this.persistGovernanceDispatch(run, run.executionSnapshot.governance.critic, envelope, { criticRunId });
+    const checkoutRoot = await this.workspaces.prepareReadOnly(taskId, row.result_commit, run.worktreePath);
+    try {
+      const envelope = buildCriticEnvelope({ connection: this.connection(), criticRunId, taskId, snapshotSha256: run.executionSnapshotHash });
+      return this.persistGovernanceDispatch(run, run.executionSnapshot.governance.critic, envelope, { criticRunId }, checkoutRoot);
+    } catch (error) { await this.workspaces.releaseReadOnly(taskId); throw error; }
   }
 
-  queueRefinement(refinementRunId: string): string {
+  async queueRefinement(refinementRunId: string): Promise<string> {
     const row = this.connection().prepare(`
       SELECT source_environment_run_id FROM refinement_runs WHERE refinement_run_id = ? AND status = 'queued'
     `).get(refinementRunId) as { source_environment_run_id: string } | undefined;
     if (!row) throw new Error(`Refinement Run ${refinementRunId} is not queueable.`);
     const run = this.runs.require(row.source_environment_run_id);
     const taskId = this.nextId("refinement-task");
-    const envelope = buildRefinementEnvelope({ connection: this.connection(), refinementRunId, taskId, snapshotSha256: run.executionSnapshotHash });
-    return this.persistGovernanceDispatch(run, run.executionSnapshot.governance.refinement, envelope, { refinementRunId });
+    const checkoutRoot = await this.workspaces.prepareReadOnly(taskId, run.resultCommit ?? run.baseCommit, run.worktreePath);
+    try {
+      const envelope = buildRefinementEnvelope({ connection: this.connection(), refinementRunId, taskId, snapshotSha256: run.executionSnapshotHash });
+      return this.persistGovernanceDispatch(run, run.executionSnapshot.governance.refinement, envelope, { refinementRunId }, checkoutRoot);
+    } catch (error) { await this.workspaces.releaseReadOnly(taskId); throw error; }
+  }
+
+  reconcile(): number {
+    let count = 0;
+    for (const task of this.execution.pendingTasks().filter(({ spec }) => ["critic", "refinement"].includes(spec.evidence.role))) {
+      if (!this.queue.has(task.taskId)) { this.queue.enqueue(task.taskId); count += 1; }
+    }
+    return count;
+  }
+
+  async processNext(provider: VNextRuntimeProvider): Promise<boolean> {
+    if (this.stopping) return false;
+    const taskId = this.queue.next();
+    if (!taskId) return false;
+    const task = this.execution.requireTask(taskId);
+    if (task.status !== "queued" || !this.execution.claimTask(taskId, this.now())) return true;
+    this.activeTaskId = taskId;
+    try {
+      const terminal = await provider.execute(task.spec, mapProviderPermissions({
+        provider: task.spec.runtime.provider, role: task.spec.evidence.role,
+        toolPolicy: "read_only", networkAccess: task.spec.runtime.networkAccess,
+        worktreePath: task.spec.project.checkoutRoot
+      }));
+      if (this.stopping) return true;
+      this.applyProviderOutput(taskId, terminal.providerOutcomeKey,
+        terminal.kind === "output" ? terminal.raw : JSON.stringify({ providerFailure: terminal.errorMessage }));
+      return true;
+    } finally {
+      this.activeTaskId = undefined;
+      await this.workspaces.releaseReadOnly(taskId);
+    }
+  }
+
+  async shutdown(provider: VNextRuntimeProvider): Promise<void> {
+    this.stopping = true;
+    if (this.activeTaskId) await provider.cancel?.(this.activeTaskId, "Ballet vNext is shutting down.");
+    this.connection().transaction(() => {
+      this.connection().prepare(`
+        UPDATE execution_tasks SET status = 'cancelled', completed_at = ?, updated_at = ?
+        WHERE role IN ('critic','refinement') AND status IN ('queued','running')
+      `).run(this.now(), this.now());
+      this.connection().prepare(`
+        UPDATE agent_runs SET status = 'interrupted', revision = revision + 1, completed_at = ?, updated_at = ?
+        WHERE role IN ('critic','refinement') AND status IN ('queued','running')
+      `).run(this.now(), this.now());
+      this.connection().prepare("UPDATE refinement_runs SET status = 'queued', updated_at = ? WHERE status = 'running'")
+        .run(this.now());
+    })();
   }
 
   applyProviderOutput(taskId: string, providerOutcomeKey: string, raw: string): "proposal" | "completed" | "failed" {
@@ -80,7 +141,8 @@ export class GovernanceExecutionService {
     run: StoredEnvironmentRun,
     composition: AgentComposition,
     envelope: TaskEnvelopeV10,
-    owner: { criticRunId?: string; refinementRunId?: string }
+    owner: { criticRunId?: string; refinementRunId?: string },
+    checkoutRoot: string
   ): string {
     if (composition.toolPolicy !== "read_only") throw new Error("Governance proposal Agent must be read-only.");
     const profile = run.executionSnapshot.executionProfiles.find(({ id }) => id === composition.executionProfileId)!;
@@ -92,7 +154,7 @@ export class GovernanceExecutionService {
       agentRunId, evidence,
       runtime: { provider: profile.provider, cliVersion: capability.cliVersion, model: profile.model,
         reasoningEffort: profile.reasoningEffort, networkAccess: profile.networkAccess, capabilityHash: capability.capabilitySha256 },
-      project: { checkoutRoot: run.worktreePath, headSha: run.baseCommit,
+      project: { checkoutRoot, headSha: run.resultCommit ?? run.baseCommit,
         configHash: run.executionSnapshot.projectConfigSha256, snapshotHash: run.executionSnapshotHash },
       createdAt: this.now()
     };
@@ -129,6 +191,10 @@ export class GovernanceExecutionService {
   }
 
   private applyRefinement(refinementRunId: string, outcome: RefinementOutcome, at: string): void {
+    if (outcome.files.some(({ relativePath }) => !this.allowedRefinementPath(relativePath))) {
+      this.failGovernanceRun(undefined, refinementRunId, at);
+      throw new Error("Refinement outcome contains a path outside this composition namespace.");
+    }
     const selectedFeedback = (this.connection().prepare(`
       SELECT feedback_entry_id FROM refinement_run_feedback WHERE refinement_run_id = ? ORDER BY feedback_entry_id
     `).all(refinementRunId) as Array<{ feedback_entry_id: string }>).map(({ feedback_entry_id }) => feedback_entry_id);
@@ -164,6 +230,16 @@ export class GovernanceExecutionService {
       .run(at, at, refinementRunId);
   }
 }
+
+export interface GovernanceWorkspaceBoundary {
+  prepareReadOnly(taskId: string, commitSha: string, fallbackPath: string): Promise<string>;
+  releaseReadOnly(taskId: string): Promise<void>;
+}
+
+const passthroughGovernanceWorkspace: GovernanceWorkspaceBoundary = {
+  prepareReadOnly: async (_taskId, _commitSha, fallbackPath) => fallbackPath,
+  releaseReadOnly: async () => undefined
+};
 
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;
 const hash = (value: unknown): string => sha256(canonicalJson(json(value)));

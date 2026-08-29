@@ -243,7 +243,7 @@ const sandboxProbeRequest = (): RuntimeExecutionRequest => ({
 
 const enforceCopilotSandbox = async (
   session: CopilotSessionLike,
-  request: Pick<RuntimeExecutionRequest, "workingDirectory" | "policy">
+  request: Pick<RuntimeExecutionRequest, "workingDirectory" | "policy" | "workspaceAccess">
 ): Promise<void> => {
   const workingDirectory = path.resolve(request.workingDirectory);
   await session.rpc.options.update({
@@ -254,8 +254,11 @@ const enforceCopilotSandbox = async (
       addCurrentWorkingDirectory: false,
       userPolicy: {
         filesystem: {
-          readwritePaths: [workingDirectory],
-          readonlyPaths: request.policy.readOnlyRoots.map((root) => path.resolve(root)),
+          readwritePaths: request.workspaceAccess === "read-only" ? [] : [workingDirectory],
+          readonlyPaths: [
+            ...(request.workspaceAccess === "read-only" ? [workingDirectory] : []),
+            ...request.policy.readOnlyRoots.map((root) => path.resolve(root))
+          ],
           clearPolicyOnExit: true
         },
         network: {

@@ -35,7 +35,7 @@ export class FeedbackBoxService {
     });
   }
 
-  list(input: { environmentRunId: string; status?: string; category?: FeedbackCategory }): Array<Record<string, unknown>> {
+  list(input: { environmentRunId?: string; status?: string; category?: FeedbackCategory }): Array<Record<string, unknown>> {
     const rows = this.store.list(input.environmentRunId);
     return rows.filter((row) => (!input.status || row.status === input.status) && (!input.category || row.category === input.category));
   }

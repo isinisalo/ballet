@@ -9,6 +9,7 @@ export const vNextCoreSchema = `
     environment_definition_id TEXT NOT NULL,
     source TEXT NOT NULL CHECK (source IN ('manual','continuation')),
     previous_run_id TEXT REFERENCES environment_runs(environment_run_id),
+    input_text TEXT CHECK (input_text IS NULL OR length(input_text) <= 131072),
     status TEXT NOT NULL CHECK (status IN ('pending','running','blocked','completed','cancelled','interrupted')),
     revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
     base_commit TEXT NOT NULL,

@@ -22,6 +22,8 @@ export class EnvironmentRuntimeService {
   private readonly runs: EnvironmentRunStore;
   private readonly execution: VNextExecutionStore;
   private readonly dispatches: AgentDispatchFactory;
+  private activeTaskId?: string;
+  private stopping = false;
 
   constructor(
     private readonly connection: () => Database.Database,
@@ -44,7 +46,13 @@ export class EnvironmentRuntimeService {
     return this.runs.require(input.environmentRunId);
   }
 
+  async resume(environmentRunId: string): Promise<StoredEnvironmentRun> {
+    await this.progress(environmentRunId);
+    return this.runs.require(environmentRunId);
+  }
+
   async processNext(): Promise<boolean> {
+    if (this.stopping) return false;
     const taskId = this.queue.next();
     if (!taskId) return false;
     const task = this.execution.requireTask(taskId);
@@ -52,7 +60,10 @@ export class EnvironmentRuntimeService {
     const agent = this.execution.requireAgent(task.agentRunId);
     const run = this.runs.require(agent.environmentRunId);
     if (!["pending", "running"].includes(run.status)) return true;
+    this.activeTaskId = taskId;
     const terminal = await this.provider.execute(task.spec, permissionsFor(task));
+    this.activeTaskId = undefined;
+    if (this.stopping) return true;
     const at = this.now();
     if (terminal.kind === "failure") {
       this.execution.finishTask(taskId, terminal.providerOutcomeKey, "failed", {
@@ -76,7 +87,7 @@ export class EnvironmentRuntimeService {
 
   reconcile(): number {
     let count = 0;
-    for (const task of this.execution.pendingTasks()) {
+    for (const task of this.execution.pendingTasks().filter(({ spec }) => ["validation", "work"].includes(spec.evidence.role))) {
       if (!this.queue.has(task.taskId)) { this.queue.enqueue(task.taskId); count += 1; }
     }
     return count;
@@ -85,6 +96,18 @@ export class EnvironmentRuntimeService {
   cancel(environmentRunId: string): StoredEnvironmentRun {
     const run = this.runs.require(environmentRunId);
     return this.flow.stop(environmentRunId, run.revision, "cancelled", this.now());
+  }
+
+  async shutdown(): Promise<void> {
+    this.stopping = true;
+    if (this.activeTaskId) await this.provider.cancel?.(this.activeTaskId, "Ballet vNext is shutting down.");
+    const rows = this.connection().prepare(
+      "SELECT environment_run_id FROM environment_runs WHERE status IN ('pending','running')"
+    ).all() as Array<{ environment_run_id: string }>;
+    for (const row of rows) {
+      const run = this.runs.require(row.environment_run_id);
+      this.flow.stop(run.environmentRunId, run.revision, "interrupted", this.now());
+    }
   }
 
   private async progress(environmentRunId: string): Promise<void> {

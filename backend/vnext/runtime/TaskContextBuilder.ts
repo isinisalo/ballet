@@ -10,6 +10,7 @@ export interface BoundedTaskContextInput {
   actionStatus?: string;
   workAttempt?: number;
   maxRetries?: number;
+  humanInput?: string;
   history?: JsonValue[];
   previousEvidence?: JsonValue;
   approvalBoundary?: JsonValue;
@@ -42,6 +43,7 @@ export const buildBoundedTaskContext = (input: BoundedTaskContextInput): JsonVal
       actionStatus: input.actionStatus ?? null,
       workAttempt: input.workAttempt ?? 0,
       maxRetries: input.maxRetries ?? 0,
+      humanInput: input.humanInput ?? null,
       history: (input.history ?? []).slice(-16),
       previousEvidence: input.previousEvidence ?? null
     },

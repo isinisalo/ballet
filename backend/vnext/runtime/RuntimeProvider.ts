@@ -7,6 +7,7 @@ export type ProviderTerminal =
 
 export interface VNextRuntimeProvider {
   execute(spec: ExecutionSpecV12, permissions: ProviderPermissionSpec): Promise<ProviderTerminal>;
+  cancel?(taskId: string, reason: string): Promise<void>;
 }
 
 export class ScriptedRuntimeProvider implements VNextRuntimeProvider {

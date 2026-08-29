@@ -16,6 +16,16 @@ export class CriticSchedulerService {
 
   configure(schedules: readonly CriticScheduleDefinition[], enabled: boolean): void {
     const at = this.clock.now();
+    const configuredIds = new Set(schedules.map(({ id }) => id));
+    const existing = this.connection().prepare("SELECT critic_schedule_id FROM critic_schedules").all() as Array<{
+      critic_schedule_id: string;
+    }>;
+    for (const row of existing) if (!configuredIds.has(row.critic_schedule_id)) {
+      this.connection().prepare(`
+        UPDATE critic_schedules SET enabled = 0, revision = revision + 1, updated_at = ?
+        WHERE critic_schedule_id = ? AND enabled = 1
+      `).run(at, row.critic_schedule_id);
+    }
     for (const config of schedules) {
       this.reviews.upsertSchedule({
         criticScheduleId: config.id, configHash: hash(config), config,

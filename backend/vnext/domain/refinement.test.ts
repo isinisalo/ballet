@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedRefinementPath, validateRefinementImpact } from "../../../shared/vnext/index.js";
+import {
+  isAllowedCanonicalRefinementPath, isAllowedRefinementPath,
+  isAllowedVNextRefinementPath, validateRefinementImpact
+} from "../../../shared/vnext/index.js";
 
 describe("refinement safety", () => {
   it.each([
     [".ballet/instructions/work.md", true],
     [".agents/skills/review/SKILL.md", true],
     [".agents/skills/group/review/SKILL.md", true],
+    [".ballet/vnext/instructions/work.md", true],
+    [".ballet/vnext/skills/review.md", true],
     [".ballet/project.json", false],
     ["/tmp/SKILL.md", false],
     [".agents/skills/../secret/SKILL.md", false],
@@ -13,6 +18,13 @@ describe("refinement safety", () => {
     [".agents/skills/review/README.md", false]
   ])("classifies %s", (path, expected) => {
     expect(isAllowedRefinementPath(path)).toBe(expected);
+  });
+
+  it("keeps canonical and transition refinement namespaces mutually exclusive", () => {
+    expect(isAllowedCanonicalRefinementPath(".ballet/instructions/work.md")).toBe(true);
+    expect(isAllowedCanonicalRefinementPath(".ballet/vnext/instructions/work.md")).toBe(false);
+    expect(isAllowedVNextRefinementPath(".ballet/vnext/instructions/work.md")).toBe(true);
+    expect(isAllowedVNextRefinementPath(".ballet/instructions/work.md")).toBe(false);
   });
 
   it("rejects symlinks and missing shared Skill impact closure together", () => {

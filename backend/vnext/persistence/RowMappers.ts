@@ -8,7 +8,8 @@ const nullableString = z.string().nullable();
 
 const environmentRowSchema = z.object({
   environment_run_id: z.string(), environment_definition_id: z.string(), source: z.enum(["manual", "continuation"]),
-  previous_run_id: nullableString, status: z.enum(["pending", "running", "blocked", "completed", "cancelled", "interrupted"]),
+  previous_run_id: nullableString, input_text: nullableString,
+  status: z.enum(["pending", "running", "blocked", "completed", "cancelled", "interrupted"]),
   revision: z.number().int(), base_commit: z.string(), result_commit: nullableString, worktree_path: z.string(), branch: z.string(),
   execution_snapshot_json: z.string(), execution_snapshot_hash: z.string(), active_state_execution_id: nullableString,
   active_action_execution_id: nullableString, active_agent_run_id: nullableString, transition_count: z.number().int(),
@@ -50,7 +51,7 @@ export const toEnvironmentRun = (value: unknown): StoredEnvironmentRun => {
   const row = environmentRowSchema.parse(value);
   return {
     environmentRunId: row.environment_run_id, environmentDefinitionId: row.environment_definition_id,
-    source: row.source, previousRunId: optional(row.previous_run_id), status: row.status, revision: row.revision,
+    source: row.source, previousRunId: optional(row.previous_run_id), input: optional(row.input_text), status: row.status, revision: row.revision,
     baseCommit: row.base_commit, resultCommit: optional(row.result_commit), worktreePath: row.worktree_path,
     branch: row.branch, executionSnapshot: rootSnapshotV13Schema.parse(JSON.parse(row.execution_snapshot_json)),
     executionSnapshotHash: row.execution_snapshot_hash, activeStateExecutionId: optional(row.active_state_execution_id),

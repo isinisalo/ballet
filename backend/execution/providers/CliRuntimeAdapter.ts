@@ -58,6 +58,7 @@ export interface RuntimeExecutionRequest {
   model: string;
   reasoning: string;
   policy: ExecutionPolicy;
+  workspaceAccess?: "read-only" | "workspace-write";
   outputSchema?: Record<string, unknown>;
   timeoutMs?: number;
   signal?: AbortSignal;

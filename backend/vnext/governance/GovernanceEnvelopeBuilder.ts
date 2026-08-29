@@ -55,9 +55,7 @@ export const buildRefinementEnvelope = (input: {
     WHERE rrf.refinement_run_id = ? ORDER BY fe.created_at
   `).all(input.refinementRunId);
   const composition = snapshot.governance.refinement;
-  const resources = snapshot.resources.filter(({ id }) => (
-    id === composition.instructionResource || composition.skillResources.includes(id)
-  ));
+  const resources = snapshot.resources;
   const preimageHashes = Object.fromEntries(resources.map(({ relativePath, sourceSha256 }) => [relativePath, sourceSha256]));
   return {
     version: 10, taskId: input.taskId, environmentRunId: String(row.source_environment_run_id),
@@ -70,7 +68,7 @@ export const buildRefinementEnvelope = (input: {
       actions: snapshot.environment.states.flatMap(({ actions }) => actions).map((action) => ({
         id: action.id, validationSkillIds: action.validation.skillResources, workSkillIds: action.work.skillResources
       })),
-      allowedPathPolicy: [".ballet/instructions/**/*.md", ".agents/skills/**/SKILL.md"]
+      allowedPathPolicy: ["immutable snapshot resource paths in the active composition namespace"]
     }),
     role: "refinement", phase: "proposal", refinementRunId: input.refinementRunId,
     approvedCriticProposalIds: selected.flatMap((item) => {

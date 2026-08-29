@@ -61,6 +61,15 @@ describe("durable Critic schedules", () => {
       .toEqual([{ status: "skipped", skip_reason: "no_product_snapshot" }]);
   });
 
+  test("disables schedules removed from the current valid configuration", () => {
+    const db = trackedDb();
+    const scheduler = new CriticSchedulerService(() => db.connection, { now: () => TEST_AT }, ids("schedule-remove"));
+    scheduler.configure([{ id: "removed", kind: "daily", timeZone: "UTC", localTimes: ["11:00"] }], true);
+    scheduler.configure([], true);
+    expect(db.connection.prepare("SELECT critic_schedule_id, enabled FROM critic_schedules").all())
+      .toEqual([{ critic_schedule_id: "removed", enabled: 0 }]);
+  });
+
   test("dedupes due, forbids overlap and releases a shutdown claim", () => {
     const context = completedDb();
     let now = "2026-08-29T10:00:00Z";
@@ -112,7 +121,7 @@ describe("Feedback Box trust and lifecycle", () => {
 });
 
 describe("read-only governance proposal execution", () => {
-  test("Critic callback creates only pending human proposal, never Feedback or approval", () => {
+  test("Critic callback creates only pending human proposal, never Feedback or approval", async () => {
     const context = completedDb();
     const config = { id: "daily", kind: "daily" as const, timeZone: "UTC", localTimes: ["10:00"] };
     context.reviews.reviews.createSchedule({
@@ -124,7 +133,7 @@ describe("read-only governance proposal execution", () => {
     });
     const queue = new DeterministicExecutionQueue();
     const execution = new GovernanceExecutionService(() => context.db.connection, queue, ids("governance"), () => TEST_AT);
-    const taskId = execution.queueCritic("critic-run");
+    const taskId = await execution.queueCritic("critic-run");
     const proposal = {
       proposalId: "critic-proposal", title: "Finding", finding: "Instruction can be clearer", evidenceRefs: ["snapshot-run-1"],
       category: "documentation", targetType: "product_snapshot", targetId: "snapshot-run-1",
@@ -165,10 +174,12 @@ describe("exact Refinement approval and managed apply", () => {
   test("shared Skill impact includes every referencing Action", () => {
     const environment = environmentSeed({ stateCount: 2 }).executionSnapshot.environment;
     for (const state of environment.states) for (const action of state.actions) action.work.skillResources = ["shared"];
-    expect(resolveRefinementImpact(environment, [{
-      operation: "replace", relativePath: ".agents/skills/shared/SKILL.md", expectedPreimageHash: HASH_A,
-      proposedContentHash: HASH_A, proposedContent: "x", rationale: "x", resourceId: "shared"
-    }], "action-1")).toEqual(["action-1", "action-2"]);
+    for (const relativePath of [".agents/skills/shared/SKILL.md", ".ballet/vnext/skills/shared.md"]) {
+      expect(resolveRefinementImpact(environment, [{
+        operation: "replace", relativePath, expectedPreimageHash: HASH_A,
+        proposedContentHash: HASH_A, proposedContent: "x", rationale: "x", resourceId: "shared"
+      }], "action-1")).toEqual(["action-1", "action-2"]);
+    }
   });
 
   test("exact approval creates one local commit and continuation without merge, push, or early resolution", async () => {
@@ -196,6 +207,29 @@ describe("exact Refinement approval and managed apply", () => {
     completeContinuation(context, "run-2");
     expect(new FeedbackResolutionService(() => context.db.connection).reconcileContinuation("run-2", TEST_AT)).toBe("resolved");
     expect(new FeedbackStore(() => context.db.connection).require("feedback-1").status).toBe("resolved");
+  });
+
+  test("applies from the approved immutable product commit without rewinding a newer checkout", async () => {
+    const repository = gitRepository();
+    const context = completedDb(repository.head);
+    const proposal = createApprovedRefinement(context, repository.head, VALID_INSTRUCTION,
+      `${VALID_INSTRUCTION}\n\nRefined from product commit.`, ["instruction_contract"]);
+    writeFileSync(path.join(repository.root, "README.md"), "newer checkout\n");
+    git(repository.root, ["add", "README.md"]);
+    git(repository.root, ["-c", "user.name=Test", "-c", "user.email=test@localhost", "commit", "-m", "newer checkout"]);
+    const newerHead = git(repository.root, ["rev-parse", "HEAD"]);
+    const service = new RefinementApplyService(
+      () => context.db.connection, repository.root, repository.worktrees,
+      { run: async () => undefined }, async ({ commitSha }) => {
+        const continuation = environmentSeed({ environmentRunId: "run-2", source: "continuation",
+          previousRunId: "run-1", baseCommit: commitSha, stateCount: 1 });
+        return { ...continuation, continuationLinkId: "continuation-1", continuationSnapshotHash: continuation.executionSnapshotHash };
+      }, () => TEST_AT
+    );
+    expect(await service.apply(proposal.refinementProposalId, "apply-product-base")).toBe("applied");
+    expect(git(repository.root, ["rev-parse", "HEAD"])).toBe(newerHead);
+    expect(git(path.join(repository.worktrees, "apply-product-base"), ["merge-base", "HEAD", repository.head]))
+      .toBe(repository.head);
   });
 
   test("symlink escape or stale approval fails without changing current checkout or resolving Feedback", async () => {

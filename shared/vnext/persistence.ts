@@ -26,6 +26,7 @@ export interface CreateEnvironmentRunInput {
   environmentRunId: string;
   environmentDefinitionId: string;
   source: "manual" | "continuation";
+  input?: string;
   previousRunId?: string;
   baseCommit: string;
   worktreePath: string;

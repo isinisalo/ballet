@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- The stateful SDK fake is shared across adapter integration cases. */
 import { describe, expect, it } from "vitest";
 import { CopilotClient } from "@github/copilot-sdk";
 import { CopilotSdkAdapter } from "../providers/copilot/CopilotSdkAdapter.js";
@@ -159,6 +160,23 @@ describe("CopilotSdkAdapter", () => {
       resolveToolFilterOptions(config: Record<string, unknown>): unknown;
     };
     expect(() => sdkValidator.resolveToolFilterOptions(client.config!)).not.toThrow();
+  });
+
+  it("maps a vNext read-only request to a zero-write SDK sandbox", async () => {
+    const client = new FakeClient();
+    const sdk: CopilotSdkModule = {
+      CopilotClient: class { constructor() { return client; } } as unknown as CopilotSdkModule["CopilotClient"],
+      RuntimeConnection: { forStdio: () => ({ kind: "stdio" }) }
+    };
+    const adapter = new CopilotSdkAdapter({ loadSdk: async () => sdk });
+    for await (const event of adapter.execute({
+      executionId: "task-read-only", prompt: "Return JSON.", workingDirectory: "/tmp/worktree",
+      model: "provider-default", reasoning: "provider-default", workspaceAccess: "read-only",
+      policy: { network: false, readOnlyRoots: [] }
+    })) { void event; }
+    expect(client.session.optionUpdates.at(-1)).toMatchObject({ sandboxConfig: { userPolicy: { filesystem: {
+      readwritePaths: [], readonlyPaths: ["/tmp/worktree"], clearPolicyOnExit: true
+    } } } });
   });
 
   it("marks an SDK/CLI handshake failure as an unsupported version", async () => {

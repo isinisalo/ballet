@@ -48,6 +48,7 @@ tags:
 | `shared/api/runtime-schemas.ts` | shared API | node outcomes, root kinds, policy/ledger DTO | Action/Feedback/approval/refinement v1 DTO | replace | 03..06 | Zod negative/positive tests | legacy schemas 0 |
 | `shared/api/task-envelope-schemas.ts` | shared API | Work-first v9 role schema | Validation-led v10 role schema | replace | 04 | pre/postwork restriction tests | v9 schema 0 |
 | `shared/api/workspace-contracts.ts` | shared API | exports all active Graph/module/policy DTOs | exports only canonical target DTOs | replace | 07..09 | frontend boundary build | vNext export names 0 in 09 |
+| `shared/vnext/**` | shared transition | isolated target contracts and HTTP inventory | canonical shared domain/API contracts | adapt | 02..09 | strict version + route/schema inventory tests | directory/import and vNext symbol count 0 in 09 |
 | `backend/project-config/**` | backend config | load/normalize/write v19 Graph | strict read/write v20 Environment | replace | 02 | v19 fail-closed; no normalization reader | vNext repo removed/renamed 09 |
 | `backend/automation/**` | backend authoring | Graph config repository/validation | Environment authoring repository/validation | replace | 02,07 | CRUD/reference/lock tests | old service imports 0 |
 | `backend/policy/**` | backend policy | compile/preview/admissibility/reward | no target responsibility | remove | 09 | absence grep + tests removed/replaced | directory absent or no active policy code |
@@ -78,6 +79,7 @@ tags:
 | `backend/services/{AutomationService,WorkspaceDataService}.ts` | backend service | Graph workspace data | target workspace data | replace | 07 | service/API tests | vNext service canonicalized 09 |
 | `backend/store.ts` | backend composition | Graph/module operations | target authoring/approval/refinement operations | replace | 07 | composition tests | module methods 0 |
 | `backend/http/apiRouter.ts` | HTTP | current `/api` Graph/module/run routes | isolated `/api/vnext`, then canonical target API | adapt | 07,09 | route inventory/security tests | `/api/vnext` 0 after 09 |
+| `backend/vnext/**` | backend transition | isolated v20/v16 services, runtime, governance and API | canonical backend services/runtime/API | adapt | 03..09 | full vNext + canonical route/lifecycle tests | directory/import and `/api/vnext` count 0 in 09 |
 | `backend/server/createBalletServer.ts` | HTTP security | loopback and origin enforcement | unchanged security around new API | keep | 07 | security tests | none |
 | SSE/invalidation services | backend/frontend | task console and refresh facts | target facts without provider-prose control | adapt | 07..08 | reconnect/replay tests | old DTOs 0 |
 | `frontend/src/workspace/routing.ts` | frontend routing | `/automation/graph...`, Graph/GraphNode Runs | `/vnext` target, then canonical Direction/Use Case/Environment routes | replace | 08,09 | route/back-forward tests | `/vnext` and old routes 0 after 09 |
@@ -87,6 +89,8 @@ tags:
 | `frontend/src/workspace/data/**`, `frontend/src/api*.ts` | frontend data | Graph/module mutations | target mutations and approval commands | adapt | 07..09 | request/refresh tests | vNext calls 0 after 09 |
 | `frontend/src/components/**`, `frontend/src/styles.css` | frontend system | tokenized primitives/layout | same dark design system | keep | 08 | lint/build/visual QA | ad hoc tokens 0 |
 | `.ballet/project.json` | project truth | strict v19 Graph data | strict v20 approved Use Cases + Environment | replace | 10 | validator + schema tests | Graph/policy terms 0 |
+| `.ballet/vnext/**` | project transition | isolated v20 config and Markdown entities | canonical `.ballet/project.json`, instruction and Skill roots | replace | 07..10 | no-cross-read + continuation resource hash tests | transition directory absent after canonicalization |
+| `.git/ballet/vnext/**` | machine transition | isolated v16 DB and managed worktrees | canonical v16 machine-local paths | replace | 07,09 | byte-isolation + fresh-start tests | archive/remove only; no migration or transition path use |
 | `.ballet/graph-node-library/**` | project package data | 14 Module v7 packages | no target responsibility | remove | 10 | path and term absence | directory entries 0 |
 | `.ballet/graph-node-modules/**` | project materialization | installed module provenance when present | no target responsibility | remove | 09..10 | path absence | directory entries 0 |
 | `.ballet/instructions/**` | project prompt truth | role-specific free-form instructions | required target sections and Validation-led roles | adapt | 10 | instruction-section validator | old routing terms 0 |

@@ -23,6 +23,7 @@ import { MarkdownStore } from "../store.js";
 import { TkTracker } from "../tracker/TkTracker.js";
 import { TrackerOutbox } from "../tracker/TrackerOutbox.js";
 import { RotatingFileLogger } from "./RotatingFileLogger.js";
+import { createVNextCompositionRoot } from "../vnext/VNextCompositionRoot.js";
 
 export interface CreateBalletServerOptions {
   root: string;
@@ -94,6 +95,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   await runs.reconcile();
   await queue.start();
+  const vnext = await createVNextCompositionRoot({ context, runtime });
 
   const app = express();
   app.disable("x-powered-by");
@@ -108,6 +110,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(202).json({ accepted: true });
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
+  app.use("/api/vnext", vnext.router);
   app.use("/api", createApiRouter({
     store, runtime, executions, runs, invalidations, logsPath: context.logsPath
   }));
@@ -134,6 +137,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
         timeout.unref();
       })
     ]);
+    await vnext.shutdown();
     const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await serverClosed;
@@ -145,7 +149,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   };
 
   logger.info("Ballet server initialized.", { root: context.root, instanceId: context.instanceId, port: options.port });
-  return { app, server, context, store, runtime, configurations, executions, runs, queue, shutdown, logger };
+  return { app, server, context, store, runtime, configurations, executions, runs, queue, vnext, shutdown, logger };
 };
 
 export const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {

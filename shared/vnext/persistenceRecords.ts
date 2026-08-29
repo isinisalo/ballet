@@ -6,6 +6,7 @@ export interface StoredEnvironmentRun {
   environmentDefinitionId: string;
   source: "manual" | "continuation";
   previousRunId?: string;
+  input?: string;
   status: "pending" | "running" | "blocked" | "completed" | "cancelled" | "interrupted";
   revision: number;
   baseCommit: string;

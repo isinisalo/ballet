@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { validateRunnableEnvironment } from "../gates.js";
+import { validateUniqueActionPriority, validateUniqueStateOrder } from "../gates.js";
 import { VNEXT_LIMITS } from "../limits.js";
 import { VNEXT_PROJECT_CONFIG_VERSION } from "../versions.js";
 import { idListSchema, idSchema, nonEmptyTextSchema } from "./common.js";
@@ -93,8 +93,20 @@ export const projectConfigurationV20Schema = z.object({
   critic: criticConfigurationSchema,
   refinement: refinementConfigurationSchema
 }).strict().superRefine((config, context) => {
-  for (const issue of validateRunnableEnvironment(config.environment, config.direction)) {
+  for (const issue of validateUniqueStateOrder(config.environment.states)) {
     context.addIssue({ code: "custom", path: issue.path.split("."), message: issue.message });
+  }
+  const useCaseIds = new Set(config.direction.useCases.map(({ id }) => id));
+  for (const [stateIndex, state] of config.environment.states.entries()) {
+    for (const issue of validateUniqueActionPriority(state.actions)) {
+      context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, ...issue.path.split(".")], message: issue.message });
+    }
+    for (const id of state.useCaseIds) if (!useCaseIds.has(id)) {
+      context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
+    }
+    for (const [actionIndex, action] of state.actions.entries()) for (const id of action.useCaseIds) {
+      if (!useCaseIds.has(id)) context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "actions", actionIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
+    }
   }
   const profileIds = new Set(config.executionProfiles.map(({ id }) => id));
   if (profileIds.size !== config.executionProfiles.length) {

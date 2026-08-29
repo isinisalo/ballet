@@ -22,7 +22,7 @@ export const useCaseExampleSchema = z.object({
   then: nonEmptyTextSchema
 }).strict();
 
-export const useCaseSchema = z.object({
+export const useCaseAuthoringSchema = z.object({
   id: idSchema,
   name: nonEmptyTextSchema,
   status: z.enum(["draft", "approved"]),
@@ -39,7 +39,9 @@ export const useCaseSchema = z.object({
     revision: z.number().int().positive(),
     contentHash: sha256Schema
   }).strict().optional()
-}).strict().superRefine((useCase, context) => {
+}).strict();
+
+export const useCaseSchema = useCaseAuthoringSchema.superRefine((useCase, context) => {
   if (useCase.status === "approved" && !hasValidUseCaseApproval(useCase)) {
     context.addIssue({ code: "custom", path: ["approval"], message: "Approved Use Case needs a matching content hash" });
   }

@@ -30,10 +30,11 @@ export class FeedbackStore {
     return row as Record<string, unknown>;
   }
 
-  list(environmentRunId: string): Array<Record<string, unknown>> {
-    return this.connection().prepare(`
-      SELECT * FROM feedback_entries WHERE environment_run_id = ? ORDER BY created_at, rowid
-    `).all(environmentRunId) as Array<Record<string, unknown>>;
+  list(environmentRunId?: string): Array<Record<string, unknown>> {
+    const query = environmentRunId
+      ? "SELECT * FROM feedback_entries WHERE environment_run_id = ? ORDER BY created_at, rowid LIMIT 500"
+      : "SELECT * FROM feedback_entries ORDER BY created_at DESC, rowid DESC LIMIT 500";
+    return this.connection().prepare(query).all(...(environmentRunId ? [environmentRunId] : [])) as Array<Record<string, unknown>>;
   }
 
   transition(input: {
