@@ -4,7 +4,7 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 40
+version: 41
 tags: [arc42, status, handoff]
 ---
 
@@ -16,11 +16,11 @@ Versiomatriisi on Project Config v21, Root Snapshot v14, Task Envelope / role ou
 
 | Evidenssi | Tila 2026-08-29 |
 | --- | --- |
-| Domain, persistence, runtime, governance and API automated suites | passed; 30 files / 267 tests including restart, provider failure, approvals, refinement races and security boundaries |
-| Canonical responsive UI | passed; nine views at both 1440×900 and 390×844, page overflow 0, keyboard-usable Sheet/dialog and internal diff scrolling |
-| Canonical default project/resources/docs/diagram | passed locally; 13 approved Use Cases, 5 States, 14 Actions, 4 role profiles and complete resource/hash/trace validation |
-| Final cross-layer conformance | accepted; four bounded audits closed, 477-file strict-cut gate, 0 dependency vulnerabilities and all repository gates green |
-| Local package/startup | passed; `make latest`, artifact/install, packaged fresh-state smoke, launchd health/restart and clean stop |
+| Domain, persistence, runtime, governance and API automated suites | passed; 33 files / 272 tests including paired daemon claims/fencing, checkout hashes, workspace permissions, restart, provider failure, approvals, refinement races and security boundaries |
+| Canonical responsive UI | passed; all 13 main routes plus selected entities at 1440×900 and 390×844, page overflow 0, SSE live, no console warning/error and visible narrow controls at least 40 px |
+| Canonical default project/resources/docs/diagram | passed locally; 13 approved Use Cases, 5 States, 14 Actions, 4 Markdown Agents and complete resource/hash/trace validation |
+| Final cross-layer conformance | accepted; strict v21/v17 contract, 552-file strict-cut gate, 0 dependency vulnerabilities and all repository gates green |
+| Local package/startup | passed; `make latest`, artifact/install, packaged fresh-state SQLite v17 smoke and healthy launchd service at `127.0.0.1:53321` |
 | External writes | not authorized and not performed |
 
-Initiative [environment-state-action-orchestration](initiatives/environment-state-action-orchestration/BRIEF.md) remains accepted historical baseline. [markdown-agent-daemon-orchestration](initiatives/markdown-agent-daemon-orchestration/BRIEF.md) is in local implementation; EVID-033–EVID-037 are pending. Merge, push, release publication, deploy, scope change or external write requires a new human authorization.
+Initiative [environment-state-action-orchestration](initiatives/environment-state-action-orchestration/BRIEF.md) remains accepted historical baseline. [markdown-agent-daemon-orchestration](initiatives/markdown-agent-daemon-orchestration/BRIEF.md) is accepted locally with EVID-033–EVID-037 passed. A remote computer was not newly paired and no live provider occurrence was run; those remain operational setup, not hidden acceptance claims. Merge, push, release publication, deploy, scope change or external write requires a new human authorization.

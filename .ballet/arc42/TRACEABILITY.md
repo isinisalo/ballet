@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 33
+version: 34
 tags: [arc42, traceability, evidence]
 ---
 
@@ -18,11 +18,11 @@ tags: [arc42, traceability, evidence]
 | goal-022 / REQ-022 | QS-030 | adr-034 / CON-015 | BB-015 | RT-028 / DEP-005 | TEST-030 | EVID-030 | RISK-023 | passed locally |
 | goal-022 / REQ-022 | QS-031 | adr-034 / CON-015 | BB-015 | RT-026 / RT-027 / RT-028 / DEP-005 | TEST-031 | EVID-031 | RISK-023 | passed canonical |
 | goal-022 / REQ-022 | QS-032 | adr-034 / CON-015 | BB-015 | RT-026 / RT-027 / RT-028 / DEP-005 | TEST-032 | EVID-032 | RISK-023 | passed locally |
-| goal-023 / REQ-023 | QS-033 | adr-035 / CON-016 | BB-016 | RT-029 / DEP-006 | TEST-033 | EVID-033 | RISK-024 | pending |
-| goal-023 / REQ-023 | QS-034 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-034 | EVID-034 | RISK-024 | pending |
-| goal-023 / REQ-023 | QS-035 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-035 | EVID-035 | RISK-024 | pending |
-| goal-023 / REQ-023 | QS-036 | adr-035 / CON-016 | BB-016 | RT-031 / DEP-006 | TEST-036 | EVID-036 | RISK-024 | pending |
-| goal-023 / REQ-023 | QS-037 | adr-035 / CON-016 | BB-016 | RT-029 / RT-030 / RT-031 / DEP-006 | TEST-037 | EVID-037 | RISK-024 | pending |
+| goal-023 / REQ-023 | QS-033 | adr-035 / CON-016 | BB-016 | RT-029 / DEP-006 | TEST-033 | EVID-033 | RISK-024 | passed locally |
+| goal-023 / REQ-023 | QS-034 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-034 | EVID-034 | RISK-024 | passed locally |
+| goal-023 / REQ-023 | QS-035 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-035 | EVID-035 | RISK-024 | passed locally |
+| goal-023 / REQ-023 | QS-036 | adr-035 / CON-016 | BB-016 | RT-031 / DEP-006 | TEST-036 | EVID-036 | RISK-024 | passed locally |
+| goal-023 / REQ-023 | QS-037 | adr-035 / CON-016 | BB-016 | RT-029 / RT-030 / RT-031 / DEP-006 | TEST-037 | EVID-037 | RISK-024 | passed locally |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
