@@ -56,7 +56,7 @@ Matriisi sisältää 32 laatuketjua. QS-027 on aktiivisen v19-cutin trace phase-
 | goal-022 / REQ-022 | QS-028 | adr-034 / CON-002 / CON-015 | BB-003–BB-006 / BB-015 | RT-026 / DEP-001 / DEP-002 / DEP-005 | TEST-028 | EVID-028 | accepted target; ordering/Validation implementation evidence pending |
 | goal-022 / REQ-022 | QS-029 | adr-034 / CON-001 / CON-015 | BB-002 / BB-005 / BB-007 / BB-015 | RT-026 / RT-027 / DEP-001 / DEP-005 | TEST-029 | EVID-029 | accepted target; Feedback/Critic/approval evidence pending |
 | goal-022 / REQ-022 | QS-030 | adr-034 / CON-015 | BB-003–BB-007 / BB-015 | RT-028 / DEP-002 / DEP-005 | TEST-030 | EVID-030 | accepted target; refinement and continuation evidence pending |
-| goal-022 / REQ-022 | QS-031 | adr-034 / CON-005 / CON-015 | BB-001 / BB-002 / BB-015 | RT-026–RT-028 / DEP-001 / DEP-005 | TEST-031 | EVID-031 | accepted target; responsive accessible UI evidence pending |
+| goal-022 / REQ-022 | QS-031 | adr-034 / CON-005 / CON-015 | BB-001 / BB-002 / BB-015 | RT-026–RT-028 / DEP-001 / DEP-005 | TEST-031 | EVID-031 | isolated responsive/accessibility UI passed; canonical evidence pending |
 | goal-022 / REQ-022 | QS-032 | adr-034 / CON-015 | BB-001–BB-008 / BB-010 / BB-015 | RT-026–RT-028 / DEP-001–DEP-005 | TEST-032 | EVID-032 | accepted target; strict cutover and release evidence pending |
 <!-- traceability:end -->
 
@@ -131,7 +131,7 @@ Matriisi sisältää 32 laatuketjua. QS-027 on aktiivisen v19-cutin trace phase-
 | EVID-028 | Approved Use Case-, ordering-, Validation-led gate/retry- ja immutable Environment Run -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
 | EVID-029 | Atomic Feedback-, Critic schedule/proposal-, human approval- ja worktree retention -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
 | EVID-030 | Exact refinement-, managed commit-, continuation lineage- ja Product Snapshot -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
-| EVID-031 | Target responsive/accessibility/browser- ja factual projection -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
+| EVID-031 | Target responsive/accessibility/browser- ja factual projection -evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; isolated phase 08 passed, canonical evidence pending |
 | EVID-032 | Strict cutover removal-, cross-store-, version-, release-, install- ja startup-evidenssi. | `.ballet/arc42/initiatives/environment-state-action-orchestration/EVIDENCE.md`; implementation evidence pending |
 
 ## Ketjun tulkinta

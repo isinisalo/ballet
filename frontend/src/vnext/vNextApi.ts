@@ -2,6 +2,7 @@ import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/vnext/direction";
 import type { ActionDefinition, EnvironmentDefinition, ProjectConfigurationV20, StateDefinition } from "@shared/vnext/environment";
 import type { ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
+import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
 
 const base = "/api/vnext";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -32,7 +33,28 @@ export const vNextApi = {
   reprioritizeActions: (stateId: string, orderedIds: string[], expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/reprioritize`, body({ orderedIds, expectedConfigHash })),
   saveResource: (collection: "instructions" | "skills", id: string, content: string, expectedHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(id)}`}`, creating ? body({ id, content, expectedHash }) : put({ content, expectedHash })),
-  manualCritic: () => request(`${base}/critic/runs`, body({}))
+  manualCritic: () => request(`${base}/critic/runs`, body({})),
+  runs: () => request<RunSummary[]>(`${base}/environment-runs`),
+  run: (id: string) => request<RunDetail>(`${base}/environment-runs/${encodeURIComponent(id)}`),
+  startRun: (environmentId: string, expectedConfigHash: string, input?: string) => request<RunSummary>(`${base}/environment-runs`, body({ environmentId, expectedConfigHash, ...(input ? { input } : {}) })),
+  cancelRun: (id: string) => request<RunSummary>(`${base}/environment-runs/${encodeURIComponent(id)}/cancel`, body({})),
+  product: (runId: string) => request<JsonRow>(`${base}/environment-runs/${encodeURIComponent(runId)}/product`),
+  feedback: (query = "") => request<JsonRow[]>(`${base}/feedback${query}`),
+  feedbackDetail: (id: string) => request<JsonRow>(`${base}/feedback/${encodeURIComponent(id)}`),
+  createFeedback: (input: JsonRow) => request<JsonRow>(`${base}/feedback`, body(input)),
+  decideFeedback: (id: string, from: "open" | "in_refinement", decision: "resolved" | "dismissed") => request(`${base}/feedback/${encodeURIComponent(id)}/decision`, body({ from, decision })),
+  criticRuns: () => request<JsonRow[]>(`${base}/critic/runs`),
+  criticProposals: () => request<JsonRow[]>(`${base}/critic/proposals`),
+  criticProposal: (id: string) => request<JsonRow>(`${base}/critic/proposals/${encodeURIComponent(id)}`),
+  decideCritic: (id: string, input: JsonRow) => request(`${base}/critic/proposals/${encodeURIComponent(id)}/decision`, body(input)),
+  refinementRuns: () => request<JsonRow[]>(`${base}/refinement/runs`),
+  refinementProposals: () => request<JsonRow[]>(`${base}/refinement/proposals`),
+  refinementProposal: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}`),
+  createRefinement: (sourceEnvironmentRunId: string, feedbackEntryIds: string[]) => request(`${base}/refinement/runs`, body({ sourceEnvironmentRunId, feedbackEntryIds })),
+  decideRefinement: (id: string, input: JsonRow) => request(`${base}/refinement/proposals/${encodeURIComponent(id)}/decision`, body(input)),
+  applyRefinement: (id: string) => request(`${base}/refinement/proposals/${encodeURIComponent(id)}/apply`, body({})),
+  applyStatus: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}/apply`),
+  continuation: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}/continuation`)
 };
 
 export const vNextApiBase = base;

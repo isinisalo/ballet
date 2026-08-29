@@ -8,16 +8,22 @@ import { useVNextConfigureData } from "./useVNextConfigureData";
 import { useVNextInvalidations } from "./useVNextInvalidations";
 import { useVNextMutation } from "./useVNextMutation";
 import { useCallback, useEffect, useState } from "react";
+import { useVNextGovernanceData } from "./useVNextGovernanceData";
+import { isGovernanceView, VNextGovernanceOutlet } from "./run/VNextGovernanceOutlet";
 
 export function VNextWorkspaceShell({ route, navigate, setNavigationBlocker }: { route: RouteState; navigate: WorkspaceNavigation["navigate"]; setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"] }) {
   const [dirty, setDirty] = useState(false);
-  const { data, loading, error, refresh } = useVNextConfigureData();
+  const configure = useVNextConfigureData();
+  const governance = useVNextGovernanceData(route);
+  const refresh = useCallback(async () => { await Promise.all([configure.refresh(), governance.refresh()]); }, [configure.refresh, governance.refresh]);
   useVNextInvalidations(refresh);
   const clearDirty = useCallback(() => setDirty(false), []);
   const mutation = useVNextMutation(refresh, clearDirty);
   useEffect(() => { setNavigationBlocker({ isDirty: dirty, message: "Discard unsaved vNext changes?" }); return () => setNavigationBlocker(null); }, [dirty, setNavigationBlocker]);
   let content = <Alert className="m-4"><AlertDescription>Loading isolated vNext workspace…</AlertDescription></Alert>;
+  const error = configure.error ?? (isGovernanceView(route.vNextView) ? governance.error : undefined);
   if (error) content = <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>;
-  else if (!loading && data) content = <div onInput={() => setDirty(true)}><VNextConfigureOutlet route={route} data={data} navigate={navigate} mutation={mutation} /></div>;
+  else if (!configure.loading && configure.data && isGovernanceView(route.vNextView) && !governance.loading && governance.data) content = <div onInput={() => setDirty(true)}><VNextGovernanceOutlet route={route} configure={configure.data} governance={governance.data} navigate={navigate} mutation={mutation} /></div>;
+  else if (!configure.loading && configure.data && !isGovernanceView(route.vNextView)) content = <div onInput={() => setDirty(true)}><VNextConfigureOutlet route={route} data={configure.data} navigate={navigate} mutation={mutation} /></div>;
   return <VNextFrame sidebar={<VNextSidebar route={route} navigate={navigate} />}>{content}</VNextFrame>;
 }
