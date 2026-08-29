@@ -1,0 +1,63 @@
+import type { JsonValue } from "./primitives.js";
+import { VNEXT_ROLE_OUTCOME_VERSION } from "./versions.js";
+
+export interface CheckEvidence {
+  name: string;
+  status: "passed" | "failed" | "skipped";
+  details?: string;
+  evidenceRefs: string[];
+}
+
+interface OutcomeBase {
+  version: typeof VNEXT_ROLE_OUTCOME_VERSION;
+  summary: string;
+  checks: CheckEvidence[];
+}
+
+export type ValidationDecision =
+  | { phase: "precheck"; decision: "done"; evidence: JsonValue }
+  | { phase: "precheck"; decision: "delegate"; workPrompt: string; evidence: JsonValue }
+  | { phase: "precheck"; decision: "blocked"; reason: string; correctiveActions: string[]; evidence: JsonValue }
+  | { phase: "postwork"; decision: "done"; evidence: JsonValue }
+  | { phase: "postwork"; decision: "retry"; workPrompt: string; feedback: string; expectedCorrection: string; evidence: JsonValue }
+  | { phase: "postwork"; decision: "blocked"; reason: string; correctiveActions: string[]; evidence: JsonValue };
+
+export interface ValidationOutcome extends OutcomeBase {
+  role: "validation";
+  result: ValidationDecision;
+}
+
+export type WorkOutcome = OutcomeBase & { role: "work" } & (
+  | { state: "completed"; artifacts: Record<string, JsonValue> }
+  | { state: "needs_input"; artifacts: Record<string, JsonValue>; question: string; context: string }
+  | { state: "blocked" | "failed"; artifacts: Record<string, JsonValue> }
+);
+
+export interface CriticProposal {
+  proposalId: string;
+  title: string;
+  rationale: string;
+  evidenceRefs: string[];
+  proposedText: string;
+}
+
+export interface CriticOutcome extends OutcomeBase {
+  role: "critic";
+  proposal?: CriticProposal;
+}
+
+export interface RefinementFileProposal {
+  relativePath: string;
+  preimageSha256: string;
+  proposedContentSha256: string;
+  proposedContent: string;
+  resourceId?: string;
+}
+
+export interface RefinementOutcome extends OutcomeBase {
+  role: "refinement";
+  proposalId: string;
+  rationale: string;
+  files: RefinementFileProposal[];
+  sharedSkillImpact: Array<{ resourceId: string; actionIds: string[] }>;
+}
