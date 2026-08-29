@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 26
+version: 27
 tags: [arc42, building-blocks]
 arc42Section: 5
 ---
@@ -14,6 +14,7 @@ arc42Section: 5
 | ID | Rakennusosa | Vastuu | Lähdeankkuri |
 | --- | --- | --- | --- |
 | BB-015 | Environment orchestration system | strict schemas, project closure, immutable run, Validation-led loop, governance, API/SSE and factual UI | `shared/orchestration/**`, `backend/orchestration/**`, `frontend/src/orchestration/**` |
+| BB-016 | Markdown Agent daemon orchestration | Markdown workbench, Agent definitions/bindings, paired daemon/control plane, Run Evidence and resource-only governance on preserved Environment runtime | same canonical layers after strict v21/v17 cut |
 
 BB-015 jakautuu seuraaviin selkeisiin rajoihin:
 

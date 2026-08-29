@@ -102,32 +102,29 @@ Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact met
 
 ## Information architecture
 
-- **Direction** shows Goals, ADRs and Constraints as linked decision context.
-- **Use Cases** makes approval status, semantic hash and Given/When/Then evidence explicit.
-- **Environment** presents States in ascending order as deterministic lanes or stacked sections.
+- **Goals** and **ADRs** are separate Markdown workspaces; Constraints, Use Cases and Instructions use the same direct Markdown editor/preview contract.
+- **Use Cases** keeps a compact list and makes approval status, semantic hash and Given/When/Then evidence explicit without a parallel form-owned truth.
+- **Loop Engineering** presents Environment, States and Actions in ascending deterministic lanes/sections inside one engineering canvas shell.
 - **State** presents Actions in ascending priority with stable IDs, role resources, retry budget and factual status.
 - **Action flow** makes Validation the primary controller and Work subordinate: precheck -> optional Work -> postwork -> done/retry/blocked.
 - **Run Gate** explains why a State or Action can or cannot advance without inventing client-owned control state.
-- **Feedback Box** groups open, refinement and resolved entries with provenance.
+- **Feedback Box** asks a human only for Category and comment; trusted runtime provenance stays visible but is not editable.
 - **Critic review** separates a read-only proposal from the human decision that may create Feedback.
 - **Refinement review** shows exact paths, operations, preimage/result hashes, diff and impact before approval.
-- **Product Snapshot** projects the terminal commit, artifacts, evidence and continuation lineage.
+- **Run Evidence** projects the terminal commit, changed files, artifacts, validation evidence and continuation lineage inside Run detail. Product is reserved for a build deployed to dev and is not an entity in this interface.
 
-Each workspace has one canonical URL owner. `/` is a shell landing redirect to `/configure/direction`, not a second Direction workspace.
+Each workspace has one canonical URL owner. `/` is a shell landing redirect to `/automation/loops`, not a second workspace.
 
 | Workspace | Canonical route |
 | --- | --- |
-| Direction | `/configure/direction` |
-| Use Cases | `/configure/use-cases` with `?id=` for entity selection |
-| Environment | `/configure/environment` |
-| State | `/configure/environment/states/:stateId` |
-| Action | `/configure/environment/states/:stateId/actions/:actionId` |
-| Instructions / Skills | `/configure/resources/instructions`, `/configure/resources/skills`, each with `?id=` |
-| Execution Profiles / Critic | `/configure/execution-profiles`, `/configure/critic` |
+| Loop Engineering | `/automation/loops` with URL-owned Environment/State/Action selection |
+| Agents / Skills / Runtimes | `/agents`, `/skills`, `/runtimes` |
+| Goals / ADRs / Constraints | `/project/goals`, `/project/adrs`, `/project/constraints`, each with `?id=` |
+| Use Cases / Instructions | `/project/use-cases`, `/project/instructions`, each with `?id=` |
 | Run Gate | `/run`, `/run/:runId`, nested State and Action routes |
 | Feedback Box | `/feedback`, `/feedback/:id` |
 | Critic / Refinement review | `/reviews/critic`, `/reviews/critic/:id`, `/reviews/refinement`, `/reviews/refinement/:id` |
-| Product Snapshot | `/products`, `/products/:id` |
+| Run Evidence | inline in `/run/:runId` |
 
 Back/forward restores the same selected entity. An invalid or malformed ID renders a labelled recovery state with a route back to the parent workspace; it never silently renders an empty detail.
 
@@ -139,6 +136,8 @@ Controls are at least 40 px high on narrow screens. Focus is visible, tab order 
 
 ## Component rules
 
+- Markdown-backed project documents use one shared workbench: compact list, YAML-frontmatter + Markdown body editor, preview and an explicit unsaved-change guard. Forms may display derived validation facts but never become a second document truth.
+- Agent detail separates project definition from machine-local execution. Computer, provider, model and reasoning are explicit labelled controls; unavailable/auth-missing/dirty states include text explanations and block Save or Run as appropriate.
 - Status badges use factual DTO values and a label, never inferred prose.
 - Cards have one primary purpose and expose stable entity IDs in Geist.
 - Reordering previews the resulting integer order/priority before mutation.
@@ -160,7 +159,7 @@ An unsaved draft cannot be approved. HTTP 409 conflicts preserve the local draft
 
 ## Responsive and accessibility acceptance
 
-The full Direction, Use Case, Environment, Action, Run retry, blocked Feedback, Critic approval, Refinement diff and Product Snapshot matrix is reviewed at 1440×900 and 390×844. At narrow width, sidebar and portalled dialog/sheet controls meet the 40 px minimum, route selection closes mobile navigation, dialogs stay within the viewport and exact diffs scroll inside their region. Page-level `overflow-x-hidden` must not conceal clipped core content: QA measures both scroll width and element bounds.
+The full Goals, ADRs, Use Case, Loop Engineering, Agent binding, Runtime, Run retry, blocked Feedback, Critic approval, Refinement diff and Run Evidence matrix is reviewed at 1440×900 and 390×844. At narrow width, sidebar and portalled dialog/sheet controls meet the 40 px minimum, route selection closes mobile navigation, dialogs stay within the viewport and exact diffs scroll inside their region. Page-level `overflow-x-hidden` must not conceal clipped core content: QA measures both scroll width and element bounds.
 
 Route changes move focus to the new workspace heading or announce it without stealing focus during factual SSE refresh. Current navigation uses `aria-current`; all form fields, switches and status cues have accessible names; keyboard order follows visual reading order; reduced motion removes non-essential movement.
 

@@ -4,7 +4,7 @@ title: Ballet project direction summary
 status: accepted
 createdAt: '2026-07-18'
 updatedAt: '2026-08-29'
-version: 21
+version: 22
 tags: [summary, goals, environment]
 ---
 
@@ -20,10 +20,11 @@ tags: [summary, goals, environment]
 - `goal-007`: canonical workspaces are accessible and responsive at desktop and narrow viewports.
 - `goal-009`: Goals and Use Cases trace through decisions and architecture to executable evidence.
 - `goal-022`: Environment → State → Action and Validation-first execution are the active orchestration model.
+- `goal-023`: Markdown is the authoring workbench, Agents are project truth and a paired Computer/CLI binding owns execution readiness.
 
 ## Active contract
 
-The strict matrix is Project Config v20, Root Snapshot v13, Task Envelope/role outcome v10, prompt composition v11, ExecutionSpec v12 and SQLite v16, with Feedback, Critic and Refinement v1. `adr-034` owns deterministic order, the Validation-led loop, human approvals, exact Refinement apply, immutable continuation and Product Snapshot semantics.
+The accepted strict target is Project Config v21, Root Snapshot v14, Task Envelope/role outcome v11, prompt composition v12, ExecutionSpec v13 and SQLite v17, with Feedback, Critic and Refinement v2 plus Agent/daemon binding/Run Evidence v1. `adr-034` retains deterministic ordering and the Validation-led loop; `adr-035` owns Markdown authoring, paired execution and the removal of Product/ExecutionProfile.
 
 The repository default demonstrates thirteen approved Use Cases, five ordered States, fourteen bounded Actions, four network-off Codex profiles, lean role instructions and explicitly selected reusable Skills. The compact fixture proves the same platform boundary with unrelated IDs.
 
@@ -38,8 +39,9 @@ Use Case, Critic and Refinement approvals require explicit human commands bound 
 ## Canonical reading order
 
 1. [ARCHITECTURE.md](../../ARCHITECTURE.md)
-2. [goal-022](goal-022-validation-led-environment-orchestration.md)
-3. [ADR-034](../adr/adr-034-validation-led-environment-state-action-orchestration.md)
-4. [arc42 index](../arc42/README.md) and [traceability](../arc42/TRACEABILITY.md)
-5. [Environment orchestration target contract](../arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md)
-6. [Editable canonical flow](../../ballet.drawio)
+2. [goal-023](goal-023-markdown-agent-daemon-orchestration.md)
+3. [ADR-035](../adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md)
+4. [goal-022](goal-022-validation-led-environment-orchestration.md) and [ADR-034](../adr/adr-034-validation-led-environment-state-action-orchestration.md)
+5. [arc42 index](../arc42/README.md) and [traceability](../arc42/TRACEABILITY.md)
+6. [Markdown Agent daemon target contract](../arc42/initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md)
+7. [Editable canonical flow](../../ballet.drawio)

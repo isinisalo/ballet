@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 31
+version: 32
 tags: [arc42, traceability, evidence]
 ---
 
@@ -18,6 +18,11 @@ tags: [arc42, traceability, evidence]
 | goal-022 / REQ-022 | QS-030 | adr-034 / CON-015 | BB-015 | RT-028 / DEP-005 | TEST-030 | EVID-030 | RISK-023 | passed locally |
 | goal-022 / REQ-022 | QS-031 | adr-034 / CON-015 | BB-015 | RT-026 / RT-027 / RT-028 / DEP-005 | TEST-031 | EVID-031 | RISK-023 | passed canonical |
 | goal-022 / REQ-022 | QS-032 | adr-034 / CON-015 | BB-015 | RT-026 / RT-027 / RT-028 / DEP-005 | TEST-032 | EVID-032 | RISK-023 | passed locally |
+| goal-023 / REQ-023 | QS-033 | adr-035 / CON-016 | BB-016 | RT-029 / DEP-006 | TEST-033 | EVID-033 | RISK-024 | pending |
+| goal-023 / REQ-023 | QS-034 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-034 | EVID-034 | RISK-024 | pending |
+| goal-023 / REQ-023 | QS-035 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-035 | EVID-035 | RISK-024 | pending |
+| goal-023 / REQ-023 | QS-036 | adr-035 / CON-016 | BB-016 | RT-031 / DEP-006 | TEST-036 | EVID-036 | RISK-024 | pending |
+| goal-023 / REQ-023 | QS-037 | adr-035 / CON-016 | BB-016 | RT-029 / RT-030 / RT-031 / DEP-006 | TEST-037 | EVID-037 | RISK-024 | pending |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
@@ -47,6 +52,11 @@ tags: [arc42, traceability, evidence]
 | TEST-030 | refinement allowlist/preimage/hash/impact/Git/lineage/Product Snapshot tests |
 | TEST-031 | canonical component, routing, keyboard, accessibility and 1440x900/390x844 browser QA |
 | TEST-032 | removal grep, exact version, full suite, docs/design, release smoke, local install/startup and clean-tree gates |
+| TEST-033 | Markdown round-trip/dirty guard, old-style workspace routes, keyboard/accessibility and desktop/narrow browser QA |
+| TEST-034 | pairing/credential/TLS-loopback/heartbeat/claim/lease/fencing/replay/restart/control-plane security tests |
+| TEST-035 | Agent definition/binding, same-device exact checkout/config preflight and Codex/Copilot adapter tests |
+| TEST-036 | strict minimal Feedback API, trusted provenance and resource-only Refinement path/hash/approval tests |
+| TEST-037 | exact v21/v14/v11/v12/v13/v17 contracts, Run Evidence, removal/full/release/install/startup/clean-tree gates |
 
 | ID | Evidenssi |
 | --- | --- |
@@ -55,3 +65,8 @@ tags: [arc42, traceability, evidence]
 | EVID-030 | initiative ESAO-evid-004/006/007/009 plus final continuation result |
 | EVID-031 | initiative ESAO-evid-008/009 plus canonical browser evidence |
 | EVID-032 | final cutover command log, release/install/startup evidence and removal gate |
+| EVID-033 | Markdown/Loop Engineering UI test and browser evidence |
+| EVID-034 | paired daemon transaction, restart and security evidence |
+| EVID-035 | Agent binding and two-CLI readiness/dispatch evidence |
+| EVID-036 | Feedback/Refinement v2 strict boundary evidence |
+| EVID-037 | final strict cutover, Run Evidence and packaged startup evidence |

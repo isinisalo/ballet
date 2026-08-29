@@ -4,13 +4,15 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 21
+version: 22
 tags: [architecture, arc42, environment]
 ---
 
 # Ballet architecture
 
-Ballet is a checkout-local orchestration command center. The accepted architecture is [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md); its bounded semantics and verification ownership live in the [Environment orchestration initiative](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md).
+Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). The accepted strict replacement for authoring and execution placement is [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) and its [target contract](.ballet/arc42/initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md).
+
+The implementation is transitioning locally from the v20/v16 baseline below to one atomic v21/v17 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized; this target note does not make partial code canonical.
 
 ## Active version matrix
 
