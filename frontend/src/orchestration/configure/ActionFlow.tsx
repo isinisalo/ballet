@@ -1,15 +1,17 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 import type { ActionDefinition } from "@shared/orchestration/environment";
 import { projectActionFlow, type ActionFlowTone } from "./actionFlowProjection";
+import { useCanvasSurfaceSize } from "./useCanvasSurfaceSize";
 import "./ActionFlow.css";
 
 export function ActionFlow({ action }: { action: ActionDefinition }) {
-  const flow = projectActionFlow();
+  const [surfaceRef, surface] = useCanvasSurfaceSize();
+  const flow = projectActionFlow(surface);
   const markerPrefix = useId().replaceAll(":", "");
   const point = (key: keyof typeof flow.points) => ({ left: flow.points[key].x, top: flow.points[key].y });
   return <section aria-label={`Validation-led flow for Action ${action.id}`} className="orchestration-flow action-flow-grid rounded-md border bg-card">
     <div className="action-flow-legend">ACTION FLOW <span>· authoring projection, not runtime control</span></div>
-    <div className="action-flow-scroll"><div className="action-flow-stage" style={{ width: flow.width, height: flow.height }}>
+    <div ref={surfaceRef} className="action-flow-scroll"><div className="action-flow-stage" style={{ width: flow.width, height: flow.height }}>
       <FlowEdges edges={flow.edges} markerPrefix={markerPrefix} width={flow.width} height={flow.height} />
       <FlowCard label="START" kind="start" style={point("start")} />
       <FlowCard label="Work · subordinate" detail="agent · workspace-write" kind="work" style={point("work")} />

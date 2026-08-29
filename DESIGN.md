@@ -103,7 +103,8 @@ Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact met
 ## Information architecture
 
 - **Goals** and **ADRs** are separate Markdown workspaces; Constraints, Use Cases and Instructions use the same direct Markdown editor/preview contract.
-- **Use Cases** keeps a compact list and makes approval status, semantic hash and Given/When/Then evidence explicit without a parallel form-owned truth.
+- **Authoring collections** expose Agents, Skills, Goals, ADRs, Constraints, Use Cases and Instructions as compact URL-owned nested sidebar lists; the content area is reserved for the selected editor.
+- **Use Cases** keeps its compact sidebar list and makes approval status, semantic hash and Given/When/Then evidence explicit without a parallel form-owned truth.
 - **Loop Engineering** keeps one ordered space canvas visible across Environment, State and Action routes. States run top-to-bottom by `order`; selecting a State reveals only its Actions left-to-right by `priority` on the same canvas.
 - **State** selection is URL-owned and presents Actions as derived sun/planet/station artwork with stable text IDs. Artwork is order language, never runtime status.
 - **Action flow** is a dark industrial workflow: START -> Validation -> done?, with delegate/retry through subordinate Work, evidence returning to Validation, and explicit done/blocked-Feedback terminals plus `1 + maxRetries` text.
@@ -134,9 +135,12 @@ At 1440x900, a persistent compact sidebar and multi-column workbench may coexist
 
 Controls are at least 40 px high on narrow screens. Focus is visible, tab order follows reading order, headings are hierarchical and live updates do not steal focus. Drag interaction always has keyboard controls. `prefers-reduced-motion` removes non-essential transitions.
 
+Configure workspaces have exactly one sticky toolbar directly below the workspace heading. Status and the current entity are on the leading side; navigation, creation, ordering, projection, save, approval and deletion commands form one trailing action row. At narrow widths the toolbar scrolls internally instead of wrapping commands onto unrelated vertical levels.
+
 ## Component rules
 
-- Markdown-backed project documents use one shared workbench: compact list, YAML-frontmatter + Markdown body editor, preview and an explicit unsaved-change guard. Forms may display derived validation facts but never become a second document truth.
+- Markdown-backed project documents use one shared workbench: sidebar selection, YAML-frontmatter + Markdown body editor, preview and an explicit unsaved-change guard. Forms may display derived validation facts but never become a second document truth.
+- Configure metadata and execution forms use compact aligned label/control rows at workbench widths and stack them at the narrow viewport. Markdown source areas remain vertically labelled editors.
 - Agent detail separates project definition from machine-local execution. Computer, provider, model and reasoning are explicit labelled controls; unavailable/auth-missing/dirty states include text explanations and block Save or Run as appropriate.
 - Status badges use factual DTO values and a label, never inferred prose.
 - Cards have one primary purpose and expose stable entity IDs in Geist.
@@ -144,6 +148,7 @@ Controls are at least 40 px high on narrow screens. Focus is visible, tab order 
 - Disabled approval includes the exact blocking reason. Confirmation repeats hashes and current revision.
 - Diff panes keep additions, deletions and unchanged context distinguishable without color alone.
 - Empty, loading, stale and error states preserve the workspace hierarchy.
+- Loop Engineering and Action flow grids cover the complete internal scroll surface. Pure geometry uses the measured surface dimensions to distribute ordered nodes across available space while retaining deterministic minimum dimensions and narrow-screen internal scrolling.
 
 ## Action flow and status language
 

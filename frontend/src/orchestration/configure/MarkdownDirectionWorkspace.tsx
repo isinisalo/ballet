@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { OperationalStatus } from "@/components/shared/workspace-ui";
+import { EditorActions } from "@/components/shared/editor-actions";
 import type { UseCase } from "@shared/orchestration/direction";
 import { useCaseApprovalHash } from "@shared/orchestration/direction";
 import { MarkdownWorkbench } from "@/workspace/documents/MarkdownWorkbench";
 import { orchestrationEntityPath } from "@/workspace/routing";
 import type { ResourceDocument } from "../types";
 import { ConfigureHeader } from "./ConfigureHeader";
+import { ConfigureToolbar } from "./ConfigureToolbar";
 import {
   createMarkdownDocument, directionValueFromMarkdown, markdownEntity, splitMarkdownSource,
   type MarkdownDirectionKind, type MarkdownDirectionValue
@@ -24,10 +25,8 @@ export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId
   onApprove?(value: UseCase): Promise<void>; onDraft?(value: UseCase): Promise<void>;
 }) {
   const [creating, setCreating] = useState(false); const [dirty, setDirty] = useState(false);
-  const [filter, setFilter] = useState<"all" | "draft" | "approved">("all");
   const selected = values.find(({ id }) => id === selectedId);
   const document = creating ? createMarkdownDocument(kind) : documents.find(({ id }) => id === selected?.id);
-  const visible = useMemo(() => kind !== "use-cases" || filter === "all" ? values : values.filter((value) => "examples" in value && value.status === filter), [filter, kind, values]);
   useEffect(() => { if (selectedId) setCreating(false); }, [selectedId]);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
@@ -38,17 +37,15 @@ export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId
     setCreating(!id); setDirty(false); navigate(id ? orchestrationEntityPath(basePath(kind), id) : basePath(kind));
   };
   const approvedCount = values.filter((value) => "examples" in value && value.status === "approved").length;
-  return <><ConfigureHeader title={title(kind)} description={kind === "use-cases" ? "Keep the compact Use Case list; edit the selected canonical document as YAML frontmatter and Markdown." : `Edit canonical ${title(kind)} as version-controlled Markdown.`} status={locked ? "Locked by active Run" : kind === "use-cases" ? `${approvedCount} approved` : `${values.length} documents`} actions={<Button size="sm" disabled={locked} onClick={() => choose(undefined)}>Create</Button>} />
-    <div className="grid min-w-0 gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)] lg:p-6">
-      <section aria-label={`${title(kind)} list`} className="min-w-0">{kind === "use-cases" ? <label className="mb-3 grid gap-1 text-sm">Filter by status<select className="h-10 rounded-sm border bg-background px-2" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}><option value="all">All</option><option value="draft">Draft</option><option value="approved">Approved</option></select></label> : null}
-        <ul className="space-y-2">{visible.map((value) => <li key={value.id}><button className="min-h-14 w-full rounded-md border bg-card p-3 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-current={value.id === selectedId ? "page" : undefined} onClick={() => choose(value.id)}><span className="flex items-center justify-between gap-2"><code className="truncate text-tertiary">{value.id}</code><OperationalStatus compact label={value.status} tone={value.status === "approved" || value.status === "accepted" ? "healthy" : "attention"} /></span><strong className="mt-1 block truncate">{value.name}</strong>{"examples" in value ? <span className="text-xs text-muted-foreground">{value.examples.length} GWT example{value.examples.length === 1 ? "" : "s"}</span> : null}</button></li>)}</ul>
-      </section>
-      {document ? <MarkdownEditor key={`${kind}:${document.id}`} kind={kind} document={document} current={selected} creating={creating} locked={locked} onDirty={setDirty} onSave={onSave} onDelete={onDelete} onApprove={onApprove} onDraft={onDraft} /> : <section className="rounded-md border border-dashed p-6 text-muted-foreground">Select a document from the list. Its complete Markdown source opens here.</section>}
-    </div></>;
+  const status = locked ? "Locked by active Run" : kind === "use-cases" ? `${approvedCount} approved` : `${values.length} documents`;
+  return <><ConfigureHeader title={title(kind)} description={kind === "use-cases" ? "Select a compact Use Case from the sidebar; edit its canonical YAML frontmatter and Markdown here." : `Select canonical ${title(kind)} from the sidebar and edit the version-controlled Markdown.`} />
+    {document ? <MarkdownEditor key={`${kind}:${document.id}`} kind={kind} document={document} current={selected} creating={creating} locked={locked} status={status} onCreate={() => choose(undefined)} onDirty={setDirty} onSave={onSave} onDelete={onDelete} onApprove={onApprove} onDraft={onDraft} /> : <><ConfigureToolbar status={status}><Button size="sm" disabled={locked} onClick={() => choose(undefined)}>Create</Button></ConfigureToolbar><section className="m-4 rounded-md border border-dashed p-6 text-muted-foreground md:m-6">Select a document from the sidebar. Its complete Markdown source opens here.</section></>}
+  </>;
 }
 
-function MarkdownEditor({ kind, document, current, creating, locked, onDirty, onSave, onDelete, onApprove, onDraft }: {
+function MarkdownEditor({ kind, document, current, creating, locked, status, onCreate, onDirty, onSave, onDelete, onApprove, onDraft }: {
   kind: MarkdownDirectionKind; document: ResourceDocument; current?: MarkdownDirectionValue; creating: boolean; locked: boolean;
+  status: string; onCreate(): void;
   onDirty(value: boolean): void; onSave(value: MarkdownDirectionValue, markdown: string, creating: boolean): Promise<void>;
   onDelete?(value: MarkdownDirectionValue): Promise<void>; onApprove?(value: UseCase): Promise<void>; onDraft?(value: UseCase): Promise<void>;
 }) {
@@ -61,8 +58,9 @@ function MarkdownEditor({ kind, document, current, creating, locked, onDirty, on
   const entity = markdownEntity(document, { frontmatterText, bodyText });
   const save = async () => { setPending(true); setServerError(""); try { const parsed = directionValueFromMarkdown(kind, { frontmatterText, bodyText }, current); await onSave(parsed.value, parsed.source, creating); onDirty(false); } catch (error) { setServerError(error instanceof Error ? error.message : "Unable to save Markdown."); } finally { setPending(false); } };
   const useCase = current && "examples" in current ? current : undefined;
-  return <div className="min-w-0 space-y-3">{useCase ? <div className="flex flex-wrap items-center gap-2 rounded-md border bg-card p-3"><span className="mr-auto text-xs text-muted-foreground">Approval hash <code className="break-all">{useCaseApprovalHash(useCase)}</code></span>{useCase.status === "draft" ? <Button size="sm" disabled={locked || dirty} onClick={() => setConfirming(true)}>Approve exact content…</Button> : <Button size="sm" variant="outline" disabled={locked} onClick={() => void onDraft?.(useCase)}>Return to draft</Button>}</div> : null}
-    <MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={`markdown-${kind}-${document.id}`} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={!validation && !locked} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} />
+  const formId = `markdown-${kind}-${document.id}`;
+  return <div className="min-w-0"><ConfigureToolbar status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? useCase.status === "draft" ? <Button size="sm" disabled={locked || dirty} onClick={() => setConfirming(true)}>Approve exact content…</Button> : <Button size="sm" variant="outline" disabled={locked} onClick={() => void onDraft?.(useCase)}>Return to draft</Button> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={!validation && !locked} pending={pending} canDelete={Boolean(current && onDelete)} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
+    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="p-4 md:p-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={!validation && !locked} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
     <Dialog open={confirming} onOpenChange={setConfirming}><DialogContent><DialogHeader><DialogTitle>Approve {useCase?.id}?</DialogTitle><DialogDescription>This approves the exact persisted semantic content with hash <code className="break-all">{useCase ? useCaseApprovalHash(useCase) : ""}</code>. Saving Markdown never approves it.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setConfirming(false)}>Cancel</Button><Button onClick={() => { setConfirming(false); if (useCase) void onApprove?.(useCase); }}>Approve exact content</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }

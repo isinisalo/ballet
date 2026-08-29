@@ -2,6 +2,7 @@ import type { EnvironmentDefinition } from "@shared/orchestration/environment";
 import { orchestrationActionPath, orchestrationStatePath } from "@/workspace/routing";
 import { ActionPlanetArtwork, StateRouteArtwork } from "./LoopEngineeringArtwork";
 import { projectLoopEngineering } from "./loopEngineeringProjection";
+import { useCanvasSurfaceSize } from "./useCanvasSurfaceSize";
 import "./LoopEngineeringCanvas.css";
 
 export function LoopEngineeringCanvas({ environment, selectedStateId, selectedActionId, navigate, onActionFlowOpen }: {
@@ -11,10 +12,11 @@ export function LoopEngineeringCanvas({ environment, selectedStateId, selectedAc
   navigate(path: string): void;
   onActionFlowOpen?(stateId: string, actionId: string): void;
 }) {
-  const projection = projectLoopEngineering(environment, selectedStateId, selectedActionId);
+  const [surfaceRef, surface] = useCanvasSurfaceSize();
+  const projection = projectLoopEngineering(environment, selectedStateId, selectedActionId, surface);
   return <section className="loop-engineering-canvas" aria-label={`Loop Engineering canvas for Environment ${environment.id}`}>
     <div className="loop-engineering-legend">ENVIRONMENT <span>{environment.id} · ordered State / Action projection</span></div>
-    <div className="loop-engineering-scroll">
+    <div ref={surfaceRef} className="loop-engineering-scroll">
       <div className="loop-engineering-stage" style={{ width: projection.width, height: projection.height }}>
         <svg className="loop-engineering-edges" width={projection.width} height={projection.height} aria-hidden="true">
           {projection.edges.map((edge) => <g key={edge.id}>

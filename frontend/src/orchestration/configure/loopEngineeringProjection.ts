@@ -1,5 +1,6 @@
 import type { EnvironmentDefinition } from "@shared/orchestration/environment";
 import { orderedActions, orderedStates } from "@shared/orchestration/gates";
+import type { CanvasSurfaceSize } from "./useCanvasSurfaceSize";
 
 export type ActionArtwork = "sol" | "terra" | "luna";
 
@@ -51,6 +52,7 @@ export function projectLoopEngineering(
   environment: EnvironmentDefinition,
   selectedStateId?: string,
   selectedActionId?: string,
+  surface: CanvasSurfaceSize = { width: 0, height: 0 },
 ): LoopEngineeringProjection {
   const states = orderedStates(environment.states);
   const projectedStates: LoopEngineeringStateNode[] = [];
@@ -58,10 +60,13 @@ export function projectLoopEngineering(
   const edges: LoopEngineeringEdge[] = [];
   let cursor = TOP;
   let previousState: LoopEngineeringStateNode | undefined;
+  const baseHeight = states.reduce((total, state) => total + (state.id === selectedStateId ? EXPANDED_ROW_HEIGHT : COMPACT_ROW_HEIGHT), 0);
+  const extraPerState = states.length ? Math.max(0, surface.height - TOP - 40 - baseHeight) / states.length : 0;
 
   states.forEach((state) => {
     const selected = state.id === selectedStateId;
-    const y = cursor + (selected ? EXPANDED_ROW_HEIGHT / 2 : COMPACT_ROW_HEIGHT / 2);
+    const rowHeight = (selected ? EXPANDED_ROW_HEIGHT : COMPACT_ROW_HEIGHT) + extraPerState;
+    const y = cursor + rowHeight / 2;
     const stateNode: LoopEngineeringStateNode = {
       kind: "state", id: state.id, name: state.name, order: state.order, x: STATE_X, y, selected,
     };
@@ -70,6 +75,7 @@ export function projectLoopEngineering(
 
     if (selected) {
       const actions = orderedActions(state.actions);
+      const actionGap = actions.length > 1 ? Math.max(ACTION_GAP, (surface.width - ACTION_START_X - 170) / (actions.length - 1)) : ACTION_GAP;
       actions.forEach((action, index) => {
         const appearance = actionAppearance(index, actions.length);
         projectedActions.push({
@@ -77,7 +83,7 @@ export function projectLoopEngineering(
           id: action.id,
           name: action.name,
           priority: action.priority,
-          x: ACTION_START_X + index * ACTION_GAP,
+          x: ACTION_START_X + index * actionGap,
           y,
           ...appearance,
           selected: action.id === selectedActionId,
@@ -87,13 +93,13 @@ export function projectLoopEngineering(
     }
 
     previousState = stateNode;
-    cursor += selected ? EXPANDED_ROW_HEIGHT : COMPACT_ROW_HEIGHT;
+    cursor += rowHeight;
   });
 
   const lastActionX = projectedActions.at(-1)?.x ?? 0;
   return {
-    width: Math.max(560, lastActionX + 170),
-    height: Math.max(360, cursor + 40),
+    width: Math.max(560, surface.width, lastActionX + 170),
+    height: Math.max(360, surface.height, cursor + 40),
     states: projectedStates,
     actions: projectedActions,
     edges,

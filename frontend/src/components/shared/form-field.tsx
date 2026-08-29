@@ -28,8 +28,8 @@ function FormFieldFrame({ id, label, description, error, required, disabled, den
   return (
     <Field
       className={cn(
-        "@container/form-field gap-1.5",
-        layout === "row" && "grid grid-cols-1 @sm/form-field:grid-cols-[5.5rem_minmax(0,1fr)] @sm/form-field:items-start",
+        "gap-1.5",
+        layout === "row" && "grid grid-cols-1 sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:items-start",
         disabled && "opacity-70"
       )}
       data-density={density}
@@ -41,7 +41,7 @@ function FormFieldFrame({ id, label, description, error, required, disabled, den
         htmlFor={id}
         className={cn(
           density === "compact" && "font-mono text-[0.68rem] font-medium leading-4 text-muted-foreground",
-          layout === "row" && "@sm/form-field:min-h-7 @sm/form-field:items-center",
+          layout === "row" && "sm:min-h-7 sm:items-center",
           required && "after:text-destructive after:content-['*']"
         )}
       >

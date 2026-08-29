@@ -81,6 +81,7 @@ export interface MarkdownWorkbenchProps {
   deleteType?: string;
   resourceName?: string;
   onDelete?: () => unknown | Promise<unknown>;
+  showActions?: boolean;
   onFrontmatterChange: (value: string) => void;
   onBodyChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
@@ -89,7 +90,7 @@ export interface MarkdownWorkbenchProps {
 export function MarkdownWorkbench(props: MarkdownWorkbenchProps) {
   const {
     document, emptyTitle, formId, saveLabel, frontmatterText, bodyText, dirty, valid, pending,
-    fieldErrors, serverError, deleteLabel, deleteType, resourceName, onDelete,
+    fieldErrors, serverError, deleteLabel, deleteType, resourceName, onDelete, showActions = true,
     onFrontmatterChange, onBodyChange, onSubmit
   } = props;
   const submittingRef = useRef(false);
@@ -124,7 +125,7 @@ export function MarkdownWorkbench(props: MarkdownWorkbenchProps) {
           icon={<FileKey2 data-icon="inline-start" />}
           compact
           contentClassName="p-0"
-          action={(
+          action={showActions ? (
             <EditorActions
               saveLabel={saveLabel}
               formId={formId}
@@ -137,7 +138,7 @@ export function MarkdownWorkbench(props: MarkdownWorkbenchProps) {
               resourceName={resourceName}
               onDelete={onDelete}
             />
-          )}
+          ) : undefined}
         >
           <form id={formId} className="flex flex-col" onSubmit={(event) => { void handleSubmit(event); }}>
             {serverError ? (

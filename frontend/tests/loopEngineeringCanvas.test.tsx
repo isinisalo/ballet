@@ -39,6 +39,23 @@ describe("Loop Engineering space canvas", () => {
     });
   });
 
+  it("fills a measured surface while keeping every projected node in bounds", () => {
+    const projection = projectLoopEngineering(environmentWithActions(4), "state-1", undefined, { width: 1100, height: 680 });
+    expect(projection).toMatchObject({ width: 1100, height: 680 });
+    projection.states.forEach(({ x, y }) => {
+      expect(x).toBeGreaterThanOrEqual(22);
+      expect(y).toBeGreaterThanOrEqual(22);
+      expect(x).toBeLessThanOrEqual(projection.width - 22);
+      expect(y).toBeLessThanOrEqual(projection.height - 22);
+    });
+    projection.actions.forEach(({ x, y, size }) => {
+      expect(x - size / 2).toBeGreaterThanOrEqual(0);
+      expect(y - size / 2).toBeGreaterThanOrEqual(0);
+      expect(x + size / 2).toBeLessThanOrEqual(projection.width);
+      expect(y + size / 2).toBeLessThanOrEqual(projection.height);
+    });
+  });
+
   it("opens States and Actions with keyboard-activatable canonical controls", async () => {
     const user = userEvent.setup();
     const navigate = vi.fn();
@@ -80,6 +97,19 @@ describe("industrial Validation-led Action flow", () => {
     expect(screen.getByText("0 additional retries")).toBeInTheDocument();
     expect(screen.getByText("1 total Work attempts")).toBeInTheDocument();
     expect(document.querySelector('[data-dashed="true"]')).toBeInTheDocument();
+  });
+
+  it("scales deterministically to the complete measured grid surface", () => {
+    const first = projectActionFlow({ width: 920, height: 640 });
+    const second = projectActionFlow({ width: 920, height: 640 });
+    expect(second).toEqual(first);
+    expect(first).toMatchObject({ width: 920, height: 640 });
+    Object.values(first.points).forEach(({ x, y }) => {
+      expect(x).toBeGreaterThan(0);
+      expect(y).toBeGreaterThan(0);
+      expect(x).toBeLessThan(first.width);
+      expect(y).toBeLessThan(first.height);
+    });
   });
 });
 
