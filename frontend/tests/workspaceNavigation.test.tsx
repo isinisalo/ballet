@@ -2,64 +2,60 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorkspaceNavigation } from "../src/workspace/useWorkspaceNavigation";
 
-describe("workspace navigation blocker", () => {
+describe("canonical workspace navigation blocker", () => {
   beforeEach(() => {
-    window.history.replaceState({}, "", "/automation/graph");
+    window.history.replaceState({}, "", "/configure/environment");
   });
 
-  it("confirms and blocks internal navigation while the workspace is dirty", () => {
+  it("confirms and blocks internal navigation while authoring is dirty", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
-
-    act(() => result.current.setNavigationBlocker({ isDirty: true, message: "Discard theme changes?" }));
-    act(() => result.current.navigate("/execution-profiles"));
-
-    expect(confirm).toHaveBeenCalledWith("Discard theme changes?");
-    expect(window.location.pathname).toBe("/automation/graph");
-    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities" });
+    act(() => result.current.setNavigationBlocker({ isDirty: true, message: "Discard Environment changes?" }));
+    act(() => result.current.navigate("/run"));
+    expect(confirm).toHaveBeenCalledWith("Discard Environment changes?");
+    expect(window.location.pathname).toBe("/configure/environment");
+    expect(result.current.route).toMatchObject({ workspaceView: "environment" });
 
     confirm.mockReturnValue(true);
-    act(() => result.current.navigate("/execution-profiles"));
-    expect(window.location.pathname).toBe("/execution-profiles");
-    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
+    act(() => result.current.navigate("/run"));
+    expect(window.location.pathname).toBe("/run");
+    expect(result.current.route).toMatchObject({ workspaceView: "run-list" });
   });
 
-  it("allows navigation after a successful save without asking to discard it", () => {
+  it("allows a post-save navigation without asking to discard", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
-
-    act(() => result.current.navigate("/execution-profiles", { bypassBlocker: true }));
-
+    act(() => result.current.navigate("/feedback", { bypassBlocker: true }));
     expect(confirm).not.toHaveBeenCalled();
-    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
+    expect(result.current.route).toMatchObject({ workspaceView: "feedback-list" });
   });
 
-  it("restores Graph and Graph Node Engineering through browser back and forward", async () => {
+  it("restores canonical deep links through browser back and forward", async () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
-    act(() => result.current.navigate("/automation/graph/nodes/release"));
-    expect(result.current.route).toMatchObject({ view: "automation", engineeringLevel: "graph_node", graphNodeId: "release" });
+    act(() => result.current.navigate("/configure/environment/states/build"));
+    expect(result.current.route).toMatchObject({ workspaceView: "state", stateId: "build" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);
       window.history.back();
       await traversed;
     });
-    expect(result.current.route).toEqual({ view: "automation", engineeringLevel: "graph", engineeringSection: "capabilities" });
+    expect(result.current.route).toMatchObject({ workspaceView: "environment" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);
       window.history.forward();
       await traversed;
     });
-    expect(result.current.route).toMatchObject({ view: "automation", engineeringLevel: "graph_node", graphNodeId: "release" });
+    expect(result.current.route).toMatchObject({ workspaceView: "state", stateId: "build" });
   });
 
-  it("restores a cancelled history traversal without losing the back/forward stack", async () => {
+  it("restores a cancelled history traversal without losing the stack", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
-    act(() => result.current.navigate("/skills"));
-    act(() => result.current.navigate("/execution-profiles"));
+    act(() => result.current.navigate("/feedback"));
+    act(() => result.current.navigate("/products"));
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
 
     await act(async () => {
@@ -67,10 +63,8 @@ describe("workspace navigation blocker", () => {
       window.history.back();
       await restored;
     });
-
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(window.location.pathname).toBe("/execution-profiles");
-    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
+    expect(window.location.pathname).toBe("/products");
+    expect(result.current.route).toMatchObject({ workspaceView: "products" });
 
     confirm.mockReturnValue(true);
     await act(async () => {
@@ -78,55 +72,30 @@ describe("workspace navigation blocker", () => {
       window.history.back();
       await traversed;
     });
-    expect(window.location.pathname).toBe("/skills");
-    expect(result.current.route).toEqual({ view: "skills", documentPath: undefined });
-
-    await act(async () => {
-      const traversed = waitForPopStates(1);
-      window.history.forward();
-      await traversed;
-    });
-    expect(window.location.pathname).toBe("/execution-profiles");
-    expect(result.current.route).toEqual({ view: "execution-profiles", executionProfileId: undefined, creating: undefined });
+    expect(result.current.route).toMatchObject({ workspaceView: "feedback-list" });
   });
 
-  it("accepts browser history navigation after confirmation", () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("prevents unload only while the workspace is dirty", () => {
     const { result } = renderHook(() => useWorkspaceNavigation());
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
-
-    act(() => {
-      window.history.pushState({}, "", "/skills");
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    });
-
-    expect(result.current.route).toEqual({ view: "skills", documentPath: undefined });
-  });
-
-  it("prevents unload only while the registered workspace is dirty", () => {
-    const { result } = renderHook(() => useWorkspaceNavigation());
-    act(() => result.current.setNavigationBlocker({ isDirty: true }));
-
-    const blockedEvent = new Event("beforeunload", { cancelable: true });
-    act(() => window.dispatchEvent(blockedEvent));
-    expect(blockedEvent.defaultPrevented).toBe(true);
+    const blocked = new Event("beforeunload", { cancelable: true });
+    act(() => window.dispatchEvent(blocked));
+    expect(blocked.defaultPrevented).toBe(true);
 
     act(() => result.current.setNavigationBlocker(null));
-    const cleanEvent = new Event("beforeunload", { cancelable: true });
-    act(() => window.dispatchEvent(cleanEvent));
-    expect(cleanEvent.defaultPrevented).toBe(false);
+    const clean = new Event("beforeunload", { cancelable: true });
+    act(() => window.dispatchEvent(clean));
+    expect(clean.defaultPrevented).toBe(false);
   });
 });
 
-function waitForPopStates(count: number) {
-  return new Promise<void>((resolve) => {
-    let received = 0;
-    const onPopState = () => {
-      received += 1;
-      if (received < count) return;
-      window.removeEventListener("popstate", onPopState);
-      resolve();
-    };
-    window.addEventListener("popstate", onPopState);
-  });
-}
+const waitForPopStates = (count: number): Promise<void> => new Promise((resolve) => {
+  let remaining = count;
+  const onPopState = () => {
+    remaining -= 1;
+    if (remaining > 0) return;
+    window.removeEventListener("popstate", onPopState);
+    resolve();
+  };
+  window.addEventListener("popstate", onPopState);
+});

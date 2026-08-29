@@ -8,7 +8,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
-      { find: /^@xyflow\/react$/, replacement: path.resolve(__dirname, "node_modules/@xyflow/react/dist/esm/index.mjs") },
       { find: "@shared", replacement: path.resolve(__dirname, "shared") },
       { find: "@", replacement: path.resolve(__dirname, "frontend/src") }
     ]
@@ -21,14 +20,6 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes("node_modules")) {
             return;
-          }
-
-          if (id.includes("@xyflow/react") || id.includes("@tisoap/react-flow-smart-edge") || id.includes("@dagrejs/dagre")) {
-            return "vendor-loop";
-          }
-
-          if (id.includes("react-markdown") || id.includes("remark-gfm") || id.includes("mdast-util-") || id.includes("micromark")) {
-            return "vendor-markdown";
           }
 
           if (id.includes("lucide-react")) {

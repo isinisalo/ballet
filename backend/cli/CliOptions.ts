@@ -1,7 +1,6 @@
 export interface StartOptions {
   codexCommand?: string;
   copilotCommand?: string;
-  tkCommand?: string;
   openBrowser: boolean;
 }
 
@@ -11,11 +10,10 @@ export interface LogOptions {
 }
 
 export const parseStartOptions = (args: readonly string[]): StartOptions => {
-  const options = parseCliOptions(args, new Set(["codex-command", "copilot-command", "tk-command"]), new Set(["no-open"]));
+  const options = parseCliOptions(args, new Set(["codex-command", "copilot-command"]), new Set(["no-open"]));
   return {
     codexCommand: optionalValue(options, "codex-command"),
     copilotCommand: optionalValue(options, "copilot-command"),
-    tkCommand: optionalValue(options, "tk-command"),
     openBrowser: !options.has("no-open")
   };
 };

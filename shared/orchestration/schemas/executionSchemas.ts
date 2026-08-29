@@ -1,0 +1,75 @@
+import { z } from "zod";
+import { sha256 } from "../primitives.js";
+import {
+  EXECUTION_SPEC_VERSION,
+  PROMPT_COMPOSITION_VERSION,
+  ROLE_OUTCOME_VERSION,
+  TASK_ENVELOPE_VERSION
+} from "../versions.js";
+import { executionProfileSchema } from "./environmentSchemas.js";
+import { gitObjectIdSchema, idSchema, nonEmptyTextSchema, sha256Schema, timestampSchema } from "./common.js";
+
+const resourceEvidenceSchema = z.object({
+  kind: z.enum(["system", "primary", "skill"]),
+  origin: z.enum(["system", "project"]),
+  id: idSchema,
+  relativePath: nonEmptyTextSchema.optional(),
+  sourceSha256: sha256Schema
+}).strict();
+
+export const executionPromptEvidenceV11Schema = z.object({
+  compositionVersion: z.literal(PROMPT_COMPOSITION_VERSION),
+  role: z.enum(["validation", "work", "critic", "refinement"]),
+  phase: z.enum(["precheck", "work", "postwork", "proposal"]),
+  executionProfile: executionProfileSchema,
+  resources: z.array(resourceEvidenceSchema).max(256),
+  prompt: nonEmptyTextSchema,
+  promptSha256: sha256Schema,
+  taskEnvelopeVersion: z.literal(TASK_ENVELOPE_VERSION),
+  taskEnvelopeSha256: sha256Schema,
+  outputSchemaVersion: z.literal(ROLE_OUTCOME_VERSION),
+  outputSchemaId: z.enum(["validation-outcome-v10", "work-outcome-v10", "critic-outcome-v10", "refinement-outcome-v10"]),
+  outputSchemaSha256: sha256Schema
+}).strict().superRefine((evidence, context) => {
+  if (sha256(evidence.prompt) !== evidence.promptSha256) {
+    context.addIssue({ code: "custom", path: ["promptSha256"], message: "Prompt hash does not match" });
+  }
+  const expectedPhase = evidence.role === "validation"
+    ? ["precheck", "postwork"]
+    : [evidence.role === "work" ? "work" : "proposal"];
+  if (!expectedPhase.includes(evidence.phase)) {
+    context.addIssue({ code: "custom", path: ["phase"], message: "Role and phase do not match" });
+  }
+  const expectedSchema = `${evidence.role}-outcome-v10`;
+  if (evidence.outputSchemaId !== expectedSchema) {
+    context.addIssue({ code: "custom", path: ["outputSchemaId"], message: "Role and output schema do not match" });
+  }
+});
+
+const executionRuntimeSnapshotSchema = z.object({
+  provider: z.enum(["codex", "copilot"]),
+  cliVersion: nonEmptyTextSchema,
+  model: nonEmptyTextSchema,
+  reasoningEffort: nonEmptyTextSchema,
+  networkAccess: z.boolean(),
+  capabilityHash: sha256Schema
+}).strict();
+
+export const executionSpecV12Schema = z.object({
+  version: z.literal(EXECUTION_SPEC_VERSION),
+  taskId: idSchema,
+  kind: z.literal("agent_execution"),
+  environmentRunId: idSchema,
+  actionExecutionId: idSchema.optional(),
+  agentRunId: idSchema,
+  evidence: executionPromptEvidenceV11Schema,
+  runtime: executionRuntimeSnapshotSchema,
+  project: z.object({
+    checkoutRoot: nonEmptyTextSchema,
+    headSha: gitObjectIdSchema,
+    configHash: sha256Schema,
+    snapshotHash: sha256Schema
+  }).strict(),
+  input: z.json().optional(),
+  createdAt: timestampSchema
+}).strict();

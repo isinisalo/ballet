@@ -2,12 +2,8 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import YAML from "yaml";
-import { projectConfigSchema } from "../../shared/api/workspace-schemas.ts";
-import {
-  validateProjectAutomationConfig,
-  validateProjectExecutionResources
-} from "../../backend/automation/validateAutomationConfig.ts";
-import { loadProjectResources } from "../../backend/documents/projectResourceCatalog.ts";
+import { projectConfigurationV20Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
+import { validateActionInstruction } from "../../shared/orchestration/instructionContract.ts";
 
 const root = process.cwd();
 const arc42Root = path.join(root, ".ballet/arc42");
@@ -22,32 +18,18 @@ const sections = [
 const required = [
   "ARCHITECTURE.md", ".ballet/arc42/README.md", ".ballet/arc42/STATUS.md",
   ".ballet/arc42/TRACEABILITY.md", ".ballet/arc42/METHOD-HEALTH.md",
-  ".ballet/arc42/STATE-CONTRACT.md", ".ballet/arc42/migration/ASSESSMENT.md",
-  ".ballet/arc42/migration/CONTENT-MAP.md", ".ballet/arc42/migration/DECISIONS.md",
   ...["BRIEF.md", "PLAN.md", "EVIDENCE.md", "REVIEW.md"].flatMap((name) => [
     `.ballet/arc42/initiatives/TEMPLATE/${name}`,
-    `.ballet/arc42/initiatives/graph-reward-mdp/${name}`,
-    `.ballet/arc42/initiatives/hierarchical-reward-mdp/${name}`
+    `.ballet/arc42/initiatives/environment-state-action-orchestration/${name}`
   ]),
   ...sections.map((name) => `.ballet/arc42/${name}`)
 ];
-const expectedGraphNodeIds = ["design", "plan", "build", "deploy", "verify"];
-const expectedDesignJobs = [
-  "design-01-introduction-and-goals", "design-02-constraints", "design-03-context-and-scope",
-  "design-04-solution-strategy", "design-05-building-block-view", "design-06-runtime-view",
-  "design-07-deployment-view", "design-08-crosscutting-concepts", "design-09-architecture-decisions",
-  "design-10-quality-requirements", "design-11-risks-and-technical-debt", "design-12-glossary"
-];
-const expectedVersions = {
-  project: 19,
-  decisionModel: 4
-};
 
 const addIssue = (message) => issues.push(message);
 const rel = (absolute) => path.relative(root, absolute).split(path.sep).join("/");
 const exists = async (absolute) => stat(absolute).then(() => true, () => false);
 const walk = async (directory) => {
-  const entries = await readdir(directory, { withFileTypes: true });
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
   return (await Promise.all(entries.map((entry) => {
     const target = path.join(directory, entry.name);
     return entry.isDirectory() ? walk(target) : [target];
@@ -85,10 +67,7 @@ const headingAnchors = (body) => {
 
 for (const filename of required) if (!(await exists(path.join(root, filename)))) addIssue(`Missing required artifact: ${filename}`);
 
-const markdownFiles = [
-  path.join(root, "ARCHITECTURE.md"),
-  ...(await walk(arc42Root)).filter((file) => file.endsWith(".md"))
-];
+const markdownFiles = [path.join(root, "ARCHITECTURE.md"), ...(await walk(arc42Root)).filter((file) => file.endsWith(".md"))];
 const docs = new Map();
 const ids = new Map();
 for (const file of markdownFiles) {
@@ -169,133 +148,41 @@ for (const line of traceLines.slice(2)) for (const id of line.match(
   /\b(?:goal|adr)-\d{3}\b|\b(?:REQ|QS|BB|RT|DEP|CON|RISK|TEST|EVID)-\d{3}\b/g
 ) ?? []) if (!stableDefinitions.has(id)) addIssue(`TRACEABILITY references undefined ID ${id}.`);
 
-const adrIndex = path.join(arc42Root, "09-architecture-decisions.md");
-for (const line of (docs.get(adrIndex)?.body ?? "").split(/\r?\n/)) {
-  const match = line.match(/^\|\s*(adr-\d{3})\s*\|[^|]*\|\s*\[[^\]]+\]\(([^)]+)\)/);
-  if (!match) continue;
-  const target = path.resolve(path.dirname(adrIndex), match[2]);
-  if (!(await exists(target))) addIssue(`Section 9 ADR link does not resolve: ${match[2]}.`);
-  else if ((await parseMarkdown(target)).frontmatter?.id !== match[1]) addIssue(`Section 9 link does not contain ${match[1]}.`);
-}
-
 const rawConfig = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8"));
-const parsed = projectConfigSchema.safeParse(rawConfig);
+const parsed = projectConfigurationV20Schema.safeParse(rawConfig);
 let config;
 if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
 } else {
   config = parsed.data;
-  const automation = { version: 19, graph: config.graph };
-  validateProjectAutomationConfig(automation, config.executionProfiles)
-    .forEach((issue) => addIssue(`Automation ${issue.path}: ${issue.message}`));
-  const resources = await loadProjectResources(root);
-  resources.issues.forEach((issue) => addIssue(`Resource ${issue.relativePath}: ${issue.message}`));
-  validateProjectExecutionResources(automation, resources)
-    .forEach((issue) => addIssue(`Resource reference ${issue.path}: ${issue.message}`));
-
-  if (config.version !== expectedVersions.project) addIssue(`Project Config must be v${expectedVersions.project}.`);
-  if (config.graph.strategy.kind !== "reward_mdp_v4") addIssue("Default Graph must use reward_mdp_v4.");
-  if (config.graph.strategy.model.version !== expectedVersions.decisionModel) addIssue("Decision Model must be v4.");
-  const graphNodeIds = config.graph.graphNodes.map(({ id }) => id);
-  if (JSON.stringify(graphNodeIds) !== JSON.stringify(expectedGraphNodeIds)) addIssue(`Default GraphNode order mismatch: ${graphNodeIds.join(", ")}`);
-  const designJobs = config.graph.graphNodes.find(({ id }) => id === "design")?.actionNodes.map(({ id }) => id) ?? [];
-  if (JSON.stringify(designJobs) !== JSON.stringify(expectedDesignJobs)) addIssue(`DESIGN Action order mismatch: ${designJobs.join(", ")}`);
-
-  const model = config.graph.strategy.model;
-  if (model.discountPpm !== 990_000) addIssue("Reward-MDP discount must be 990000 ppm.");
-  const reward = model.reward;
-  const expectedReward = [
-    reward.actionCostMicros === 1_000_000, reward.terminalSuccessBonusMicros === 25_000_000,
-    reward.acceptanceProgressPotentialScaleMicros === 100_000_000,
-    reward.outcomePenaltyMicros.transient === 2_000_000,
-    reward.outcomePenaltyMicros.implementation_defect === 5_000_000,
-    reward.outcomePenaltyMicros.invalid_plan === 12_000_000,
-    reward.outcomePenaltyMicros.invalid_design === 25_000_000
-  ];
-  if (expectedReward.some((valid) => !valid)) addIssue("Reward-MDP default reward constants do not match adr-033.");
-  const scopes = [
-    { label: "graph", ids: graphNodeIds, strategy: config.graph.strategy, expectedRows: 15 },
-    ...config.graph.graphNodes.map((node) => ({
-      label: `graph_node:${node.id}`,
-      ids: node.actionNodes.map(({ id }) => id),
-      strategy: node.strategy,
-      expectedRows: node.id === "design" ? 78 : node.id === "plan" ? 3 : 1
-    }))
-  ];
-  for (const scope of scopes) {
-    const scopeModel = scope.strategy.model;
-    if (scope.strategy.kind !== "reward_mdp_v4" || scopeModel.version !== 4) addIssue(`${scope.label} must use Decision Model v4.`);
-    if (!scope.ids.includes(scopeModel.initialStateId)) addIssue(`${scope.label} initial state is not owned by the scope.`);
-    if (scopeModel.stateActions.length !== scope.expectedRows) addIssue(`${scope.label} must contain ${scope.expectedRows} modeled cells.`);
-    if (scope.label !== "graph" && scopeModel.reward.acceptanceProgressPotentialScaleMicros !== 0) {
-      addIssue(`${scope.label} local reward cannot shape acceptance progress.`);
-    }
-    for (const row of scopeModel.stateActions) {
-      if (!scope.ids.includes(row.stateId) || !scope.ids.includes(row.actionId)) addIssue(`${scope.label} contains a free-floating state/action ID.`);
-      if (row.successors.reduce((sum, branch) => sum + branch.probabilityPpm, 0) !== 1_000_000) {
-        addIssue(`PPM does not sum to 1000000 for ${scope.label}/${row.stateId}/${row.actionId}.`);
-      }
-      if (new Set(row.successors.map(({ outcomeId }) => outcomeId)).size !== row.successors.length) {
-        addIssue(`Outcome IDs are not unique for ${scope.label}/${row.stateId}/${row.actionId}.`);
-      }
-      if (row.successors.some(({ provenance }) => provenance !== "default_prior" && provenance !== "authored_evidence")) {
-        addIssue(`Invalid prior provenance for ${scope.label}/${row.stateId}/${row.actionId}.`);
-      }
-    }
-    if (!scopeModel.stateActions.some(({ successors }) => successors.some(({ target }) => target.kind === "terminal" && target.terminal === "success"))) {
-      addIssue(`${scope.label} has no success terminal branch.`);
+  const directionRoots = { goals: "goals", adrs: "adr", constraints: "constraints", useCases: "use-cases" };
+  for (const [field, directory] of Object.entries(directionRoots)) {
+    const documents = await indexedMarkdown(path.join(root, ".ballet", directory));
+    for (const item of config.direction[field]) if (!documents.has(item.id)) {
+      addIssue(`Project Config ${field} reference ${item.id} has no Markdown source.`);
     }
   }
-  if (config.graph.acceptance.obligations.length !== 5) addIssue("Default Graph acceptance-ledger must contain five obligations.");
-
-  const profiles = new Map(config.executionProfiles.map((profile) => [profile.id, profile]));
-  for (const graphNode of config.graph.graphNodes) for (const action of graphNode.actionNodes) {
-    for (const [role, node] of [["work", action.workNode], ["validation", action.validationNode]]) {
-      if (node.type !== "agent") continue;
-      const profile = profiles.get(node.executionProfileId);
-      if (profile?.model !== "gpt-5.6-sol" || profile.reasoningEffort !== "high") {
-        addIssue(`${graphNode.id}/${action.id}/${role} must use gpt-5.6-sol high.`);
-      }
+  const instructionIds = new Set();
+  const skillIds = new Set();
+  for (const agent of allAgents(config)) {
+    instructionIds.add(agent.instructionResource);
+    agent.skillResources.forEach((id) => skillIds.add(id));
+  }
+  for (const id of instructionIds) {
+    const filename = path.join(root, ".ballet/instructions", `${id}.md`);
+    if (!(await exists(filename))) { addIssue(`Missing instruction resource ${id}.`); continue; }
+    for (const issue of validateActionInstruction(await readFile(filename, "utf8"))) {
+      addIssue(`Instruction ${id}: ${issue.message}.`);
     }
   }
-
-  const stateSource = docs.get(path.join(arc42Root, "STATE-CONTRACT.md"))?.source ?? "";
-  const stateJson = markerBlock(stateSource, "arc42-state-initial").match(/```json\s*([\s\S]*?)```/)?.[1];
-  let contractState;
-  try { contractState = JSON.parse(stateJson ?? ""); } catch { addIssue("STATE-CONTRACT initial JSON is invalid."); }
-  const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]`
-    : value && typeof value === "object"
-      ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`
-      : JSON.stringify(value);
-  if (contractState && canonical(config.graph.state.initial) !== canonical(contractState)) {
-    addIssue("Graph initial State differs from STATE-CONTRACT.");
+  for (const id of skillIds) {
+    const filename = path.join(root, ".agents/skills", id, "SKILL.md");
+    if (!(await exists(filename))) addIssue(`Missing Skill resource ${id}.`);
   }
 }
 
-const instructionFiles = (await Promise.all([
-  walk(path.join(root, ".ballet/instructions")),
-  walk(path.join(root, ".fixture-ballet-project/.ballet/instructions"))
-])).flat();
-const migrated = instructionFiles.filter((file) => path.basename(file).startsWith("migrated-") && file.endsWith(".md"));
-if (migrated.length) addIssue(`Legacy migrated instructions remain: ${migrated.map(rel).join(", ")}`);
-
-const platformForbidden = [
-  "blueprint-design", "milestone-planning", "milestone-delivery", "release-validation",
-  "arc42-clarify-requirements", "arc42-design-structures", "arc42-design-concepts",
-  "arc42-communicate-document", "arc42-accompany-implementation", "arc42-analyze-evaluate",
-  "arc42-continuous-learning", ".ballet/arc42/", "ROADMAP.md", "IMPLEMENTATION-PLAN.md", "ACCEPTANCE.md"
-];
-const legacyRuntimeTerms = ["agent_v1", "ssp_v2", "RepairNode", "RepairRequest", "repair_requests", "routing_requests", "routing_decisions"];
-for (const directory of ["backend", "frontend", "shared"]) for (const file of await walk(path.join(root, directory))) {
-  if (!/\.(?:ts|tsx|js|jsx|json|md)$/.test(file) || /\.(?:test|spec)\.[^.]+$/.test(file)) continue;
-  const source = await readFile(file, "utf8");
-  for (const term of platformForbidden) if (source.includes(term)) addIssue(`Platform boundary violation: ${rel(file)} contains ${term}.`);
-  for (const term of legacyRuntimeTerms) if (source.includes(term)) addIssue(`Legacy runtime path: ${rel(file)} contains ${term}.`);
-}
-for (const file of [path.join(root, ".ballet/project.json"), ...(await walk(path.join(root, ".ballet/graph-node-library")))]) {
-  if (!(await stat(file)).isFile()) continue;
-  const source = await readFile(file, "utf8");
-  for (const term of legacyRuntimeTerms) if (source.includes(term)) addIssue(`Legacy project data: ${rel(file)} contains ${term}.`);
+for (const removed of [".ballet/graph-node-library", ".ballet/graph-node-modules"]) {
+  if (await exists(path.join(root, removed))) addIssue(`Removed project-data surface remains: ${removed}.`);
 }
 
 if (issues.length) {
@@ -303,9 +190,24 @@ if (issues.length) {
   issues.forEach((issue) => process.stderr.write(`- ${issue}\n`));
   process.exitCode = 1;
 } else {
-  const graphNodes = config?.graph.graphNodes.length ?? 0;
-  const actions = config?.graph.graphNodes.reduce((total, node) => total + node.actionNodes.length, 0) ?? 0;
-  const globalCells = config?.graph.strategy.model.stateActions.length ?? 0;
-  const localCells = config?.graph.graphNodes.reduce((total, node) => total + node.strategy.model.stateActions.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, ${graphNodes} GraphNodes, ${actions} Action Nodes, ${globalCells} global and ${localCells} local Reward-MDP cells.\n`);
+  const states = config?.environment.states.length ?? 0;
+  const actions = config?.environment.states.reduce((total, state) => total + state.actions.length, 0) ?? 0;
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v20, ${states} States and ${actions} Actions.\n`);
+}
+
+async function indexedMarkdown(directory) {
+  const result = new Set();
+  for (const filename of (await walk(directory)).filter((file) => file.endsWith(".md"))) {
+    const parsedDocument = await parseMarkdown(filename);
+    if (typeof parsedDocument.frontmatter?.id === "string") result.add(parsedDocument.frontmatter.id);
+  }
+  return result;
+}
+
+function allAgents(project) {
+  return [
+    project.critic.agent,
+    project.refinement.agent,
+    ...project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]))
+  ];
 }

@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative evidence
 status: draft
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 9
+version: 10
 tags:
   - arc42
   - initiative
@@ -26,21 +26,22 @@ tags:
 | ESAO-evid-007 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated v20 project/Markdown repositories, reference/blocker index, v16 service composition, 73-route typed HTTP contract, trusted human operations, factual SSE, immutable governance worktree capture and v15/v16 isolation | `backend/vnext/{VNextCompositionRoot.ts,project/**,http/**,runtime/VNextWorkspaceManager*}`; `shared/vnext/{httpContracts,routeInventory}.ts`; API/isolation/workspace tests | passed: API fixture asserts 76 lifecycle/security cases; route inventory equals mounted Express routes; focused suite 8 files/50 tests; full `npm run test` 62 files/320 tests; zero-warning lint; production build | 2026-08-29 temporary v20 project roots, v16 databases, fake provider and local Git worktrees | Transition `/api/vnext` only; current v19 API/UI remain canonical. No browser UI or real provider occurrence is claimed. |
 | ESAO-evid-008 | REQ-022; partial QS-028/QS-029/QS-031 | Isolated vNext Configure UI for Direction, Use Cases, ordered Environment/State/Action authoring, resources, profiles and Critic configuration | `frontend/src/vnext/{configure/**,authoringModels.ts,vNextApi.ts,useVNext*}`; `frontend/tests/vnext{AuthoringModels,Routing,ConfigureUi}.test.*`; `evidence/configure-{environment-1440x900,action-390x844}.png` | passed: 39 focused tests; real API browser snapshots at 1440×900 and 390×844; overflow 0; URL back/forward preserved Action deep link; keyboard reorder and color-independent status inspected | 2026-08-29 local loopback service | Configure half of phase 08 only. Run/Feedback/review/Product UI and final target verdict remain pending. |
 | ESAO-evid-009 | REQ-022; partial QS-028–QS-031 | Isolated vNext Environment Run gate, Validation/Work timeline, Feedback, Critic and Refinement exact-approval review, continuation and Product Snapshot UI | `frontend/src/vnext/{run/**,runModels.ts,runTypes.ts,useVNextGovernanceData.ts}`; `frontend/tests/vnext{RunModels,GovernanceUi,Routing}.test.*`; `evidence/run-gate-{1440x900,390x844}.png` | passed: 53 focused tests; built-browser factual fixture at 1440×900 and 390×844; page overflow 0; narrow controls at least 40 px; 0 console errors/warnings; no old-domain text | 2026-08-29 local loopback service with bounded browser-only Run facts | Browser fixture is not a provider-backed product occurrence. Canonical routes and final quality verdict remain phase 09/11 work. |
-| EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | pending final cutover | phases 02–04/07/11 | ESAO-evid-003–005/007 prove the isolated contracts, transactions, runtime and API; canonical provider-backed evidence remains pending. |
-| EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | pending final cutover | phases 05/07/08/11 | ESAO-evid-004/006/007 prove exact decisions, durable scheduling and HTTP trust boundaries; product UI and real occurrence remain pending. |
-| EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | pending final cutover | phases 06–08/11 | ESAO-evid-004/006/007 prove managed Git effects, immutable Product-commit capture, continuation and API boundaries; UI/real occurrence remain pending. |
-| EVID-031 | REQ-022 / QS-031 | Target responsive/accessibility browser evidence | TEST-031 | isolated phase 08 passed; canonical pending | phases 08/10/11 | ESAO-evid-008/009 prove Configure and Run/governance routes at both protected viewports; canonical QA remains pending. |
-| EVID-032 | REQ-022 / QS-032 | Strict versions, isolation, removal, release/install/startup | TEST-032 | pending | future phases 02–11 | Existing v19 baseline must remain active until phase 09. |
+| ESAO-evid-010 | REQ-022 / QS-028–QS-032 | Atomic canonical cutover, strict removal, responsive canonical UI, packaged release smoke and local install/startup | `shared/orchestration/**`, `backend/orchestration/**`, `frontend/src/orchestration/**`, `scripts/check-cutover-removal.mjs`, `evidence/canonical-{environment-1440x900,action-390x844}.png` | passed: 27 files/254 tests; zero-warning lint; production build; 219-file removal gate; arc42/design/diff checks; packaged v20/v16 API smoke; `make latest`; healthy launchd service | 2026-08-29 local checkout, deterministic fake providers and real production bundle browser | No merge, push, release or deploy. A production-like real-provider continuation remains future operational evidence, not a cutover blocker. |
+| EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | passed locally | phases 02–04/07/09/11 | strict schema, planner, transaction, runtime, API and fake-provider completion/blocking tests plus ESAO-evid-010. |
+| EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | passed locally | phases 05/07–09/11 | atomic/restart/schedule/approval/API/UI tests plus ESAO-evid-010. |
+| EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | passed locally | phases 06–09/11 | safe-path/hash/impact/Git/lineage/API/UI tests plus ESAO-evid-010. |
+| EVID-031 | REQ-022 / QS-031 | Target responsive/accessibility browser evidence | TEST-031 | passed canonical | phases 08–11 | canonical browser deep links, back/forward, invalid IDs, 0 overflow, 40 px narrow controls and 0 console errors/warnings. |
+| EVID-032 | REQ-022 / QS-032 | Strict versions, isolation, removal, release/install/startup | TEST-032 | passed locally | phases 02–11 | strict rejection tests, removal gate, full repository gates, packaged smoke, local install and healthy startup. |
 
 ## Relevant decisions
 
-`goal-022`, `adr-034`, `CON-015`, `BB-015`, `RT-026`–`RT-028`, `DEP-005`. The current baseline remains `goal-021` / `adr-033` until phase 09; that is an implementation-status fact, not a competing target decision.
+`goal-022`, `adr-034`, `CON-015`, `BB-015`, `RT-026`–`RT-028`, `DEP-005`. These now describe the active canonical implementation.
 
 ## Evidence policy
 
-ESAO-evid-002 is passed, but it cannot advance EVID-028..032. Full command logs remain transient; this index records exact commands/results and limitations without claiming operational success.
+ESAO-evid-003–009 preserve the isolated build phases as historical evidence. ESAO-evid-010 is the canonical cutover record. Full command logs remain transient; this index records exact commands/results and limitations without turning deterministic fake-provider checks into a real-provider product occurrence.
 
-## Phase 02 contract bounds and refinements
+## Historical phase 02 contract bounds and refinements
 
 The isolated namespace uses independent safety limits rather than copying Graph fixtures: at most 256 Goal/ADR/Constraint items, 128 Use Cases, 128 States, 128 Actions per State, 4,096 Actions per Environment, 64 references or Skills per item, 20 additional Work retries, 50 examples per Use Case, 100,000 instruction characters and 128 proposed files. These bounds cap canonical hashing, issue accumulation, snapshot seeding and provider payload growth while remaining materially above expected authored configurations. Persistence and provider phases must preserve or tighten them at their own trust boundaries.
 
@@ -52,7 +53,7 @@ The phase-02 implementation follows three explicit refinements in the newer auth
 
 These are recorded deviations rather than hidden compatibility behavior. Phase 03 composition and phase 06 refinement work must consume the implemented contracts, and the accepted architecture canon must be reconciled before phase 09 canonicalization if it still states the superseded details.
 
-## Phase 02 strict-v16 inventory and invariants
+## Historical phase 02 strict-v16 inventory and invariants
 
 The isolated v16 inventory is exactly: `metadata`, `environment_runs`, `state_executions`, `action_executions`, `agent_runs`, `control_flow_events`, `product_snapshots`, `feedback_entries`, `feedback_status_events`, `critic_schedules`, `critic_runs`, `critic_proposals`, `critic_proposal_decisions`, `refinement_runs`, `refinement_run_feedback`, `refinement_proposals`, `refinement_proposal_files`, `refinement_proposal_decisions`, `refinement_applies`, `continuation_links`, `execution_tasks`, and `execution_events`. It contains no Graph, Reward, policy or acceptance tables.
 
@@ -60,7 +61,7 @@ The tested transaction boundaries create a complete ordered run aggregate; selec
 
 `VNextConnection` creates only an empty v16 database, reopens a complete v16 inventory, and fails closed for v15, unknown or incomplete inventories with archive/remove guidance. No `ALTER`, copy, reader, alias or dual-write path exists. Current `LocalDatabase` v15 startup is not imported or modified; every v16 test uses a newly created temporary database.
 
-## Phase 03 Validation-led runtime evidence
+## Historical phase 03 Validation-led runtime evidence
 
 The tested transaction/queue sequence is:
 
@@ -91,7 +92,7 @@ Snapshot v13 contains Project Config/base hashes, full Environment definition, a
 
 Continuation tests prove that only prior `done` Actions with unchanged definition and relevant resource hashes outside target/impact scope import evidence. Target/impact Actions remain pending, and a changed shared Skill invalidates import for every referencing Action. The parent run is never updated.
 
-## Phase 05 governance evidence
+## Historical phase 05 governance evidence
 
 Approval state machines are explicit and provider-inaccessible:
 
@@ -112,7 +113,7 @@ Critic schedules support bounded daily/weekly local times and IANA timezones. `@
 
 Refinement changes are full-content `create | replace | delete` operations limited to `.ballet/instructions/**/*.md` and `.agents/skills/**/SKILL.md`. Absolute paths, `..`, `.git`, arbitrary docs/source, secret-like paths and any symlink chain are rejected. A shared Skill change requires every referencing Action in the exact approved impact list. Apply checks operation-specific human authorization, base commit, all preimages before writes, resulting hashes and a fixed validation-command allowlist. It then creates one local `ballet/refinement/*` branch/worktree commit with provenance trailers and persists one immutable continuation. It never invokes a proposal-supplied shell command, merges, pushes or mutates the current checkout. Failures retain the isolated worktree for diagnosis, leave the parent Run/current checkout unchanged and keep Feedback unresolved.
 
-## Phase 07 project, composition and HTTP evidence
+## Historical phase 07 project, composition and HTTP evidence
 
 The transition source paths are explicit and disjoint: vNext reads/writes `.ballet/vnext/project.json` and `.ballet/vnext/{goals,adrs,constraints,use-cases,instructions,skills}/**`; machine state is `.git/ballet/vnext/state.sqlite`. `VNextProjectRepository` has no v19 fallback and `VNextConnection` has no v15 import. `VNextCompositionIsolation.test.ts` proves byte-level cross-version DB non-interference in both directions, while `VNextProjectPersistence.test.ts` proves explicit-path-only config loading, atomic stable serialization, optimistic hashes, symlink rejection, snapshot locks and reference blockers.
 
@@ -168,7 +169,7 @@ Human identity is constructed outside request bodies by the local server boundar
 
 Successful Run worktrees may be removed after finalization because the Product Snapshot retains the result commit. Before Critic or Refinement execution, `VNextWorkspaceManager` creates a detached read-only worktree at that exact commit and removes it after provider capture. The workspace test proves a newer current checkout is neither read as the approved product base nor rewound. Refinement apply likewise branches from the exact approved reachable Product commit, never from an assumed current `HEAD`.
 
-## Phase 08 Configure UI evidence
+## Historical phase 08 Configure UI evidence
 
 The isolated route inventory implemented and tested in this increment is:
 
@@ -188,7 +189,7 @@ The isolated route inventory implemented and tested in this increment is:
 
 Use Case approval opens a separate confirmation containing the exact semantic hash/revision; Save remains draft content mutation. Action authoring labels Validation as main/controller twice in the control projection and Work as subordinate, exposes `1 + maxRetries`, exact instruction requirements and the read-only/workspace-write permission split. The checked browser snapshots show the same content stacked at 390×844, zero page overflow and exact textual statuses. The initial narrow audit found a 28 px compact control; the local retry added a vNext-scoped 40 px minimum and 16 px form text rule before acceptance. No palette or shape token changed.
 
-## Phase 08 Run and governance UI evidence
+## Historical phase 08 Run and governance UI evidence
 
 The Run workspace starts only a complete Environment and projects persisted States by ascending `order` and Actions by ascending `priority`. It derives the current gate from the first unfinished Action, labels Validation as main and Work as subordinate, renders retries as `first + maxRetries`, and exposes no standalone State/Action start or force-done control. Blocked Actions link to factual Feedback while later States remain visibly gated.
 
@@ -200,8 +201,8 @@ Browser QA used the production bundle and a bounded Playwright route fixture onl
 
 ## Open evidence gaps
 
-Canonical cutover, package/install and real-provider evidence remain pending. Test/browser-fixture Environment/Critic/Refinement records are not product occurrences. The managed-worktree tests prove local Git and continuation mechanics, but not a production-like provider-backed continuation.
+The strict cutover, package/install/startup and canonical browser gates passed locally. One production-like real-provider Environment occurrence and continuation remain open operational evidence; deterministic fake-provider and managed-worktree tests are not represented as that occurrence.
 
 ## Next review basis
 
-The next evidence-producing action is the phase 09 atomic canonical cutover and removal-gate verification.
+The next evidence-producing action is a separately authorized real-provider Environment occurrence followed by independent review of its persisted Product Snapshot and continuation lineage. Merge, push, release and deploy remain outside this initiative authorization.

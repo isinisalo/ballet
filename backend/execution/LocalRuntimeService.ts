@@ -1,39 +1,33 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import type {
-  ExecutionRuntimeSnapshot,
   LocalProviderStatus,
   LocalRuntime,
-  ResolvedExecutionProfile,
   RuntimeCapabilities,
   RuntimeProvider
-} from "../../shared/domain/runtime.js";
+} from "../../shared/domain/localRuntime.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
-import type { ExecutionStore } from "./ExecutionStore.js";
 import type { LocalSettingsRepository } from "./LocalSettingsRepository.js";
-import { LocalWorkspaceManager } from "./git/LocalWorkspaceManager.js";
+import { runGit } from "./git/gitProcess.js";
 import type { CliRuntimeAdapter, RuntimeModel, RuntimeProbe } from "./providers/CliRuntimeAdapter.js";
 import { CodexAppServerAdapter } from "./providers/codex/CodexAppServerAdapter.js";
 import { CopilotSdkAdapter } from "./providers/copilot/CopilotSdkAdapter.js";
 
 export interface LocalRuntimeServiceOptions {
   context: ProjectContext;
-  executionStore: ExecutionStore;
+  executionStore?: { activeCount(provider?: RuntimeProvider): number; runningCount(provider: RuntimeProvider): number };
   settings: LocalSettingsRepository;
   codexCommand?: string;
   copilotCommand?: string;
   adapters?: CliRuntimeAdapter[];
 }
 
-export interface RuntimePreflightSnapshot {
-  runtime: ExecutionRuntimeSnapshot;
-}
-
 export class LocalRuntimeService {
   private readonly startedAt = new Date();
   private readonly adapters: Map<RuntimeProvider, CliRuntimeAdapter>;
   private readonly statuses = new Map<RuntimeProvider, LocalProviderStatus>();
-  private readonly workspace: LocalWorkspaceManager;
 
   constructor(private readonly options: LocalRuntimeServiceOptions) {
     const adapters = options.adapters ?? [
@@ -41,7 +35,6 @@ export class LocalRuntimeService {
       new CopilotSdkAdapter({ command: options.copilotCommand })
     ];
     this.adapters = new Map(adapters.map((adapter) => [adapter.provider, adapter]));
-    this.workspace = new LocalWorkspaceManager(options.context);
   }
 
   get startedAtIso(): string { return this.startedAt.toISOString(); }
@@ -60,27 +53,13 @@ export class LocalRuntimeService {
     return this.withActivity(provider);
   }
 
-  async verify(expected: ExecutionRuntimeSnapshot): Promise<void> {
-    const status = await this.refreshProvider(expected.provider);
-    if (status.health !== "ready" || status.cliVersion !== expected.cliVersion) {
-      throw new Error(status.healthMessage ?? `${expected.provider} CLI changed after the Run was queued.`);
-    }
-    if (capabilityHash(status.capabilities) !== expected.capabilityHash) {
-      throw new Error(`${expected.provider} capabilities changed after the Run was queued.`);
-    }
-    const model = status.capabilities.models.find((candidate) => candidate.id === expected.model);
-    if (!model && expected.model !== "provider-default") throw new Error(`Model ${expected.model} is no longer available.`);
-    if (model?.reasoningOptions.length && expected.reasoning !== "provider-default"
-      && !model.reasoningOptions.includes(expected.reasoning)) throw new Error(`Reasoning ${expected.reasoning} is no longer available.`);
-  }
-
   async refresh(): Promise<LocalRuntime> {
     await Promise.all((["codex", "copilot"] as const).map((provider) => this.refreshProvider(provider)));
     return this.snapshot();
   }
 
   async snapshot(): Promise<LocalRuntime> {
-    const checkout = await this.workspace.inspect();
+    const checkout = await inspectCheckout(this.options.context.root);
     return {
       instanceId: this.options.context.instanceId,
       hostname: os.hostname(),
@@ -95,35 +74,8 @@ export class LocalRuntimeService {
       uptimeSeconds: Math.max(0, Math.floor((Date.now() - this.startedAt.getTime()) / 1000)),
       startedAt: this.startedAt.toISOString(),
       providers: (["codex", "copilot"] as const).map((provider) => this.withActivity(provider)),
-      activeRunCount: this.options.executionStore.activeCount(),
+      activeRunCount: this.options.executionStore?.activeCount() ?? 0,
       logsPath: this.options.context.logsPath
-    };
-  }
-
-  async preflight(execution: ResolvedExecutionProfile): Promise<RuntimePreflightSnapshot> {
-    const status = await this.refreshProvider(execution.provider);
-    if (status.health !== "ready" || !status.cliVersion) {
-      throw new Error(status.healthMessage ?? `${execution.provider} CLI is not ready.`);
-    }
-    const model = status.capabilities.models.find((candidate) => candidate.id === execution.model);
-    if (!model && execution.model !== "provider-default") {
-      throw new Error(`Model ${execution.model} is not available from the local ${execution.provider} CLI.`);
-    }
-    if (model && model.reasoningOptions.length > 0 && execution.reasoning !== "provider-default"
-      && !model.reasoningOptions.includes(execution.reasoning)) {
-      throw new Error(`Reasoning option ${execution.reasoning} is not available for ${execution.model}.`);
-    }
-    if (!status.capabilities.policy.workspaceWrite
-      || (execution.policy.network && !status.capabilities.policy.networkControl)
-      || (execution.policy.readOnlyRoots.length > 0 && !status.capabilities.policy.readOnlyRoots)) {
-      throw new Error(`${execution.provider} cannot enforce the selected execution policy.`);
-    }
-    return {
-      runtime: {
-        hostname: os.hostname(), provider: execution.provider, cliVersion: status.cliVersion,
-        model: execution.model, reasoning: execution.reasoning, policy: execution.policy,
-        capabilityHash: capabilityHash(status.capabilities)
-      }
     };
   }
 
@@ -166,8 +118,8 @@ export class LocalRuntimeService {
       provider, command: probe.command, installed: probe.installed, compatible: probe.compatible,
       cliVersion: probe.version, authStatus: probe.authStatus, health,
       healthMessage: probe.reason ?? modelError, capabilities,
-      busy: this.options.executionStore.runningCount(provider) > 0,
-      activeRunCount: this.options.executionStore.activeCount(provider)
+      busy: (this.options.executionStore?.runningCount(provider) ?? 0) > 0,
+      activeRunCount: this.options.executionStore?.activeCount(provider) ?? 0
     };
     this.statuses.set(provider, status);
     return status;
@@ -175,8 +127,8 @@ export class LocalRuntimeService {
 
   private withActivity(provider: RuntimeProvider): LocalProviderStatus {
     const status = this.statuses.get(provider) ?? unavailable(provider, provider, "Runtime has not been probed yet.");
-    const activeRunCount = this.options.executionStore.activeCount(provider);
-    return { ...status, activeRunCount, busy: this.options.executionStore.runningCount(provider) > 0 };
+    const activeRunCount = this.options.executionStore?.activeCount(provider) ?? 0;
+    return { ...status, activeRunCount, busy: (this.options.executionStore?.runningCount(provider) ?? 0) > 0 };
   }
 }
 
@@ -190,8 +142,11 @@ const unavailable = (provider: RuntimeProvider, command: string, message: string
 });
 
 const hash = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const capabilityHash = (capabilities: RuntimeCapabilities): string => hash({
-  models: capabilities.models,
-  supportsStructuredOutput: capabilities.supportsStructuredOutput,
-  policy: capabilities.policy
-});
+const inspectCheckout = async (root: string) => {
+  const [head, status, config] = await Promise.all([
+    runGit(["rev-parse", "HEAD"], { cwd: root }),
+    runGit(["status", "--porcelain"], { cwd: root }),
+    readFile(path.join(root, ".ballet", "project.json"), "utf8")
+  ]);
+  return { headSha: head.stdout.trim(), configHash: hash(config), codeDirty: Boolean(status.stdout.trim()) };
+};

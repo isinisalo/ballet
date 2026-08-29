@@ -1,202 +1,99 @@
 {
-  "version": 19,
-  "executionProfiles": [
-    {
-      "id": "codex-gpt-5-6-luna-medium-network-off",
-      "name": "Codex GPT-5.6 Luna · Medium · Network off",
-      "provider": "codex",
-      "model": "gpt-5.6-luna",
-      "reasoningEffort": "medium",
-      "networkAccess": false
-    }
-  ],
-  "issueTracker": {
-    "kind": "tk",
-    "testedRevision": "d778bb520ee526c314c26f2bb876447e0a19caa5",
-    "orchestrationDirectory": ".tickets/orchestration",
-    "workDirectory": ".tickets/work"
+  "version": 20,
+  "direction": {
+    "goals": [{ "id": "test-goal", "name": "Load fixture goal", "status": "accepted" }],
+    "adrs": [{ "id": "0001-test-adr", "name": "Use Markdown-backed fixtures", "status": "accepted" }],
+    "constraints": [{
+      "id": "fixture-constraint",
+      "name": "Validation controls fixture work",
+      "status": "accepted",
+      "kind": "required",
+      "description": "The fixture executes through the Validation-first Action loop.",
+      "rationale": "Integration fixtures must exercise the canonical runtime contract."
+    }],
+    "useCases": [{
+      "id": "fixture-UC-01",
+      "name": "Run the fixture environment",
+      "status": "approved",
+      "examples": [{
+        "given": "a configured fixture",
+        "when": "the Environment runs",
+        "then": "Validation controls the Action"
+      }],
+      "successGoals": ["Produce fixture evidence"],
+      "failureGoals": ["Do not skip Validation"],
+      "expectedOutcomes": ["Completed or blocked fixture Run"],
+      "goalIds": ["test-goal"],
+      "adrIds": ["0001-test-adr"],
+      "constraintIds": ["fixture-constraint"],
+      "approval": {
+        "approvedBy": "fixture-human",
+        "approvedAt": "2026-08-29T00:00:00.000Z",
+        "revision": 1,
+        "contentHash": "04178e3c80a97400e644d21f939cc159a861c8fdfac8d0668d1b51853e6c9dd5"
+      }
+    }]
   },
-  "graph": {
-    "id": "fixture-graph",
-    "name": "Fixture Graph",
-    "state": {
-      "description": "Provider-neutral context shared by the fixture Graph.",
-      "initial": {}
-    },
-    "acceptance": {
-      "version": 1,
-      "obligations": [
-        {
-          "obligationId": "review-accepted",
-          "description": "The fixture review is accepted with evidence.",
-          "weight": 1
+  "executionProfiles": [{
+    "id": "fixture-profile",
+    "name": "Fixture profile",
+    "provider": "codex",
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "medium",
+    "networkAccess": false
+  }],
+  "environment": {
+    "id": "fixture-environment",
+    "name": "Fixture environment",
+    "description": "A bounded canonical integration fixture.",
+    "states": [{
+      "id": "fixture-state",
+      "name": "Fixture State",
+      "description": "Exercise one ordered State.",
+      "order": 1,
+      "useCaseIds": ["fixture-UC-01"],
+      "actions": [{
+        "id": "fixture-action",
+        "name": "Fixture Action",
+        "description": "Exercise Validation and subordinate Work.",
+        "priority": 1,
+        "useCaseIds": ["fixture-UC-01"],
+        "maxRetries": 1,
+        "validation": {
+          "executionProfileId": "fixture-profile",
+          "instructionResource": "reviewer",
+          "skillResources": ["fixture-skill"],
+          "toolPolicy": "read_only"
+        },
+        "work": {
+          "executionProfileId": "fixture-profile",
+          "instructionResource": "architect",
+          "skillResources": ["fixture-skill"],
+          "toolPolicy": "workspace_write"
         }
-      ]
+      }]
+    }]
+  },
+  "critic": {
+    "version": 1,
+    "enabled": false,
+    "schedules": [],
+    "agent": {
+      "executionProfileId": "fixture-profile",
+      "instructionResource": "reviewer",
+      "skillResources": ["fixture-skill"],
+      "toolPolicy": "read_only"
+    }
+  },
+  "refinement": {
+    "version": 1,
+    "enabled": true,
+    "agent": {
+      "executionProfileId": "fixture-profile",
+      "instructionResource": "reviewer",
+      "skillResources": ["fixture-skill"],
+      "toolPolicy": "read_only"
     },
-    "strategy": {
-      "kind": "reward_mdp_v4",
-      "id": "fixture-reward-mdp",
-      "description": "Select fixture Graph Nodes through one immutable global policy.",
-      "model": {
-        "version": 4,
-        "initialStateId": "clarify-node",
-        "discountPpm": 990000,
-        "reward": {
-          "actionCostMicros": 1000000,
-          "terminalSuccessBonusMicros": 25000000,
-          "acceptanceProgressPotentialScaleMicros": 100000000,
-          "outcomePenaltyMicros": {
-            "none": 0,
-            "transient": 2000000,
-            "implementation_defect": 5000000,
-            "invalid_plan": 12000000,
-            "invalid_design": 25000000
-          }
-        },
-        "stateActions": [
-          {
-            "stateId": "clarify-node",
-            "actionId": "clarify-node",
-            "guards": [],
-            "successors": [
-              { "outcomeId": "success", "target": { "kind": "state", "stateId": "review-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
-              { "outcomeId": "failure", "target": { "kind": "state", "stateId": "clarify-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
-            ]
-          },
-          {
-            "stateId": "review-node",
-            "actionId": "clarify-node",
-            "guards": [],
-            "successors": [
-              { "outcomeId": "success", "target": { "kind": "state", "stateId": "review-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
-              { "outcomeId": "failure", "target": { "kind": "state", "stateId": "clarify-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
-            ]
-          },
-          {
-            "stateId": "review-node",
-            "actionId": "review-node",
-            "guards": [],
-            "successors": [
-              { "outcomeId": "success", "target": { "kind": "terminal", "terminal": "success" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
-              { "outcomeId": "failure", "target": { "kind": "state", "stateId": "review-node" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
-            ]
-          }
-        ],
-        "solver": {
-          "algorithm": "discounted_value_iteration_v4",
-          "maxIterations": 10000,
-          "convergenceToleranceMicros": 1
-        }
-      }
-    },
-    "graphNodes": [
-      {
-        "id": "clarify-node",
-        "description": "Clarify the fixture before review.",
-        "capabilities": {
-          "accepts": ["fixture:requirements.requested"],
-          "provides": ["fixture:requirements.clarified"]
-        },
-        "outcomes": [
-          { "outcomeId": "success", "result": "PASS", "acceptanceEffects": [] },
-          { "outcomeId": "failure", "result": "FAIL", "acceptanceEffects": [] }
-        ],
-        "stateContract": { "description": "Bounded fixture clarification references." },
-        "strategy": {
-          "kind": "reward_mdp_v4",
-          "id": "clarify-node-local-reward-mdp",
-          "description": "Select fixture clarification Action Nodes.",
-          "model": {
-            "version": 4,
-            "initialStateId": "clarify-action",
-            "discountPpm": 990000,
-            "reward": {
-              "actionCostMicros": 1000000,
-              "terminalSuccessBonusMicros": 5000000,
-              "acceptanceProgressPotentialScaleMicros": 0,
-              "outcomePenaltyMicros": { "none": 0, "transient": 2000000, "implementation_defect": 5000000, "invalid_plan": 12000000, "invalid_design": 25000000 }
-            },
-            "stateActions": [{
-              "stateId": "clarify-action",
-              "actionId": "clarify-action",
-              "guards": [],
-              "successors": [
-                { "outcomeId": "success", "target": { "kind": "terminal", "terminal": "success", "emitOutcomeId": "success" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
-                { "outcomeId": "failure", "target": { "kind": "state", "stateId": "clarify-action" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
-              ]
-            }],
-            "solver": { "algorithm": "discounted_value_iteration_v4", "maxIterations": 10000, "convergenceToleranceMicros": 1 }
-          }
-        },
-        "actionNodes": [
-          {
-            "id": "clarify-action",
-            "description": "Clarify and validate the fixture request.",
-            "capabilities": { "accepts": [], "provides": [] },
-            "outcomes": [
-              { "outcomeId": "success", "result": "PASS" },
-              { "outcomeId": "failure", "result": "FAIL" }
-            ],
-            "maxRetries": 1,
-            "workNode": { "id": "clarify-work", "type": "human", "description": "Clarify the fixture request.", "task": "Clarify the fixture request.", "nodeStyle": "terra", "nodeSize": "medium" },
-            "validationNode": { "id": "clarify-validation", "type": "human", "description": "Validate fixture clarification.", "task": "Confirm that fixture clarification is actionable.", "nodeStyle": "luna", "nodeSize": "small" }
-          }
-        ]
-      },
-      {
-        "id": "review-node",
-        "description": "Review the fixture project.",
-        "capabilities": {
-          "accepts": ["fixture:review.requested"],
-          "provides": ["fixture:review.completed"]
-        },
-        "acceptanceObligationId": "review-accepted",
-        "outcomes": [
-          { "outcomeId": "success", "result": "PASS", "acceptanceEffects": [{ "obligationId": "review-accepted", "status": "verified" }] },
-          { "outcomeId": "failure", "result": "FAIL", "acceptanceEffects": [] }
-        ],
-        "stateContract": { "description": "Bounded fixture review references." },
-        "strategy": {
-          "kind": "reward_mdp_v4",
-          "id": "review-node-local-reward-mdp",
-          "description": "Select fixture review Action Nodes.",
-          "model": {
-            "version": 4,
-            "initialStateId": "review-action",
-            "discountPpm": 990000,
-            "reward": {
-              "actionCostMicros": 1000000,
-              "terminalSuccessBonusMicros": 5000000,
-              "acceptanceProgressPotentialScaleMicros": 0,
-              "outcomePenaltyMicros": { "none": 0, "transient": 2000000, "implementation_defect": 5000000, "invalid_plan": 12000000, "invalid_design": 25000000 }
-            },
-            "stateActions": [{
-              "stateId": "review-action",
-              "actionId": "review-action",
-              "guards": [],
-              "successors": [
-                { "outcomeId": "success", "target": { "kind": "terminal", "terminal": "success", "emitOutcomeId": "success" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "none" },
-                { "outcomeId": "failure", "target": { "kind": "state", "stateId": "review-action" }, "probabilityPpm": 500000, "provenance": "default_prior", "penaltyClass": "implementation_defect" }
-              ]
-            }],
-            "solver": { "algorithm": "discounted_value_iteration_v4", "maxIterations": 10000, "convergenceToleranceMicros": 1 }
-          }
-        },
-        "actionNodes": [
-          {
-            "id": "review-action",
-            "description": "Run and validate the fixture review.",
-            "capabilities": { "accepts": [], "provides": [] },
-            "outcomes": [
-              { "outcomeId": "success", "result": "PASS" },
-              { "outcomeId": "failure", "result": "FAIL" }
-            ],
-            "maxRetries": 3,
-            "workNode": { "id": "review-work", "type": "human", "description": "Perform the fixture review.", "task": "Review the fixture project and surface concrete risks.", "nodeStyle": "terra", "nodeSize": "medium" },
-            "validationNode": { "id": "review-validation", "type": "human", "description": "Validate the fixture review.", "task": "Confirm that the fixture review is complete and actionable.", "nodeStyle": "luna", "nodeSize": "small" }
-          }
-        ]
-      }
-    ]
+    "allowedRoots": [".ballet/instructions", ".agents/skills"]
   }
 }

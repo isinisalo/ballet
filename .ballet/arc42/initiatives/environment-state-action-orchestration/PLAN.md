@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative plan
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 2
+version: 3
 tags:
   - arc42
   - initiative
@@ -12,6 +12,19 @@ tags:
 ---
 
 # Environment State Action orchestration PLAN
+
+## Execution status
+
+| Phase | Status | Evidence |
+| --- | --- | --- |
+| 01 architecture/audit | completed | ESAO-evid-001/002 |
+| 02–07 contracts, persistence, runtime, governance and API | completed | ESAO-evid-003–007 |
+| 08 Configure and Run/governance UI | completed | ESAO-evid-008/009 |
+| 09 atomic canonical cutover | completed | ESAO-evid-010, EVID-028–EVID-032 |
+| 10 project/docs/release surfaces | completed as part of strict cutover | canonical v20 config, active docs and packaged smoke |
+| 11 local acceptance gates | completed for deterministic/local scope | full suite, browser QA, `make latest` and healthy startup; real-provider occurrence remains operational evidence |
+
+No phase authorized merge, push, release or deploy.
 
 ## Phase plan and dependencies
 
@@ -29,7 +42,7 @@ tags:
 | ESAO-step-010 | goal-022 / REQ-022 | QS-031, QS-032 | adr-011, adr-034 / CON-005, CON-006, CON-015 | BB-001, BB-003, BB-008, BB-015 | DEP-001, DEP-003 | strict project data, required instructions, shared Skills, fixtures, release smoke and canonical docs | arc42/design/project-resource/release-smoke tests | EVID-031/EVID-032 |
 | ESAO-step-011 | goal-022 / REQ-022 | QS-028–QS-032 | adr-034 / CON-015 | all active target blocks | RT-026–RT-028, DEP-001–DEP-005 | final conformance, full suite, install/startup and clean tree | TEST-028–TEST-032 + repository final gates | EVID-028–EVID-032 |
 
-Dependencies are strict: 01→02→03→04; 03→05; 03/04/05→06; 02–06→07; 07→08; 02–08→09; 09→10→11. Phase 09 is the only canonical switch. No pre-09 phase may make vNext read/write v19 or vice versa.
+Dependencies were executed in strict order: 01→02→03→04; 03→05; 03/04/05→06; 02–06→07; 07→08; 02–08→09; 09→10→11. Phase 09 was the only canonical switch; earlier namespaces are now historical evidence only.
 
 ## Use Case trace
 
@@ -85,11 +98,11 @@ Dependencies are strict: 01→02→03→04; 03→05; 03/04/05→06; 02–06→07
 
 ## Rollback and compatibility
 
-There is no runtime down migration, compatibility reader, alias or dual-write. Before phase 09, rollback means discard the feature branch or checkout the last pre-cutover commit; isolated vNext data may be deleted because it is not canonical. After local phase 09 validation but before any external write, rollback still means checkout the pre-cutover commit and archive/remove incompatible v16 machine state. No step grants release/deploy authority.
+There is no runtime down migration, compatibility reader, alias or dual-write. Rollback before external write means discard the feature branch or checkout the pre-cutover commit and archive/remove incompatible machine state. No step grants release/deploy authority.
 
 ## Legacy and temporary removal
 
-`CUTOVER-MANIFEST.md` is an acceptance input, not optional cleanup. Phase 09 must remove old active control surfaces and all temporary vNext names. Phase 10 must remove old project/release/doc assertions. Historical superseded documents remain.
+`CUTOVER-MANIFEST.md` was an acceptance input, not optional cleanup. Its active-source, project, release and document gates passed; historical superseded documents remain.
 
 ## Completion definition
 

@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 import { runGit } from "./gitProcess.js";
+
 export interface GitCheckoutStatus {
   root: string;
   headSha: string;
@@ -22,21 +23,16 @@ export const inspectGitCheckout = async (root: string, signal?: AbortSignal): Pr
   const resolvedTop = await realpath(path.resolve(top));
   const headSha = (await runGit(["rev-parse", "HEAD"], { cwd: resolvedTop, signal })).stdout.trim();
   const branchResult = await runGit(["symbolic-ref", "--quiet", "--short", "HEAD"], {
-    cwd: resolvedTop,
-    signal,
-    allowedExitCodes: [1]
+    cwd: resolvedTop, signal, allowedExitCodes: [1]
   });
   const status = await runGit(["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd: resolvedTop, signal });
   const paths = parsePorcelainPaths(status.stdout);
   const ignoredRuntimePaths = paths.filter(isAllowedRuntimePath);
   const dirtyPaths = paths.filter((entry) => !isAllowedRuntimePath(entry));
   return {
-    root: resolvedTop,
-    headSha,
+    root: resolvedTop, headSha,
     branch: branchResult.exitCode === 0 ? branchResult.stdout.trim() : undefined,
-    dirtyPaths,
-    ignoredRuntimePaths,
-    codeDirty: dirtyPaths.length > 0
+    dirtyPaths, ignoredRuntimePaths, codeDirty: dirtyPaths.length > 0
   };
 };
 

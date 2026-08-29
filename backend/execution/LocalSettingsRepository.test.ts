@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { LEGACY_AGENT_ROOTS_REMEDIATION, LocalSettingsRepository } from "./LocalSettingsRepository.js";
+import { LocalSettingsRepository } from "./LocalSettingsRepository.js";
 
 const roots: string[] = [];
 
@@ -34,23 +34,18 @@ describe("local settings repository", () => {
   });
 
   it.each([{}, null, { profile: ["/tmp/reference"] }])(
-    "fails closed on legacy agentReadOnlyRoots key presence (%j)",
-    async (legacyValue) => {
+    "fails closed on unknown settings fields (%j)",
+    async (unknownValue) => {
       const settings = await repository();
       const source = `${JSON.stringify({
         version: 1,
         readOnlyRoots: ["/tmp/global"],
-        agentReadOnlyRoots: legacyValue
+        unsupportedRoots: unknownValue
       }, null, 2)}\n`;
       await writeFile(settings.filename, source, "utf8");
 
-      await expect(settings.inspect()).resolves.toMatchObject({
-        settings: { version: 1, readOnlyRoots: ["/tmp/global"] },
-        legacyAgentReadOnlyRoots: true
-      });
-      await expect(settings.readOnlyRootsForRun()).rejects.toThrow(LEGACY_AGENT_ROOTS_REMEDIATION);
-      await expect(settings.write({ version: 1, readOnlyRoots: ["/tmp/global"] }))
-        .rejects.toThrow(LEGACY_AGENT_ROOTS_REMEDIATION);
+      await expect(settings.load()).rejects.toThrow("unsupported fields: unsupportedRoots");
+      await expect(settings.readOnlyRootsForRun()).rejects.toThrow("unsupported fields: unsupportedRoots");
       expect(await readFile(settings.filename, "utf8")).toBe(source);
     }
   );

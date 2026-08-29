@@ -51,14 +51,13 @@ export const loadLocalSettings = async (project: ProjectContext): Promise<LocalS
 
 export const updateProviderCommands = async (
   project: ProjectContext,
-  commands: { codexCommand?: string; copilotCommand?: string; tkCommand?: string }
+  commands: { codexCommand?: string; copilotCommand?: string }
 ): Promise<LocalSettings> => {
   const repository = new LocalSettingsRepository(settingsPath(project));
   const settings = await repository.load();
   const next: LocalSettings = { ...settings, version: 1 };
   if (commands.codexCommand !== undefined) next.codexCommand = commands.codexCommand;
   if (commands.copilotCommand !== undefined) next.copilotCommand = commands.copilotCommand;
-  if (commands.tkCommand !== undefined) next.tkCommand = commands.tkCommand;
   await repository.write(next);
   return next;
 };

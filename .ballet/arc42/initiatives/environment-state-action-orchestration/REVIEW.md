@@ -1,57 +1,54 @@
 ---
 id: environment-state-action-orchestration-review
 title: Environment State Action orchestration initiative review
-status: draft
+status: review
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
 version: 5
-tags:
-  - arc42
-  - initiative
-  - review
+tags: [arc42, initiative, review, conformance]
 ---
 
 # Environment State Action orchestration REVIEW
 
-## Current status
+## Verdict
 
-Initiative `environment-state-action-orchestration` has an accepted WHAT/WHY, architecture decision and target contract. Isolated phases 02–07 provide strict contracts, v16 persistence, Validation-led runtime, governance/refinement workflows and `/api/vnext`; phase 08 now has complete Configure, Run, Feedback, Critic, Refinement and Product workspaces under `/vnext`. The active canonical API/UI remains strict v19 until phase 09. Final EVID-028..032 verdicts remain pending.
+The atomic strict cutover conforms to `goal-022`, `adr-034`, `TARGET-CONTRACT.md`, CON-015 and the removal manifest for the deterministic/local acceptance scope. The canonical code, config, SQLite, API, UI, release fixture and active documentation now use Environment -> State -> Action and the target version matrix. No unresolved cutover finding remains.
 
-## Facts, decisions and findings
+The initiative stays in `review` because a production-like real-provider Environment occurrence and independent Product Snapshot/continuation review are still useful operational evidence. This does not leave a compatibility or transition surface in the product.
 
-- **Fact:** `AUDIT.md` and `CUTOVER-MANIFEST.md` are committed baseline evidence in `116322db`.
-- **Decision:** `goal-022` and `adr-034` accept Environment → State → Action, Validation-led execution, human approval and strict version/removal semantics.
-- **Decision:** phases 02–08 may use only the bounded isolated vNext exception; phase 09 removes both legacy and temporary names.
-- **Finding:** semantic replacement is required; a GraphNode→State rename would preserve the wrong control owner.
-- **Finding:** Critic-readable artifact lifetime and shared Skill reverse impact are mandatory phase 06 design controls.
-- **Evidence:** commits `e494cab9` and `21ba436b` implement the isolated runtime and governance boundaries; ESAO-evid-007 records the project repository, service composition and typed HTTP boundary added in phase 07.
-- **Evidence:** ESAO-evid-008 records the isolated Configure route/data/component decomposition, 39 focused tests and real-browser desktop/narrow findings.
-- **Evidence:** ESAO-evid-009 records the isolated Run/governance projection and exact-approval UI, 53 focused tests and built-browser desktop/narrow findings.
-- **Conformance result:** the bounded phase-08 Configure diff matches `goal-022`, `adr-034`, `QS-031`, `BB-001/BB-015`, `RT-026` and the transition exception: no v19 data hook mounts on `/vnext`, no old-domain term is rendered, approval remains a separate exact-hash command and browser QA found zero page overflow. No unresolved implementation defect or documentation drift remains in this increment.
-- **Finding resolved in transition:** successful Run worktrees are cleaned, then a bounded detached read-only worktree is materialized from the exact Product commit for Critic/Refinement capture and removed afterward.
-- **Assumption:** pre-production machine state may be archived/removed rather than migrated, as explicitly authorized.
-- **Conformance result:** the bounded review classified README's “Module v7 has no local policy” sentence as documentation drift and corrected it to the executable v7 contract. After that local retry, no unresolved conflict remains between goal-022, adr-034, Target Contract, transition scope, stable trace IDs and active-v19 status; final validator results are recorded in ESAO-evid-002.
+## Conformance findings
 
-## Open questions
+| Finding | Resolution | Verification |
+| --- | --- | --- |
+| Active docs still described the pre-cut baseline and transition exception | rewrote root AGENTS/ARCHITECTURE/DESIGN/README and active arc42 status/trace/views to the canonical contract | arc42 validator and design lint |
+| A local-settings compatibility-specific reader remained | replaced it with one strict current-settings parser and unknown-field rejection | LocalSettings/CLI tests |
+| Packaged smoke read the Environment response at the wrong envelope level | corrected the canonical response assertion | packaged v20/v16 release smoke |
+| Browser QA initially reached a stale local server on the test port | stopped the stale process, launched the production cutover bundle and repeated the full check | zero console errors/warnings and canonical API responses |
+| Removed concepts or temporary namespaces could return through imports/routes/CSS/tests | deleted/canonicalized them and added `validate:cutover` | 219 active files scanned, zero prohibited matches |
 
-No open decision blocks phase 02. Any request to change ordering, approval ownership, allowed refinement paths, standalone run boundary, strict cut or external-write authority returns `needs_input`.
+## Quality verdicts
 
-## Per-QS verdict
+| QS | Evidence | Verdict |
+| --- | --- | --- |
+| QS-028 | EVID-028 | passed locally: ordering, Validation loop, retry, provider-failure split, restart and fake completion/blocking |
+| QS-029 | EVID-029 | passed locally: atomic Feedback, schedules, Critic read-only proposal and trusted human approval |
+| QS-030 | EVID-030 | passed locally: exact safe Refinement, one commit, immutable continuation and Product projection |
+| QS-031 | EVID-031 | passed canonical browser/component scope at 1440x900 and 390x844 |
+| QS-032 | EVID-032 | passed locally: strict rejection, removal, full build, package/install and startup |
 
-| QS | Criterion owner | Evidence | Verdict |
-| --- | --- | --- | --- |
-| QS-028 | ordered Validation-led runtime | EVID-028 | isolated backend/API passed; canonical/provider evidence pending |
-| QS-029 | Feedback/Critic/human approval | EVID-029 | isolated backend/API/UI passed; real occurrence pending |
-| QS-030 | refinement/continuation immutability | EVID-030 | isolated Git/API/UI passed; real occurrence pending |
-| QS-031 | responsive accessible UI | EVID-031 | full isolated phase 08 passed; canonical QA pending |
-| QS-032 | strict cut/removal/release | EVID-032 | pending implementation |
+## Browser and accessibility review
 
-Architecture validation accepts the contract as ESAO-evid-002 but cannot turn these target implementation verdicts green.
+- Canonical Environment at 1440x900: body/root overflow 0, factual readiness labels and deterministic ordered lane.
+- Canonical Action at 390x844: body/root overflow 0, minimum visible button height 40 px, Validation labelled main/controller and Work subordinate.
+- Deep link, back/forward and invalid-ID recovery passed; browser console had 0 errors and 0 warnings.
+- Evidence: `evidence/canonical-environment-1440x900.png` and `evidence/canonical-action-390x844.png`.
+
+## Security and authority review
+
+Approval actor identity is outside request bodies. Use Case, Critic and Refinement decisions require operation-specific expected hashes/revisions. Refinement approval sends no arbitrary replacement bytes; apply is allowlisted, preimage-bound and worktree-isolated. No merge, push, release, deploy or external-service write was performed.
 
 ## Handoff
 
-- Initiative: `environment-state-action-orchestration`.
-- Status: accepted architecture; implementation pending.
-- Completed Node goal: phases 01–08, including all isolated Configure and Run/governance workspaces.
-- Next one prepared action: phase-09 atomic canonical cutover and strict legacy/vNext removal.
-- Stop condition: any scope-changing decision or any merge/push/release/deploy/external write requires new human input; canonical switching remains reserved for phase 09.
+- Active baseline: Project Config v20, Root Snapshot v13, Task/Outcome v10, composition v11, ExecutionSpec v12, SQLite v16 and governance v1.
+- Rollback: discard this feature branch or checkout the pre-cutover commit and archive/remove the incompatible local database; there is no down migration.
+- Next evidence: separately authorize one real-provider Environment occurrence and review its Product Snapshot/continuation lineage.

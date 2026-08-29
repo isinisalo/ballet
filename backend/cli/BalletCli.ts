@@ -7,7 +7,6 @@ import { parseLogOptions, parseStartOptions } from "./CliOptions.js";
 import type { LocalServerService } from "./LocalServerService.js";
 import { resolveProjectContext, type ProjectContext } from "../project/ProjectContext.js";
 import type { VerifiedReleaseUpdater } from "./VerifiedReleaseUpdater.js";
-import { runTrackerCli } from "./TrackerCli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -50,9 +49,6 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
         requireNoArguments(args, "ballet update");
         await update(services);
         return 0;
-      case "tracker":
-        await runTrackerCli(args, await currentProject(services), services.output.stdout);
-        return 0;
       case "version":
         requireNoArguments(args, "ballet version");
         services.output.stdout(services.version);
@@ -86,8 +82,7 @@ const start = async (args: readonly string[], services: BalletCliServices): Prom
   const project = await currentProject(services);
   const state = await services.server(project).ensureStarted({
     codexCommand: options.codexCommand,
-    copilotCommand: options.copilotCommand,
-    tkCommand: options.tkCommand
+    copilotCommand: options.copilotCommand
   });
   const url = `http://127.0.0.1:${state.port}`;
   services.output.stdout(`Ballet is running for ${project.root} at ${url}.`);
@@ -185,5 +180,4 @@ Usage:
   ballet status
   ballet logs [--lines N] [--follow]
   ballet update
-  ballet tracker <query|ready|claim|upsert|start|note|close|reopen>
   ballet version`;

@@ -121,7 +121,7 @@ describe("CodexAppServerAdapter", () => {
     ]);
   });
 
-  it("maps a vNext read-only request to read-only thread and turn sandboxes", async () => {
+  it("maps a canonical read-only request to read-only thread and turn sandboxes", async () => {
     const context = await fixture();
     await writeFile(path.join(context.root, "read-only-mode"), "");
     const adapter = new CodexAppServerAdapter({ command: context.command });

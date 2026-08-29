@@ -14,14 +14,10 @@ case "$(uname -m)" in
   x86_64) HOST_ARCH=x64 ;;
   *) printf 'unsupported build host architecture: %s\n' "$(uname -m)" >&2; exit 1 ;;
 esac
-[ "$HOST_ARCH" = "$ARCH" ] || {
-  printf 'release target %s must be built on a native %s host (current: %s)\n' "$ARCH" "$ARCH" "$HOST_ARCH" >&2
-  exit 1
-}
+[ "$HOST_ARCH" = "$ARCH" ] || { printf 'release target %s must use a native %s host\n' "$ARCH" "$ARCH" >&2; exit 1; }
 [ "$(node -p 'process.arch')" = "$ARCH" ] || { printf 'Node runtime architecture does not match %s\n' "$ARCH" >&2; exit 1; }
-NODE_MAJOR=$(node -p 'Number(process.versions.node.split(".")[0])')
-[ "$NODE_MAJOR" -ge 22 ] || { printf 'Node.js 22 or newer is required for release builds\n' >&2; exit 1; }
-command -v curl >/dev/null 2>&1 || { printf 'curl is required for the packaged server smoke test\n' >&2; exit 1; }
+[ "$(node -p 'Number(process.versions.node.split(".")[0])')" -ge 22 ] || { printf 'Node.js 22 or newer is required\n' >&2; exit 1; }
+command -v curl >/dev/null 2>&1 || { printf 'curl is required for the packaged smoke test\n' >&2; exit 1; }
 
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 OUTPUT_DIR=$(mkdir -p "$OUTPUT_DIR" && CDPATH= cd -- "$OUTPUT_DIR" && pwd)
@@ -67,8 +63,6 @@ ARCHIVE_PATH="$OUTPUT_DIR/$ARCHIVE"
 rm -f "$ARCHIVE_PATH"
 COPYFILE_DISABLE=1 tar -czf "$ARCHIVE_PATH" -C "$STAGE" ballet libexec share
 
-# Exercise only bytes read back from the final archive, installed through the
-# same immutable-bundle + atomic launcher layout used by the curl updater.
 EXTRACTED="$SMOKE_ROOT/extracted"
 SMOKE_INSTALL="$SMOKE_ROOT/install"
 BUNDLE="$SMOKE_INSTALL/libexec/ballet/versions/release-smoke"
@@ -83,10 +77,7 @@ RUNTIME="$BUNDLE/libexec/ballet"
 codesign --verify "$RUNTIME/node"
 [ -f "$RUNTIME/node_modules/better-sqlite3/package.json" ]
 find "$RUNTIME/node_modules/better-sqlite3" -name '*.node' -type f | grep . >/dev/null
-(
-  cd "$RUNTIME"
-  "$RUNTIME/node" -e 'require("better-sqlite3")'
-)
+(cd "$RUNTIME" && "$RUNTIME/node" -e 'require("better-sqlite3")')
 "$SMOKE_INSTALL/bin/ballet" version | grep -Fx "$VERSION" >/dev/null
 [ -f "$BUNDLE/share/ballet/dist/index.html" ]
 
@@ -100,13 +91,10 @@ cp -R .fixture-ballet-project "$SMOKE_ROOT/project"
   git commit -m "Release smoke fixture" >/dev/null
 )
 mkdir -p "$SMOKE_ROOT/home"
-SMOKE_PORT=$(
-  "$RUNTIME/node" -e 'const s=require("node:net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})'
-)
+SMOKE_PORT=$("$RUNTIME/node" -e 'const s=require("node:net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')
 (cd "$SMOKE_ROOT/project" && \
   exec env HOME="$SMOKE_ROOT/home" "$SMOKE_INSTALL/bin/ballet" server-internal-run \
-    --root "$SMOKE_ROOT/project" \
-    --port "$SMOKE_PORT" \
+    --root "$SMOKE_ROOT/project" --port "$SMOKE_PORT" \
     --state-root "$SMOKE_ROOT/project/.git/ballet" \
     --codex-command "$SMOKE_ROOT/providers/missing-codex" \
     --copilot-command "$SMOKE_ROOT/providers/missing-copilot") \
@@ -122,7 +110,7 @@ while [ "$ATTEMPT" -lt 80 ]; do
     exit 1
   fi
   if curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/health" -o "$SMOKE_ROOT/health.json" 2>/dev/null \
-    && "$RUNTIME/node" -e 'const fs=require("node:fs");const h=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(h.ok!==true||fs.realpathSync(h.checkoutRoot)!==fs.realpathSync(process.argv[2])||h.port!==Number(process.argv[3])||typeof h.instanceId!=="string")process.exit(1)' "$SMOKE_ROOT/health.json" "$SMOKE_ROOT/project" "$SMOKE_PORT"; then
+    && "$RUNTIME/node" -e 'const fs=require("node:fs");const h=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(h.ok!==true||fs.realpathSync(h.checkoutRoot)!==fs.realpathSync(process.argv[2])||h.port!==Number(process.argv[3]))process.exit(1)' "$SMOKE_ROOT/health.json" "$SMOKE_ROOT/project" "$SMOKE_PORT"; then
     READY=true
     break
   fi
@@ -131,125 +119,32 @@ while [ "$ATTEMPT" -lt 80 ]; do
 done
 [ "$READY" = true ] || { cat "$SMOKE_ROOT/server.err.log" >&2; printf 'packaged Ballet server did not become healthy\n' >&2; exit 1; }
 
-curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/data" -o "$SMOKE_ROOT/workspace.json" || {
-  cat "$SMOKE_ROOT/server.err.log" >&2
-  printf 'packaged Ballet server could not load the fixture workspace\n' >&2
-  exit 1
-}
-curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/graph-node-modules/library" -o "$SMOKE_ROOT/graph-node-library.json" || {
-  cat "$SMOKE_ROOT/server.err.log" >&2
-  printf 'packaged Ballet server could not list the fixture Graph Node Module library\n' >&2
-  exit 1
-}
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/project" -o "$SMOKE_ROOT/project.json"
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/environment" -o "$SMOKE_ROOT/environment.json"
 "$RUNTIME/node" -e '
 const fs = require("node:fs");
-const entries = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-if (!Array.isArray(entries)
-  || entries.length !== 1
-  || entries[0]?.source !== ".ballet/graph-node-library/fixture-clarify.ballet-graph-node.json"
-  || entries[0]?.valid !== true
-  || entries[0]?.manifest?.title !== "Clarify requirements"
-  || entries[0]?.permissions?.externalWrites !== false
-  || entries[0]?.package?.format !== "ballet-graph-node-module"
-  || entries[0]?.package?.version !== 7
-  || entries[0]?.package?.capabilities?.accepts?.[0] !== "fixture:requirements.requested"
-  || entries[0]?.package?.capabilities?.provides?.[0] !== "fixture:requirements.clarified"
-  || entries[0]?.package?.graphNode?.actionNodes?.length !== 1
-  || entries[0]?.package?.graphNode?.actionNodes?.[0]?.key !== "clarify"
-  || entries[0]?.package?.graphNode?.strategy?.kind !== "reward_mdp_v4") {
-  throw new Error("packaged Ballet server did not list the fixture Graph Node Module package");
+const project = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const environment = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+if (project.config?.version !== 20
+  || project.config?.environment?.id !== "fixture-environment"
+  || project.config?.direction?.useCases?.[0]?.status !== "approved"
+  || environment.environment?.id !== "fixture-environment"
+  || environment.environment?.states?.[0]?.order !== 1
+  || environment.environment?.states?.[0]?.actions?.[0]?.priority !== 1) {
+  throw new Error("packaged Ballet server did not load the canonical fixture workspace");
 }
-' "$SMOKE_ROOT/graph-node-library.json"
-"$RUNTIME/node" -e '
-const fs = require("node:fs");
-const workspace = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-const expectedProfile = {
-  id: "codex-gpt-5-6-luna-medium-network-off",
-  name: "Codex GPT-5.6 Luna · Medium · Network off",
-  provider: "codex",
-  model: "gpt-5.6-luna",
-  reasoningEffort: "medium",
-  networkAccess: false
-};
-const graphNode = workspace.automation?.graph?.graphNodes?.find((node) => node.id === "review-node");
-const actionNode = graphNode?.actionNodes?.find((node) => node.id === "review-action");
-const workNode = actionNode?.workNode;
-const validationNode = actionNode?.validationNode;
-const architect = workspace.instructions?.find((item) => item.id === "project:architect");
-const reviewer = workspace.instructions?.find((item) => item.id === "project:reviewer");
-if (workspace.automation?.version !== 19
-  || workspace.automation.graph?.graphNodes?.length !== 2
-  || graphNode?.id !== "review-node"
-  || graphNode?.description !== "Review the fixture project."
-  || graphNode?.capabilities?.accepts?.[0] !== "fixture:review.requested"
-  || graphNode?.capabilities?.provides?.[0] !== "fixture:review.completed"
-  || workspace.automation.graph?.id !== "fixture-graph"
-  || workspace.automation.graph?.state?.description !== "Provider-neutral context shared by the fixture Graph."
-  || JSON.stringify(workspace.automation.graph?.state?.initial) !== "{}"
-  || JSON.stringify(workspace.executionProfiles) !== JSON.stringify([expectedProfile])
-  || workspace.automation.graph?.strategy?.kind !== "reward_mdp_v4"
-  || workspace.automation.graph?.strategy?.id !== "fixture-reward-mdp"
-  || workspace.automation.graph?.strategy?.model?.discountPpm !== 990000
-  || workspace.automation.graph?.strategy?.model?.stateActions?.[0]?.successors
-    ?.reduce((sum, successor) => sum + successor.probabilityPpm, 0) !== 1000000
-  || workspace.automation.graph?.strategy?.model?.stateActions?.length !== 3
-  || graphNode?.strategy?.kind !== "reward_mdp_v4"
-  || graphNode?.strategy?.model?.stateActions?.length !== 1
-  || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "success" && outcome.result === "PASS")
-  || !graphNode?.outcomes?.some((outcome) => outcome.outcomeId === "failure" && outcome.result === "FAIL")
-  || actionNode?.description !== "Run and validate the fixture review."
-  || actionNode?.capabilities?.accepts?.length !== 0
-  || actionNode?.capabilities?.provides?.length !== 0
-  || actionNode?.maxRetries !== 3
-  || workNode?.type !== "human"
-  || workNode?.task !== "Review the fixture project and surface concrete risks."
-  || validationNode?.type !== "human"
-  || validationNode?.task !== "Confirm that the fixture review is complete and actionable."
-  || workspace.instructions?.length !== 2
-  || architect?.valid !== true
-  || architect?.relativePath !== ".ballet/instructions/architect.md"
-  || architect?.body !== "## Instructions\n\nDesign architecture, keep decisions traceable, and write ADRs when routing requires it.\n"
-  || architect?.sourceSha256 !== "e14626fb277d87f010307476613b89b0aa8bbb0f6903a10127f4f8e23082b44b"
-  || architect?.contentSha256 !== "3a7b394727be306a4dad011a4152d1502f35da591a406a74281362d9cd19b78d"
-  || architect?.sizeBytes !== 105
-  || reviewer?.valid !== true
-  || reviewer?.relativePath !== ".ballet/instructions/reviewer.md"
-  || reviewer?.body !== "Review implementation changes and surface risks.\n"
-  || reviewer?.sourceSha256 !== "4e43b53837175e6ac6b1b666b96de045cf2cb37b9f6cda2868e1207dd9ac6df6"
-  || reviewer?.contentSha256 !== "8ce7d15bdcd9cd6e2e4ec3471343e96ee50d1c18bc19aae62a8941f6dfc8ee9a"
-  || reviewer?.sizeBytes !== 49
-  || workspace.resourceIssues?.length !== 0
-  || workspace.automationIssues?.length !== 0
-  || workspace.canvasTheme?.version !== 4
-  || Object.hasOwn(workspace.canvasTheme?.node ?? {}, "showAgentAvatarInNode")
-  || workspace.canvasThemeIssues?.length !== 0) {
-  throw new Error("packaged Ballet server did not load the strict v19 hierarchical Reward-MDP fixture workspace");
-}
-' "$SMOKE_ROOT/workspace.json" || {
-  cat "$SMOKE_ROOT/server.err.log" >&2
-  exit 1
-}
+' "$SMOKE_ROOT/project.json" "$SMOKE_ROOT/environment.json"
 
-[ -f "$SMOKE_ROOT/project/.git/ballet/state.sqlite" ] || {
-  printf 'packaged Ballet server did not create checkout-local state.sqlite\n' >&2
-  exit 1
-}
+[ -f "$SMOKE_ROOT/project/.git/ballet/state.sqlite" ] || { printf 'packaged Ballet server did not create state.sqlite\n' >&2; exit 1; }
 "$RUNTIME/node" -e '
 const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "15") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 15`);
+if (version !== "16") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 16`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
-[ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || {
-  git -C "$SMOKE_ROOT/project" status --short >&2
-  printf 'packaged Ballet server dirtied the fixture checkout\n' >&2
-  exit 1
-}
-[ -z "$(find "$SMOKE_ROOT/home" -mindepth 1 -print -quit)" ] || {
-  printf 'packaged Ballet server wrote mutable state outside the checkout\n' >&2
-  exit 1
-}
+[ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || { git -C "$SMOKE_ROOT/project" status --short >&2; exit 1; }
+[ -z "$(find "$SMOKE_ROOT/home" -mindepth 1 -print -quit)" ] || { printf 'packaged Ballet wrote mutable state outside the checkout\n' >&2; exit 1; }
 kill "$SERVER_PID"
 wait "$SERVER_PID"
 SERVER_PID=

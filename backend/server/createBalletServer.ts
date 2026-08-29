@@ -3,27 +3,14 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { emptyBodySchema } from "../../shared/api/runtime-schemas.js";
-import { createApiRouter } from "../http/apiRouter.js";
+import { z } from "zod";
+import { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
+import { LocalSettingsRepository } from "../execution/LocalSettingsRepository.js";
 import { sendKnownHttpError } from "../http/errors.js";
 import { parseBody } from "../http/validation/httpValidation.js";
-import { LocalExecutionQueue } from "../execution/LocalExecutionQueue.js";
-import { ExecutionStore } from "../execution/ExecutionStore.js";
-import { LocalRuntimeService } from "../execution/LocalRuntimeService.js";
-import { RuntimeConfigurationService } from "../execution/RuntimeConfigurationService.js";
-import { LocalSettingsRepository } from "../execution/LocalSettingsRepository.js";
+import { createCompositionRoot } from "../orchestration/CompositionRoot.js";
 import { resolveProjectContext, type ProjectContext } from "../project/ProjectContext.js";
-import { RuntimeDatabase } from "../runtime-db.js";
-import { LocalRunService } from "../runs/LocalRunService.js";
-import { LocalRunTargetService } from "../runs/LocalRunTargetService.js";
-import { RootRunStore } from "../runs/RootRunStore.js";
-import { isActiveRootStatus } from "../runs/RunReadProjection.js";
-import { WorkspaceInvalidationBroadcaster } from "../runs/WorkspaceInvalidationBroadcaster.js";
-import { MarkdownStore } from "../store.js";
-import { TkTracker } from "../tracker/TkTracker.js";
-import { TrackerOutbox } from "../tracker/TrackerOutbox.js";
 import { RotatingFileLogger } from "./RotatingFileLogger.js";
-import { createVNextCompositionRoot } from "../vnext/VNextCompositionRoot.js";
 
 export interface CreateBalletServerOptions {
   root: string;
@@ -31,71 +18,25 @@ export interface CreateBalletServerOptions {
   stateRoot?: string;
   codexCommand?: string;
   copilotCommand?: string;
-  tkCommand?: string;
   webDist?: string;
   onShutdown?(): void;
 }
 
+const emptyBodySchema = z.object({}).strict();
+
 export const createBalletServer = async (options: CreateBalletServerOptions) => {
   const context = await resolveProjectContext({ root: options.root, stateRoot: options.stateRoot });
   const logger = new RotatingFileLogger(context.logsPath);
-  const database = new RuntimeDatabase(context.databasePath);
-  database.connection();
-  const roots = new RootRunStore(() => database.connection());
-  const executions = new ExecutionStore(() => database.connection());
   const settings = new LocalSettingsRepository(context.settingsPath);
   const savedSettings = await settings.load();
   const runtime = new LocalRuntimeService({
-    context, executionStore: executions, settings,
+    context,
+    settings,
     codexCommand: options.codexCommand ?? savedSettings.codexCommand,
     copilotCommand: options.copilotCommand ?? savedSettings.copilotCommand
   });
   await runtime.start();
-  const configurations = new RuntimeConfigurationService(settings, runtime);
-  const tracker = new TkTracker(options.tkCommand ?? savedSettings.tkCommand ?? "tk");
-  const trackerOutbox = new TrackerOutbox(() => database.connection(), tracker);
-  const invalidations = new WorkspaceInvalidationBroadcaster();
-  const store = new MarkdownStore(context.root, database);
-  const targets = new LocalRunTargetService(roots);
-  const runHolder: { service?: LocalRunService } = {};
-  const publishRunChanged = runInvalidationPublisher(roots, invalidations);
-  const queue = new LocalExecutionQueue({
-    store: executions, runtime, worktreesRoot: context.worktreesRoot,
-    onTerminal: (task) => runHolder.service!.handleTerminal(task),
-    onStarted: (task) => runHolder.service!.handleStarted(task),
-    onOrchestrationError: (error, task) => logger.error("Task terminal reconciliation failed.", {
-      taskId: task.id, error: error instanceof Error ? error.message : String(error)
-    }),
-    onChanged: publishRunChanged
-  });
-  const runs = new LocalRunService({
-    context, connection: () => database.connection(), database, roots, executions, runtime,
-    configurations, queue, tracker, trackerOutbox,
-    onChanged: publishRunChanged
-  });
-  runHolder.service = runs;
-  store.setWorkspaceEnricher(async (content) => {
-    const configurationResolution = await configurations.resolveAll(content.executionProfiles);
-    const activeRootRuns = roots.list().filter((root) => isActiveRootStatus(root.status));
-    return {
-      ...content,
-      activeRootRuns,
-      runtime: await runtime.snapshot(),
-      runtimeConfigurationIssues: [
-        ...configurationResolution.globalIssues,
-        ...Object.values(configurationResolution.configurations)
-        .flatMap((configuration) => configuration.issues),
-      ],
-      runTargets: targets.list(
-        content,
-        configurationResolution.configurations,
-        configurationResolution.globalIssues
-      )
-    };
-  });
-  await runs.reconcile();
-  await queue.start();
-  const vnext = await createVNextCompositionRoot({ context, runtime });
+  const composition = await createCompositionRoot({ context, runtime });
 
   const app = express();
   app.disable("x-powered-by");
@@ -110,10 +51,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(202).json({ accepted: true });
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
-  app.use("/api/vnext", vnext.router);
-  app.use("/api", createApiRouter({
-    store, runtime, executions, runs, invalidations, logsPath: context.logsPath
-  }));
+  app.use("/api", composition.router);
 
   const clientDist = resolveClientDist(options.webDist);
   app.use(express.static(clientDist));
@@ -130,18 +68,10 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     if (shuttingDown) return closed;
     shuttingDown = true;
     logger.info("Ballet shutdown started.");
-    await Promise.race([
-      queue.shutdown(85_000).then(() => runs.reconcile()),
-      new Promise<void>((resolve) => {
-        const timeout = setTimeout(resolve, 90_000);
-        timeout.unref();
-      })
-    ]);
-    await vnext.shutdown();
+    await composition.shutdown();
     const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await serverClosed;
-    database.close();
     logger.info("Ballet shutdown completed.");
     await logger.flush();
     resolveClosed();
@@ -149,7 +79,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   };
 
   logger.info("Ballet server initialized.", { root: context.root, instanceId: context.instanceId, port: options.port });
-  return { app, server, context, store, runtime, configurations, executions, runs, queue, vnext, shutdown, logger };
+  return { app, server, context, runtime, composition, shutdown, logger };
 };
 
 export const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {
@@ -171,20 +101,8 @@ export const loopbackSecurity = (port: number): express.RequestHandler => (req, 
 
 const health = (context: ProjectContext, port: number, runtime: LocalRuntimeService) => ({
   ok: true, instanceId: context.instanceId, checkoutRoot: context.root, port,
-  version: process.env.BALLET_VERSION ?? "0.1.0",
-  startedAt: runtime.startedAtIso
+  version: process.env.BALLET_VERSION ?? "0.1.0", startedAt: runtime.startedAtIso
 });
-
-const runInvalidationPublisher = (
-  roots: RootRunStore,
-  invalidations: WorkspaceInvalidationBroadcaster
-) => (rootRunId: string): void => {
-  const root = roots.get(rootRunId);
-  if (!root) return;
-  invalidations.publish({
-    type: "runs-changed", rootRunId, stateRevision: root.stateRevision, status: root.status
-  });
-};
 
 const resolveClientDist = (configured?: string): string => {
   const candidates = [configured, path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist"), path.resolve(process.cwd(), "dist")]

@@ -1,75 +1,80 @@
 ---
-id: ballet-architecture-entrypoint
-title: Balletin arkkitehtuurin aloituspiste
+id: architecture-root
+title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 25
+version: 20
 tags:
   - architecture
   - arc42
-  - entrypoint
 ---
 
-# Balletin arkkitehtuuri
+# Ballet architecture
 
-## Tarkoitus
+Ballet is a checkout-local orchestration command center. Its canonical architecture is the accepted Environment -> State -> Action model in [`adr-034`](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md), with the full contract in the [`environment-state-action-orchestration`](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md) initiative.
 
-Tämä on ihmisten ja AI-agenttien yhteinen aloituspiste Balletin versionhallittuun arkkitehtuuriin. Pitkäikäinen project truth on Goal/ADR/arc42/initiative-ketjussa; runtime truth on immutable Root Snapshotissa ja SQLite-faktoissa. Project-local-menetelmää ei päätellä platform-koodista eikä runtime-lokeja kopioida dokumentaatioksi.
+## Truth boundaries
 
-## Aktiivinen nykytila
+- Project truth is version-controlled Markdown, `.ballet/project.json`, instructions and Skills.
+- Machine-local truth is fresh SQLite v16 under `.git/ballet`, immutable run snapshots, events and managed worktrees.
+- Runtime status is authoritative; `done` and `blocked` are derived facts.
+- UI and providers project facts. They do not own ordering, approval or retry decisions.
 
-- `goal-021` ja `adr-033` omistavat hierarkkisen Reward-MDP:n: Graph-scope käyttää GraphNode-ID:itä ja jokainen GraphNode omia ActionNode-ID:itään sekä state- että action-joukkona.
-- Default Graph on 5×5 (15/25 authoroitua solua), PLAN 2×2 (3/4) ja DESIGN 12×12 (78/144). Terminalit ovat branch targetteja, eivät policy-stateja.
-- Validation palauttaa typed ActionNode-outcomen local policylle. Local terminal emittoi GraphNode-outcomen global policylle; bounded FAIL on `retry | escalate`, mutta kumpikaan ei ohita local branchia.
-- Acceptance-ledger kuuluu Graphille ja on erillinen evidenssiportti. Vain eksplisiittisesti sidotut obligaatiot vaikuttavat Graph-potentialiin; sitomaton node, Action-split tai duplicate verification antaa progress-rewardia nolla.
-- Reward on scopekohtainen `terminalSuccessBonus − actionCost − outcomePenalty`, Graphissa lisäksi `γΦ(target) − Φ(s)`. Kaikki rewardit ovat integer-mikroyksikköjä ja probabilityt integer-ppm:iä.
-- Transitionit mallintavat `P(outcome,s′|s,a)`:n. Authoroimattoman tiedon läpinäkyvä prior on exact-ppm symmetric Dirichlet(1), provenance `default_prior`; runtime ei opi siitä online.
-- Global ja reachable local policyt compileutuvat erikseen kerran immutable Root Snapshotiin deterministic iteration boundilla, stable tie-breakillä ja absorption-checkillä. Havaittu typed outcome valitsee branchin deterministisesti; runtime ei arvo seuraajaa.
-- Authorization tulee erillisestä immutable snapshotista. Unauthorized action ei kuulu `A(s)`:ään eikä project State voi antaa sille lupaa.
-- Aktiivinen strict cut on Project Config v19, Decision Model v4, Graph Node Module v7, Root Snapshot v12, Task Envelope/Outcome v9, composition v10, ExecutionSpec v11, policy decision/observation v5 ja SQLite v15. Legacy-readeria, migraatiota, aliasia tai dual-writeä ei ole.
-- Repositoryn project-local default sisältää DESIGN/PLAN/BUILD/DEPLOY/VERIFY-GraphNodet ja 17 ActionNodea. Platform tuntee vain geneeriset primitivit.
-- UI säilyttää capability-first-kortit ja ADR-025/027:n protected Action Node flow'n. Graph ja GraphNode näyttävät semanttisen CSS-grid 5×5/N×N Q(s,a)-matriisin, vihreän `+reward`-, punertavan `−cost`- ja amber `≈estimate`-semantiikan sekä exact micros/ppm-detailin.
-- Release, deploy, rollback, merge, push ja muu ulkoinen kirjoitus vaativat täsmällisen ihmisvaltuutuksen.
+## Runtime architecture
 
-## Hyväksytty target ja transition
+```text
+Human-approved direction
+  -> strict Project Config v20
+  -> immutable Root Snapshot v13
+  -> Environment Run
+  -> lowest-order eligible State
+  -> lowest-priority eligible Action
+  -> Validation precheck
+       -> done
+       -> delegate -> Work -> Validation postwork -> done | retry | blocked
+       -> blocked
+  -> next State only after every prior Action is done
+  -> Product Snapshot
+```
 
-`goal-022` ja `adr-034` hyväksyvät strict targetin Environment → State → Action, approved Use Caset, Validation-led precheck/Work/postwork-loopin, runtime-statuksesta johdetut `done`/`blocked`-portit, Feedback/Critic/Refinement-human approval -rajat sekä immutable continuation/Product Snapshot -evidenssin. Target matrix on Project Config v20, Snapshot v13, Task/outcome v10, composition v11, ExecutionSpec v12, SQLite v16 ja Feedback/Critic/Refinement v1; Reward-MDP/Graph/GraphNode/ActionNode/policy/acceptance ledger/Graph Node Module poistuvat lopputilasta.
+Validation controls the loop. `maxRetries` counts additional Work attempts after the first. Exhaustion persists the blocked Action and Feedback entry in one transaction. Provider failure is a technical outcome and never silently becomes a semantic retry.
 
-Toteutusbaseline pysyy yllä kuvattuna strict v19:nä phase 09:n atomiseen cutoveriin asti. Phases 02–08 saavat käyttää vain dataeristettyä vNext-namespacea, `/api/vnext`-API:a ja `/vnext`-UI:ta. V19 ja vNext eivät lue tai kirjoita toisiaan, dual-writeä/compatibility readeria/migraatiota/route aliasia ei ole, ja phase 09 poistaa sekä vanhan aktiivipolun että kaikki vNext-prefixit. Targetin kanoninen rajaus on [Target Contract](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md).
+Critic and Refinement are separate governance flows. A Critic proposal requires a human decision before it can become Feedback. A Refinement proposal is read-only and exact-hash-bound; approval applies only allowed instruction/Skill paths in a managed worktree, creates one commit and starts an immutable continuation run.
 
-## Supersession
+## Building blocks
 
-`goal-021` supersedoi `goal-020`:n single-policy/ledger-state/array-order-osat. `adr-033` supersedoi vastaavat ADR-031:n osat ja ADR-032:n 62-state landscape/pulse/horizon -projektion. Vanhat tiedostot säilyvät audit trailina. ADR-031:n deterministic outcome-aware reward/authorization, ADR-032:n ihmisyksiköt/värisemantiikka ja ADR-025/027:n Action flow säilyvät.
+| Block | Responsibility | Source |
+| --- | --- | --- |
+| Shared contracts | Strict schemas, version constants, status derivation, route contracts | `shared/orchestration/**` |
+| Project services | v20 config and Markdown closure | `backend/orchestration/project/**` |
+| Runtime | planning, Validation-led control, provider dispatch and continuation | `backend/orchestration/runtime/**` |
+| Persistence | SQLite v16 transactions, events, schedules, feedback and reviews | `backend/orchestration/persistence/**` |
+| Governance | Critic, human approvals and Refinement apply | `backend/orchestration/governance/**` |
+| HTTP/SSE | loopback-secured canonical `/api/*` boundary | `backend/orchestration/http/**` |
+| UI | canonical configure, run, feedback, review and product workspaces | `frontend/src/orchestration/**` |
+| Provider/worktree primitives | provider-neutral execution and local Git isolation | `backend/execution/**` |
 
-Accepted `goal-022` / `adr-034` supersedoi phase 09:n final cutissa `goal-021`:n ja ADR-016/023/025/027/029/031/032/033:n nimeämät Graph/module/policy/matrix/control-osat. Ennen phase 09:ää tämä on hyväksytty target-päätös, ei väite toteutetusta runtime-cutista. Checkout-local-, provider-, worktree-, immutable evidence-, security-, design token- ja external-write-periaatteet säilyvät.
+## Strict version matrix
 
-## Kanoniset lähteet
+| Contract | Version |
+| --- | ---: |
+| Project Config | 20 |
+| Root Snapshot | 13 |
+| Task Envelope / role outcome | 10 |
+| Prompt composition | 11 |
+| ExecutionSpec | 12 |
+| SQLite | 16 |
+| Feedback / Critic / Refinement | 1 |
 
-- [arc42-indeksi](.ballet/arc42/README.md)
-- [status ja handoff](.ballet/arc42/STATUS.md)
+There is no migration, compatibility reader, route alias or dual write. Incompatible local databases must be archived or removed.
+
+## Canonical documentation
+
+- [arc42 index](.ballet/arc42/README.md)
+- [status](.ballet/arc42/STATUS.md)
 - [traceability](.ballet/arc42/TRACEABILITY.md)
-- [method health](.ballet/arc42/METHOD-HEALTH.md)
-- [State-sopimus](.ballet/arc42/STATE-CONTRACT.md)
-- [Goal-yhteenveto](.ballet/goals/summary.md)
-- [ADR-indeksi](.ballet/arc42/09-architecture-decisions.md)
-- [UI-designjärjestelmä](DESIGN.md)
-- [Hierarchical Reward-MDP initiative](.ballet/arc42/initiatives/hierarchical-reward-mdp/BRIEF.md)
-- [Environment orchestration target](.ballet/arc42/initiatives/environment-state-action-orchestration/TARGET-CONTRACT.md)
+- [quality scenarios](.ballet/arc42/10-quality-requirements.md)
+- [design system](DESIGN.md)
 
-## Omistajuus
-
-1. Goalit omistavat WHAT/WHY:n.
-2. ADR:t omistavat riskialttiit ja vaikeasti peruttavat päätökset sekä supersessionin.
-3. arc42-osiot 1–12 omistavat pitkäikäiset näkymät, konseptit, laadun ja riskit.
-4. Initiative BRIEF/PLAN/EVIDENCE/REVIEW omistaa rajatun muutoksen sopimuksen ja todellisen näytön.
-5. `DESIGN.md` omistaa visuaalisen järjestelmän; `.ballet/project.json` project-local automaatiodatan.
-6. `.git/ballet` omistaa machine-local runtime-tilan, ei arkkitehtuuritekstiä.
-
-## Evidenssi ja avoin riski
-
-`npm run validate:arc42` tarkistaa tällä hetkellä dokumentti-, trace-, resource- ja strict-v19 hierarchical Reward-MDP -sopimuksen. `EVID-028`–`EVID-032` ovat pending, joten accepted targetista ei päätellä toteutusta. Testit, lint, build, manifestin removal-gatet, platform boundary, `make latest` ja käynnistyssmoke muodostavat tulevan teknisen acceptance-portin.
-
-## Seuraava katselmointiperuste
-
-Katselmoi entrypoint, kun accepted Goal/ADR, strict version matrix, deployment boundary tai persistent handoff muuttuu.
+Historical initiatives and superseded ADRs remain audit evidence, not active architecture.

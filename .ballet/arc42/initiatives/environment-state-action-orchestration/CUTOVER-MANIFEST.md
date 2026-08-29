@@ -4,7 +4,7 @@ title: Environment State Action orchestration cutover manifest
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 2
+version: 3
 tags:
   - arc42
   - initiative
@@ -13,6 +13,10 @@ tags:
 ---
 
 # Environment State Action orchestration cutover manifest
+
+## Final execution status
+
+All `replace`, `remove`, `adapt` and `supersede-doc` actions in this manifest are complete in the canonical implementation. `npm run validate:cutover` scans the active source/config/build/script surface and passed with 219 files; path and route inventory checks found no transitional namespace. Historical phase descriptions and source paths below remain the audit record of what was cut over.
 
 ## Phase map
 

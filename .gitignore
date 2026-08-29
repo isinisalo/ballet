@@ -42,3 +42,4 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.json
 release/*
+.playwright-cli/page-*.yml

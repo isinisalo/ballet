@@ -1,6 +1,6 @@
-import type { ExecutionPolicy, RuntimeProvider } from "../../../shared/domain/runtime.js";
+import type { ExecutionPolicy, RuntimeProvider } from "../../../shared/domain/localRuntime.js";
 
-export type { RuntimeProvider } from "../../../shared/domain/runtime.js";
+export type { RuntimeProvider } from "../../../shared/domain/localRuntime.js";
 
 export interface RuntimeProbe {
   provider: RuntimeProvider;

@@ -162,7 +162,7 @@ describe("CopilotSdkAdapter", () => {
     expect(() => sdkValidator.resolveToolFilterOptions(client.config!)).not.toThrow();
   });
 
-  it("maps a vNext read-only request to a zero-write SDK sandbox", async () => {
+  it("maps a canonical read-only request to a zero-write SDK sandbox", async () => {
     const client = new FakeClient();
     const sdk: CopilotSdkModule = {
       CopilotClient: class { constructor() { return client; } } as unknown as CopilotSdkModule["CopilotClient"],

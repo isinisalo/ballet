@@ -4,7 +4,7 @@ title: Validation-led Environment State Action target contract
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 1
+version: 2
 tags:
   - arc42
   - initiative
@@ -16,7 +16,7 @@ tags:
 
 ## Authority and status
 
-This contract is the canonical bounded target for `goal-022`, `adr-034` and initiative `environment-state-action-orchestration`. It governs phases 02–11 if those implementation phases are separately requested; this architecture phase does not itself authorize production-code changes. It never authorizes merge, push, release, deploy or external-service writes.
+This contract is the canonical active baseline for `goal-022`, `adr-034` and initiative `environment-state-action-orchestration`. It governs the strict v20/v16 implementation. It never authorizes merge, push, release, deploy or external-service writes.
 
 ## Project truth and runtime truth
 
@@ -225,24 +225,26 @@ Product Snapshot is a read-only projection with version, source Run/snapshot/com
 
 Canonical target API exposes explicit commands for Use Case approve/reject, Critic proposal approve/reject and Refinement proposal approve/reject. Each body contains expected revision and relevant content/preimage hash; server authentication is the existing loopback/same-origin human UI boundary. Agent task tokens/outputs cannot call approval services.
 
-Refinement apply is an internal/application command that consumes an already recorded approval; no public route accepts “approved=true” plus a diff. All mutations use Zod validation, exact conflict errors and one transaction. `/api/vnext` is temporary in phases 07–08 and disappears in phase 09; there are no aliases.
+Refinement apply is an internal/application command that consumes an already recorded approval; no public route accepts “approved=true” plus a diff. All mutations use Zod validation, exact conflict errors and one transaction. Canonical endpoints live under `/api`; there are no aliases.
 
 ## UI routes and responsive contract
 
-Final canonical workspaces are Direction, Use Cases, Environment, Run Gate, Feedback Box, Critic Review, Refinement Approval and Product Snapshot. Final routes are chosen once in phase 09 from the vNext prototypes and have no `/vnext`, `/automation/graph`, GraphNode or ActionNode alias.
+Canonical workspaces are Direction, Use Cases, Environment, Run Gate, Feedback Box, Critic Review, Refinement Approval and Product Snapshot. Each has one route owned by the shared route inventory and frontend routing contract.
 
 The Environment view uses ordered lanes/sections and priority Action rows/cards, not freeform topology. Action detail shows Validation as main, Work subordinate and retry/block states. Approval commands expose exact revision/hash impact, require deliberate confirmation, remain keyboard reachable and never rely on color alone. Acceptance at 1440×900 and 390×844 is page overflow 0, clipped core action 0 and full keyboard/focus flow. Existing dark palette, Inter/Geist, spacing/radii and signal colors remain.
 
 ## Required instruction sections
 
-Every selected primary instruction must contain exactly these top-level sections in this order, with role-appropriate non-empty content:
+Every selected Action-role instruction must contain exactly these top-level sections in this order, with role-appropriate non-empty content:
 
-1. `## Purpose`
-2. `## Inputs`
-3. `## Responsibilities`
-4. `## Output contract`
-5. `## Permissions`
-6. `## Stop conditions`
+1. `## Task`
+2. `## Role`
+3. `## Goals`
+4. `## Priorities`
+5. `## Method`
+6. `## Output contract`
+7. `## Tool policy`
+8. `## Acceptance evidence`
 
 Validation instructions describe precheck/postwork restrictions. Work instructions state subordinate scope and forbidden approval/routing. Critic/Refinement instructions state read-only proposal authority. Missing, duplicate or reordered sections block config/resource readiness with zero provider tasks.
 
@@ -252,7 +254,7 @@ While a Run or continuation using a snapshot is active, mutation is disabled for
 
 ## Strict removal criteria
 
-Phase 09/10 must satisfy [CUTOVER-MANIFEST.md](CUTOVER-MANIFEST.md): zero active Reward-MDP, Graph/GraphNode/ActionNode, policy decision/observation, acceptance ledger, Graph Node Module, `/automation/graph`, Graph/GraphNode root-kind and vNext-prefix surfaces. Historical superseded docs and initiative evidence remain. Project Config v19 and SQLite v15 are rejected unchanged; no migration, reader, alias or dual-write exists.
+The implementation must satisfy [CUTOVER-MANIFEST.md](CUTOVER-MANIFEST.md): the removed architecture and every transitional prefix are absent from active source, configuration, routes and tests. Historical superseded docs and initiative evidence remain. Project Config versions other than v20 and SQLite versions other than v16 are rejected unchanged; no migration, reader, alias or dual-write exists.
 
 ## Target version matrix
 
@@ -278,6 +280,6 @@ Phase 09/10 must satisfy [CUTOVER-MANIFEST.md](CUTOVER-MANIFEST.md): zero active
 | Critic schedule and human approval | runtime/application owners | `TEST-029` |
 | Refinement/hash/apply/continuation/Product Snapshot | Git/runtime/read-model owners | `TEST-030` |
 | Routes, authoring lock, accessibility and responsive UI | frontend/browser owners | `TEST-031` |
-| Legacy/vNext removal, release fixture/install/startup | conformance/release owners | `TEST-032` |
+| Removed-surface gate, release fixture/install/startup | conformance/release owners | `TEST-032` |
 
 “Done” requires executable evidence for every in-scope priority-1 criterion, not compilation alone.
