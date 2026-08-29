@@ -11,7 +11,32 @@ export type View =
   | "runtimes"
   | "execution-profiles"
   | "skills"
-  | "run";
+  | "run"
+  | "vnext";
+
+export type VNextView =
+  | "direction"
+  | "use-cases"
+  | "environment"
+  | "state"
+  | "action"
+  | "instructions"
+  | "skills"
+  | "execution-profiles"
+  | "critic"
+  | "run-list"
+  | "run-detail"
+  | "run-state"
+  | "run-action"
+  | "feedback-list"
+  | "feedback-detail"
+  | "critic-reviews"
+  | "critic-proposal"
+  | "refinement-reviews"
+  | "refinement-proposal"
+  | "products"
+  | "product-detail"
+  | "invalid";
 
 export type SaveCollection = "skills";
 export type EngineeringLevel = "graph" | "graph_node" | "action_node";
@@ -30,6 +55,10 @@ export interface RouteState {
   runTargetKind?: "graph" | "graph_node";
   runTargetId?: string;
   rootRunId?: string;
+  vNextView?: VNextView;
+  entityId?: string;
+  stateId?: string;
+  actionId?: string;
 }
 
 export const emptyData: AppData = {

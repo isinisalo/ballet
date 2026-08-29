@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/base.css";
 @import "tw-animate-css";
+
+@media (max-width: 767px) {
+  .vnext-workspace button,
+  .vnext-workspace input,
+  .vnext-workspace select,
+  .vnext-workspace textarea {
+    min-height: 40px;
+  }
+
+  .vnext-workspace input,
+  .vnext-workspace select,
+  .vnext-workspace textarea {
+    font-size: 16px;
+  }
+}
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/geist-mono";

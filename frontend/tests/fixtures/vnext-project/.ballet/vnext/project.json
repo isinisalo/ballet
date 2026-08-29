@@ -1,0 +1,196 @@
+{
+  "critic": {
+    "agent": {
+      "executionProfileId": "profile-1",
+      "instructionResource": "validation",
+      "skillResources": [
+        "shared-skill"
+      ],
+      "toolPolicy": "read_only"
+    },
+    "enabled": false,
+    "schedules": [
+      {
+        "id": "daily",
+        "kind": "daily",
+        "localTimes": [
+          "09:00"
+        ],
+        "timeZone": "Europe/Helsinki"
+      }
+    ],
+    "version": 1
+  },
+  "direction": {
+    "adrs": [
+      {
+        "id": "adr-1",
+        "name": "Validation-led orchestration",
+        "status": "accepted"
+      }
+    ],
+    "constraints": [
+      {
+        "description": "No State may be skipped",
+        "id": "constraint-1",
+        "kind": "prohibited",
+        "name": "No premature progression",
+        "rationale": "Deterministic quality gate",
+        "status": "accepted"
+      }
+    ],
+    "goals": [
+      {
+        "id": "goal-1",
+        "name": "Deliver verified outcomes",
+        "status": "accepted"
+      }
+    ],
+    "useCases": [
+      {
+        "adrIds": [
+          "adr-1"
+        ],
+        "approval": {
+          "approvedAt": "2026-08-29T10:00:00.000Z",
+          "approvedBy": "human",
+          "contentHash": "6763b54217ffb2b8dcd848e49816d80435c9cfdb9d47a437cebf6b63695fa26d",
+          "revision": 1
+        },
+        "constraintIds": [
+          "constraint-1"
+        ],
+        "examples": [
+          {
+            "given": "approved intent",
+            "then": "verified evidence is produced",
+            "when": "the Environment runs"
+          }
+        ],
+        "expectedOutcomes": [
+          "Done"
+        ],
+        "failureGoals": [
+          "No skip"
+        ],
+        "goalIds": [
+          "goal-1"
+        ],
+        "id": "UC-1",
+        "name": "Deliver outcome",
+        "status": "approved",
+        "successGoals": [
+          "goal-1"
+        ]
+      }
+    ]
+  },
+  "environment": {
+    "description": "Ordered delivery",
+    "id": "environment-1",
+    "name": "Delivery Environment",
+    "states": [
+      {
+        "actions": [
+          {
+            "description": "Perform bounded work",
+            "id": "action-1",
+            "maxRetries": 2,
+            "name": "Implement and verify",
+            "priority": 1,
+            "useCaseIds": [
+              "UC-1"
+            ],
+            "validation": {
+              "executionProfileId": "profile-1",
+              "instructionResource": "validation",
+              "skillResources": [
+                "shared-skill"
+              ],
+              "toolPolicy": "read_only"
+            },
+            "work": {
+              "executionProfileId": "profile-1",
+              "instructionResource": "work",
+              "skillResources": [
+                "shared-skill"
+              ],
+              "toolPolicy": "workspace_write"
+            }
+          }
+        ],
+        "description": "Build the requested change",
+        "id": "state-1",
+        "name": "Build",
+        "order": 1,
+        "useCaseIds": [
+          "UC-1"
+        ]
+      },
+      {
+        "actions": [
+          {
+            "description": "Verify the result",
+            "id": "action-2",
+            "maxRetries": 0,
+            "name": "Final verification",
+            "priority": 1,
+            "useCaseIds": [
+              "UC-1"
+            ],
+            "validation": {
+              "executionProfileId": "profile-1",
+              "instructionResource": "validation",
+              "skillResources": [
+                "shared-skill"
+              ],
+              "toolPolicy": "read_only"
+            },
+            "work": {
+              "executionProfileId": "profile-1",
+              "instructionResource": "work",
+              "skillResources": [
+                "shared-skill"
+              ],
+              "toolPolicy": "workspace_write"
+            }
+          }
+        ],
+        "description": "Validate all evidence",
+        "id": "state-2",
+        "name": "Verify",
+        "order": 2,
+        "useCaseIds": [
+          "UC-1"
+        ]
+      }
+    ]
+  },
+  "executionProfiles": [
+    {
+      "id": "profile-1",
+      "model": "gpt-5.6-sol",
+      "name": "Primary Codex",
+      "networkAccess": false,
+      "provider": "codex",
+      "reasoningEffort": "high"
+    }
+  ],
+  "refinement": {
+    "agent": {
+      "executionProfileId": "profile-1",
+      "instructionResource": "validation",
+      "skillResources": [
+        "shared-skill"
+      ],
+      "toolPolicy": "read_only"
+    },
+    "allowedRoots": [
+      ".ballet/instructions",
+      ".agents/skills"
+    ],
+    "enabled": true,
+    "version": 1
+  },
+  "version": 20
+}

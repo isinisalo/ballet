@@ -1,0 +1,13 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { ExecutionProfile } from "@shared/vnext/environment";
+import type { ReferenceEntry } from "../types";
+import { ConfigureHeader } from "./ConfigureHeader";
+
+export function ExecutionProfilesWorkspace({ profiles, references, locked, onSave }: { profiles: ExecutionProfile[]; references: ReferenceEntry[]; locked: boolean; onSave(profiles: ExecutionProfile[]): Promise<void> }) {
+  const [draft, setDraft] = useState(profiles); const usage = (id: string) => references.find((entry) => entry.kind === "execution-profile" && entry.id === id)?.references ?? [];
+  return <><ConfigureHeader title="Execution profiles" description="Provider-neutral model, reasoning, network, role usage, and permission summaries." status={locked ? "Locked by active Run" : `${profiles.length} profiles`} />
+    <form className="space-y-3 p-4 md:p-6" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>{draft.map((profile, index) => <fieldset key={profile.id} className="grid gap-3 rounded-md border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4"><legend className="px-1 font-mono text-xs text-tertiary">{profile.id}</legend><div><Label>Name<Input value={profile.name} onChange={(event) => setDraft(draft.map((item, current) => current === index ? { ...item, name: event.target.value } : item))} /></Label></div><div><Label>Provider<select className="mt-1 h-10 w-full rounded-sm border bg-background px-2" value={profile.provider} onChange={(event) => setDraft(draft.map((item, current) => current === index ? { ...item, provider: event.target.value as ExecutionProfile["provider"] } : item))}><option value="codex">Codex</option><option value="copilot">Copilot</option></select></Label></div><div><Label>Model<Input value={profile.model} placeholder="gpt-5.6-sol" onChange={(event) => setDraft(draft.map((item, current) => current === index ? { ...item, model: event.target.value } : item))} /></Label></div><div><Label>Reasoning<Input value={profile.reasoningEffort} onChange={(event) => setDraft(draft.map((item, current) => current === index ? { ...item, reasoningEffort: event.target.value } : item))} /></Label></div><p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">Network: {profile.networkAccess ? "enabled by profile" : "off"} · Role uses: {usage(profile.id).map((reference) => `${reference.ownerId}/${reference.field}`).join(", ") || "none"}. Validation/Critic/Refinement remain read-only; Work remains workspace-write.</p></fieldset>)}<Button disabled={locked}>Save execution profiles</Button></form></>;
+}

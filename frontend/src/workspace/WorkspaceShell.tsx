@@ -16,10 +16,20 @@ import { useRunDashboard } from "./runs/useRunDashboard";
 import { useWorkspaceSelection } from "./selection/useWorkspaceSelection";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation";
 import { WorkspaceRouteOutlet } from "./WorkspaceRouteOutlet";
+import { VNextWorkspaceShell } from "../vnext/VNextWorkspaceShell";
 
 export function WorkspaceShell() {
-  const { notify } = useNotifications();
   const { route, navigate, setNavigationBlocker } = useWorkspaceNavigation();
+  if (route.view === "vnext") return <VNextWorkspaceShell route={route} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+  return <CurrentWorkspaceShell route={route} navigate={navigate} setNavigationBlocker={setNavigationBlocker} />;
+}
+
+function CurrentWorkspaceShell({ route, navigate, setNavigationBlocker }: {
+  route: ReturnType<typeof useWorkspaceNavigation>["route"];
+  navigate: ReturnType<typeof useWorkspaceNavigation>["navigate"];
+  setNavigationBlocker: ReturnType<typeof useWorkspaceNavigation>["setNavigationBlocker"];
+}) {
+  const { notify } = useNotifications();
   const { data, loading, refresh } = useWorkspaceData({ notify });
   const selection = useWorkspaceSelection({ data, route });
   const runDashboardData = useRunDashboard({ enabled: route.view === "run", rootRunId: route.rootRunId, targets: data.runTargets });

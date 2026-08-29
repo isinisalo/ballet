@@ -4,7 +4,7 @@ title: Environment State Action orchestration initiative evidence
 status: draft
 createdAt: '2026-08-29'
 updatedAt: '2026-08-29'
-version: 7
+version: 8
 tags:
   - arc42
   - initiative
@@ -24,10 +24,11 @@ tags:
 | ESAO-evid-005 | REQ-022; partial QS-028/QS-030/QS-032 | Immutable v13 closure planning, six-part v11 prompt, strict v10 output, provider-neutral permissions, Validation-led Environment loop, durable enqueue/reconcile, parent-agent lineage, Product Snapshot and safe continuation seeding | `backend/vnext/runtime/**`; `shared/vnext/runtime.ts`; `agent_runs.parent_agent_run_id`; `TEST-028` integration scenarios 1–18 | passed: 22 runtime/planner/provider tests and complete focused vNext suite; full repository gates recorded in the phase-03 commit | 2026-08-29 deterministic fake provider and temporary v16 databases | Isolated transition namespace only; no public HTTP/startup/frontend registration and no real provider invocation. Managed refinement apply remains phase 05. |
 | ESAO-evid-006 | REQ-022; partial QS-029/QS-030/QS-032 | Human/Validation/system Feedback provenance; DST-aware durable Critic scheduling and read-only proposals; exact human decisions; safe-path agentless Refinement apply; shared-Skill impact; immutable continuation and evidence-gated Feedback resolution | `backend/vnext/governance/**`; `backend/vnext/persistence/Review*.ts`; `FeedbackStore.ts`; governance integration tests | passed: disabled/daily/weekly/DST/dedupe/overlap/catch-up/skip/shutdown, approval, target, symlink/preimage/hash/allowlist/Git/continuation/resolution/security scenarios; full repository gates recorded in the phase-05 commit | 2026-08-29 deterministic clock, fake provider boundary, temporary v16 DBs and temporary Git repositories | Local worktrees/branches are intentionally retained for audit; no merge, push, HTTP route or canonical service startup. Real provider occurrence remains pending. |
 | ESAO-evid-007 | REQ-022; partial QS-028/QS-029/QS-030/QS-032 | Isolated v20 project/Markdown repositories, reference/blocker index, v16 service composition, 73-route typed HTTP contract, trusted human operations, factual SSE, immutable governance worktree capture and v15/v16 isolation | `backend/vnext/{VNextCompositionRoot.ts,project/**,http/**,runtime/VNextWorkspaceManager*}`; `shared/vnext/{httpContracts,routeInventory}.ts`; API/isolation/workspace tests | passed: API fixture asserts 76 lifecycle/security cases; route inventory equals mounted Express routes; focused suite 8 files/50 tests; full `npm run test` 62 files/320 tests; zero-warning lint; production build | 2026-08-29 temporary v20 project roots, v16 databases, fake provider and local Git worktrees | Transition `/api/vnext` only; current v19 API/UI remain canonical. No browser UI or real provider occurrence is claimed. |
+| ESAO-evid-008 | REQ-022; partial QS-028/QS-029/QS-031 | Isolated vNext Configure UI for Direction, Use Cases, ordered Environment/State/Action authoring, resources, profiles and Critic configuration | `frontend/src/vnext/{configure/**,authoringModels.ts,vNextApi.ts,useVNext*}`; `frontend/tests/vnext{AuthoringModels,Routing,ConfigureUi}.test.*`; `evidence/configure-{environment-1440x900,action-390x844}.png` | passed: 39 focused tests; real API browser snapshots at 1440×900 and 390×844; overflow 0; URL back/forward preserved Action deep link; keyboard reorder and color-independent status inspected | 2026-08-29 local loopback service | Configure half of phase 08 only. Run/Feedback/review/Product UI and final target verdict remain pending. |
 | EVID-028 | REQ-022 / QS-028 | Ordered Environment/State/Action and Validation-led runtime | TEST-028 | pending final cutover | phases 02–04/07/11 | ESAO-evid-003–005/007 prove the isolated contracts, transactions, runtime and API; canonical provider-backed evidence remains pending. |
 | EVID-029 | REQ-022 / QS-029 | Feedback/Critic/approval integrity | TEST-029 | pending final cutover | phases 05/07/08/11 | ESAO-evid-004/006/007 prove exact decisions, durable scheduling and HTTP trust boundaries; product UI and real occurrence remain pending. |
 | EVID-030 | REQ-022 / QS-030 | Refinement/apply/continuation/Product Snapshot | TEST-030 | pending final cutover | phases 06–08/11 | ESAO-evid-004/006/007 prove managed Git effects, immutable Product-commit capture, continuation and API boundaries; UI/real occurrence remain pending. |
-| EVID-031 | REQ-022 / QS-031 | Target responsive/accessibility browser evidence | TEST-031 | pending | future phases 08/10/11 | No target UI exists yet. |
+| EVID-031 | REQ-022 / QS-031 | Target responsive/accessibility browser evidence | TEST-031 | pending phase-08 completion | phases 08/10/11 | ESAO-evid-008 proves the isolated Configure routes; Run/governance workspaces and final canonical QA remain pending. |
 | EVID-032 | REQ-022 / QS-032 | Strict versions, isolation, removal, release/install/startup | TEST-032 | pending | future phases 02–11 | Existing v19 baseline must remain active until phase 09. |
 
 ## Relevant decisions
@@ -166,10 +167,30 @@ Human identity is constructed outside request bodies by the local server boundar
 
 Successful Run worktrees may be removed after finalization because the Product Snapshot retains the result commit. Before Critic or Refinement execution, `VNextWorkspaceManager` creates a detached read-only worktree at that exact commit and removes it after provider capture. The workspace test proves a newer current checkout is neither read as the approved product base nor rewound. Refinement apply likewise branches from the exact approved reachable Product commit, never from an assumed current `HEAD`.
 
+## Phase 08 Configure UI evidence
+
+The isolated route inventory implemented and tested in this increment is:
+
+```text
+/vnext/configure/direction
+/vnext/configure/use-cases
+/vnext/configure/environment
+/vnext/configure/environment/states/:stateId
+/vnext/configure/environment/states/:stateId/actions/:actionId
+/vnext/configure/resources/instructions
+/vnext/configure/resources/skills
+/vnext/configure/execution-profiles
+/vnext/configure/critic
+```
+
+`WorkspaceShell` branches before any v19 data or event hook mounts. The vNext branch owns `/api/vnext` fetch/mutation modules, bounded factual SSE invalidation, refresh-safe local form state, optimistic server hashes and one navigation blocker; it imports no backend or v19 API module. Pure modules own URL parsing/building, State/Action reorder, approval invalidation projection, readiness grouping, shared-Skill impact and schedule normalization. Components own rendering, local draft state and event forwarding.
+
+Use Case approval opens a separate confirmation containing the exact semantic hash/revision; Save remains draft content mutation. Action authoring labels Validation as main/controller twice in the control projection and Work as subordinate, exposes `1 + maxRetries`, exact instruction requirements and the read-only/workspace-write permission split. The checked browser snapshots show the same content stacked at 390×844, zero page overflow and exact textual statuses. The initial narrow audit found a 28 px compact control; the local retry added a vNext-scoped 40 px minimum and 16 px form text rule before acceptance. No palette or shape token changed.
+
 ## Open evidence gaps
 
-Canonical cutover, browser, package/install and real-provider evidence remain pending. Test-only Environment/Critic/Refinement records are not product occurrences. The managed-worktree tests prove local Git and continuation mechanics, but not a production-like provider-backed continuation.
+Run/governance browser, canonical cutover, package/install and real-provider evidence remain pending. Test-only Environment/Critic/Refinement records are not product occurrences. The managed-worktree tests prove local Git and continuation mechanics, but not a production-like provider-backed continuation.
 
 ## Next review basis
 
-The next evidence-producing action is phase 08 isolated `/vnext` UI and fixed-viewport accessibility/browser verification under the transition exception.
+The next evidence-producing action is the remaining phase 08 isolated Run, Feedback, Critic/Refinement review and Product Snapshot UI plus fixed-viewport approval-flow verification.
