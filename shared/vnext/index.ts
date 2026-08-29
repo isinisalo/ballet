@@ -5,6 +5,8 @@ export * from "./gates.js";
 export * from "./instructionContract.js";
 export * from "./limits.js";
 export * from "./outcomes.js";
+export * from "./persistence.js";
+export * from "./persistenceRecords.js";
 export * from "./primitives.js";
 export * from "./refinement.js";
 export * from "./reviews.js";

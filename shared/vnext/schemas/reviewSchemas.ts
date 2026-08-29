@@ -13,7 +13,7 @@ export const feedbackEntrySchema = z.object({
   id: idSchema,
   environmentRunId: idSchema,
   actionExecutionId: idSchema.optional(),
-  source: z.enum(["retry_exhaustion", "approved_critic_proposal"]),
+  source: z.enum(["validation_blocked", "retry_exhaustion", "approved_critic_proposal"]),
   sourceId: idSchema,
   status: z.enum(["open", "resolved"]),
   message: nonEmptyTextSchema,
