@@ -3,7 +3,7 @@ import type { Constraint, DirectionReference, UseCase } from "@shared/orchestrat
 import type { ActionDefinition, AgentDefinition, EnvironmentDefinition, ProjectConfigurationV22, StateDefinition } from "@shared/orchestration/environment";
 import type { ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
-import type { ActionExecutionRole, ActionRoleExecutionBinding, AgentExecutionBinding, ExecutionPolicy, LocalDaemonLogEntry, LocalDaemonStatus, RuntimeProvider } from "@shared/domain/runtime";
+import type { ActionExecutionBinding, ActionRoleModelSelection, AgentExecutionBinding, ExecutionPolicy, LocalDaemonLogEntry, LocalDaemonStatus, RuntimeProvider } from "@shared/domain/runtime";
 
 const base = "/api";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -36,11 +36,11 @@ export const orchestrationApi = {
   agentBinding: (id: string) => request<AgentExecutionBinding | null>(`${base}/agents/${encodeURIComponent(id)}/execution`),
   saveAgentBinding: (id: string, input: { provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy }) =>
     request<AgentExecutionBinding>(`${base}/agents/${encodeURIComponent(id)}/execution`, put(input)),
-  actionRoleBinding: (stateId: string, actionId: string, role: ActionExecutionRole) =>
-    request<ActionRoleExecutionBinding | null>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution/${role}`),
-  saveActionRoleBinding: (stateId: string, actionId: string, role: ActionExecutionRole,
-    input: { provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy }) =>
-    request<ActionRoleExecutionBinding>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution/${role}`, put(input)),
+  actionBinding: (stateId: string, actionId: string) =>
+    request<ActionExecutionBinding | null>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution`),
+  saveActionBinding: (stateId: string, actionId: string, input: { provider: RuntimeProvider; policy: ExecutionPolicy;
+    validation: ActionRoleModelSelection; work: ActionRoleModelSelection }) =>
+    request<ActionExecutionBinding>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution`, put(input)),
   approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(
     `${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash, expectedContentHash })),
   returnUseCaseToDraft: (id: string, expectedConfigHash: string) => request(`${base}/use-cases/${encodeURIComponent(id)}/return-to-draft`, body({ expectedConfigHash })),

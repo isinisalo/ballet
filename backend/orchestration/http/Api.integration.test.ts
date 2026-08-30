@@ -430,16 +430,24 @@ const startFixture = async () => {
   documents.put("agent", "profile", "# Agent\n\nTest execution agent.\n", "absent");
   const instructionHash = documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent").contentHash;
   const project = new ProjectDefinitionService(root, projects, documents);
-  const capability = (subject: { kind: "agent"; agentId: string } | { kind: "action_role"; actionId: string; role: "validation" | "work" }) => ({
-    subject,
+  const agentCapability = (agentId: string) => ({
+    subject: { kind: "agent" as const, agentId },
     provider: "codex" as const, model: "model", reasoningEffort: "high",
     networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
     supportedModels: ["model"], supportedReasoningEfforts: ["high"],
     supportsReadOnly: true, supportsWorkspaceWrite: true
   });
+  const actionCapability = (actionId: string) => ({
+    subject: { kind: "action" as const, actionId }, provider: "codex" as const,
+    networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
+    roles: {
+      validation: { model: "model", reasoningEffort: "high", supportedModels: ["model"], supportedReasoningEfforts: ["high"] },
+      work: { model: "model", reasoningEffort: "high", supportedModels: ["model"], supportedReasoningEfforts: ["high"] }
+    }, supportsReadOnly: true, supportsWorkspaceWrite: true
+  });
   const preflight = {
-    inspectAgent: async (agent: { id: string }) => { const value = capability({ kind: "agent", agentId: agent.id }); return { ...value, capabilitySha256: hash(value) }; },
-    inspectActionRole: async (actionId: string, role: "validation" | "work") => { const value = capability({ kind: "action_role", actionId, role }); return { ...value, capabilitySha256: hash(value) }; }
+    inspectAgent: async (agent: { id: string }) => { const value = agentCapability(agent.id); return { ...value, capabilitySha256: hash(value) }; },
+    inspectAction: async (actionId: string) => { const value = actionCapability(actionId); return { ...value, capabilitySha256: hash(value) }; }
   };
   const planner = new EnvironmentRunPlanner(project, preflight, () => TEST_AT);
   const environmentQueue = new DeterministicExecutionQueue();

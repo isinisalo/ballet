@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 37
+version: 38
 tags: [arc42, traceability, evidence]
 ---
 
@@ -26,6 +26,7 @@ tags: [arc42, traceability, evidence]
 | goal-024 / REQ-024 | QS-038 | adr-037 / CON-017 | BB-017 | RT-032 / DEP-007 | TEST-038 | EVID-038 | RISK-025 | passed canonical |
 | goal-023,goal-024 / REQ-023,REQ-024 | QS-039 | adr-038 / CON-017 | BB-016,BB-017 | RT-026,RT-032 / DEP-007 | TEST-039 | EVID-039 | RISK-025 | passed locally |
 | goal-023,goal-024 / REQ-023,REQ-024 | QS-040 | adr-038 / CON-017 | BB-016,BB-017 | RT-026,RT-032 / DEP-007 | TEST-040 | EVID-040 | RISK-025 | passed canonical |
+| goal-024 / REQ-024 | QS-041 | adr-039 / CON-017 | BB-017 | RT-033 / DEP-007 | TEST-041 | EVID-041 | RISK-025 | passed canonical |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
@@ -63,6 +64,7 @@ tags: [arc42, traceability, evidence]
 | TEST-038 | local daemon lifecycle, atomic one-time claim, lease renewal/expiry, stale fencing, duplicate terminal, queued restart and fail-closed recovery tests |
 | TEST-039 | strict Action-role binding v1 and governance Agent binding v2, State/Action/role API, cleanup, provider/model/reasoning/policy readiness, loopback auth and Action UI dependency tests |
 | TEST-040 | exact v22/v16/v11/v13/v15/v19/v1/v2 contracts, Action legacy removal, State-owned closure, nested Skills, full docs/design/browser gates, make latest and packaged startup smoke |
+| TEST-041 | strict ActionExecutionBindingV2 schema and atomic SQLite v20 upsert/cleanup; canonical API and removed role route; shared provider/policy snapshot, both role mismatches, permissions, immutable continuation, one-save Action UI and v22/v17/v11/v13/v15/v20 cutover/startup gates |
 
 | ID | Evidenssi |
 | --- | --- |
@@ -79,3 +81,4 @@ tags: [arc42, traceability, evidence]
 | EVID-038 | checkout-local-daemon initiative transaction and lifecycle command log |
 | EVID-039 | ADR-038 schema/persistence/API/planner/runtime/UI command log and immutable snapshot assertions |
 | EVID-040 | ADR-038 full repository, desktop/narrow browser and fresh SQLite v19 packaged startup evidence |
+| EVID-041 | ADR-039 schema/persistence/API/planner/runtime/UI, full repository, desktop/narrow browser and fresh SQLite v20 packaged startup evidence |

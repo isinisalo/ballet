@@ -14,7 +14,7 @@ export type RuntimeBindingSubject =
   | { kind: "action_role"; actionId: string; role: "validation" | "work" }
   | { kind: "agent"; agentId: string };
 
-export interface RootSnapshotV16 {
+export interface RootSnapshotV17 {
   version: typeof ROOT_SNAPSHOT_VERSION;
   projectHeadSha: string;
   projectConfigSha256: string;
@@ -42,20 +42,40 @@ export interface RootSnapshotV16 {
   createdAt: string;
 }
 
-export interface RuntimeCapabilitySnapshot {
-  subject: RuntimeBindingSubject;
+interface RuntimeCapabilityBase {
   provider: RuntimeProvider;
-  model: string;
-  reasoningEffort: string;
   networkAccess: boolean;
   readOnlyRoots: string[];
   cliVersion: string;
-  supportedModels: string[];
-  supportedReasoningEfforts: string[];
   supportsReadOnly: boolean;
   supportsWorkspaceWrite: boolean;
   capabilitySha256: string;
 }
+
+export interface RuntimeAgentCapabilitySnapshot extends RuntimeCapabilityBase {
+  subject: { kind: "agent"; agentId: string };
+  model: string;
+  reasoningEffort: string;
+  supportedModels: string[];
+  supportedReasoningEfforts: string[];
+}
+
+export interface RuntimeRoleModelCapabilitySnapshot {
+  model: string;
+  reasoningEffort: string;
+  supportedModels: string[];
+  supportedReasoningEfforts: string[];
+}
+
+export interface RuntimeActionCapabilitySnapshot extends RuntimeCapabilityBase {
+  subject: { kind: "action"; actionId: string };
+  roles: {
+    validation: RuntimeRoleModelCapabilitySnapshot;
+    work: RuntimeRoleModelCapabilitySnapshot;
+  };
+}
+
+export type RuntimeCapabilitySnapshot = RuntimeAgentCapabilitySnapshot | RuntimeActionCapabilitySnapshot;
 
 export interface RuntimeResourceSnapshot {
   kind: "instruction" | "skill";
@@ -77,7 +97,7 @@ export interface EnvironmentRun {
   id: string;
   environmentId: string;
   status: EnvironmentRunStatus;
-  snapshot: RootSnapshotV16;
+  snapshot: RootSnapshotV17;
   continuationOfRunId?: string;
   createdAt: string;
   updatedAt: string;

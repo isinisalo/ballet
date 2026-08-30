@@ -34,9 +34,12 @@ export class AgentDispatchFactory {
   }): PreparedAgentDispatch {
     const { state, action } = findDefinitions(input.run, input.action.actionDefinitionId);
     const composition = input.role === "work" ? action.work : action.validation;
-    const capability = input.run.executionSnapshot.runtimeCapabilities.find(
-      ({ subject }) => subject.kind === "action_role" && subject.actionId === action.id && subject.role === input.role
-    )!;
+    const matchedCapability = input.run.executionSnapshot.runtimeCapabilities.find(
+      ({ subject }) => subject.kind === "action" && subject.actionId === action.id
+    );
+    if (!matchedCapability || !("roles" in matchedCapability)) throw new Error(`Action ${action.id} capability is invalid.`);
+    const capability = matchedCapability;
+    const roleCapability = capability.roles[input.role];
     const agentRunId = this.nextId(`${input.role}-${input.phase}`);
     const taskId = this.nextId("task");
     const outputSchemaId = `${input.role}-outcome-v11`;
@@ -73,8 +76,8 @@ export class AgentDispatchFactory {
       version: 15, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
-        subject, provider: capability.provider, cliVersion: capability.cliVersion, model: capability.model,
-        reasoningEffort: capability.reasoningEffort,
+        subject, provider: capability.provider, cliVersion: capability.cliVersion, model: roleCapability.model,
+        reasoningEffort: roleCapability.reasoningEffort,
         capabilityHash: capability.capabilitySha256
       },
       permissions: {

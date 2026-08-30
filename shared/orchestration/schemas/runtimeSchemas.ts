@@ -4,7 +4,22 @@ import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchem
 import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
 import { agentCompositionSchema, agentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
-export const rootSnapshotV16Schema = z.object({
+const runtimeCapabilityBase = {
+  provider: z.enum(["codex", "copilot"]),
+  networkAccess: z.boolean(),
+  readOnlyRoots: z.array(z.string().trim().min(1)),
+  cliVersion: z.string().trim().min(1),
+  supportsReadOnly: z.boolean(),
+  supportsWorkspaceWrite: z.boolean(),
+  capabilitySha256: sha256Schema
+};
+const roleModelCapabilitySchema = z.object({
+  model: z.string().trim().min(1), reasoningEffort: z.string().trim().min(1),
+  supportedModels: z.array(z.string().trim().min(1)),
+  supportedReasoningEfforts: z.array(z.string().trim().min(1))
+}).strict();
+
+export const rootSnapshotV17Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
@@ -19,24 +34,20 @@ export const rootSnapshotV16Schema = z.object({
     constraints: z.array(constraintSchema.extend({ contentSha256: sha256Schema }).strict())
   }).strict(),
   agents: z.array(agentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()),
-  runtimeCapabilities: z.array(z.object({
-    subject: z.discriminatedUnion("kind", [
-      z.object({ kind: z.literal("action_role"), actionId: idSchema,
-        role: z.enum(["validation", "work"]) }).strict(),
-      z.object({ kind: z.literal("agent"), agentId: idSchema }).strict()
-    ]),
-    provider: z.enum(["codex", "copilot"]),
-    model: z.string().trim().min(1),
-    reasoningEffort: z.string().trim().min(1),
-    networkAccess: z.boolean(),
-    readOnlyRoots: z.array(z.string().trim().min(1)),
-    cliVersion: z.string().trim().min(1),
-    supportedModels: z.array(z.string().trim().min(1)),
-    supportedReasoningEfforts: z.array(z.string().trim().min(1)),
-    supportsReadOnly: z.boolean(),
-    supportsWorkspaceWrite: z.boolean(),
-    capabilitySha256: sha256Schema
-  }).strict()),
+  runtimeCapabilities: z.array(z.union([
+    z.object({
+      ...runtimeCapabilityBase,
+      subject: z.object({ kind: z.literal("agent"), agentId: idSchema }).strict(),
+      model: z.string().trim().min(1), reasoningEffort: z.string().trim().min(1),
+      supportedModels: z.array(z.string().trim().min(1)),
+      supportedReasoningEfforts: z.array(z.string().trim().min(1))
+    }).strict(),
+    z.object({
+      ...runtimeCapabilityBase,
+      subject: z.object({ kind: z.literal("action"), actionId: idSchema }).strict(),
+      roles: z.object({ validation: roleModelCapabilitySchema, work: roleModelCapabilitySchema }).strict()
+    }).strict()
+  ])),
   resources: z.array(z.object({
     kind: z.enum(["instruction", "skill"]), id: idSchema, relativePath: z.string().trim().min(1),
     content: z.string(), sourceSha256: sha256Schema
@@ -58,7 +69,7 @@ export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV16Schema,
+  snapshot: rootSnapshotV17Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

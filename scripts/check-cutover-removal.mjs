@@ -64,6 +64,14 @@ const localOnlyProhibited = [
   "executionSpecV" + "14Schema",
   "RootSnapshotV" + "15",
   "rootSnapshotV" + "15Schema",
+  "RootSnapshotV" + "16",
+  "rootSnapshotV" + "16Schema",
+  "ActionRoleExecution" + "Binding",
+  "actionRole" + "Binding",
+  "putActionRole" + "Binding",
+  "inspectAction" + "Role",
+  "action_role_execution_" + "bindings",
+  "useActionRoleExecution" + "Binding",
   "ExecutionSpecV" + "13",
   "RootSnapshotV" + "14"
 ];

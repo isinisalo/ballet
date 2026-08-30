@@ -23,24 +23,25 @@ describe("checkout-local daemon persistence", () => {
     expect(binding).not.toHaveProperty("deviceId"); expect(binding).not.toHaveProperty("runtimeBackendId");
   });
 
-  it("upserts and removes Action-role bindings by action and role", () => {
+  it("atomically upserts and removes one Action execution binding", () => {
     const { daemon } = setup(); daemon.heartbeat(heartbeat());
-    const first = daemon.putActionRoleBinding("action-1", "validation", {
-      provider: "codex", model: "gpt", reasoningEffort: "high",
-      policy: { network: false, readOnlyRoots: ["/tmp/reference"] }
+    const first = daemon.putActionBinding("action-1", {
+      provider: "codex", policy: { network: false, readOnlyRoots: ["/tmp/reference"] },
+      validation: { model: "gpt", reasoningEffort: "high" },
+      work: { model: "gpt", reasoningEffort: "high" }
     });
-    expect(first).toEqual(expect.objectContaining({ version: 1, actionId: "action-1", role: "validation" }));
-    daemon.putActionRoleBinding("action-1", "validation", {
-      provider: "copilot", model: "claude", reasoningEffort: "high",
-      policy: { network: true, readOnlyRoots: [] }
+    expect(first).toEqual(expect.objectContaining({ version: 2, actionId: "action-1", provider: "codex" }));
+    daemon.putActionBinding("action-1", {
+      provider: "copilot", policy: { network: true, readOnlyRoots: [] },
+      validation: { model: "claude", reasoningEffort: "high" },
+      work: { model: "claude", reasoningEffort: "high" }
     });
-    expect(daemon.actionRoleBinding("action-1", "validation")).toEqual(expect.objectContaining({ provider: "copilot", policy: { network: true, readOnlyRoots: [] } }));
-    daemon.putActionRoleBinding("action-1", "work", {
-      provider: "codex", model: "gpt", reasoningEffort: "high", policy: { network: false, readOnlyRoots: [] }
-    });
+    expect(daemon.actionBinding("action-1")).toEqual(expect.objectContaining({
+      provider: "copilot", policy: { network: true, readOnlyRoots: [] },
+      validation: { model: "claude", reasoningEffort: "high" }, work: { model: "claude", reasoningEffort: "high" }
+    }));
     daemon.removeActionBindings(["action-1"]);
-    expect(daemon.actionRoleBinding("action-1", "validation")).toBeUndefined();
-    expect(daemon.actionRoleBinding("action-1", "work")).toBeUndefined();
+    expect(daemon.actionBinding("action-1")).toBeUndefined();
   });
 
   it("rejects unsupported Action-role model, reasoning, and policy selections", () => {
@@ -49,11 +50,18 @@ describe("checkout-local daemon persistence", () => {
       policy: { workspaceWrite: true, networkControl: false, readOnlyRoots: false } } };
     daemon.heartbeat(reports);
     const put = (model: string, reasoningEffort: string, network = false, roots: string[] = []) =>
-      daemon.putActionRoleBinding("action-1", "validation", { provider: "codex", model, reasoningEffort, policy: { network, readOnlyRoots: roots } });
+      daemon.putActionBinding("action-1", {
+        provider: "codex", policy: { network, readOnlyRoots: roots },
+        validation: { model, reasoningEffort }, work: { model: "gpt", reasoningEffort: "high" }
+      });
     expect(() => put("missing", "high")).toThrow(/unavailable/);
     expect(() => put("gpt", "missing")).toThrow(/Reasoning effort/);
     expect(() => put("gpt", "high", true)).toThrow(/network policy/);
     expect(() => put("gpt", "high", false, ["/tmp/reference"])).toThrow(/read-only roots/);
+    reports.providers[0] = { ...reports.providers[0]!, capabilities: { ...reports.providers[0]!.capabilities,
+      policy: { workspaceWrite: false, networkControl: true, readOnlyRoots: true } } };
+    daemon.heartbeat(reports);
+    expect(() => put("gpt", "high")).toThrow(/workspace-write/);
   });
 
   it("claims once, fences stale callbacks, and applies one daemon terminal", () => {

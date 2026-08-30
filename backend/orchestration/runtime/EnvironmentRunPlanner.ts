@@ -4,7 +4,8 @@ import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../../shared/orchestration/gates.js";
 import type {
-  RootSnapshotV16, RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
+  RootSnapshotV17, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
+  RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/orchestration/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
 import { mapProviderPermissions } from "./ProviderPermissions.js";
@@ -33,15 +34,15 @@ export interface OrchestrationProviderPreflightPort {
   inspectAgent(
     profile: ProjectConfigurationV22["agents"][number],
     project: { headSha: string; configHash: string }
-  ): Promise<RuntimeCapabilitySnapshot>;
-  inspectActionRole(
-    actionId: string, role: "validation" | "work",
+  ): Promise<RuntimeAgentCapabilitySnapshot>;
+  inspectAction(
+    actionId: string,
     project: { headSha: string; configHash: string }
-  ): Promise<RuntimeCapabilitySnapshot>;
+  ): Promise<RuntimeActionCapabilitySnapshot>;
 }
 
 export interface PlannedEnvironmentRun {
-  snapshot: RootSnapshotV16;
+  snapshot: RootSnapshotV17;
   snapshotSha256: string;
   createInput(input: {
     environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
@@ -72,16 +73,14 @@ export class EnvironmentRunPlanner {
     const capabilities: RuntimeCapabilitySnapshot[] = [];
     for (const agent of agents) {
       const capability = await this.providers.inspectAgent(agent, { headSha: loaded.baseCommit, configHash: loaded.configSha256 });
-      assertCapability({ kind: "agent", agentId: agent.id }, capability);
+      assertAgentCapability(agent.id, capability);
       capabilities.push(capability);
     }
     for (const state of config.environment.states) for (const action of state.actions) {
-      for (const role of ["validation", "work"] as const) {
-        const capability = await this.providers.inspectActionRole(action.id, role,
-          { headSha: loaded.baseCommit, configHash: loaded.configSha256 });
-        assertCapability({ kind: "action_role", actionId: action.id, role }, capability);
-        capabilities.push(capability);
-      }
+      const capability = await this.providers.inspectAction(action.id,
+        { headSha: loaded.baseCommit, configHash: loaded.configSha256 });
+      assertActionCapability(action.id, capability);
+      capabilities.push(capability);
     }
     const permissions = permissionSnapshot(config, capabilities, loaded.checkoutRoot);
     const referencedUseCaseIds = new Set(config.environment.states.flatMap((state) => state.useCaseIds));
@@ -99,8 +98,8 @@ export class EnvironmentRunPlanner {
         ...value, contentSha256: requireDirectionHash("Constraint", value.id, loaded.directionDocumentHashes.constraints)
       }))
     };
-    const snapshot: RootSnapshotV16 = {
-      version: 16,
+    const snapshot: RootSnapshotV17 = {
+      version: 17,
       projectHeadSha: loaded.baseCommit,
       projectConfigSha256: loaded.configSha256,
       directionSha256: contentHash(config.direction),
@@ -136,23 +135,32 @@ export class EnvironmentRunPlanner {
   }
 }
 
-const assertCapability = (
-  subject: RuntimeCapabilitySnapshot["subject"], capability: RuntimeCapabilitySnapshot
-): void => {
+const assertAgentCapability = (agentId: string, capability: RuntimeAgentCapabilitySnapshot): void => {
+  const subject = { kind: "agent" as const, agentId };
   if (canonicalJson(capability.subject) !== canonicalJson(subject)
     || !capability.supportedModels.includes(capability.model)
     || !capability.supportedReasoningEfforts.includes(capability.reasoningEffort)
-    || !capability.supportsReadOnly) {
-    throw new Error(`Execution binding ${canonicalJson(subject)} is not supported by provider preflight.`);
-  }
-  const expectedHash = contentHash({
-    subject: capability.subject, provider: capability.provider, model: capability.model, reasoningEffort: capability.reasoningEffort,
-    networkAccess: capability.networkAccess, readOnlyRoots: capability.readOnlyRoots,
-    cliVersion: capability.cliVersion, supportedModels: capability.supportedModels,
-    supportedReasoningEfforts: capability.supportedReasoningEfforts,
-    supportsReadOnly: capability.supportsReadOnly, supportsWorkspaceWrite: capability.supportsWorkspaceWrite
+    || !capability.supportsReadOnly) unsupported(subject);
+  assertCapabilityHash(capability);
+};
+
+const assertActionCapability = (actionId: string, capability: RuntimeActionCapabilitySnapshot): void => {
+  const subject = { kind: "action" as const, actionId };
+  const validRoles = (["validation", "work"] as const).every((role) => {
+    const value = capability.roles[role];
+    return value.supportedModels.includes(value.model)
+      && value.supportedReasoningEfforts.includes(value.reasoningEffort);
   });
-  if (capability.capabilitySha256 !== expectedHash) throw new Error(`Capability hash for ${canonicalJson(subject)} differs.`);
+  if (canonicalJson(capability.subject) !== canonicalJson(subject) || !validRoles
+    || !capability.supportsReadOnly || !capability.supportsWorkspaceWrite) unsupported(subject);
+  assertCapabilityHash(capability);
+};
+const unsupported = (subject: RuntimeCapabilitySnapshot["subject"]): never => {
+  throw new Error(`Execution binding ${canonicalJson(subject)} is not supported by provider preflight.`);
+};
+const assertCapabilityHash = (capability: RuntimeCapabilitySnapshot): void => {
+  const { capabilitySha256, ...content } = capability;
+  if (capabilitySha256 !== contentHash(content)) throw new Error(`Capability hash for ${canonicalJson(capability.subject)} differs.`);
 };
 
 const permissionSnapshot = (
@@ -160,9 +168,8 @@ const permissionSnapshot = (
 ): RuntimePermissionSnapshot[] => {
   const rows: RuntimePermissionSnapshot[] = [];
   for (const state of config.environment.states) for (const action of state.actions) {
+    const capability = capabilities.find(({ subject }) => subject.kind === "action" && subject.actionId === action.id) as RuntimeActionCapabilitySnapshot;
     for (const role of ["validation", "work"] as const) {
-      const capability = capabilities.find(({ subject }) => subject.kind === "action_role"
-        && subject.actionId === action.id && subject.role === role)!;
       const toolPolicy = role === "work" ? "workspace_write" : "read_only";
       if (toolPolicy === "workspace_write" && !capability.supportsWorkspaceWrite) {
         throw new Error(`Action ${action.id} Work binding cannot provide workspace-write.`);

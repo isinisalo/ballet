@@ -45,7 +45,7 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 | `.ballet/instructions/**` | selected role instructions |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v19, Action-role and governance Agent bindings, checkout-daemon state, logs and server-owned worktrees |
+| `.git/ballet/**` | machine-local SQLite v20, Action execution and governance Agent bindings, checkout-daemon state, logs and server-owned worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
@@ -151,11 +151,11 @@ Refinement proposal generation is read-only. It records exact allowlisted paths,
 | Critic / Refinement review | `/reviews/critic`, `/reviews/critic/:id`, `/reviews/refinement`, `/reviews/refinement/:id` |
 | Run Evidence | inline in `/run/:runId` |
 
-JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. Key boundaries are `GET /api/project`, `GET /api/environment`, whole-Environment `POST /api/environment-runs`, exact human Work response `POST /api/environment-runs/:runId/work-input`, Feedback commands under `/api/feedback`, human Critic decisions under `/api/critic/proposals/:id/decision`, and exact Refinement decision/apply state under `/api/refinement/proposals/:id/*`. There are no route aliases or standalone State/Action Run commands.
+JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. Key boundaries are `GET /api/project`, `GET /api/environment`, atomic Action execution binding `GET/PUT /api/environment/states/:stateId/actions/:actionId/execution`, whole-Environment `POST /api/environment-runs`, exact human Work response `POST /api/environment-runs/:runId/work-input`, Feedback commands under `/api/feedback`, human Critic decisions under `/api/critic/proposals/:id/decision`, and exact Refinement decision/apply state under `/api/refinement/proposals/:id/*`. There are no role-route aliases or standalone State/Action Run commands.
 
 ## Strict local state
 
-The active matrix is Project Config v22, Root Snapshot v16, Task Envelope and role outcome v11, prompt composition v13, ExecutionSpec v15 and SQLite v19. Feedback, Critic and Refinement are v2; Action-role binding is v1, governance Agent binding is v2 and Run Evidence is v1. Older local databases and control-plane state are intentionally unsupported: stop the service, archive or remove the incompatible `.git/ballet` state, and start fresh. There is no migration or compatibility reader.
+The active matrix is Project Config v22, Root Snapshot v17, Task Envelope and role outcome v11, prompt composition v13, ExecutionSpec v15 and SQLite v20. Feedback, Critic and Refinement are v2; Action execution binding and governance Agent binding are v2 and Run Evidence is v1. Validation and its subordinate Work agent share one Action provider and network/read-only-roots policy while retaining role-specific model and reasoning selections. Older local databases and control-plane state are intentionally unsupported: stop the service, archive or remove the incompatible `.git/ballet` state, and start fresh. There is no migration or compatibility reader.
 
 ## Verification
 

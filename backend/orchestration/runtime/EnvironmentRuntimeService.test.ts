@@ -344,18 +344,20 @@ const twoActionSeed = (stateCount = 1, runId = "run-1", baseCommit = TEST_SHA): 
   first.definition = { ...first.definition, actions: [first.definition.actions[0]!, second] };
   first.definitionHash = hash(first.definition);
   first.actions.push({ actionExecutionId: `${runId}:action:${second.id}`, definition: second, definitionHash: hash(second) });
+  const firstActionCapability = seed.executionSnapshot.runtimeCapabilities.find(({ subject }) =>
+    subject.kind === "action" && subject.actionId === first.definition.actions[0]!.id
+  );
+  if (!firstActionCapability || !("roles" in firstActionCapability)) throw new Error("Missing first Action capability fixture.");
   seed.executionSnapshot = {
     ...seed.executionSnapshot,
     projectHeadSha: baseCommit,
     environment: { ...seed.executionSnapshot.environment, states: seed.states.map(({ definition }) => definition) },
     runtimeCapabilities: [
       ...seed.executionSnapshot.runtimeCapabilities,
-      ...(["validation", "work"] as const).map((role) => ({
-        ...seed.executionSnapshot.runtimeCapabilities.find(({ subject }) =>
-          subject.kind === "action_role" && subject.actionId === first.definition.actions[0]!.id && subject.role === role
-        )!,
-        subject: { kind: "action_role" as const, actionId: second.id, role }
-      }))
+      {
+        ...firstActionCapability,
+        subject: { kind: "action" as const, actionId: second.id }
+      }
     ],
     permissions: [
       ...seed.executionSnapshot.permissions,

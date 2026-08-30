@@ -2,7 +2,7 @@ import type { ActionRoleComposition, AgentComposition } from "../../../shared/or
 import type { ExecutionPromptEvidenceV13 } from "../../../shared/orchestration/execution.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV16 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV17 } from "../../../shared/orchestration/runtime.js";
 import type { TaskEnvelopeV11 } from "../../../shared/orchestration/taskEnvelopes.js";
 
 const MAX_PROMPT_BYTES = 512 * 1024;
@@ -10,7 +10,7 @@ const MAX_ENVELOPE_BYTES = 192 * 1024;
 const SYSTEM_ROLE_CONTRACT = "Ballet owns orchestration and human approvals. Obey the role, permissions, immutable context, and exact output contract.";
 
 export const composeOrchestrationPrompt = (input: {
-  snapshot: RootSnapshotV16;
+  snapshot: RootSnapshotV17;
   envelope: TaskEnvelopeV11;
   composition: ActionRoleComposition | AgentComposition;
   subject: ExecutionPromptEvidenceV13["subject"];
@@ -61,11 +61,11 @@ const hardConstraints = (role: TaskEnvelopeV11["role"]): string =>
   `Role=${role}; toolPolicy=${role === "work" ? "workspace_write" : "read_only"}; provider approvalPolicy=never; no routing, approval, or orchestration-state mutation.`;
 const section = (name: string, content: string): string => `<<< BALLET ORCHESTRATION COMPOSITION V13 · ${name} >>>\n${content}\n<<< END ${name} >>>`;
 const evidence = (
-  resource: RootSnapshotV16["resources"][number], kind: "primary" | "skill"
+  resource: RootSnapshotV17["resources"][number], kind: "primary" | "skill"
 ): ExecutionPromptEvidenceV13["resources"][number] => ({
   kind, origin: "project", id: resource.id, relativePath: resource.relativePath, sourceSha256: resource.sourceSha256
 });
-const requireResource = (snapshot: RootSnapshotV16, kind: "instruction" | "skill", id: string) => {
+const requireResource = (snapshot: RootSnapshotV17, kind: "instruction" | "skill", id: string) => {
   const resource = snapshot.resources.find((candidate) => candidate.kind === kind && candidate.id === id);
   if (!resource) throw new Error(`Snapshot is missing ${kind} ${id}.`);
   return resource;

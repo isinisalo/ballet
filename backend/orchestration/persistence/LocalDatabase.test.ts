@@ -15,8 +15,8 @@ afterEach(() => {
   directories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true }));
 });
 
-describe("strict SQLite v18 open behavior", () => {
-  it("creates the exact v18 inventory in an empty database", () => {
+describe("strict SQLite v20 open behavior", () => {
+  it("creates the exact v20 inventory in an empty database", () => {
     const database = track();
     const names = database.connection.prepare(`
       SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name
@@ -27,7 +27,7 @@ describe("strict SQLite v18 open behavior", () => {
     expect(names.join(" ")).not.toMatch(/graph|policy|acceptance/);
   });
 
-  it("reopens v18 without recreating persisted data", () => {
+  it("reopens v20 without recreating persisted data", () => {
     const database = track();
     new EnvironmentRunStore(() => database.connection).create(environmentSeed());
     database.manager.close();
@@ -37,7 +37,7 @@ describe("strict SQLite v18 open behavior", () => {
     reopened.close();
   });
 
-  it.each(["15", "999"])("fails closed for schema %s and leaves a sentinel unchanged", (version) => {
+  it.each(["15", "19", "999"])("fails closed for schema %s and leaves a sentinel unchanged", (version) => {
     const { databasePath } = unsupportedDatabase(version);
     const manager = new LocalDatabase(databasePath);
     expect(() => manager.connection()).toThrow(/archive or remove/i);
@@ -56,7 +56,7 @@ describe("strict SQLite v18 open behavior", () => {
   });
 });
 
-describe("v18 relational constraints", () => {
+describe("v20 relational constraints", () => {
   it("enforces foreign keys, role/phase checks, and ordered uniqueness", () => {
     const database = track();
     const store = new EnvironmentRunStore(() => database.connection);

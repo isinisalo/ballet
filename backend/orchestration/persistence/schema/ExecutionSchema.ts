@@ -38,17 +38,17 @@ export const executionSchema = `
     updated_at TEXT NOT NULL
   );
 
-  CREATE TABLE action_role_execution_bindings (
-    action_id TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('validation','work')),
-    version INTEGER NOT NULL CHECK (version = 1),
+  CREATE TABLE action_execution_bindings (
+    action_id TEXT PRIMARY KEY,
+    version INTEGER NOT NULL CHECK (version = 2),
     provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
-    model TEXT NOT NULL,
-    reasoning_effort TEXT NOT NULL,
     network_access INTEGER NOT NULL CHECK (network_access IN (0,1)),
     read_only_roots_json TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    PRIMARY KEY (action_id, role)
+    validation_model TEXT NOT NULL,
+    validation_reasoning_effort TEXT NOT NULL,
+    work_model TEXT NOT NULL,
+    work_reasoning_effort TEXT NOT NULL,
+    updated_at TEXT NOT NULL
   );
 
   CREATE TABLE local_daemon_state (

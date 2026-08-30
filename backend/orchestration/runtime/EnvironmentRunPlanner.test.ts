@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { approveUseCase, type UseCase } from "../../../shared/orchestration/direction.js";
 import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import type { RuntimeCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
+import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import { EnvironmentRunPlanner, type ProjectDefinition } from "./EnvironmentRunPlanner.js";
 import { parseOrchestrationStructuredOutput } from "./StructuredOutputValidator.js";
 
@@ -10,11 +10,11 @@ describe("EnvironmentRunPlanner immutable closure", () => {
   test("resolves approved direction, resources, capabilities, permissions and canonical snapshot", async () => {
     const project = definition();
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
-      inspectAgent: async (agent) => capability({ kind: "agent", agentId: agent.id }),
-      inspectActionRole: async (actionId, role) => capability({ kind: "action_role", actionId, role })
+      inspectAgent: async (agent) => agentCapability(agent.id),
+      inspectAction: async (actionId) => actionCapability(actionId)
     }, () => "2026-08-29T10:00:00.000Z");
     const result = await planner.plan();
-    expect(result.snapshot).toMatchObject({ version: 16, projectHeadSha: "a".repeat(40) });
+    expect(result.snapshot).toMatchObject({ version: 17, projectHeadSha: "a".repeat(40) });
     expect(result.snapshot.approvedUseCases).toHaveLength(1);
     expect(result.snapshot.resources.map(({ kind }) => kind)).toEqual(["instruction", "skill"]);
     expect(result.snapshot.permissions.find(({ role }) => role === "validation")?.toolPolicy).toBe("read_only");
@@ -26,8 +26,8 @@ describe("EnvironmentRunPlanner immutable closure", () => {
     const project = definition();
     project.resources = project.resources.filter(({ kind }) => kind !== "skill");
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
-      inspectAgent: async (agent) => capability({ kind: "agent", agentId: agent.id }),
-      inspectActionRole: async (actionId, role) => capability({ kind: "action_role", actionId, role })
+      inspectAgent: async (agent) => agentCapability(agent.id),
+      inspectAction: async (actionId) => actionCapability(actionId)
     }, () => new Date().toISOString());
     await expect(planner.plan()).rejects.toThrow(/Missing skill/);
   });
@@ -35,8 +35,23 @@ describe("EnvironmentRunPlanner immutable closure", () => {
   test("fails closed on model capability mismatch", async () => {
     const project = definition();
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
-      inspectAgent: async (agent) => ({ ...capability({ kind: "agent", agentId: agent.id }), supportedModels: ["different-model"] }),
-      inspectActionRole: async (actionId, role) => capability({ kind: "action_role", actionId, role })
+      inspectAgent: async (agent) => ({ ...agentCapability(agent.id), supportedModels: ["different-model"] }),
+      inspectAction: async (actionId) => actionCapability(actionId)
+    }, () => new Date().toISOString());
+    await expect(planner.plan()).rejects.toThrow(/not supported/);
+  });
+
+  test.each(["validation", "work"] as const)("fails before dispatch on %s model capability mismatch", async (role) => {
+    const project = definition();
+    const planner = new EnvironmentRunPlanner({ load: async () => project }, {
+      inspectAgent: async (agent) => agentCapability(agent.id),
+      inspectAction: async (actionId) => {
+        const capability = actionCapability(actionId);
+        const content = { ...capability, capabilitySha256: undefined,
+          roles: { ...capability.roles, [role]: { ...capability.roles[role], supportedModels: ["different-model"] } } };
+        delete content.capabilitySha256;
+        return { ...content, capabilitySha256: contentHash(content) };
+      }
     }, () => new Date().toISOString());
     await expect(planner.plan()).rejects.toThrow(/not supported/);
   });
@@ -103,12 +118,21 @@ const definition = (): ProjectDefinition => {
     ]
   };
 };
-const capability = (subject: RuntimeCapabilitySnapshot["subject"]): RuntimeCapabilitySnapshot => {
+const agentCapability = (agentId: string): RuntimeAgentCapabilitySnapshot => {
   const value = {
-    subject,
+    subject: { kind: "agent" as const, agentId },
     provider: "codex" as const, model: "gpt-test", reasoningEffort: "high", networkAccess: false,
     readOnlyRoots: [], cliVersion: "1.0.0", supportedModels: ["gpt-test"],
     supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true
+  };
+  return { ...value, capabilitySha256: contentHash(value) };
+};
+const actionCapability = (actionId: string): RuntimeActionCapabilitySnapshot => {
+  const role = { model: "gpt-test", reasoningEffort: "high", supportedModels: ["gpt-test"], supportedReasoningEfforts: ["high"] };
+  const value = {
+    subject: { kind: "action" as const, actionId }, provider: "codex" as const,
+    networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
+    roles: { validation: role, work: role }, supportsReadOnly: true, supportsWorkspaceWrite: true
   };
   return { ...value, capabilitySha256: contentHash(value) };
 };

@@ -50,4 +50,6 @@ Prompt composition v13 ja ExecutionSpec v15 käyttävät samaa subject-identitee
 
 ADR-038 supersedoi ADR-034:n Action-kohtaiset Use Case -viitteet ja ADR-035:n Validation/Work-`agentId`-bindingin. ADR-034:n Environment-, State-, Validation-led-, retry- ja human approval -rajat, ADR-035:n Critic/Refinement Markdown Agents sekä ADR-037:n checkout-local daemon säilyvät.
 
+ADR-039 supersedoi tämän päätöksen roolikohtaisen provider- ja policy-omistuksen. State-owned closure, project-owned role resources ja muut tässä määritetyt rajat säilyvät.
+
 Uusi ADR vaaditaan, jos Actionille palautetaan oma Use Case -closure, Validation/Work palautetaan Agent-identiteettiin, binding siirretään project truthiin tai daemon/worktree/approval-omistus muuttuu. Trace: `goal-023` / `goal-024`, REQ-023 / REQ-024, QS-039–QS-040, CON-016–CON-017, BB-016–BB-017, RT-026 / RT-032, DEP-007, TEST-039–TEST-040 ja EVID-039–EVID-040.

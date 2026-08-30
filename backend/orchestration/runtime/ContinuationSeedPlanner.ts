@@ -79,7 +79,7 @@ const relevantExecutionContextHash = (
     directionSha256: source.executionSnapshot.directionSha256,
     useCases: source.executionSnapshot.approvedUseCases.filter(({ useCase }) => useCaseIds.has(useCase.id))
       .map(({ useCase, contentSha256 }) => ({ id: useCase.id, contentSha256 })),
-    capabilities: source.executionSnapshot.runtimeCapabilities.filter(({ subject }) => subject.kind === "action_role" && subject.actionId === actionId),
+    capabilities: source.executionSnapshot.runtimeCapabilities.filter(({ subject }) => subject.kind === "action" && subject.actionId === actionId),
     permissions: source.executionSnapshot.permissions.filter(({ actionId: scopedActionId }) => !scopedActionId || scopedActionId === actionId),
     resources: source.executionSnapshot.resources.filter(({ id }) => ids.has(id)).map(
       ({ kind, id, sourceSha256 }) => ({ kind, id, sourceSha256 })

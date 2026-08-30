@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV16, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV17, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -74,8 +74,8 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV16 = {
-    version: 16, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const snapshot: RootSnapshotV17 = {
+    version: 17, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
@@ -89,12 +89,15 @@ export const environmentSeed = (options: {
       model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
       cliVersion: "1.0.0", supportedModels: ["test-model"],
       supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
-    }, ...states.flatMap(({ definition }) => definition.actions.flatMap((action) => (["validation", "work"] as const).map((role) => ({
-      subject: { kind: "action_role" as const, actionId: action.id, role }, provider: "codex" as const,
-      model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
-      cliVersion: "1.0.0", supportedModels: ["test-model"], supportedReasoningEfforts: ["high"],
+    }, ...states.flatMap(({ definition }) => definition.actions.map((action) => ({
+      subject: { kind: "action" as const, actionId: action.id }, provider: "codex" as const,
+      networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
+      roles: {
+        validation: { model: "test-model", reasoningEffort: "high", supportedModels: ["test-model"], supportedReasoningEfforts: ["high"] },
+        work: { model: "test-model", reasoningEffort: "high", supportedModels: ["test-model"], supportedReasoningEfforts: ["high"] }
+      },
       supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
-    }))))],
+    })))],
     resources: [{
       kind: "instruction", id: "instruction", relativePath: ".ballet/instructions/test.md",
       content: VALID_INSTRUCTION, sourceSha256: hash(VALID_INSTRUCTION)

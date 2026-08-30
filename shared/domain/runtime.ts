@@ -65,14 +65,17 @@ export interface AgentExecutionBinding {
 }
 
 export type ActionExecutionRole = "validation" | "work";
-export interface ActionRoleExecutionBinding {
-  version: 1;
-  actionId: string;
-  role: ActionExecutionRole;
-  provider: RuntimeProvider;
+export interface ActionRoleModelSelection {
   model: string;
   reasoningEffort: string;
+}
+export interface ActionExecutionBinding {
+  version: 2;
+  actionId: string;
+  provider: RuntimeProvider;
   policy: ExecutionPolicy;
+  validation: ActionRoleModelSelection;
+  work: ActionRoleModelSelection;
   updatedAt: string;
 }
 

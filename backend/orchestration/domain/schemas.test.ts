@@ -5,7 +5,7 @@ import {
   refinementOutcomeSchema, roleOutcomeV11Schema, sha256, taskEnvelopeV11Schema,
   validationDecisionSchema, workOutcomeSchema
 } from "../../../shared/orchestration/index.js";
-import { executionBindingBodySchema } from "../../../shared/api/runtime-schemas.js";
+import { actionExecutionBindingBodySchema, executionBindingBodySchema } from "../../../shared/api/runtime-schemas.js";
 import { DAEMON_BINDING_CONTRACT_VERSION, ROOT_SNAPSHOT_VERSION } from "../../../shared/orchestration/versions.js";
 import { DATABASE_SCHEMA_VERSION } from "../persistence/RuntimeSchema.js";
 
@@ -120,9 +120,18 @@ describe("Project Configuration v22 boundary", () => {
     expect(TASK_ENVELOPE_VERSION).toBe(11);
     expect(ROLE_OUTCOME_VERSION).toBe(11);
     expect(EXECUTION_SPEC_VERSION).toBe(15);
-    expect(ROOT_SNAPSHOT_VERSION).toBe(16);
-    expect(DATABASE_SCHEMA_VERSION).toBe(19);
+    expect(ROOT_SNAPSHOT_VERSION).toBe(17);
+    expect(DATABASE_SCHEMA_VERSION).toBe(20);
     expect(DAEMON_BINDING_CONTRACT_VERSION).toBe(2);
+  });
+
+  it("accepts only the atomic Action execution binding body", () => {
+    const binding = { provider: "codex", policy: { network: false, readOnlyRoots: [] },
+      validation: { model: "gpt", reasoningEffort: "medium" }, work: { model: "gpt", reasoningEffort: "high" } };
+    expect(actionExecutionBindingBodySchema.safeParse(binding).success).toBe(true);
+    expect(actionExecutionBindingBodySchema.safeParse({ ...binding, role: "validation" }).success).toBe(false);
+    expect(actionExecutionBindingBodySchema.safeParse({ ...binding, validation: { ...binding.validation, provider: "copilot" } }).success).toBe(false);
+    expect(actionExecutionBindingBodySchema.safeParse({ ...binding, work: { model: "" } }).success).toBe(false);
   });
 
   it("rejects Computer-era binding identity fields", () => {

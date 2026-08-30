@@ -17,10 +17,20 @@ export const executionBindingBodySchema = z.object({
   policy: executionPolicySchema
 }).strict();
 
-export const agentExecutionParamsSchema = z.object({ agentId: idSchema }).strict();
-export const actionRoleExecutionParamsSchema = z.object({
-  stateId: idSchema, actionId: idSchema, role: z.enum(["validation", "work"])
+const actionRoleModelSelectionSchema = z.object({
+  model: z.string().trim().min(1).max(200),
+  reasoningEffort: z.string().trim().min(1).max(100)
 }).strict();
+
+export const actionExecutionBindingBodySchema = z.object({
+  provider: providerSchema,
+  policy: executionPolicySchema,
+  validation: actionRoleModelSelectionSchema,
+  work: actionRoleModelSelectionSchema
+}).strict();
+
+export const agentExecutionParamsSchema = z.object({ agentId: idSchema }).strict();
+export const actionExecutionParamsSchema = z.object({ stateId: idSchema, actionId: idSchema }).strict();
 export const executionTaskParamsSchema = z.object({ taskId: idSchema }).strict();
 export const emptyRuntimeBodySchema = z.object({}).strict();
 export const runtimeLogQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(1000).default(200) }).strict();

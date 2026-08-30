@@ -75,7 +75,7 @@ describe("orchestration Configure UI", () => {
   it("presents Validation as main and Work as subordinate", () => { renderAction(); expect(screen.getByText("Validation Agent · main/controller")).toBeInTheDocument(); expect(screen.getByText("Work Agent · subordinate")).toBeInTheDocument(); });
   it("uses only the workspace title for Action metadata", () => { renderAction(); expect(screen.getAllByRole("heading", { name: "Implement" })).toHaveLength(1); expect(screen.queryByText("Action metadata")).not.toBeInTheDocument(); });
   it("explains the total attempts derived from maxRetries", () => { renderAction(); expect(screen.getByText("Total maximum Work attempts: 3")).toBeInTheDocument(); });
-  it("reports missing instruction sections", () => { mockActionExecution(); const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} instructions={[{ ...resources()[0]!, content: "# Missing" }, resources()[1]!]} skills={[resources()[2]!]} locked={false} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); expect(screen.getByRole("alert")).toHaveTextContent("Missing Task section"); });
+  it("reports missing instruction sections", () => { mockActionExecution(); const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} instructions={[{ ...resources()[0]!, content: "# Missing" }, resources()[1]!]} skills={[resources()[2]!]} locked={false} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); expect(screen.getByText("Missing Task section")).toBeInTheDocument(); });
   it("opens and closes the Action flow with an accessible control", async () => { mockActionExecution(); const user = userEvent.setup(); const changeMode = vi.fn(); const config = orchestrationConfig(); const props = { stateId: "state-1", action: config.environment.states[0]!.actions[0], instructions: resources().filter((item) => item.kind === "instruction"), skills: resources().filter((item) => item.kind === "skill"), locked: false, navigate: vi.fn(), onCanvasModeChange: changeMode, onSave: vi.fn() }; const { rerender } = render(<ActionWorkspace {...props} />); await user.click(screen.getByRole("button", { name: "Open Action flow" })); expect(changeMode).toHaveBeenCalledWith("flow"); await user.type(screen.getByLabelText("Name"), " draft"); rerender(<ActionWorkspace {...props} canvasMode="flow" />); expect(screen.getByLabelText("Name")).toHaveValue(`${props.action.name} draft`); await user.click(screen.getByRole("button", { name: "Show space canvas" })); expect(changeMode).toHaveBeenLastCalledWith("space"); });
   it("locks authoring controls during an active Run", () => { renderAction(true); expect(screen.getByRole("button", { name: "Save Action" })).toBeDisabled(); expect(screen.getByText("Locked by active Run")).toBeInTheDocument(); });
   it("keeps a dirty resource draft when refreshed props arrive", async () => { const user = userEvent.setup(); const resource = resources()[0]!; const navigate = vi.fn(); const { rerender } = render(<ResourceWorkspace kind="instructions" resources={[resource]} references={[]} locked={false} selectedId="validation" navigate={navigate} onSave={vi.fn()} />); await user.type(screen.getByLabelText("Markdown Body"), "\nlocal draft"); rerender(<ResourceWorkspace kind="instructions" resources={[{ ...resource, content: `${resource.content}\nserver refresh` }]} references={[]} locked={false} selectedId="validation" navigate={navigate} onSave={vi.fn()} />); expect(screen.getByLabelText("Markdown Body")).toHaveValue(`${resource.content.trimEnd()}\nlocal draft`); });
@@ -88,15 +88,47 @@ describe("orchestration Configure UI", () => {
   it("renders invalid State deep links with recovery", () => { render(<StateWorkspace locked={false} navigate={vi.fn()} onSave={vi.fn()} onMoveAction={vi.fn()} />); expect(screen.getByRole("heading", { name: "State not found" })).toBeInTheDocument(); expect(screen.getByRole("button", { name: "Return to Environment" })).toBeInTheDocument(); });
   it("keeps core actions in one responsive toolbar", () => { renderAction(); const save = screen.getByRole("button", { name: "Save Action" }); expect(save).toHaveAttribute("form", "action-action-1"); expect(screen.getAllByRole("toolbar")).toHaveLength(1); expect(screen.getByRole("button", { name: "Open Action flow" })).toBeInTheDocument(); });
   it("uses the canonical API prefix in orchestration data modules", () => { expect(orchestrationApiBase).toBe("/api"); });
-  it("associates Action execution and composition fields with labels", () => { renderAction(); expect(screen.getByLabelText("maxRetries")).toHaveAttribute("type", "number"); const validation = screen.getByRole("group", { name: "Validation Agent · main/controller" }); expect(within(validation).getByLabelText("Provider")).toBeInTheDocument(); expect(within(validation).getByLabelText("Instruction")).toBeInTheDocument(); expect(within(validation).getByLabelText("Validation Skills")).toBeInTheDocument(); expect(screen.queryByLabelText("Agent")).not.toBeInTheDocument(); expect(screen.queryByLabelText("Use Case refs")).not.toBeInTheDocument(); });
-  it("reports each missing Action-role execution binding in Run readiness", async () => { renderAction(); await waitFor(() => expect(screen.getByText("validation: execution binding is missing.")).toBeInTheDocument()); expect(screen.getByText("work: execution binding is missing.")).toBeInTheDocument(); expect(screen.getByRole("toolbar")).toHaveTextContent("Not ready"); });
+  it("associates one Action provider and policy with role composition fields", () => { renderAction(); expect(screen.getByLabelText("maxRetries")).toHaveAttribute("type", "number"); const execution = screen.getByRole("group", { name: "Action execution" }); const validation = screen.getByRole("group", { name: "Validation Agent · main/controller" }); expect(within(execution).getByLabelText("Provider")).toBeInTheDocument(); expect(within(execution).getByRole("switch", { name: "Network" })).toBeInTheDocument(); expect(within(execution).getByLabelText("Read-only roots")).toBeInTheDocument(); expect(within(validation).queryByLabelText("Provider")).not.toBeInTheDocument(); expect(within(validation).getByLabelText("Model")).toBeInTheDocument(); expect(within(validation).getByLabelText("Instruction")).toBeInTheDocument(); expect(within(validation).getByLabelText("Validation Skills")).toBeInTheDocument(); expect(screen.getAllByRole("button", { name: "Save execution" })).toHaveLength(1); expect(screen.queryByLabelText("Agent")).not.toBeInTheDocument(); expect(screen.queryByLabelText("Use Case refs")).not.toBeInTheDocument(); });
+  it("resets both roles from one changed provider and saves the whole binding atomically", async () => {
+    const user = userEvent.setup(); const save = mockReadyActionExecution(); renderActionWorkspace();
+    const provider = await screen.findByLabelText("Provider"); await user.click(provider);
+    await user.click(await screen.findByRole("option", { name: "copilot · ready" }));
+    const models = screen.getAllByLabelText("Model"); const reasoning = screen.getAllByLabelText("Reasoning");
+    expect(models).toHaveLength(2); models.forEach((control) => expect(control).toHaveTextContent("Copilot Model"));
+    reasoning.forEach((control) => expect(control).toHaveTextContent("high"));
+    await user.click(screen.getByRole("button", { name: "Save execution" }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith("state-1", "action-1", {
+      provider: "copilot", policy: { network: false, readOnlyRoots: [] },
+      validation: { model: "claude", reasoningEffort: "high" }, work: { model: "claude", reasoningEffort: "high" }
+    }));
+  });
+  it("reports one missing Action execution binding in Run readiness", async () => { renderAction(); await waitFor(() => expect(screen.getByText("Action execution binding is missing.")).toBeInTheDocument()); expect(screen.getByRole("toolbar")).toHaveTextContent("Not ready"); });
 });
 
-function renderAction(locked = false) { mockActionExecution(); const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} instructions={resources().filter((item) => item.kind === "instruction")} skills={resources().filter((item) => item.kind === "skill")} locked={locked} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); }
+function renderAction(locked = false) { mockActionExecution(); renderActionWorkspace(locked); }
+
+function renderActionWorkspace(locked = false) { const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} instructions={resources().filter((item) => item.kind === "instruction")} skills={resources().filter((item) => item.kind === "skill")} locked={locked} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); }
 
 function mockActionExecution() {
   vi.spyOn(orchestrationApi, "localRuntime").mockResolvedValue({ status: "offline", daemonVersion: "unknown", uptimeSeconds: 0, activeTaskCount: 0, lastSeenAt: new Date(0).toISOString(), refreshRequested: false, restartRequested: false, providers: [] });
-  vi.spyOn(orchestrationApi, "actionRoleBinding").mockResolvedValue(null);
+  vi.spyOn(orchestrationApi, "actionBinding").mockResolvedValue(null);
+}
+
+function mockReadyActionExecution() {
+  const at = "2026-08-30T10:00:00.000Z";
+  vi.spyOn(orchestrationApi, "localRuntime").mockResolvedValue({ status: "online", daemonVersion: "2", uptimeSeconds: 10,
+    activeTaskCount: 0, lastSeenAt: at, refreshRequested: false, restartRequested: false, providers: [
+      { provider: "codex", cliVersion: "1", authStatus: "ready", health: "ready", busy: false, updatedAt: at,
+        capabilities: { models: [{ id: "gpt", label: "Codex Model", reasoningOptions: ["medium"], defaultReasoning: "medium" }],
+          supportsResume: true, supportsStructuredOutput: true, policy: { workspaceWrite: true, networkControl: true, readOnlyRoots: true }, refreshedAt: at } },
+      { provider: "copilot", cliVersion: "1", authStatus: "ready", health: "ready", busy: false, updatedAt: at,
+        capabilities: { models: [{ id: "claude", label: "Copilot Model", reasoningOptions: ["low", "high"], defaultReasoning: "high" }],
+          supportsResume: true, supportsStructuredOutput: true, policy: { workspaceWrite: true, networkControl: true, readOnlyRoots: true }, refreshedAt: at } }
+    ] });
+  vi.spyOn(orchestrationApi, "actionBinding").mockResolvedValue(null);
+  return vi.spyOn(orchestrationApi, "saveActionBinding").mockImplementation(async (stateId, actionId, input) => ({
+    version: 2, actionId, ...input, updatedAt: at
+  }));
 }
 
 function sidebarData(config = orchestrationConfig()) {

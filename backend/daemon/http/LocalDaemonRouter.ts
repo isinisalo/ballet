@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import express from "express";
 import { z } from "zod";
 import {
-  actionRoleExecutionParamsSchema, agentExecutionParamsSchema, emptyRuntimeBodySchema, executionBindingBodySchema,
+  actionExecutionBindingBodySchema, actionExecutionParamsSchema, agentExecutionParamsSchema, emptyRuntimeBodySchema, executionBindingBodySchema,
   executionTaskParamsSchema, localDaemonClaimBodySchema, localDaemonCompleteBodySchema,
   localDaemonDiagnosticsBodySchema, localDaemonEventBatchBodySchema, localDaemonFailBodySchema,
   localDaemonHeartbeatBodySchema, localDaemonLeaseBodySchema, runtimeLogQuerySchema
@@ -40,15 +40,15 @@ export const createLocalDaemonRouter = (options: {
     const { agentId } = parseParams(agentExecutionParamsSchema, req);
     res.json(options.store.putBinding(agentId, parseBody(executionBindingBodySchema, req)));
   }));
-  router.get("/environment/states/:stateId/actions/:actionId/execution/:role", route((req, res) => {
-    const { stateId, actionId, role } = parseParams(actionRoleExecutionParamsSchema, req);
+  router.get("/environment/states/:stateId/actions/:actionId/execution", route((req, res) => {
+    const { stateId, actionId } = parseParams(actionExecutionParamsSchema, req);
     if (!options.actionExists(stateId, actionId)) { res.status(404).json({ error: `Action ${actionId} was not found in State ${stateId}.` }); return; }
-    res.json(options.store.actionRoleBinding(actionId, role) ?? null);
+    res.json(options.store.actionBinding(actionId) ?? null);
   }));
-  router.put("/environment/states/:stateId/actions/:actionId/execution/:role", route((req, res) => {
-    const { stateId, actionId, role } = parseParams(actionRoleExecutionParamsSchema, req);
+  router.put("/environment/states/:stateId/actions/:actionId/execution", route((req, res) => {
+    const { stateId, actionId } = parseParams(actionExecutionParamsSchema, req);
     if (!options.actionExists(stateId, actionId)) { res.status(404).json({ error: `Action ${actionId} was not found in State ${stateId}.` }); return; }
-    res.json(options.store.putActionRoleBinding(actionId, role, parseBody(executionBindingBodySchema, req)));
+    res.json(options.store.putActionBinding(actionId, parseBody(actionExecutionBindingBodySchema, req)));
   }));
 
   router.post("/daemon/heartbeat", authenticated, route((req, res) => {

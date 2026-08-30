@@ -1,8 +1,8 @@
 import type { AgentDefinition } from "../../../shared/orchestration/environment.js";
-import type { ActionExecutionRole, ActionRoleExecutionBinding, AgentExecutionBinding } from "../../../shared/domain/runtime.js";
+import type { ActionExecutionBinding, AgentExecutionBinding, LocalProviderStatus } from "../../../shared/domain/runtime.js";
 import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RuntimeCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
+import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import type { LocalDaemonStore } from "../persistence/LocalDaemonStore.js";
 import type { OrchestrationProviderPreflightPort } from "./EnvironmentRunPlanner.js";
 import type { ProviderPermissionSpec } from "./ProviderPermissions.js";
@@ -13,41 +13,55 @@ const EXECUTION_TIMEOUT_MS = 30 * 60_000;
 export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimeProvider, OrchestrationProviderPreflightPort {
   constructor(private readonly daemon: LocalDaemonStore) {}
 
-  async inspectAgent(agent: AgentDefinition): Promise<RuntimeCapabilitySnapshot> {
+  async inspectAgent(agent: AgentDefinition): Promise<RuntimeAgentCapabilitySnapshot> {
     const binding = this.daemon.binding(agent.id);
     if (!binding) throw new Error(`Agent ${agent.id} has no local execution binding.`);
-    return this.inspectBinding({ kind: "agent", agentId: agent.id }, binding);
+    const provider = this.readyProvider(binding);
+    const model = requireModel(provider, binding.model, binding.reasoningEffort);
+    const content = {
+      subject: { kind: "agent" as const, agentId: agent.id }, provider: binding.provider,
+      model: binding.model, reasoningEffort: binding.reasoningEffort,
+      networkAccess: binding.policy.network, readOnlyRoots: binding.policy.readOnlyRoots,
+      cliVersion: provider.cliVersion!, supportedModels: provider.capabilities.models.map(({ id }) => id).sort(),
+      supportedReasoningEfforts: [...model.reasoningOptions].sort(), supportsReadOnly: true,
+      supportsWorkspaceWrite: provider.capabilities.policy.workspaceWrite
+    };
+    return { ...content, capabilitySha256: hash(content) };
   }
 
-  async inspectActionRole(actionId: string, role: ActionExecutionRole): Promise<RuntimeCapabilitySnapshot> {
-    const binding = this.daemon.actionRoleBinding(actionId, role);
-    if (!binding) throw new Error(`Action ${actionId} ${role} has no local execution binding.`);
-    return this.inspectBinding({ kind: "action_role", actionId, role }, binding);
+  async inspectAction(actionId: string): Promise<RuntimeActionCapabilitySnapshot> {
+    const binding = this.daemon.actionBinding(actionId);
+    if (!binding) throw new Error(`Action ${actionId} has no local execution binding.`);
+    const provider = this.readyProvider(binding);
+    if (!provider.capabilities.policy.workspaceWrite) {
+      throw new Error(`${binding.provider} cannot provide managed workspace-write for Work.`);
+    }
+    const validation = requireModel(provider, binding.validation.model, binding.validation.reasoningEffort);
+    const work = requireModel(provider, binding.work.model, binding.work.reasoningEffort);
+    const supportedModels = provider.capabilities.models.map(({ id }) => id).sort();
+    const content = {
+      subject: { kind: "action" as const, actionId }, provider: binding.provider,
+      networkAccess: binding.policy.network, readOnlyRoots: binding.policy.readOnlyRoots,
+      cliVersion: provider.cliVersion!, supportsReadOnly: true,
+      supportsWorkspaceWrite: provider.capabilities.policy.workspaceWrite,
+      roles: {
+        validation: { ...binding.validation, supportedModels, supportedReasoningEfforts: [...validation.reasoningOptions].sort() },
+        work: { ...binding.work, supportedModels, supportedReasoningEfforts: [...work.reasoningOptions].sort() }
+      }
+    };
+    return { ...content, capabilitySha256: hash(content) };
   }
 
-  private async inspectBinding(subject: RuntimeCapabilitySnapshot["subject"], binding: AgentExecutionBinding | ActionRoleExecutionBinding): Promise<RuntimeCapabilitySnapshot> {
+  private readyProvider(binding: AgentExecutionBinding | ActionExecutionBinding): LocalProviderStatus {
     const status = this.daemon.status();
     if (status.status !== "online") throw new Error(`Local daemon is ${status.status}.`);
     const provider = status.providers.find((candidate) => candidate.provider === binding.provider);
     if (!provider || provider.health !== "ready" || !provider.cliVersion) {
       throw new Error(provider?.healthMessage ?? `${binding.provider} is unavailable on the local daemon.`);
     }
-    const model = provider.capabilities.models.find(({ id }) => id === binding.model);
-    if (!model) throw new Error(`Model ${binding.model} is unavailable for ${binding.provider}.`);
-    if (!model.reasoningOptions.includes(binding.reasoningEffort)) {
-      throw new Error(`Reasoning effort ${binding.reasoningEffort} is unavailable for ${binding.model}.`);
-    }
-    const supportedModels = provider.capabilities.models.map(({ id }) => id).sort();
-    const supportedReasoningEfforts = [...new Set(provider.capabilities.models
-      .flatMap(({ reasoningOptions }) => reasoningOptions))].sort();
-    const content = {
-      subject, provider: binding.provider, model: binding.model,
-      reasoningEffort: binding.reasoningEffort, networkAccess: binding.policy.network,
-      readOnlyRoots: binding.policy.readOnlyRoots, cliVersion: provider.cliVersion,
-      supportedModels, supportedReasoningEfforts, supportsReadOnly: true,
-      supportsWorkspaceWrite: provider.capabilities.policy.workspaceWrite
-    };
-    return { ...content, capabilitySha256: hash(content) };
+    if (binding.policy.network && !provider.capabilities.policy.networkControl) throw new Error(`${binding.provider} cannot enforce network policy.`);
+    if (binding.policy.readOnlyRoots.length > 0 && !provider.capabilities.policy.readOnlyRoots) throw new Error(`${binding.provider} cannot enforce additional read-only roots.`);
+    return provider;
   }
 
   async execute(spec: ExecutionSpecV15, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
@@ -79,4 +93,10 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
 }
 
 const hash = (value: unknown): string => sha256(canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue));
+const requireModel = (provider: LocalProviderStatus, modelId: string, reasoningEffort: string) => {
+  const model = provider.capabilities.models.find(({ id }) => id === modelId);
+  if (!model) throw new Error(`Model ${modelId} is unavailable for ${provider.provider}.`);
+  if (!model.reasoningOptions.includes(reasoningEffort)) throw new Error(`Reasoning effort ${reasoningEffort} is unavailable for ${modelId}.`);
+  return model;
+};
 const delay = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));

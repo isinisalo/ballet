@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ActionExecutionRole, ActionRoleExecutionBinding, AgentExecutionBinding, AgentExecutionState, ExecutionPolicy, LocalDaemonEvent, LocalDaemonHeartbeat,
+import type { ActionExecutionBinding, ActionRoleModelSelection, AgentExecutionBinding, AgentExecutionState, ExecutionPolicy, LocalDaemonEvent, LocalDaemonHeartbeat,
   LocalDaemonLogEntry, LocalDaemonStatus, LocalDaemonTaskClaim, LocalProviderStatus, RuntimeProvider } from "../../../shared/domain/runtime.js";
 import { localProviderStatusSchema } from "../../../shared/api/runtime-schemas.js";
 import { canonicalJson, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -51,34 +51,42 @@ export class LocalDaemonStore {
     return this.binding(agentId)!;
   }
 
-  actionRoleBinding(actionId: string, role: ActionExecutionRole): ActionRoleExecutionBinding | undefined {
-    const row = this.connection().prepare(`
-      SELECT * FROM action_role_execution_bindings WHERE action_id = ? AND role = ?
-    `).get(actionId, role) as ActionRoleBindingRow | undefined;
-    return row ? toActionRoleBinding(row) : undefined;
+  actionBinding(actionId: string): ActionExecutionBinding | undefined {
+    const row = this.connection().prepare("SELECT * FROM action_execution_bindings WHERE action_id = ?")
+      .get(actionId) as ActionBindingRow | undefined;
+    return row ? toActionBinding(row) : undefined;
   }
 
-  putActionRoleBinding(actionId: string, role: ActionExecutionRole, input: {
-    provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy;
-  }): ActionRoleExecutionBinding {
-    this.assertBindingSupported(input);
+  putActionBinding(actionId: string, input: {
+    provider: RuntimeProvider; policy: ExecutionPolicy;
+    validation: ActionRoleModelSelection; work: ActionRoleModelSelection;
+  }): ActionExecutionBinding {
+    this.assertBindingSupported({ ...input.validation, provider: input.provider, policy: input.policy });
+    this.assertBindingSupported({ ...input.work, provider: input.provider, policy: input.policy });
+    const provider = this.provider(input.provider)!;
+    if (!provider.capabilities.policy.workspaceWrite) {
+      throw new ConflictError(`${input.provider} cannot provide managed workspace-write for Work.`);
+    }
     const at = this.now().toISOString();
     this.connection().prepare(`
-      INSERT INTO action_role_execution_bindings (
-        action_id, role, version, provider, model, reasoning_effort, network_access, read_only_roots_json, updated_at
-      ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(action_id, role) DO UPDATE SET provider = excluded.provider, model = excluded.model,
-        reasoning_effort = excluded.reasoning_effort, network_access = excluded.network_access,
-        read_only_roots_json = excluded.read_only_roots_json, updated_at = excluded.updated_at
-    `).run(actionId, role, input.provider, input.model, input.reasoningEffort, input.policy.network ? 1 : 0,
-      canonical(input.policy.readOnlyRoots), at);
-    return this.actionRoleBinding(actionId, role)!;
+      INSERT INTO action_execution_bindings (
+        action_id, version, provider, network_access, read_only_roots_json,
+        validation_model, validation_reasoning_effort, work_model, work_reasoning_effort, updated_at
+      ) VALUES (?, 2, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(action_id) DO UPDATE SET provider = excluded.provider,
+        network_access = excluded.network_access, read_only_roots_json = excluded.read_only_roots_json,
+        validation_model = excluded.validation_model, validation_reasoning_effort = excluded.validation_reasoning_effort,
+        work_model = excluded.work_model, work_reasoning_effort = excluded.work_reasoning_effort,
+        updated_at = excluded.updated_at
+    `).run(actionId, input.provider, input.policy.network ? 1 : 0, canonical(input.policy.readOnlyRoots),
+      input.validation.model, input.validation.reasoningEffort, input.work.model, input.work.reasoningEffort, at);
+    return this.actionBinding(actionId)!;
   }
 
   removeActionBindings(actionIds: string[]): void {
     if (actionIds.length === 0) return;
     this.connection().transaction(() => {
-      const remove = this.connection().prepare("DELETE FROM action_role_execution_bindings WHERE action_id = ?");
+      const remove = this.connection().prepare("DELETE FROM action_execution_bindings WHERE action_id = ?");
       for (const actionId of actionIds) remove.run(actionId);
     })();
   }
@@ -342,8 +350,9 @@ export class LocalDaemonStore {
 
 interface BindingRow { agent_id: string; provider: RuntimeProvider; model: string; reasoning_effort: string;
   network_access: 0 | 1; read_only_roots_json: string; updated_at: string }
-interface ActionRoleBindingRow { action_id: string; role: ActionExecutionRole; provider: RuntimeProvider; model: string;
-  reasoning_effort: string; network_access: 0 | 1; read_only_roots_json: string; updated_at: string }
+interface ActionBindingRow { action_id: string; provider: RuntimeProvider; network_access: 0 | 1;
+  read_only_roots_json: string; validation_model: string; validation_reasoning_effort: string;
+  work_model: string; work_reasoning_effort: string; updated_at: string }
 interface DaemonRow { status: LocalDaemonStatus["status"]; pid: number; daemon_version: string; uptime_seconds: number;
   active_task_count: number; last_seen_at: string; recent_error: string | null; refresh_requested_at: string | null;
   refresh_acknowledged_at: string | null; restart_requested_at: string | null; restart_acknowledged_at: string | null }
@@ -363,10 +372,11 @@ const toBinding = (row: BindingRow): AgentExecutionBinding => ({
   policy: { network: Boolean(row.network_access), readOnlyRoots: JSON.parse(row.read_only_roots_json) as string[] },
   updatedAt: row.updated_at
 });
-const toActionRoleBinding = (row: ActionRoleBindingRow): ActionRoleExecutionBinding => ({
-  version: 1, actionId: row.action_id, role: row.role, provider: row.provider, model: row.model,
-  reasoningEffort: row.reasoning_effort,
+const toActionBinding = (row: ActionBindingRow): ActionExecutionBinding => ({
+  version: 2, actionId: row.action_id, provider: row.provider,
   policy: { network: Boolean(row.network_access), readOnlyRoots: JSON.parse(row.read_only_roots_json) as string[] },
+  validation: { model: row.validation_model, reasoningEffort: row.validation_reasoning_effort },
+  work: { model: row.work_model, reasoningEffort: row.work_reasoning_effort },
   updatedAt: row.updated_at
 });
 const canonical = (value: unknown): string => canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue);

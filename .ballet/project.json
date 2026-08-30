@@ -21,7 +21,8 @@
       { "id": "adr-012", "name": "Execution profiles separate from instructions and Skills", "status": "accepted" },
       { "id": "adr-013", "name": "Reusable procedures belong to Skills", "status": "accepted" },
       { "id": "adr-034", "name": "Validation-led deterministic Environment orchestration", "status": "accepted" },
-      { "id": "adr-037", "name": "Checkout-local daemon is the only CLI execution worker", "status": "accepted" }
+      { "id": "adr-037", "name": "Checkout-local daemon is the only CLI execution worker", "status": "accepted" },
+      { "id": "adr-039", "name": "Action-level shared provider and policy", "status": "accepted" }
     ],
     "constraints": [
       { "id": "constraint-001", "name": "Human approval and ordered execution integrity", "status": "accepted", "kind": "required", "description": "Human decisions and deterministic State and Action gates remain authoritative.", "rationale": "The runtime must preserve operator authority and explain every progression decision." },

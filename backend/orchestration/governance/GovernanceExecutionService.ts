@@ -195,7 +195,9 @@ export class GovernanceExecutionService {
     checkoutRoot: string
   ): string {
     const agentDefinition = run.executionSnapshot.agents.find(({ id }) => id === composition.agentId)!;
-    const capability = run.executionSnapshot.runtimeCapabilities.find(({ subject }) => subject.kind === "agent" && subject.agentId === agentDefinition.id)!;
+    const matchedCapability = run.executionSnapshot.runtimeCapabilities.find(({ subject }) => subject.kind === "agent" && subject.agentId === agentDefinition.id);
+    if (!matchedCapability || !("model" in matchedCapability)) throw new Error(`Agent ${agentDefinition.id} capability is invalid.`);
+    const capability = matchedCapability;
     const agentRunId = this.nextId(`${envelope.role}-agent`);
     const promptAgent = { ...agentDefinition }; delete (promptAgent as Partial<typeof promptAgent>).contentSha256;
     const subject = { kind: "agent" as const, agent: promptAgent };

@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 30
+version: 31
 tags: [arc42, decisions]
 arc42Section: 9
 ---
@@ -17,6 +17,7 @@ arc42Section: 9
 | [adr-035](../adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) | accepted | Markdown authoring, Agent project truth, paired daemon execution binding, resource-only Refinement and Run Evidence |
 | [adr-037](../adr/adr-037-checkout-local-daemon.md) | accepted | Supersedes ADR-035 Computer/pairing/remote execution with one checkout-local daemon while retaining Markdown Agents and Run Evidence |
 | [adr-038](../adr/adr-038-action-role-execution-bindings.md) | accepted | Action inherits its State Use Case closure and selects versioned role resources plus machine-local Action-role execution bindings |
+| [adr-039](../adr/adr-039-action-shared-provider-policy.md) | accepted | Validation and subordinate Work share one Action-level provider and policy while retaining role-specific model and reasoning selections |
 | [adr-036](../adr/adr-036-loop-engineering-space-and-action-flow-projections.md) | accepted | shared ordered State/Action space canvas and Validation-led Action workflow projection without runtime ownership |
 
-ADR-034:n, ADR-035:n, ADR-037:n ja ADR-038:n supersession-listat määrittävät, mitkä aiemmat päätökset tai niiden osat ovat historiallisia. ADR-036 tarkentaa vain aktiivisen UI-projektion. Tässä indeksissä ei ylläpidetä rinnakkaista päätöstekstiä.
+ADR-034:n, ADR-035:n, ADR-037:n, ADR-038:n ja ADR-039:n supersession-listat määrittävät, mitkä aiemmat päätökset tai niiden osat ovat historiallisia. ADR-036 tarkentaa vain aktiivisen UI-projektion. Tässä indeksissä ei ylläpidetä rinnakkaista päätöstekstiä.

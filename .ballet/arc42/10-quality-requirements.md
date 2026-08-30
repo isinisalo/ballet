@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 31
+version: 32
 tags: [arc42, quality, scenarios]
 arc42Section: 10
 ---
@@ -27,6 +27,7 @@ arc42Section: 10
 | QS-038 | goal-024 / REQ-024 | server/daemon käynnistyy, daemon crashaa tai taskin lease katoaa | fresh SQLite v19, launchd restart ja aktiivinen taski | local daemon lifecycle and execution queue | fresh ready <=60 s, crash recovery <=30 s, claimed task yksi runtime_lost <=90 s ja queued task restartin jälkeen kerran | lifecycle/claim/lease/fencing/restart tests and packaged smoke | 1 | EVID-038 | passed canonical; measured daemon recovery 8 s and stable PID |
 | QS-039 | goal-023, goal-024 / REQ-023, REQ-024 | Action-role tai governance Agent binding tallennetaan tai Run preflightataan | ready/missing/offline provider, model/reasoning/policy mismatch, invalid State/Action/role ja extra fields | binding v1/v2, loopback HTTP and provider capabilities | strict upsert hyväksyy vain oikean subjectin ja capabilityt; yksikin puuttuva tai sopimaton binding tuottaa 0 dispatchia; väärä token ja legacy fields hylätään | schema, persistence, API, planner, capability, auth and UI tests | 1 | EVID-039 | passed locally |
 | QS-040 | goal-023, goal-024 / REQ-023, REQ-024 | Action-role strict cut rakennetaan ja käynnistetään | clean checkout, fresh/incompatible state, desktop/narrow UI | whole product | vain v22/v16/v11/v13/v15/v19 ja binding v1/v2 jää aktiiviseksi; Action useCaseIds/agentId ja Validation/Work Agent resources 0; server-owned finalization säilyy | removal, arc42, full test/lint/build/design, desktop/narrow QA, make latest and startup smoke | 1 | EVID-040 | passed canonical |
+| QS-041 | goal-024 / REQ-024 | Action execution tallennetaan tai Run preflightataan | shared provider/policy, eri role model/reasoning, missing/offline/mismatch ja active immutable Run | ActionExecutionBindingV2 and Root Snapshot v17 | yksi atominen upsert ja yksi Action capability; provider/policy esiintyy kerran; kumman tahansa roolin mismatch tuottaa 0 dispatchia; Validation on read-only ja Work managed-worktree-write | strict schema/API/persistence/planner/runtime/UI tests; old role route 404; desktop/narrow overflow 0; fresh SQLite v20 startup | 1 | EVID-041 | passed canonical |
 <!-- quality-scenarios:end -->
 
 Compile yksin ei täytä mitään skenaariota. Verdict edellyttää scenario-kohtaista test/evidence-ketjua ja rajoitteiden raportointia.
