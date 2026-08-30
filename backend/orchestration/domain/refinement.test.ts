@@ -20,6 +20,7 @@ describe("refinement safety", () => {
   it("accepts only canonical refinement namespaces", () => {
     expect(isAllowedRefinementPath(".ballet/instructions/work.md")).toBe(true);
     expect(isAllowedRefinementPath(".agents/skills/review/SKILL.md")).toBe(true);
+    expect(isAllowedRefinementPath(".codex/agents/ballet-action-validation-action-1.toml")).toBe(true);
     expect(isAllowedRefinementPath(".ballet/project.json")).toBe(false);
   });
 

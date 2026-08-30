@@ -1,5 +1,4 @@
-import type { ActionRoleComposition, AgentComposition, ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
-import { validateActionInstruction } from "../../../shared/orchestration/instructionContract.js";
+import type { ActionRoleComposition, AgentComposition, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeResourceSnapshot } from "../../../shared/orchestration/runtime.js";
 
@@ -13,18 +12,15 @@ export interface ProjectResourceInput {
 export class ResourceContextError extends Error {}
 
 export const resolveOrchestrationResources = (
-  config: ProjectConfigurationV24,
+  config: ProjectConfigurationV25,
   catalog: readonly ProjectResourceInput[]
 ): RuntimeResourceSnapshot[] => {
   const indexed = new Map(catalog.map((resource) => [`${resource.kind}:${resource.id}`, resource]));
   if (indexed.size !== catalog.length) throw new ResourceContextError("Resource catalog contains duplicate identities.");
   const selected = new Map<string, RuntimeResourceSnapshot>();
   for (const composition of allCompositions(config)) {
-    if ("instructionResource" in composition) {
-      addResource(indexed, selected, "instruction", composition.instructionResource, true);
-    }
     for (const skillId of [...composition.skillResources].sort(compareUtf8)) {
-      addResource(indexed, selected, "skill", skillId, false);
+      addResource(indexed, selected, "skill", skillId);
     }
   }
   return [...selected.values()].sort((left, right) => compareUtf8(`${left.kind}:${left.id}`, `${right.kind}:${right.id}`));
@@ -34,8 +30,7 @@ const addResource = (
   catalog: Map<string, ProjectResourceInput>,
   selected: Map<string, RuntimeResourceSnapshot>,
   kind: ProjectResourceInput["kind"],
-  id: string,
-  validateInstruction: boolean
+  id: string
 ): void => {
   const key = `${kind}:${id}`;
   const source = catalog.get(key);
@@ -43,14 +38,10 @@ const addResource = (
   if (Buffer.byteLength(source.content, "utf8") > 128 * 1024) {
     throw new ResourceContextError(`${kind} resource ${id} exceeds 128 KiB.`);
   }
-  if (validateInstruction) {
-    const issues = validateActionInstruction(source.content);
-    if (issues.length) throw new ResourceContextError(`${id}: ${issues[0]!.message}.`);
-  }
   selected.set(key, { ...source, sourceSha256: sha256(source.content) });
 };
 
-const allCompositions = (config: ProjectConfigurationV24): Array<ActionRoleComposition | AgentComposition> => [
+const allCompositions = (config: ProjectConfigurationV25): Array<ActionRoleComposition | AgentComposition> => [
   config.critic.agent,
   config.refinement.agent,
   ...config.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]))

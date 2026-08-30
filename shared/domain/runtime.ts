@@ -51,19 +51,6 @@ export interface LocalDaemonStatus {
   providers: LocalProviderStatus[];
 }
 
-export type ActionExecutionRole = "validation" | "work";
-export interface ActionRoleModelSelection {
-  model: string;
-  reasoningEffort: string;
-}
-export interface ActionExecutionBinding {
-  version: 3;
-  actionId: string;
-  validation: ActionRoleModelSelection;
-  work: ActionRoleModelSelection;
-  updatedAt: string;
-}
-
 export interface LocalDaemonHeartbeat {
   pid: number;
   daemonVersion: string;
@@ -81,7 +68,7 @@ export interface LocalDaemonTaskClaim {
   leaseUntil: string;
   leaseDurationMs: number;
   renewAfterMs: number;
-  spec: import("../orchestration/execution.js").ExecutionSpecV17;
+  spec: import("../orchestration/execution.js").ExecutionSpecV18;
   permissions: { workspaceAccess: WorkspaceAccess };
 }
 

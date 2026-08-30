@@ -4,17 +4,32 @@ import { CONTRACT_LIMITS } from "../limits.js";
 import { PROJECT_CONFIG_VERSION } from "../versions.js";
 import { idListSchema, idSchema, nonEmptyTextSchema } from "./common.js";
 import { directionSchema } from "./directionSchemas.js";
+import { actionAgentId } from "../environment.js";
+
+const codexModelSchema = z.enum(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"]);
+const reasoningEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
 
 export const governanceAgentDefinitionSchema = z.object({
   id: z.enum(["ballet-critic-agent", "ballet-refinement-agent"]),
   name: z.enum(["ballet-critic-agent", "ballet-refinement-agent"]),
   description: nonEmptyTextSchema,
   developerInstructions: nonEmptyTextSchema,
-  model: z.enum(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"]),
-  reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]),
+  model: codexModelSchema,
+  reasoningEffort: reasoningEffortSchema,
   sandboxMode: z.literal("read-only")
 }).strict().superRefine((agent, context) => {
   if (agent.id !== agent.name) context.addIssue({ code: "custom", path: ["name"], message: "Agent name must match its fixed id" });
+});
+
+export const actionAgentDefinitionSchema = z.object({
+  id: z.string().regex(/^ballet-action-(?:validation|work)-[a-z0-9][a-z0-9-]*$/),
+  name: z.string().regex(/^ballet-action-(?:validation|work)-[a-z0-9][a-z0-9-]*$/),
+  description: nonEmptyTextSchema,
+  developerInstructions: nonEmptyTextSchema,
+  model: codexModelSchema,
+  reasoningEffort: reasoningEffortSchema
+}).strict().superRefine((agent, context) => {
+  if (agent.id !== agent.name) context.addIssue({ code: "custom", path: ["name"], message: "Agent name must match its id" });
 });
 
 export const agentCompositionSchema = z.object({
@@ -23,7 +38,7 @@ export const agentCompositionSchema = z.object({
 }).strict();
 
 export const actionRoleCompositionSchema = z.object({
-  instructionResource: idSchema,
+  agentId: idSchema,
   skillResources: idListSchema
 }).strict();
 
@@ -101,7 +116,7 @@ const refinementConfigurationSchema = z.object({
   ])
 }).strict();
 
-export const projectConfigurationV24Schema = z.object({
+export const projectConfigurationV25Schema = z.object({
   version: z.literal(PROJECT_CONFIG_VERSION),
   direction: directionSchema,
   environment: environmentDefinitionSchema,
@@ -112,6 +127,14 @@ export const projectConfigurationV24Schema = z.object({
     context.addIssue({ code: "custom", path: issue.path.split("."), message: issue.message });
   }
   for (const [stateIndex, state] of config.environment.states.entries()) {
+    for (const [actionIndex, action] of state.actions.entries()) {
+      for (const role of ["validation", "work"] as const) {
+        if (action[role].agentId !== actionAgentId(action.id, role)) context.addIssue({
+          code: "custom", path: ["environment", "states", stateIndex, "actions", actionIndex, role, "agentId"],
+          message: `${role} Agent id must match its Action id`
+        });
+      }
+    }
     for (const issue of validateUniqueActionPriority(state.actions)) {
       context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, ...issue.path.split(".")], message: issue.message });
     }

@@ -191,6 +191,14 @@ describe("exact Refinement approval and managed apply", () => {
     }
   });
 
+  test("Action Agent TOML impact includes the Agent-owning Action", () => {
+    const environment = environmentSeed({ stateCount: 2 }).executionSnapshot.environment;
+    expect(resolveRefinementImpact(environment, [{
+      operation: "replace", relativePath: ".codex/agents/ballet-action-validation-action-2.toml",
+      expectedPreimageHash: HASH_A, proposedContentHash: HASH_A, proposedContent: "x", rationale: "x"
+    }], "action-1")).toEqual(["action-1", "action-2"]);
+  });
+
   test("exact approval creates one local commit and continuation without merge, push, or early resolution", async () => {
     const repository = gitRepository();
     const context = completedDb(repository.head);

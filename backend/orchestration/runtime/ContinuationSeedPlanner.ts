@@ -69,16 +69,15 @@ const relevantExecutionContextHash = (
 ): string => {
   const action = source.executionSnapshot.environment.states.flatMap(({ actions }) => actions).find(({ id }) => id === actionId);
   if (!action) return "missing";
-  const ids = new Set([
-    action.validation.instructionResource, ...action.validation.skillResources,
-    action.work.instructionResource, ...action.work.skillResources
-  ]);
+  const ids = new Set([...action.validation.skillResources, ...action.work.skillResources]);
   return contentHash({
     capabilities: source.executionSnapshot.runtimeCapabilities.filter(({ subject }) => subject.kind === "action" && subject.actionId === actionId),
     permissions: source.executionSnapshot.permissions.filter(({ actionId: scopedActionId }) => !scopedActionId || scopedActionId === actionId),
     resources: source.executionSnapshot.resources.filter(({ id }) => ids.has(id)).map(
       ({ kind, id, sourceSha256 }) => ({ kind, id, sourceSha256 })
-    )
+    ),
+    actionAgents: source.executionSnapshot.actionAgents.filter(({ id }) =>
+      id === action.validation.agentId || id === action.work.agentId).map(({ id, contentSha256 }) => ({ id, contentSha256 }))
   });
 };
 const contentHash = (value: unknown): string => sha256(canonicalJson(JSON.parse(JSON.stringify(value))));

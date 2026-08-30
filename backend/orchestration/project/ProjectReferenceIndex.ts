@@ -1,4 +1,4 @@
-import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 
 export type ProjectDocumentKind = "goal" | "adr" | "constraint" | "use-case" | "instruction" | "skill";
 export type ProjectReferenceKind = ProjectDocumentKind;
@@ -12,7 +12,7 @@ export interface ProjectReference {
 export class ProjectReferenceIndex {
   private readonly references = new Map<string, ProjectReference[]>();
 
-  constructor(config: ProjectConfigurationV24) {
+  constructor(config: ProjectConfigurationV25) {
     for (const useCase of config.direction.useCases) {
       this.addMany("goal", useCase.goalIds, "use-case", useCase.id, "goalIds");
       this.addMany("adr", useCase.adrIds, "use-case", useCase.id, "adrIds");
@@ -21,7 +21,6 @@ export class ProjectReferenceIndex {
     for (const state of config.environment.states) {
       for (const action of state.actions) {
         for (const [role, composition] of [["validation", action.validation], ["work", action.work]] as const) {
-          this.add("instruction", composition.instructionResource, "action", action.id, `${role}.instructionResource`);
           this.addMany("skill", composition.skillResources, "action", action.id, `${role}.skillResources`);
         }
       }

@@ -4,17 +4,6 @@ const idSchema = z.string().trim().min(1).max(200);
 const providerSchema = z.literal("codex");
 const isoDateSchema = z.iso.datetime({ offset: true });
 
-const actionRoleModelSelectionSchema = z.object({
-  model: z.string().trim().min(1).max(200),
-  reasoningEffort: z.string().trim().min(1).max(100)
-}).strict();
-
-export const actionExecutionBindingBodySchema = z.object({
-  validation: actionRoleModelSelectionSchema,
-  work: actionRoleModelSelectionSchema
-}).strict();
-
-export const actionExecutionParamsSchema = z.object({ stateId: idSchema, actionId: idSchema }).strict();
 export const executionTaskParamsSchema = z.object({ taskId: idSchema }).strict();
 export const emptyRuntimeBodySchema = z.object({}).strict();
 export const runtimeLogQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(1000).default(200) }).strict();

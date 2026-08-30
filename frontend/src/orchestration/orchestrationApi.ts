@@ -1,9 +1,9 @@
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
-import type { ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV24, StateDefinition } from "@shared/orchestration/environment";
-import type { GovernanceAgentsResponse, GovernanceAgentSlot, ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
+import type { ActionAgentDefinition, ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV25, StateDefinition } from "@shared/orchestration/environment";
+import type { ActionResponse, GovernanceAgentsResponse, GovernanceAgentSlot, ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
-import type { ActionExecutionBinding, ActionRoleModelSelection, LocalDaemonLogEntry, LocalDaemonStatus } from "@shared/domain/runtime";
+import type { LocalDaemonLogEntry, LocalDaemonStatus } from "@shared/domain/runtime";
 
 const base = "/api";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -17,7 +17,7 @@ export const orchestrationApi = {
   agents: () => request<GovernanceAgentsResponse>(`${base}/agents`),
   agent: (id: GovernanceAgentId) => request<GovernanceAgentSlot & { configHash: string }>(`${base}/agents/${encodeURIComponent(id)}`),
   schedules: () => request<Array<Record<string, unknown>>>(`${base}/critic/schedules`),
-  putProject: (config: ProjectConfigurationV24, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
+  putProject: (config: ProjectConfigurationV25, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
   saveDirection: (collection: "goals" | "adrs" | "constraints" | "use-cases", value: DirectionReference | Constraint | UseCase,
     markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {
@@ -32,11 +32,6 @@ export const orchestrationApi = {
   refreshRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local/refresh`, body({})),
   restartRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local/restart`, body({})),
   runtimeLogs: (limit = 200) => request<{ entries: LocalDaemonLogEntry[] }>(`${base}/runtimes/local/logs?limit=${limit}`),
-  actionBinding: (stateId: string, actionId: string) =>
-    request<ActionExecutionBinding | null>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution`),
-  saveActionBinding: (stateId: string, actionId: string, input: {
-    validation: ActionRoleModelSelection; work: ActionRoleModelSelection }) =>
-    request<ActionExecutionBinding>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution`, put(input)),
   approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(
     `${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash, expectedContentHash })),
   returnUseCaseToDraft: (id: string, expectedConfigHash: string) => request(`${base}/use-cases/${encodeURIComponent(id)}/return-to-draft`, body({ expectedConfigHash })),
@@ -46,7 +41,11 @@ export const orchestrationApi = {
   deleteState: (stateId: string, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}`, remove({ expectedConfigHash })),
   reorderStates: (orderedIds: string[], expectedConfigHash: string) => request(`${base}/environment/states/reorder`, body({ orderedIds, expectedConfigHash })),
   createAction: (stateId: string, action: ActionDefinition, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions`, body({ action, expectedConfigHash })),
-  updateAction: (stateId: string, action: ActionDefinition, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(action.id)}`, put({ action, expectedConfigHash })),
+  action: (stateId: string, actionId: string) => request<ActionResponse>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}`),
+  updateAction: (stateId: string, action: ActionDefinition, expectedConfigHash: string, agents: {
+    validationAgent: Omit<ActionAgentDefinition, "id" | "name"> & { expectedDocumentHash: string };
+    workAgent: Omit<ActionAgentDefinition, "id" | "name"> & { expectedDocumentHash: string };
+  }) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(action.id)}`, put({ action, expectedConfigHash, ...agents })),
   deleteAction: (stateId: string, actionId: string, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}`, remove({ expectedConfigHash })),
   reprioritizeActions: (stateId: string, orderedIds: string[], expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/reprioritize`, body({ orderedIds, expectedConfigHash })),
   saveResource: (collection: "instructions" | "skills", id: string, content: string, expectedHash: string | "absent", creating = false) =>

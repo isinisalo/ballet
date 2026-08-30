@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { LocalDaemonHeartbeat, LocalProviderStatus } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV18 } from "../../../shared/orchestration/execution.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { ActionOutcomeCoordinator } from "./ActionOutcomeCoordinator.js";
 import { AgentExecutionStore } from "./AgentExecutionStore.js";
@@ -16,41 +16,6 @@ describe("checkout-local daemon persistence", () => {
   it("reports exactly one Codex provider", () => {
     const { daemon } = setup(); daemon.heartbeat(heartbeat());
     expect(daemon.status().providers.map(({ provider }) => provider)).toEqual(["codex"]);
-  });
-
-  it("atomically upserts and removes one Action execution binding", () => {
-    const { daemon } = setup(); daemon.heartbeat(heartbeat());
-    const first = daemon.putActionBinding("action-1", {
-      validation: { model: "gpt", reasoningEffort: "high" },
-      work: { model: "gpt", reasoningEffort: "high" }
-    });
-    expect(first).toEqual(expect.objectContaining({ version: 3, actionId: "action-1" }));
-    daemon.putActionBinding("action-1", {
-      validation: { model: "gpt", reasoningEffort: "medium" },
-      work: { model: "gpt", reasoningEffort: "medium" }
-    });
-    expect(daemon.actionBinding("action-1")).toEqual(expect.objectContaining({
-      validation: { model: "gpt", reasoningEffort: "medium" }, work: { model: "gpt", reasoningEffort: "medium" }
-    }));
-    daemon.removeActionBindings(["action-1"]);
-    expect(daemon.actionBinding("action-1")).toBeUndefined();
-  });
-
-  it("rejects unsupported Action-role model, reasoning, and workspace-write capability", () => {
-    const { daemon } = setup(); const reports = heartbeat();
-    reports.providers[0] = { ...reports.providers[0]!, capabilities: { ...reports.providers[0]!.capabilities,
-      policy: { workspaceWrite: true } } };
-    daemon.heartbeat(reports);
-    const put = (model: string, reasoningEffort: string) =>
-      daemon.putActionBinding("action-1", {
-        validation: { model, reasoningEffort }, work: { model: "gpt", reasoningEffort: "high" }
-      });
-    expect(() => put("missing", "high")).toThrow(/unavailable/);
-    expect(() => put("gpt", "missing")).toThrow(/Reasoning effort/);
-    reports.providers[0] = { ...reports.providers[0]!, capabilities: { ...reports.providers[0]!.capabilities,
-      policy: { workspaceWrite: false } } };
-    daemon.heartbeat(reports);
-    expect(() => put("gpt", "high")).toThrow(/workspace-write/);
   });
 
   it("claims once, fences stale callbacks, and applies one daemon terminal", () => {
@@ -108,22 +73,25 @@ const setup = (now = () => new Date(TEST_AT)) => {
   return { database, execution, daemon: new LocalDaemonStore(() => database.connection, now) };
 };
 
-const spec = (envelopeHash: string): ExecutionSpecV17 => {
+const spec = (envelopeHash: string): ExecutionSpecV18 => {
   const prompt = "Validate the Action";
   return {
-    version: 17, taskId: "execution-task-1", kind: "agent_execution", environmentRunId: "run-1",
+    version: 18, taskId: "execution-task-1", kind: "agent_execution", environmentRunId: "run-1",
     actionExecutionId: "action-execution-1", agentRunId: "precheck-1",
-    evidence: { compositionVersion: 15, role: "validation", phase: "precheck",
-      subject: { kind: "action_role", actionId: "action-1", role: "validation" }, resources: [], prompt, promptSha256: sha256(prompt),
+    evidence: { compositionVersion: 16, role: "validation", phase: "precheck",
+      subject: { kind: "action_agent", actionId: "action-1", role: "validation", agent: actionAgent }, resources: [], prompt, promptSha256: sha256(prompt),
       taskEnvelopeVersion: 11, taskEnvelopeSha256: envelopeHash, outputSchemaVersion: 11,
       outputSchemaId: "validation-outcome-v11", outputSchemaSha256: HASH_A },
-    runtime: { subject: { kind: "action_role", actionId: "action-1", role: "validation" }, provider: "codex", cliVersion: "1.0.0", model: "gpt",
+    runtime: { subject: { kind: "action_agent", actionId: "action-1", role: "validation", agentId: actionAgent.id }, provider: "codex", cliVersion: "1.0.0", model: "gpt",
       reasoningEffort: "high", capabilityHash: HASH_A },
     permissions: { workspaceAccess: "read-only", approvalPolicy: "never" },
     project: { checkoutRoot: "/tmp/worktree", headSha: TEST_SHA, configHash: HASH_A, snapshotHash: HASH_A },
     createdAt: TEST_AT
   };
 };
+const actionAgent = { id: "ballet-action-validation-action-1", name: "ballet-action-validation-action-1",
+  description: "Validate Action", developerInstructions: "Inspect Action", model: "gpt-5.6-sol",
+  reasoningEffort: "high", contentSha256: HASH_A };
 const provider = (): LocalProviderStatus => ({
   provider: "codex", cliVersion: "1.0.0", authStatus: "ready", health: "ready", busy: false, updatedAt: TEST_AT,
   capabilities: { models: [{ id: "gpt", label: "Model", reasoningOptions: ["high", "medium"] }],

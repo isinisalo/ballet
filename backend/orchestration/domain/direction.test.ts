@@ -33,8 +33,8 @@ const environment = (): EnvironmentDefinition => ({
     actions: [{
       id: "action-1", name: "Action", description: "First action", priority: 1,
       maxRetries: 1,
-      validation: { instructionResource: "validation", skillResources: [] },
-      work: { instructionResource: "work", skillResources: [] }
+      validation: { agentId: "ballet-action-validation-action-1", skillResources: [] },
+      work: { agentId: "ballet-action-work-action-1", skillResources: [] }
     }]
   }]
 });

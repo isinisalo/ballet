@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV19 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV20 } from "../../../shared/orchestration/runtime.js";
 import type { CriticTaskEnvelope, RefinementTaskEnvelope } from "../../../shared/orchestration/taskEnvelopes.js";
 
 export const buildCriticEnvelope = (input: {
@@ -13,7 +13,7 @@ export const buildCriticEnvelope = (input: {
     WHERE cr.critic_run_id = ?
   `).get(input.criticRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Critic Run ${input.criticRunId} has no immutable Run Evidence.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV19;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV20;
   const composition = snapshot.governance.critic;
   const instruction = requireAgent(snapshot, composition.agentId).developerInstructions;
   const feedback = input.connection.prepare(`
@@ -48,7 +48,7 @@ export const buildRefinementEnvelope = (input: {
     WHERE rr.refinement_run_id = ?
   `).get(input.refinementRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Refinement Run ${input.refinementRunId} has no immutable source.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV19;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV20;
   const selected = input.connection.prepare(`
     SELECT fe.* FROM refinement_run_feedback rrf
     JOIN feedback_entries fe ON fe.feedback_entry_id = rrf.feedback_entry_id
@@ -56,7 +56,8 @@ export const buildRefinementEnvelope = (input: {
   `).all(input.refinementRunId);
   const composition = snapshot.governance.refinement;
   const resources = snapshot.resources;
-  const agentPreimages = snapshot.agents.map(({ id, contentSha256 }) => [`.codex/agents/${id}.toml`, contentSha256] as const);
+  const agentPreimages = [...snapshot.agents, ...snapshot.actionAgents]
+    .map(({ id, contentSha256 }) => [`.codex/agents/${id}.toml`, contentSha256] as const);
   const preimageHashes = Object.fromEntries([
     ...resources.map(({ relativePath, sourceSha256 }) => [relativePath, sourceSha256] as const),
     ...agentPreimages
@@ -74,7 +75,7 @@ export const buildRefinementEnvelope = (input: {
       })),
       allowedPathPolicy: [
         "immutable snapshot instruction and Skill paths",
-        "fixed governance Agent TOMLs; only developer_instructions may change"
+        "snapshot Agent TOMLs; only developer_instructions may change"
       ]
     }),
     role: "refinement", phase: "proposal", refinementRunId: input.refinementRunId,
@@ -86,7 +87,7 @@ export const buildRefinementEnvelope = (input: {
   };
 };
 
-const requireAgent = (snapshot: RootSnapshotV19, id: string) => {
+const requireAgent = (snapshot: RootSnapshotV20, id: string) => {
   const agent = snapshot.agents.find(({ id: agentId }) => agentId === id);
   if (!agent) throw new Error(`Governance Agent ${id} is absent from snapshot.`);
   return agent;

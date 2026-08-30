@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV19, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV20, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -42,11 +42,11 @@ export const openTestDatabase = (): TestDatabase => {
 };
 
 const agent = (agentId: "ballet-critic-agent" | "ballet-refinement-agent") => ({ agentId, skillResources: [] });
-const actionRole = () => ({ instructionResource: "instruction", skillResources: [] });
+const actionRole = (id: string, role: "validation" | "work") => ({ agentId: `ballet-action-${role}-${id}`, skillResources: [] });
 
 export const actionDefinition = (id: string, priority: number, maxRetries = 1): ActionDefinition => ({
   id, name: id, description: `${id} description`, priority, maxRetries,
-  validation: actionRole(), work: actionRole()
+  validation: actionRole(id, "validation"), work: actionRole(id, "work")
 });
 
 export const environmentSeed = (options: {
@@ -74,8 +74,13 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV19 = {
-    version: 19, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const actionAgents = states.flatMap(({ definition }) => definition.actions.flatMap((action) => (["validation", "work"] as const).map((role) => ({
+    id: action[role].agentId, name: action[role].agentId,
+    description: `${role} test Agent`, developerInstructions: `${VALID_INSTRUCTION}\n\nAction Agent ${action.id} ${role}.`,
+    model: "gpt-5.6-sol", reasoningEffort: "high", contentSha256: HASH_A
+  }))));
+  const snapshot: RootSnapshotV20 = {
+    version: 20, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
@@ -84,6 +89,7 @@ export const environmentSeed = (options: {
       id, name: id, description: "Test Agent", developerInstructions: VALID_INSTRUCTION,
       model: "gpt-5.6-sol", reasoningEffort: "high", sandboxMode: "read-only" as const, contentSha256: HASH_A
     })),
+    actionAgents,
     runtimeCapabilities: [...(["ballet-critic-agent", "ballet-refinement-agent"] as const).map((agentId) => ({
       subject: { kind: "agent" as const, agentId }, provider: "codex" as const,
       model: "gpt-5.6-sol", reasoningEffort: "high",
@@ -93,15 +99,12 @@ export const environmentSeed = (options: {
       subject: { kind: "action" as const, actionId: action.id }, provider: "codex" as const,
       cliVersion: "1.0.0",
       roles: {
-        validation: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] },
-        work: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] }
+        validation: { agentId: action.validation.agentId, model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] },
+        work: { agentId: action.work.agentId, model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] }
       },
       supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
     })))],
-    resources: [{
-      kind: "instruction", id: "instruction", relativePath: ".ballet/instructions/test.md",
-      content: VALID_INSTRUCTION, sourceSha256: hash(VALID_INSTRUCTION)
-    }],
+    resources: [],
     permissions: [
       { role: "validation", actionId: "action-1", toolPolicy: "read_only", approvalPolicy: "never" },
       { role: "work", actionId: "action-1", toolPolicy: "workspace_write", approvalPolicy: "never" }

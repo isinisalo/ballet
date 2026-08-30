@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
 import { constraintSchema, directionReferenceSchema } from "./directionSchemas.js";
-import { agentCompositionSchema, governanceAgentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
+import { actionAgentDefinitionSchema, agentCompositionSchema, governanceAgentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
 const runtimeCapabilityBase = {
   provider: z.literal("codex"),
@@ -12,12 +12,13 @@ const runtimeCapabilityBase = {
   capabilitySha256: sha256Schema
 };
 const roleModelCapabilitySchema = z.object({
+  agentId: idSchema,
   model: z.string().trim().min(1), reasoningEffort: z.string().trim().min(1),
   supportedModels: z.array(z.string().trim().min(1)),
   supportedReasoningEfforts: z.array(z.string().trim().min(1))
 }).strict();
 
-export const rootSnapshotV19Schema = z.object({
+export const rootSnapshotV20Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
@@ -31,6 +32,7 @@ export const rootSnapshotV19Schema = z.object({
     constraints: z.array(constraintSchema.extend({ contentSha256: sha256Schema }).strict())
   }).strict(),
   agents: z.array(governanceAgentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()).length(2),
+  actionAgents: z.array(actionAgentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()),
   runtimeCapabilities: z.array(z.union([
     z.object({
       ...runtimeCapabilityBase,
@@ -59,14 +61,22 @@ export const rootSnapshotV19Schema = z.object({
     refinementCommitSha: gitObjectIdSchema
   }).strict().optional(),
   createdAt: timestampSchema
-}).strict();
+}).strict().superRefine((snapshot, context) => {
+  const expected = new Set(snapshot.environment.states.flatMap((state) => state.actions.flatMap((action) => [
+    action.validation.agentId, action.work.agentId
+  ])));
+  const actual = snapshot.actionAgents.map(({ id }) => id);
+  if (actual.length !== expected.size || actual.some((id) => !expected.has(id)) || new Set(actual).size !== actual.length) {
+    context.addIssue({ code: "custom", path: ["actionAgents"], message: "Action Agent snapshot must match the Environment exactly" });
+  }
+});
 
 const environmentRunStatusSchema = z.enum(["pending", "running", "blocked", "completed", "cancelled", "interrupted"]);
 export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV19Schema,
+  snapshot: rootSnapshotV20Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

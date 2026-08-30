@@ -13,7 +13,7 @@ describe("LocalDaemonRouter", () => {
   it("rejects a wrong daemon bearer token before touching runtime state", async () => {
     const heartbeat = vi.fn();
     const app = express(); app.use(express.json());
-    app.use("/api", createLocalDaemonRouter({ store: { heartbeat } as unknown as LocalDaemonStore, token: "a".repeat(64), actionExists: () => false }));
+    app.use("/api", createLocalDaemonRouter({ store: { heartbeat } as unknown as LocalDaemonStore, token: "a".repeat(64) }));
     const server = app.listen(0, "127.0.0.1"); servers.push(server);
     await new Promise<void>((resolve) => server.once("listening", resolve));
     const { port } = server.address() as AddressInfo;
@@ -21,28 +21,20 @@ describe("LocalDaemonRouter", () => {
     expect(response.status).toBe(401); expect(heartbeat).not.toHaveBeenCalled();
   });
 
-  it("validates the State/Action pair, strict body and removed role route", async () => {
-    const binding = { version: 3, actionId: "action-1",
-      validation: { model: "gpt", reasoningEffort: "high" }, work: { model: "gpt", reasoningEffort: "medium" }, updatedAt: "2026-08-30T00:00:00.000Z" };
-    const actionBinding = vi.fn().mockReturnValue(binding); const putActionBinding = vi.fn().mockReturnValue(binding);
+  it("does not expose removed machine-local Action execution routes", async () => {
     const app = express(); app.use(express.json());
-    app.use("/api", createLocalDaemonRouter({ store: { actionBinding, putActionBinding } as unknown as LocalDaemonStore,
-      token: "a".repeat(64), actionExists: (stateId, actionId) => stateId === "state-1" && actionId === "action-1" }));
+    app.use("/api", createLocalDaemonRouter({ store: {} as LocalDaemonStore, token: "a".repeat(64) }));
     app.use(((error, _req, res, _next) => { void _next; res.status(400).json({ error: String(error) }); }) as ErrorRequestHandler);
     const server = app.listen(0, "127.0.0.1"); servers.push(server);
     await new Promise<void>((resolve) => server.once("listening", resolve));
     const { port } = server.address() as AddressInfo; const base = `http://127.0.0.1:${port}/api/environment/states`;
     let response = await fetch(`${base}/state-1/actions/action-1/execution`);
-    expect(response.status).toBe(200); expect(actionBinding).toHaveBeenCalledWith("action-1");
+    expect(response.status).toBe(404);
     response = await fetch(`${base}/wrong-state/actions/action-1/execution`);
     expect(response.status).toBe(404);
     response = await fetch(`${base}/state-1/actions/action-1/execution/validation`);
     expect(response.status).toBe(404);
-    response = await fetch(`${base}/state-1/actions/action-1/execution`, { method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ validation: binding.validation, work: binding.work }) });
-    expect(response.status).toBe(200); expect(putActionBinding).toHaveBeenCalledWith("action-1", expect.objectContaining({ validation: binding.validation }));
-    response = await fetch(`${base}/state-1/actions/action-1/execution`, { method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ validation: binding.validation, work: binding.work, role: "validation" }) });
-    expect(response.status).toBe(400);
+    response = await fetch(`${base}/state-1/actions/action-1/execution`, { method: "PUT", headers: { "content-type": "application/json" }, body: "{}" });
+    expect(response.status).toBe(404);
   });
 });

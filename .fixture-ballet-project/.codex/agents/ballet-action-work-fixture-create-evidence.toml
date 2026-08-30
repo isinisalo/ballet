@@ -1,0 +1,5 @@
+name = "ballet-action-work-fixture-create-evidence"
+description = "Managed-worktree agent for creating fixture evidence."
+developer_instructions = "Implement only the delegated fixture-create-evidence task in the managed worktree, produce the requested fixture artifact, and report its exact checks without external writes."
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"

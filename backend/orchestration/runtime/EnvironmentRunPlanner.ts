@@ -1,10 +1,10 @@
-import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
+import type { ActionAgentDefinition, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 import type { GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
-import { projectConfigurationV24Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV25Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { validateRunnableEnvironment } from "../../../shared/orchestration/gates.js";
 import type {
-  RootSnapshotV19, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
+  RootSnapshotV20, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
   RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/orchestration/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
@@ -12,12 +12,13 @@ import { resolveOrchestrationResources, type ProjectResourceInput } from "./Reso
 import { ConflictError } from "../persistence/PersistenceErrors.js";
 
 export interface ProjectDefinition {
-  config: ProjectConfigurationV24;
+  config: ProjectConfigurationV25;
   configSha256: string;
   baseCommit: string;
   checkoutRoot: string;
   resources: ProjectResourceInput[];
   agents: Array<GovernanceAgentDefinition & { contentSha256: string }>;
+  actionAgents: Array<ActionAgentDefinition & { contentSha256: string }>;
   directionDocumentHashes: {
     goals: Record<string, string>;
     adrs: Record<string, string>;
@@ -37,12 +38,13 @@ export interface OrchestrationProviderPreflightPort {
   ): Promise<RuntimeAgentCapabilitySnapshot>;
   inspectAction(
     actionId: string,
+    profiles: { validation: ActionAgentDefinition; work: ActionAgentDefinition },
     project: { headSha: string; configHash: string }
   ): Promise<RuntimeActionCapabilitySnapshot>;
 }
 
 export interface PlannedEnvironmentRun {
-  snapshot: RootSnapshotV19;
+  snapshot: RootSnapshotV20;
   snapshotSha256: string;
   createInput(input: {
     environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
@@ -58,7 +60,7 @@ export class EnvironmentRunPlanner {
 
   async plan(): Promise<PlannedEnvironmentRun> {
     const loaded = await this.projects.load();
-    const config = projectConfigurationV24Schema.parse(loaded.config);
+    const config = projectConfigurationV25Schema.parse(loaded.config);
     const readinessIssues = validateRunnableEnvironment(config.environment);
     if (readinessIssues.length > 0) {
       throw new ConflictError(`Environment is not runnable: ${readinessIssues.map(({ code, path }) => `${code}@${path}`).join(", ")}.`);
@@ -74,10 +76,16 @@ export class EnvironmentRunPlanner {
       assertAgentCapability(agent.id, capability);
       capabilities.push(capability);
     }
+    const actionAgents = [...loaded.actionAgents].sort((left, right) => left.id.localeCompare(right.id));
+    const actionAgentById = new Map(actionAgents.map((agent) => [agent.id, agent]));
     for (const state of config.environment.states) for (const action of state.actions) {
-      const capability = await this.providers.inspectAction(action.id,
+      const profiles = {
+        validation: requireActionAgent(action.validation.agentId, actionAgentById),
+        work: requireActionAgent(action.work.agentId, actionAgentById)
+      };
+      const capability = await this.providers.inspectAction(action.id, profiles,
         { headSha: loaded.baseCommit, configHash: loaded.configSha256 });
-      assertActionCapability(action.id, capability);
+      assertActionCapability(action.id, profiles, capability);
       capabilities.push(capability);
     }
     const permissions = permissionSnapshot(config, capabilities);
@@ -92,8 +100,8 @@ export class EnvironmentRunPlanner {
         ...value, contentSha256: requireDirectionHash("Constraint", value.id, loaded.directionDocumentHashes.constraints)
       }))
     };
-    const snapshot: RootSnapshotV19 = {
-      version: 19,
+    const snapshot: RootSnapshotV20 = {
+      version: 20,
       projectHeadSha: loaded.baseCommit,
       projectConfigSha256: loaded.configSha256,
       directionSha256: contentHash(config.direction),
@@ -101,7 +109,7 @@ export class EnvironmentRunPlanner {
       resourceSha256: contentHash(resources),
       environment: config.environment,
       direction,
-      agents,
+      agents, actionAgents,
       runtimeCapabilities: capabilities,
       resources,
       permissions,
@@ -137,11 +145,12 @@ const assertAgentCapability = (agentId: string, capability: RuntimeAgentCapabili
   assertCapabilityHash(capability);
 };
 
-const assertActionCapability = (actionId: string, capability: RuntimeActionCapabilitySnapshot): void => {
+const assertActionCapability = (actionId: string, profiles: { validation: ActionAgentDefinition; work: ActionAgentDefinition }, capability: RuntimeActionCapabilitySnapshot): void => {
   const subject = { kind: "action" as const, actionId };
   const validRoles = (["validation", "work"] as const).every((role) => {
     const value = capability.roles[role];
-    return value.supportedModels.includes(value.model)
+    return value.agentId === profiles[role].id && value.model === profiles[role].model
+      && value.reasoningEffort === profiles[role].reasoningEffort && value.supportedModels.includes(value.model)
       && value.supportedReasoningEfforts.includes(value.reasoningEffort);
   });
   if (canonicalJson(capability.subject) !== canonicalJson(subject) || !validRoles
@@ -157,7 +166,7 @@ const assertCapabilityHash = (capability: RuntimeCapabilitySnapshot): void => {
 };
 
 const permissionSnapshot = (
-  config: ProjectConfigurationV24, capabilities: RuntimeCapabilitySnapshot[]
+  config: ProjectConfigurationV25, capabilities: RuntimeCapabilitySnapshot[]
 ): RuntimePermissionSnapshot[] => {
   const rows: RuntimePermissionSnapshot[] = [];
   for (const state of config.environment.states) for (const action of state.actions) {
@@ -178,11 +187,16 @@ const permissionSnapshot = (
 };
 
 const contentHash = (value: unknown): string => sha256(canonicalJson(JSON.parse(JSON.stringify(value))));
+const requireActionAgent = (
+  id: string, agents: Map<string, ActionAgentDefinition & { contentSha256: string }>
+): ActionAgentDefinition => {
+  const agent = agents.get(id); if (!agent) throw new Error(`Action Agent ${id} is absent from project truth.`); return agent;
+};
 const requireDirectionHash = (label: string, id: string, hashes: Record<string, string>): string => {
   const value = hashes[id];
   if (!value || !/^[0-9a-f]{64}$/.test(value)) throw new Error(`${label} ${id} has no source content hash.`);
   return value;
 };
-const transitionLimit = (config: ProjectConfigurationV24): number => 16 + config.environment.states.reduce(
+const transitionLimit = (config: ProjectConfigurationV25): number => 16 + config.environment.states.reduce(
   (total, state) => total + state.actions.reduce((count, action) => count + 4 + action.maxRetries * 3, 0), 0
 );

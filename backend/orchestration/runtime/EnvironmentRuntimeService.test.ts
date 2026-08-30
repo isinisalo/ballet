@@ -7,7 +7,7 @@ import { EnvironmentRunStore } from "../persistence/EnvironmentRunStore.js";
 import { FeedbackStore } from "../persistence/FeedbackStore.js";
 import { AgentExecutionStore } from "../persistence/AgentExecutionStore.js";
 import {
-  actionDefinition, environmentSeed, hash, openTestDatabase, TEST_AT, TEST_SHA, type TestDatabase
+  actionDefinition, environmentSeed, HASH_A, hash, openTestDatabase, TEST_AT, TEST_SHA, type TestDatabase
 } from "../persistence/PersistenceTestFixtures.js";
 import { planContinuationSeed } from "./ContinuationSeedPlanner.js";
 import { DeterministicExecutionQueue } from "./ExecutionQueueBoundary.js";
@@ -351,11 +351,20 @@ const twoActionSeed = (stateCount = 1, runId = "run-1", baseCommit = TEST_SHA): 
     ...seed.executionSnapshot,
     projectHeadSha: baseCommit,
     environment: { ...seed.executionSnapshot.environment, states: seed.states.map(({ definition }) => definition) },
+    actionAgents: [...seed.executionSnapshot.actionAgents, ...(["validation", "work"] as const).map((role) => ({
+      id: second[role].agentId, name: second[role].agentId, description: `${role} ${second.id}`,
+      developerInstructions: `${role} instructions for ${second.id}`, model: "gpt-5.6-sol",
+      reasoningEffort: "high", contentSha256: HASH_A
+    }))],
     runtimeCapabilities: [
       ...seed.executionSnapshot.runtimeCapabilities,
       {
         ...firstActionCapability,
-        subject: { kind: "action" as const, actionId: second.id }
+        subject: { kind: "action" as const, actionId: second.id },
+        roles: {
+          validation: { ...firstActionCapability.roles.validation, agentId: second.validation.agentId },
+          work: { ...firstActionCapability.roles.work, agentId: second.work.agentId }
+        }
       }
     ],
     permissions: [

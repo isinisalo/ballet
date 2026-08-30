@@ -1,5 +1,5 @@
 import type { JsonValue } from "./primitives.js";
-import type { AgentComposition, EnvironmentDefinition, GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
+import type { ActionAgentDefinition, AgentComposition, EnvironmentDefinition, GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
 import type { Constraint, DirectionReference } from "./direction.js";
 import { ROOT_SNAPSHOT_VERSION } from "./versions.js";
 
@@ -11,10 +11,10 @@ export type AgentRunPhase = "precheck" | "work" | "postwork" | "proposal";
 export type AgentRunStatus = "queued" | "running" | "waiting_for_input" | "completed" | "failed" | "cancelled" | "interrupted";
 
 export type RuntimeBindingSubject =
-  | { kind: "action_role"; actionId: string; role: "validation" | "work" }
+  | { kind: "action_agent"; actionId: string; role: "validation" | "work"; agentId: string }
   | { kind: "agent"; agentId: string };
 
-export interface RootSnapshotV19 {
+export interface RootSnapshotV20 {
   version: typeof ROOT_SNAPSHOT_VERSION;
   projectHeadSha: string;
   projectConfigSha256: string;
@@ -28,6 +28,7 @@ export interface RootSnapshotV19 {
     constraints: Array<Constraint & { contentSha256: string }>;
   };
   agents: Array<GovernanceAgentDefinition & { contentSha256: string }>;
+  actionAgents: Array<ActionAgentDefinition & { contentSha256: string }>;
   runtimeCapabilities: RuntimeCapabilitySnapshot[];
   resources: RuntimeResourceSnapshot[];
   permissions: RuntimePermissionSnapshot[];
@@ -58,6 +59,7 @@ export interface RuntimeAgentCapabilitySnapshot extends RuntimeCapabilityBase {
 }
 
 export interface RuntimeRoleModelCapabilitySnapshot {
+  agentId: string;
   model: string;
   reasoningEffort: string;
   supportedModels: string[];
@@ -93,7 +95,7 @@ export interface EnvironmentRun {
   id: string;
   environmentId: string;
   status: EnvironmentRunStatus;
-  snapshot: RootSnapshotV19;
+  snapshot: RootSnapshotV20;
   continuationOfRunId?: string;
   createdAt: string;
   updatedAt: string;

@@ -36,26 +36,26 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 
 | Path | Ownership |
 | --- | --- |
-| `.ballet/project.json` | strict Project Config v24: project direction, Environment Action compositions and fixed governance composition |
-| `.codex/agents/*.toml` | The two fixed read-only Codex Agent definitions for Critic and Refinement governance |
+| `.ballet/project.json` | strict Project Config v25: project direction, Action Agent IDs and role-specific Skill compositions |
+| `.codex/agents/*.toml` | Action-specific Validation/Work definitions plus the two fixed read-only governance Agents |
 | `.ballet/goals/**` | human WHAT/WHY |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
 | `.ballet/constraints/**` | required and prohibited operating boundaries |
 | `.ballet/use-cases/**` | human-readable approved Use Cases and approval provenance |
-| `.ballet/instructions/**` | selected role instructions |
+| `.ballet/instructions/**` | optional generic project instructions; Action execution instructions live in Agent TOMLs |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v22, Action role selections, checkout-daemon state, logs and server-owned worktrees |
+| `.git/ballet/**` | machine-local SQLite v23, checkout-daemon state, logs and server-owned worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
 ## Configuration example
 
-This abbreviated example shows the ownership boundary; the repository default contains five States, fourteen Actions and thirteen approved Use Cases.
+This abbreviated example shows the ownership boundary; the repository default contains five States, twenty-one Actions and thirteen approved Use Cases.
 
 ```json
 {
-  "version": 22,
+  "version": 25,
   "direction": {
     "goals": [{ "id": "goal-022", "name": "Human-directed orchestration", "status": "accepted" }],
     "adrs": [{ "id": "adr-034", "name": "Validation-led Environment", "status": "accepted" }],
@@ -74,14 +74,6 @@ This abbreviated example shows the ownership boundary; the repository default co
       "approval": { "approvedBy": "human-id", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "<sha256>" }
     }]
   },
-  "agents": [{
-    "id": "critic",
-    "name": "Critic",
-    "description": "Read-only governance reviewer",
-    "enabled": true,
-    "instructionResource": "environment-validation",
-    "skillResources": ["test-evidence-verification"]
-  }],
   "environment": {
     "id": "example",
     "name": "Example",
@@ -97,15 +89,17 @@ This abbreviated example shows the ownership boundary; the repository default co
         "description": "Run exact accepted checks",
         "priority": 1,
         "maxRetries": 1,
-        "validation": { "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification"] },
-        "work": { "instructionResource": "environment-work", "skillResources": ["test-evidence-verification"] }
+        "validation": { "agentId": "ballet-action-validation-check", "skillResources": ["test-evidence-verification"] },
+        "work": { "agentId": "ballet-action-work-check", "skillResources": ["test-evidence-verification"] }
       }]
     }]
-  }
+  },
+  "critic": { "version": 2, "enabled": false, "schedules": [], "agent": { "agentId": "ballet-critic-agent", "skillResources": ["test-evidence-verification"] } },
+  "refinement": { "version": 2, "enabled": true, "agent": { "agentId": "ballet-refinement-agent", "skillResources": ["safe-refinement-proposal"] }, "allowedRoots": [".codex/agents", ".ballet/instructions", ".agents/skills"] }
 }
 ```
 
-The complete strict shape also requires Markdown-backed governance Agents, disabled-by-default Critic configuration and Refinement configuration. Validation/Work provider, model, reasoning and policy selection belong to the machine-local `actionId + role` binding, not Project Config. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
+The complete strict shape also requires one Validation and one Work Agent TOML per Action, the two governance Agent TOMLs, disabled-by-default Critic configuration and Refinement configuration. Action Agent TOMLs own role instructions, model and reasoning; Project Config owns the fixed Agent ID and Skill list. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
 
 ## Use Case approval
 
@@ -113,15 +107,15 @@ Saving a draft is not approval. The human approval command binds the canonical s
 
 ## Environment authoring
 
-Author one Environment as dependency-ordered States, keep each Action small enough for independent Validation, set a bounded `maxRetries`, and select one Validation and one Work composition. State order and Action priority are persisted through their sortable ID lists. Instructions must contain Task, Role, Goals, Priorities, Method, Output contract, Tool policy and Acceptance evidence sections in that order, and must explicitly tell the agent when relevant `.ballet/**` project documents need to be read.
+Author one Environment as dependency-ordered States, keep each Action small enough for independent Validation, set a bounded `maxRetries`, and maintain one Validation and one Work Agent with explicit Skills. State order and Action priority are persisted through their sortable ID lists. Each Action Agent's developer instructions name the Action, role, source material, exact goal, output, validation and allowed outcomes, including when relevant `.ballet/**` project documents must be read.
 
 The default project demonstrates:
 
-1. Direction and acceptance
-2. Architecture and design
-3. Implementation
-4. Verification
-5. Release evidence
+1. Event Storming
+2. Arc42
+3. Design
+4. Build
+5. Deploy
 
 ## Validation-first execution
 
@@ -150,11 +144,11 @@ Refinement proposal generation is read-only. It records exact allowlisted paths,
 | Critic / Refinement review | `/reviews/critic`, `/reviews/critic/:id`, `/reviews/refinement`, `/reviews/refinement/:id` |
 | Run Evidence | inline in `/run/:runId` |
 
-JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. Key boundaries are `GET /api/project`, `GET /api/environment`, atomic Action execution binding `GET/PUT /api/environment/states/:stateId/actions/:actionId/execution`, whole-Environment `POST /api/environment-runs`, exact human Work response `POST /api/environment-runs/:runId/work-input`, Feedback commands under `/api/feedback`, human Critic decisions under `/api/critic/proposals/:id/decision`, and exact Refinement decision/apply state under `/api/refinement/proposals/:id/*`. There are no role-route aliases or standalone State/Action Run commands.
+JSON commands and projections live under canonical `/api/*` routes and SSE uses `/api/events`. Key boundaries are `GET/PUT /api/project`, atomic Action + Agent pair operations under `/api/environment/states/:stateId/actions/:actionId`, whole-Environment `POST /api/environment-runs`, exact human Work response `POST /api/environment-runs/:runId/work-input`, Feedback commands under `/api/feedback`, human Critic decisions under `/api/critic/proposals/:id/decision`, and exact Refinement decision/apply state under `/api/refinement/proposals/:id/*`. There are no execution-binding routes or standalone State/Action Run commands.
 
 ## Strict local state
 
-The active matrix is Project Config v24, Root Snapshot v19, Task Envelope and role outcome v11, prompt composition v15, ExecutionSpec v17 and SQLite v22. Feedback, Critic, Refinement and Codex Agent are v2; Action execution binding is v3 and Run Evidence is v1. Validation and its subordinate Work agent have role-specific model/reasoning selections on the single fixed Codex runtime; network is denied and external read-only roots are not configurable. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
+The active matrix is Project Config v25, Root Snapshot v20, Task Envelope and role outcome v11, prompt composition v16, ExecutionSpec v18 and SQLite v23. Feedback, Critic and Refinement are v2, Codex Agent is v3 and Run Evidence is v1. Validation and subordinate Work load their own TOML model/reasoning/instructions; role-derived permissions deny network and external read-only roots. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
 
 ## Verification
 

@@ -7,7 +7,7 @@ export const executionSchema = `
     role TEXT NOT NULL CHECK (role IN ('validation','work','critic','refinement')),
     kind TEXT NOT NULL CHECK (kind = 'agent_execution'),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','succeeded','failed','cancelled')),
-    spec_version INTEGER NOT NULL CHECK (spec_version = 17),
+    spec_version INTEGER NOT NULL CHECK (spec_version = 18),
     spec_json TEXT NOT NULL,
     spec_hash TEXT NOT NULL,
     provider_outcome_key TEXT UNIQUE,
@@ -25,16 +25,6 @@ export const executionSchema = `
     , daemon_output_key TEXT UNIQUE
     , daemon_output TEXT
     , daemon_error_message TEXT
-  );
-
-  CREATE TABLE action_execution_bindings (
-    action_id TEXT PRIMARY KEY,
-    version INTEGER NOT NULL CHECK (version = 3),
-    validation_model TEXT NOT NULL,
-    validation_reasoning_effort TEXT NOT NULL,
-    work_model TEXT NOT NULL,
-    work_reasoning_effort TEXT NOT NULL,
-    updated_at TEXT NOT NULL
   );
 
   CREATE TABLE local_daemon_state (

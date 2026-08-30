@@ -3,7 +3,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { Constraint, DirectionReference, UseCase } from "../../../shared/orchestration/direction.js";
 import { approveUseCase, invalidateUseCaseApproval, useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
-import type { GovernanceAgentId, ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentId, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDefinition, ProjectDefinitionPort } from "../runtime/EnvironmentRunPlanner.js";
@@ -11,18 +11,23 @@ import { ProjectDocumentRepository } from "./ProjectDocumentRepository.js";
 import { ProjectConfigurationRepository } from "./ProjectConfigurationRepository.js";
 import { ProjectReferenceIndex, type ProjectDocumentKind } from "./ProjectReferenceIndex.js";
 import { CodexAgentRepository } from "./CodexAgentRepository.js";
+import { ActionAgentMutationService } from "./ActionAgentMutationService.js";
 
 const runFile = promisify(execFile);
 export type DirectionValue = DirectionReference | Constraint | UseCase;
 
 export class ProjectDefinitionService implements ProjectDefinitionPort {
   readonly agents: CodexAgentRepository;
+  readonly actions: ActionAgentMutationService;
 
   constructor(
     readonly root: string,
     readonly projects: ProjectConfigurationRepository,
     readonly documents: ProjectDocumentRepository
-  ) { this.agents = new CodexAgentRepository(root); }
+  ) {
+    this.agents = new CodexAgentRepository(root);
+    this.actions = new ActionAgentMutationService(projects, this.agents);
+  }
 
   putDirection(input: {
     kind: Exclude<ProjectDocumentKind, "instruction" | "skill">;
@@ -125,6 +130,12 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
       }
       return { ...slot.agent, contentSha256: slot.contentHash };
     });
+    const actionAgentIds = loaded.config.environment.states.flatMap((state) => state.actions.flatMap((action) => [
+      action.validation.agentId, action.work.agentId
+    ]));
+    const actionAgents = this.agents.requireActionSet(actionAgentIds).map((slot) => ({
+      ...slot.agent, contentSha256: slot.contentHash
+    }));
     const resources = (["instruction", "skill"] as const).flatMap((kind) =>
       this.documents.list(kind).map(({ id, content }) => ({
         kind, id, content, relativePath: kind === "instruction"
@@ -139,18 +150,18 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
     return {
       config: loaded.config, configSha256: loaded.configHash,
       baseCommit: result.stdout.trim(), checkoutRoot: this.root, resources,
-      agents,
+      agents, actionAgents,
       directionDocumentHashes: { goals: hashes("goal"), adrs: hashes("adr"), constraints: hashes("constraint") },
-      agentDocumentHashes: Object.fromEntries(agents.map(({ id, contentSha256 }) => [id, contentSha256]))
+      agentDocumentHashes: Object.fromEntries([...agents, ...actionAgents].map(({ id, contentSha256 }) => [id, contentSha256]))
     };
   }
 }
 
 const replaceDirectionValue = (
-  config: ProjectConfigurationV24,
+  config: ProjectConfigurationV25,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   input: DirectionValue
-): ProjectConfigurationV24 => {
+): ProjectConfigurationV25 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = replace(direction.goals, input as DirectionReference);
   else if (kind === "adr") direction.adrs = replace(direction.adrs, input as DirectionReference);
@@ -172,10 +183,10 @@ const replaceDirectionValue = (
   return { ...config, direction };
 };
 const removeDirectionValue = (
-  config: ProjectConfigurationV24,
+  config: ProjectConfigurationV25,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   id: string
-): ProjectConfigurationV24 => {
+): ProjectConfigurationV25 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = direction.goals.filter((value) => value.id !== id);
   else if (kind === "adr") direction.adrs = direction.adrs.filter((value) => value.id !== id);
@@ -185,6 +196,6 @@ const removeDirectionValue = (
 };
 const replace = <T extends { id: string }>(values: T[], value: T): T[] =>
   [...values.filter((candidate) => candidate.id !== value.id), value].sort((left, right) => left.id.localeCompare(right.id));
-const replaceUseCase = (config: ProjectConfigurationV24, useCase: UseCase): ProjectConfigurationV24 => ({
+const replaceUseCase = (config: ProjectConfigurationV25, useCase: UseCase): ProjectConfigurationV25 => ({
   ...config, direction: { ...config.direction, useCases: replace(config.direction.useCases, useCase) }
 });

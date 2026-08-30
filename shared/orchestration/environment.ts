@@ -5,6 +5,11 @@ import { PROJECT_CONFIG_VERSION } from "./versions.js";
 export type RuntimeProvider = "codex";
 
 export type GovernanceAgentId = "ballet-critic-agent" | "ballet-refinement-agent";
+export type ActionAgentRole = "validation" | "work";
+export type ActionAgentId = string;
+
+export const actionAgentId = (actionId: string, role: ActionAgentRole): ActionAgentId =>
+  `ballet-action-${role}-${actionId}`;
 
 export interface GovernanceAgentDefinition {
   id: GovernanceAgentId;
@@ -16,13 +21,22 @@ export interface GovernanceAgentDefinition {
   sandboxMode: "read-only";
 }
 
+export interface ActionAgentDefinition {
+  id: ActionAgentId;
+  name: ActionAgentId;
+  description: string;
+  developerInstructions: string;
+  model: string;
+  reasoningEffort: string;
+}
+
 export interface AgentComposition {
   agentId: GovernanceAgentId;
   skillResources: string[];
 }
 
 export interface ActionRoleComposition {
-  instructionResource: string;
+  agentId: ActionAgentId;
   skillResources: string[];
 }
 
@@ -75,7 +89,7 @@ export interface RefinementConfiguration {
   allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"];
 }
 
-export interface ProjectConfigurationV24 {
+export interface ProjectConfigurationV25 {
   version: typeof PROJECT_CONFIG_VERSION;
   direction: Direction;
   environment: EnvironmentDefinition;

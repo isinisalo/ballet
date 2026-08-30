@@ -1,6 +1,6 @@
-import type { GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
+import type { ActionAgentDefinition, GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
 import type { LocalProviderStatus } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV18 } from "../../../shared/orchestration/execution.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import type { LocalDaemonStore } from "../persistence/LocalDaemonStore.js";
@@ -26,23 +26,27 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
     return { ...content, capabilitySha256: hash(content) };
   }
 
-  async inspectAction(actionId: string): Promise<RuntimeActionCapabilitySnapshot> {
-    const binding = this.daemon.actionBinding(actionId);
-    if (!binding) throw new Error(`Action ${actionId} has no local execution binding.`);
+  async inspectAction(actionId: string, profiles: {
+    validation: ActionAgentDefinition; work: ActionAgentDefinition;
+  }): Promise<RuntimeActionCapabilitySnapshot> {
     const provider = this.readyProvider();
     if (!provider.capabilities.policy.workspaceWrite) {
       throw new Error("Codex cannot provide managed workspace-write for Work.");
     }
-    const validation = requireModel(provider, binding.validation.model, binding.validation.reasoningEffort);
-    const work = requireModel(provider, binding.work.model, binding.work.reasoningEffort);
+    const validation = requireModel(provider, profiles.validation.model, profiles.validation.reasoningEffort);
+    const work = requireModel(provider, profiles.work.model, profiles.work.reasoningEffort);
     const supportedModels = provider.capabilities.models.map(({ id }) => id).sort();
     const content = {
       subject: { kind: "action" as const, actionId }, provider: "codex" as const,
       cliVersion: provider.cliVersion!, supportsReadOnly: true,
       supportsWorkspaceWrite: provider.capabilities.policy.workspaceWrite,
       roles: {
-        validation: { ...binding.validation, supportedModels, supportedReasoningEfforts: [...validation.reasoningOptions].sort() },
-        work: { ...binding.work, supportedModels, supportedReasoningEfforts: [...work.reasoningOptions].sort() }
+        validation: { agentId: profiles.validation.id, model: profiles.validation.model,
+          reasoningEffort: profiles.validation.reasoningEffort, supportedModels,
+          supportedReasoningEfforts: [...validation.reasoningOptions].sort() },
+        work: { agentId: profiles.work.id, model: profiles.work.model,
+          reasoningEffort: profiles.work.reasoningEffort, supportedModels,
+          supportedReasoningEfforts: [...work.reasoningOptions].sort() }
       }
     };
     return { ...content, capabilitySha256: hash(content) };
@@ -58,7 +62,7 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
     return provider;
   }
 
-  async execute(spec: ExecutionSpecV17, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
+  async execute(spec: ExecutionSpecV18, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
     if (permissions.provider !== spec.runtime.provider || permissions.approvalPolicy !== spec.permissions.approvalPolicy) {
       throw new Error("Local daemon permission snapshot differs from the ExecutionSpec.");
     }

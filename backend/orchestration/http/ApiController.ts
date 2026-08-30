@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
-import type { GovernanceAgentId, ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentId, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 import type { FeedbackCategory, FeedbackTargetType } from "../../../shared/orchestration/reviews.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -37,7 +37,6 @@ export interface OrchestrationControllerDependencies {
   project: ProjectDefinitionService;
   planner: EnvironmentRunPlanner;
   runtime: EnvironmentRuntimeService;
-  actionBindings: { removeActionBindings(actionIds: string[]): void };
   workspace: OrchestrationWorkspacePort;
   feedback: FeedbackBoxService;
   scheduler: CriticSchedulerService;
@@ -66,10 +65,13 @@ export class ApiController {
   }
 
   project(): unknown { return this.dependencies.project.projects.load(); }
-  putProject(config: ProjectConfigurationV24, expectedHash: string | "absent"): unknown {
+  putProject(config: ProjectConfigurationV25, expectedHash: string | "absent"): unknown {
     const current = this.dependencies.project.projects.loadOptional();
     if (current && canonical(current.config.direction) !== canonical(config.direction)) {
       throw new ConflictError("Direction and Use Case mutations require their dedicated document commands.");
+    }
+    if (current && canonical(current.config.environment) !== canonical(config.environment)) {
+      throw new ConflictError("Environment, State, and Action mutations require their dedicated commands.");
     }
     if (!current && config.direction.useCases.some(({ status }) => status === "approved")) {
       throw new ConflictError("Initial Use Cases must be draft and use the dedicated human approval command.");
@@ -182,6 +184,13 @@ export class ApiController {
   }
   putEnvironment(environment: EnvironmentDefinition, expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
+    assertExactOrder(environment.states.map(({ id }) => id), loaded.config.environment.states.map(({ id }) => id), "Environment State");
+    for (const state of environment.states) {
+      const current = loaded.config.environment.states.find(({ id }) => id === state.id)!;
+      if (canonical(state.actions) !== canonical(current.actions)) {
+        throw new ConflictError("Action mutations require their dedicated commands.");
+      }
+    }
     const saved = this.dependencies.project.projects.save({ ...loaded.config, environment }, expectedConfigHash);
     this.changed("project_changed", environment.id); return saved;
   }
@@ -192,27 +201,22 @@ export class ApiController {
     return { state, configHash: loaded.configHash };
   }
   createState(state: StateDefinition, expectedConfigHash: string): unknown {
-    const loaded = this.requireConfigHash(expectedConfigHash);
-    if (loaded.config.environment.states.some(({ id }) => id === state.id)) {
-      throw new ConflictError(`State ${state.id} already exists.`);
-    }
-    return this.saveState(loaded.config.environment.states, state, loaded.config.environment, expectedConfigHash);
+    const saved = this.dependencies.project.actions.createState(state, expectedConfigHash);
+    this.changed("project_changed", state.id); return saved;
   }
   updateState(state: StateDefinition, expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
-    if (!loaded.config.environment.states.some(({ id }) => id === state.id)) {
-      throw new NotFoundError(`State ${state.id} was not found.`);
+    const current = loaded.config.environment.states.find(({ id }) => id === state.id);
+    if (!current) throw new NotFoundError(`State ${state.id} was not found.`);
+    assertExactOrder(state.actions.map(({ id }) => id), current.actions.map(({ id }) => id), "State Action");
+    if (canonical(state.actions) !== canonical(current.actions)) {
+      throw new ConflictError("Action mutations require their dedicated commands.");
     }
     return this.saveState(loaded.config.environment.states, state, loaded.config.environment, expectedConfigHash);
   }
   removeState(id: string, expectedConfigHash: string): unknown {
-    const loaded = this.requireConfigHash(expectedConfigHash);
-    if (!loaded.config.environment.states.some((state) => state.id === id)) throw new NotFoundError(`State ${id} was not found.`);
-    const actionIds = loaded.config.environment.states.find((state) => state.id === id)!.actions.map(({ id }) => id);
-    const result = this.putEnvironment({ ...loaded.config.environment,
-      states: loaded.config.environment.states.filter((state) => state.id !== id) }, expectedConfigHash);
-    this.dependencies.actionBindings.removeActionBindings(actionIds);
-    return result;
+    const saved = this.dependencies.project.actions.removeState(id, expectedConfigHash);
+    this.changed("project_changed", id); return saved;
   }
   reorderStates(ids: string[], expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
@@ -223,36 +227,22 @@ export class ApiController {
       states: ids.map((id, index) => ({ ...byId.get(id)!, order: index + 1 })) }, expectedConfigHash);
   }
   action(stateId: string, actionId: string): unknown {
-    const loaded = this.dependencies.project.projects.load();
-    const state = loaded.config.environment.states.find(({ id }) => id === stateId);
-    if (!state) throw new NotFoundError(`State ${stateId} was not found.`);
-    const action = state.actions.find(({ id }) => id === actionId);
-    if (!action) throw new NotFoundError(`Action ${actionId} was not found.`);
-    return { action, configHash: loaded.configHash };
+    return this.dependencies.project.actions.action(stateId, actionId);
   }
   createAction(stateId: string, action: ActionDefinition, expectedConfigHash: string): unknown {
-    const loaded = this.requireConfigHash(expectedConfigHash);
-    const state = loaded.config.environment.states.find(({ id }) => id === stateId);
-    if (!state) throw new NotFoundError(`State ${stateId} was not found.`);
-    if (state.actions.some(({ id }) => id === action.id)) throw new ConflictError(`Action ${action.id} already exists.`);
-    return this.saveState(loaded.config.environment.states, { ...state, actions: [...state.actions, action] }, loaded.config.environment, expectedConfigHash);
+    const saved = this.dependencies.project.actions.createAction(stateId, action, expectedConfigHash);
+    this.changed("project_changed", action.id); return saved;
   }
-  updateAction(stateId: string, action: ActionDefinition, expectedConfigHash: string): unknown {
-    const loaded = this.requireConfigHash(expectedConfigHash);
-    const state = loaded.config.environment.states.find(({ id }) => id === stateId);
-    if (!state) throw new NotFoundError(`State ${stateId} was not found.`);
-    if (!state.actions.some(({ id }) => id === action.id)) throw new NotFoundError(`Action ${action.id} was not found.`);
-    return this.saveState(loaded.config.environment.states, { ...state, actions: replace(state.actions, action) }, loaded.config.environment, expectedConfigHash);
+  updateAction(stateId: string, action: ActionDefinition, agents: {
+    validationAgent: Parameters<ProjectDefinitionService["actions"]["updateAction"]>[2]["validationAgent"];
+    workAgent: Parameters<ProjectDefinitionService["actions"]["updateAction"]>[2]["workAgent"];
+  }, expectedConfigHash: string): unknown {
+    const saved = this.dependencies.project.actions.updateAction(stateId, action, agents, expectedConfigHash);
+    this.changed("project_changed", action.id); return saved;
   }
   removeAction(stateId: string, actionId: string, expectedConfigHash: string): unknown {
-    const loaded = this.requireConfigHash(expectedConfigHash);
-    const state = loaded.config.environment.states.find(({ id }) => id === stateId);
-    if (!state) throw new NotFoundError(`State ${stateId} was not found.`);
-    if (!state.actions.some(({ id }) => id === actionId)) throw new NotFoundError(`Action ${actionId} was not found.`);
-    const result = this.saveState(loaded.config.environment.states,
-      { ...state, actions: state.actions.filter(({ id }) => id !== actionId) }, loaded.config.environment, expectedConfigHash);
-    this.dependencies.actionBindings.removeActionBindings([actionId]);
-    return result;
+    const saved = this.dependencies.project.actions.removeAction(stateId, actionId, expectedConfigHash);
+    this.changed("project_changed", actionId); return saved;
   }
   reprioritizeActions(stateId: string, ids: string[], expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
@@ -505,7 +495,11 @@ export class ApiController {
   }
   private saveState(states: StateDefinition[], state: StateDefinition,
     environment: EnvironmentDefinition, expectedConfigHash: string): unknown {
-    return this.putEnvironment({ ...environment, states: replace(states, state) }, expectedConfigHash);
+    const loaded = this.requireConfigHash(expectedConfigHash);
+    const saved = this.dependencies.project.projects.save({ ...loaded.config,
+      environment: { ...environment, states: replace(states, state) } }, expectedConfigHash);
+    this.changed("project_changed", state.id);
+    return saved;
   }
   private changed(kind: InvalidationKind, entityId?: string): void {
     this.dependencies.invalidations?.publish(kind, this.dependencies.now(), entityId);
@@ -529,7 +523,7 @@ const assertExactOrder = (received: string[], current: string[], label: string):
   }
 };
 const directionValues = (
-  config: ProjectConfigurationV24, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
+  config: ProjectConfigurationV25, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
 ) => kind === "goal" ? config.direction.goals : kind === "adr" ? config.direction.adrs
   : kind === "constraint" ? config.direction.constraints : config.direction.useCases;
 

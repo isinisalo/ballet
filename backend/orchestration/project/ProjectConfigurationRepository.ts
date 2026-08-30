@@ -5,18 +5,18 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
-import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
-import { projectConfigurationV24Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV25Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 
 export interface LoadedProjectConfiguration {
   path: string;
-  config: ProjectConfigurationV24;
+  config: ProjectConfigurationV25;
   configHash: string;
 }
 
-/** Owns the single canonical Project Config v23 source. */
+/** Owns the single canonical Project Config v25 source. */
 export class ProjectConfigurationRepository {
   constructor(
     readonly configPath: string,
@@ -32,11 +32,11 @@ export class ProjectConfigurationRepository {
       descriptor = openSync(this.configPath, constants.O_RDONLY | constants.O_NOFOLLOW);
       if (!fstatSync(descriptor).isFile()) throw new ConflictError("Project Config must be an ordinary file.");
       const value = JSON.parse(readFileSync(descriptor, "utf8")) as unknown;
-      const config = projectConfigurationV24Schema.parse(value);
+      const config = projectConfigurationV25Schema.parse(value);
       return { path: this.configPath, config, configHash: configHash(config) };
     } catch (error) {
       if (error instanceof ConflictError) throw error;
-      throw new ConflictError(`Project Config v23 is required; earlier Project Config versions are unsupported and are not migrated: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ConflictError(`Project Config v25 is required; earlier Project Config versions are unsupported and are not migrated: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       if (descriptor !== undefined) closeSync(descriptor);
     }
@@ -46,10 +46,10 @@ export class ProjectConfigurationRepository {
     return safeStatus(this.configPath) ? this.load() : undefined;
   }
 
-  save(config: ProjectConfigurationV24, expectedHash: string | "absent"): LoadedProjectConfiguration {
-    const result = projectConfigurationV24Schema.safeParse(config);
+  save(config: ProjectConfigurationV25, expectedHash: string | "absent"): LoadedProjectConfiguration {
+    const result = projectConfigurationV25Schema.safeParse(config);
     if (!result.success) {
-      throw new ConflictError(`Project Config v23 is invalid: ${result.error.issues.map(({ path: issuePath, message }) => `${issuePath.join(".")}: ${message}`).join("; ")}`);
+      throw new ConflictError(`Project Config v25 is invalid: ${result.error.issues.map(({ path: issuePath, message }) => `${issuePath.join(".")}: ${message}`).join("; ")}`);
     }
     const parsed = result.data;
     const current = this.loadOptional();
@@ -77,10 +77,10 @@ export class ProjectConfigurationRepository {
   }
 }
 
-export const configHash = (config: ProjectConfigurationV24): string =>
+export const configHash = (config: ProjectConfigurationV25): string =>
   sha256(canonicalProject(config));
 
-const canonicalProject = (config: ProjectConfigurationV24): string =>
+const canonicalProject = (config: ProjectConfigurationV25): string =>
   canonicalJson(JSON.parse(JSON.stringify(config)) as JsonValue);
 
 const safeStatus = (filename: string): ReturnType<typeof lstatSync> | undefined => {

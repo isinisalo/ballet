@@ -91,6 +91,18 @@ const localOnlyProhibited = [
   ,"executionPromptEvidenceV" + "14Schema"
   ,"ExecutionSpecV" + "16"
   ,"executionSpecV" + "16Schema"
+  ,"ProjectConfigurationV" + "24"
+  ,"projectConfigurationV" + "24Schema"
+  ,"RootSnapshotV" + "19"
+  ,"rootSnapshotV" + "19Schema"
+  ,"ExecutionPromptEvidenceV" + "15"
+  ,"executionPromptEvidenceV" + "15Schema"
+  ,"ExecutionSpecV" + "17"
+  ,"executionSpecV" + "17Schema"
+  ,"ActionExecutionBindingV" + "3"
+  ,"action_execution_" + "bindings"
+  ,"useActionExecution" + "Binding"
+  ,"instruction" + "Resource"
 ];
 const self = path.resolve(import.meta.filename);
 

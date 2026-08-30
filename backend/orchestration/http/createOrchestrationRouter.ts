@@ -6,7 +6,7 @@ import type { ApiController } from "./ApiController.js";
 import {
   actionParamsSchema, createFeedbackSchema, criticDecisionSchema,
   directionDecisionSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
-  governanceAgentParamsSchema, idParamsSchema, putActionSchema, putAgentSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
+  createActionSchema, governanceAgentParamsSchema, idParamsSchema, putActionSchema, putAgentSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
   putResourceSchema, putStateSchema, refinementDecisionSchema, removeDirectionSchema,
   removeResourceSchema, reorderSchema, runParamsSchema, startRunSchema, stateParamsSchema,
   workInputResponseSchema,
@@ -132,7 +132,7 @@ const registerEnvironmentRoutes = (router: express.Router, controller: ApiContro
     res.json(controller.reprioritizeActions(stateId, input.orderedIds, input.expectedConfigHash));
   }));
   router.post("/environment/states/:stateId/actions", route(async (req, res) => {
-    const { stateId } = parseParams(stateParamsSchema, req); const input = parseBody(putActionSchema, req);
+    const { stateId } = parseParams(stateParamsSchema, req); const input = parseBody(createActionSchema, req);
     res.status(201).json(controller.createAction(stateId, input.action, input.expectedConfigHash));
   }));
   router.get("/environment/states/:stateId/actions/:actionId", route(async (req, res) => {
@@ -141,7 +141,9 @@ const registerEnvironmentRoutes = (router: express.Router, controller: ApiContro
   router.put("/environment/states/:stateId/actions/:actionId", route(async (req, res) => {
     const { stateId, actionId } = parseParams(actionParamsSchema, req); const input = parseBody(putActionSchema, req);
     if (actionId !== input.action.id) throw new HttpValidationError("Action path id differs from body id.");
-    res.json(controller.updateAction(stateId, input.action, input.expectedConfigHash));
+    res.json(controller.updateAction(stateId, input.action, {
+      validationAgent: input.validationAgent, workAgent: input.workAgent
+    }, input.expectedConfigHash));
   }));
   router.delete("/environment/states/:stateId/actions/:actionId", route(async (req, res) => {
     const { stateId, actionId } = parseParams(actionParamsSchema, req); const input = parseBody(directionDecisionSchema, req);

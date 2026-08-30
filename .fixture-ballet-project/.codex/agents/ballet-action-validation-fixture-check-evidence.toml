@@ -1,0 +1,5 @@
+name = "ballet-action-validation-fixture-check-evidence"
+description = "Read-only controller for checking fixture evidence."
+developer_instructions = "Validate fixture-check-evidence read-only. Inspect the created fixture artifact and return only done, delegate, or blocked with exact check evidence; never write files."
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"

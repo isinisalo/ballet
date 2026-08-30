@@ -1,9 +1,9 @@
 import type { ActionDefinition, ActionRoleComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV19 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV20 } from "../../../shared/orchestration/runtime.js";
 
 export interface BoundedTaskContextInput {
-  snapshot: RootSnapshotV19;
+  snapshot: RootSnapshotV20;
   state?: StateDefinition;
   action?: ActionDefinition;
   composition: ActionRoleComposition;
@@ -18,7 +18,7 @@ export interface BoundedTaskContextInput {
 }
 
 export const buildBoundedTaskContext = (input: BoundedTaskContextInput): JsonValue => {
-  const resourceIds = new Set([input.composition.instructionResource, ...input.composition.skillResources]);
+  const resourceIds = new Set(input.composition.skillResources);
   const context = {
     definitions: {
       environment: { id: input.snapshot.environment.id, sha256: input.snapshot.environmentSha256 },

@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ActionExecutionBinding, ActionRoleModelSelection, LocalDaemonEvent, LocalDaemonHeartbeat,
+import type { LocalDaemonEvent, LocalDaemonHeartbeat,
   LocalDaemonLogEntry, LocalDaemonStatus, LocalDaemonTaskClaim, LocalProviderStatus, RuntimeProvider } from "../../../shared/domain/runtime.js";
 import { localProviderStatusSchema } from "../../../shared/api/runtime-schemas.js";
 import { canonicalJson, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -15,44 +15,6 @@ export class LocalDaemonStore {
 
   constructor(private readonly connection: () => Database.Database, private readonly now: () => Date = () => new Date()) {
     this.executions = new AgentExecutionStore(connection);
-  }
-
-  actionBinding(actionId: string): ActionExecutionBinding | undefined {
-    const row = this.connection().prepare("SELECT * FROM action_execution_bindings WHERE action_id = ?")
-      .get(actionId) as ActionBindingRow | undefined;
-    return row ? toActionBinding(row) : undefined;
-  }
-
-  putActionBinding(actionId: string, input: {
-    validation: ActionRoleModelSelection; work: ActionRoleModelSelection;
-  }): ActionExecutionBinding {
-    this.assertBindingSupported(input.validation);
-    this.assertBindingSupported(input.work);
-    const provider = this.provider("codex")!;
-    if (!provider.capabilities.policy.workspaceWrite) {
-      throw new ConflictError("Codex cannot provide managed workspace-write for Work.");
-    }
-    const at = this.now().toISOString();
-    this.connection().prepare(`
-      INSERT INTO action_execution_bindings (
-        action_id, version, validation_model, validation_reasoning_effort,
-        work_model, work_reasoning_effort, updated_at
-      ) VALUES (?, 3, ?, ?, ?, ?, ?)
-      ON CONFLICT(action_id) DO UPDATE SET validation_model = excluded.validation_model,
-        validation_reasoning_effort = excluded.validation_reasoning_effort,
-        work_model = excluded.work_model, work_reasoning_effort = excluded.work_reasoning_effort,
-        updated_at = excluded.updated_at
-    `).run(actionId, input.validation.model, input.validation.reasoningEffort,
-      input.work.model, input.work.reasoningEffort, at);
-    return this.actionBinding(actionId)!;
-  }
-
-  removeActionBindings(actionIds: string[]): void {
-    if (actionIds.length === 0) return;
-    this.connection().transaction(() => {
-      const remove = this.connection().prepare("DELETE FROM action_execution_bindings WHERE action_id = ?");
-      for (const actionId of actionIds) remove.run(actionId);
-    })();
   }
 
   heartbeat(input: LocalDaemonHeartbeat): { refreshRequested: boolean; restartRequested: boolean } {
@@ -124,16 +86,6 @@ export class LocalDaemonStore {
       health: row.health, healthMessage: row.health_message ?? undefined,
       capabilities: JSON.parse(row.capabilities_json), busy: Boolean(row.busy), updatedAt: row.updated_at
     });
-  }
-
-  private assertBindingSupported(input: {
-    model: string; reasoningEffort: string;
-  }): void {
-    const provider = this.provider("codex");
-    if (!provider || provider.health !== "ready") throw new ConflictError("Codex is not ready on the local daemon.");
-    const model = provider.capabilities.models.find(({ id }) => id === input.model);
-    if (!model) throw new ConflictError(`Model ${input.model} is unavailable for Codex.`);
-    if (!model.reasoningOptions.includes(input.reasoningEffort)) throw new ConflictError(`Reasoning effort ${input.reasoningEffort} is unavailable for model ${input.model}.`);
   }
 
   private activeClaimCount(): number {
@@ -286,8 +238,6 @@ export class LocalDaemonStore {
   }
 }
 
-interface ActionBindingRow { action_id: string; validation_model: string; validation_reasoning_effort: string;
-  work_model: string; work_reasoning_effort: string; updated_at: string }
 interface DaemonRow { status: LocalDaemonStatus["status"]; pid: number; daemon_version: string; uptime_seconds: number;
   active_task_count: number; last_seen_at: string; recent_error: string | null; refresh_requested_at: string | null;
   refresh_acknowledged_at: string | null; restart_requested_at: string | null; restart_acknowledged_at: string | null }
@@ -301,12 +251,6 @@ interface ClaimedTaskRow {
   daemon_output_key: string | null; daemon_output: string | null; daemon_error_message: string | null;
 }
 
-const toActionBinding = (row: ActionBindingRow): ActionExecutionBinding => ({
-  version: 3, actionId: row.action_id,
-  validation: { model: row.validation_model, reasoningEffort: row.validation_reasoning_effort },
-  work: { model: row.work_model, reasoningEffort: row.work_reasoning_effort },
-  updatedAt: row.updated_at
-});
 const canonical = (value: unknown): string => canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue);
 const levelFor = (line: string): LocalDaemonLogEntry["level"] => /\berror\b/i.test(line) ? "error" : /\bwarn/i.test(line) ? "warn" : "info";
 const offlineProvider = (now: Date): LocalProviderStatus => ({

@@ -17,6 +17,7 @@ import { LocalDatabase } from "./persistence/LocalDatabase.js";
 import { ProjectDocumentRepository } from "./project/ProjectDocumentRepository.js";
 import { ProjectConfigurationRepository } from "./project/ProjectConfigurationRepository.js";
 import { ProjectDefinitionService } from "./project/ProjectDefinitionService.js";
+import { CodexAgentRepository } from "./project/CodexAgentRepository.js";
 import { planContinuationSeed } from "./runtime/ContinuationSeedPlanner.js";
 import { EnvironmentRunPlanner } from "./runtime/EnvironmentRunPlanner.js";
 import { EnvironmentRuntimeService } from "./runtime/EnvironmentRuntimeService.js";
@@ -36,7 +37,6 @@ export interface CompositionOptions {
   provider: OrchestrationRuntimeProvider & OrchestrationProviderPreflightPort;
   environmentWorkspace: OrchestrationWorkspacePort;
   environmentFinalizer: RunEvidenceFinalizationPort;
-  actionBindings: { removeActionBindings(actionIds: string[]): void };
 }
 
 export const createCompositionRoot = async (options: CompositionOptions) => {
@@ -96,7 +96,6 @@ export const createCompositionRoot = async (options: CompositionOptions) => {
   );
   const invalidations = new InvalidationBroadcaster();
   const controller = new ApiController({ connection: database, project, planner, runtime: environment,
-    actionBindings: options.actionBindings,
     workspace: options.environmentWorkspace, feedback, scheduler, governance, refinementApply, invalidations, nextId, now });
   const router = createOrchestrationRouter({ controller, actor: localActor });
 
@@ -162,6 +161,11 @@ const runRefinementValidation = async (id: RefinementValidationId, worktreePath:
       const issues = validateActionInstruction(source);
       if (issues.length > 0) throw new Error(`${relativePath}: ${issues[0]!.message}`);
     }
+    const config = new ProjectConfigurationRepository(path.join(worktreePath, ".ballet", "project.json")).load().config;
+    const actionAgentIds = config.environment.states.flatMap((state) => state.actions.flatMap((action) => [
+      action.validation.agentId, action.work.agentId
+    ]));
+    new CodexAgentRepository(worktreePath).requireActionSet(actionAgentIds);
     await runGit(["diff", "--check"], { cwd: worktreePath });
     return;
   }

@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 40
+version: 41
 tags: [arc42, traceability, evidence]
 ---
 
@@ -28,6 +28,7 @@ tags: [arc42, traceability, evidence]
 | goal-023,goal-024 / REQ-023,REQ-024 | QS-040 | adr-040 / CON-017 | BB-016,BB-017 | RT-026,RT-032 / DEP-007 | TEST-040 | EVID-040 | RISK-025 | passed canonical |
 | goal-024 / REQ-024 | QS-041 | adr-040 / CON-017 | BB-017 | RT-033 / DEP-007 | TEST-041 | EVID-041 | RISK-025 | passed canonical |
 | goal-002,goal-007,goal-022 / REQ-022 | QS-042 | adr-041 / CON-015 | BB-015,BB-016 | RT-026,RT-029 / DEP-007 | TEST-042 | EVID-042 | RISK-023 | passed locally |
+| goal-023,goal-024 / REQ-023,REQ-024 | QS-043 | adr-042 / CON-018 | BB-018 | RT-034 / DEP-008 | TEST-043 | EVID-043 | RISK-025 | passed canonical |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
@@ -67,6 +68,7 @@ tags: [arc42, traceability, evidence]
 | TEST-040 | exact v24/v19/v11/v15/v17/v22/v2/v3 contracts, automatic Use Case closure and general Agent removal, nested Skills, full docs/design/browser gates, make latest and packaged startup smoke |
 | TEST-041 | strict ActionExecutionBindingV3 schema and atomic SQLite v22 upsert/cleanup; removed Agent POST/DELETE/execution routes; Codex-only snapshot, both role mismatches, permissions, immutable continuation and responsive UI gates |
 | TEST-042 | strict legacy `useCaseIds` rejection, draft Use Case run, snapshot/task-context absence, normalized reorder API, ID-only keyboard sortable UI and compact retry-field tests |
+| TEST-043 | exact Action Agent inventory/schema/identity/uniqueness/symlink/capability tests; atomic Action pair create/update/delete, stale/rollback/Run-lock tests; immutable prompt/snapshot/permissions and responsive Action Workspace tests |
 
 | ID | Evidenssi |
 | --- | --- |
@@ -85,3 +87,4 @@ tags: [arc42, traceability, evidence]
 | EVID-040 | ADR-040 full repository, desktop/narrow browser and fresh SQLite v22 packaged startup evidence |
 | EVID-041 | ADR-040 refinement/continuation, full repository and responsive browser evidence |
 | EVID-042 | ADR-041 schema/planner/context/API/UI tests plus arc42, cutover, design, lint, build and full-suite command log |
+| EVID-043 | ADR-042 TOMLs, Project Config v25, Root Snapshot v20, SQLite v23, repository/API/runtime/UI tests and final validation/startup command log |

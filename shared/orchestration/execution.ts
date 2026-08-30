@@ -1,4 +1,4 @@
-import type { GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
+import type { ActionAgentDefinition, GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
 import type { JsonValue } from "./primitives.js";
 import type { AgentRunPhase, AgentRunRole } from "./runtime.js";
 import {
@@ -17,10 +17,10 @@ export interface ExecutionResourceEvidence {
 }
 
 export type ExecutionPromptSubject =
-  | { kind: "action_role"; actionId: string; role: "validation" | "work" }
-  | { kind: "agent"; agent: GovernanceAgentDefinition };
+  | { kind: "action_agent"; actionId: string; role: "validation" | "work"; agent: ActionAgentDefinition & { contentSha256: string } }
+  | { kind: "agent"; agent: GovernanceAgentDefinition & { contentSha256: string } };
 
-export interface ExecutionPromptEvidenceV15 {
+export interface ExecutionPromptEvidenceV16 {
   compositionVersion: typeof PROMPT_COMPOSITION_VERSION;
   role: AgentRunRole;
   phase: AgentRunPhase;
@@ -44,14 +44,14 @@ export interface ExecutionRuntimeSnapshot {
   capabilityHash: string;
 }
 
-export interface ExecutionSpecV17 {
+export interface ExecutionSpecV18 {
   version: typeof EXECUTION_SPEC_VERSION;
   taskId: string;
   kind: "agent_execution";
   environmentRunId: string;
   actionExecutionId?: string;
   agentRunId: string;
-  evidence: ExecutionPromptEvidenceV15;
+  evidence: ExecutionPromptEvidenceV16;
   runtime: ExecutionRuntimeSnapshot;
   permissions: {
     workspaceAccess: "read-only" | "workspace-write";

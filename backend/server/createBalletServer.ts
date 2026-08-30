@@ -38,22 +38,15 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   });
   const daemonDatabase = new LocalDatabase(context.databasePath); daemonDatabase.connection();
   const daemonStore = new LocalDaemonStore(() => daemonDatabase.connection());
-  type Composition = Awaited<ReturnType<typeof createCompositionRoot>>;
-  const compositionRef: { current?: Composition } = {};
-  const currentComposition = (): Composition => {
-    if (!compositionRef.current) throw new Error("Ballet composition is not initialized.");
-    return compositionRef.current;
-  };
   const provider = new LocalDaemonOrchestrationProvider(daemonStore);
   const environmentWorkspace = new EnvironmentWorkspaceManager(
     context.root, path.join(context.worktreesRoot, "environment"), (kind) => `${kind}:${randomUUID()}`
   );
   const composition = await createCompositionRoot({
-    context, provider, actionBindings: daemonStore,
+    context, provider,
     environmentWorkspace,
     environmentFinalizer: environmentWorkspace
   });
-  compositionRef.current = composition;
 
   const app = express();
   app.disable("x-powered-by");
@@ -69,9 +62,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(202).json({ accepted: true });
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
-  app.use("/api", createLocalDaemonRouter({ store: daemonStore, token: daemonConfig.token,
-    actionExists: (stateId, actionId) => currentComposition().project.projects.load().config.environment.states
-      .some((state) => state.id === stateId && state.actions.some((action) => action.id === actionId)) }));
+  app.use("/api", createLocalDaemonRouter({ store: daemonStore, token: daemonConfig.token }));
   app.use("/api", composition.router);
 
   const clientDist = resolveClientDist(options.webDist);

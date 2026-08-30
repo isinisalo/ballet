@@ -3,7 +3,7 @@ import { CONTRACT_LIMITS } from "./limits.js";
 import { idSchema, nonEmptyTextSchema, sha256Schema } from "./schemas/common.js";
 import { constraintSchema, directionReferenceSchema, useCaseAuthoringSchema } from "./schemas/directionSchemas.js";
 import {
-  actionDefinitionSchema, environmentDefinitionSchema, projectConfigurationV24Schema, stateDefinitionSchema
+  actionDefinitionSchema, environmentDefinitionSchema, projectConfigurationV25Schema, stateDefinitionSchema
 } from "./schemas/environmentSchemas.js";
 
 const markdownSourceSchema = z.string().max(CONTRACT_LIMITS.text)
@@ -19,7 +19,7 @@ export const stateParamsSchema = z.object({ stateId: idSchema }).strict();
 export const actionParamsSchema = z.object({ stateId: idSchema, actionId: idSchema }).strict();
 export const emptySchema = z.object({}).strict();
 export const putProjectSchema = z.object({
-  expectedHash: z.union([sha256Schema, z.literal("absent")]), config: projectConfigurationV24Schema
+  expectedHash: z.union([sha256Schema, z.literal("absent")]), config: projectConfigurationV25Schema
 }).strict();
 export const putResourceSchema = z.object({
   expectedHash: z.union([sha256Schema, z.literal("absent")]), content: markdownSourceSchema
@@ -51,7 +51,15 @@ export const workInputResponseSchema = z.object({
 }).strict();
 export const putEnvironmentSchema = z.object({ expectedConfigHash: sha256Schema, environment: environmentDefinitionSchema }).strict();
 export const putStateSchema = z.object({ expectedConfigHash: sha256Schema, state: stateDefinitionSchema }).strict();
-export const putActionSchema = z.object({ expectedConfigHash: sha256Schema, action: actionDefinitionSchema }).strict();
+const actionAgentAuthoringSchema = z.object({
+  description: nonEmptyTextSchema, developerInstructions: nonEmptyTextSchema,
+  model: nonEmptyTextSchema, reasoningEffort: nonEmptyTextSchema, expectedDocumentHash: sha256Schema
+}).strict();
+export const createActionSchema = z.object({ expectedConfigHash: sha256Schema, action: actionDefinitionSchema }).strict();
+export const putActionSchema = z.object({
+  expectedConfigHash: sha256Schema, action: actionDefinitionSchema,
+  validationAgent: actionAgentAuthoringSchema, workAgent: actionAgentAuthoringSchema
+}).strict();
 export const reorderSchema = z.object({ expectedConfigHash: sha256Schema, orderedIds: z.array(idSchema).min(1) }).strict();
 export const eventQuerySchema = z.object({ after: z.coerce.number().int().nonnegative().default(0) }).strict();
 export const feedbackQuerySchema = z.object({

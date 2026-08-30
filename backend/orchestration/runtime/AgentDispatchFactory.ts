@@ -1,5 +1,5 @@
-import type { ActionDefinition, ActionRoleComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
+import type { ActionDefinition, StateDefinition } from "../../../shared/orchestration/environment.js";
+import type { ExecutionSpecV18 } from "../../../shared/orchestration/execution.js";
 import type { CreateAgentRunInput, ExecutionTaskSeed } from "../../../shared/orchestration/persistence.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
@@ -40,6 +40,8 @@ export class AgentDispatchFactory {
     if (!matchedCapability || !("roles" in matchedCapability)) throw new Error(`Action ${action.id} capability is invalid.`);
     const capability = matchedCapability;
     const roleCapability = capability.roles[input.role];
+    const actionAgent = input.run.executionSnapshot.actionAgents.find(({ id }) => id === composition.agentId);
+    if (!actionAgent) throw new Error(`Action Agent ${composition.agentId} is absent from immutable snapshot.`);
     const agentRunId = this.nextId(`${input.role}-${input.phase}`);
     const taskId = this.nextId("task");
     const outputSchemaId = `${input.role}-outcome-v11`;
@@ -50,7 +52,7 @@ export class AgentDispatchFactory {
       previousEvidence: input.workOutcome as unknown as JsonValue | undefined,
       approvalBoundary: { humanDecisionRequired: false }, outputSchemaId
     });
-    const instruction = requireInstruction(input.run, composition);
+    const instruction = actionAgent.developerInstructions;
     const base = {
       version: 11 as const, taskId, environmentRunId: input.run.environmentRunId,
       snapshotSha256: input.run.executionSnapshotHash, instruction, context,
@@ -70,13 +72,14 @@ export class AgentDispatchFactory {
       workOutcome: requiredOutcome(input.workOutcome) as unknown as JsonValue
     };
     const parsedEnvelope = taskEnvelopeV11Schema.parse(envelope);
-    const subject = { kind: "action_role" as const, actionId: action.id, role: input.role };
+    const subject = { kind: "action_agent" as const, actionId: action.id, role: input.role, agent: actionAgent };
     const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition, subject });
-    const spec: ExecutionSpecV17 = {
-      version: 17, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
+    const spec: ExecutionSpecV18 = {
+      version: 18, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
-        subject, provider: capability.provider, cliVersion: capability.cliVersion, model: roleCapability.model,
+        subject: { kind: "action_agent", actionId: action.id, role: input.role, agentId: actionAgent.id },
+        provider: capability.provider, cliVersion: capability.cliVersion, model: roleCapability.model,
         reasoningEffort: roleCapability.reasoningEffort,
         capabilityHash: capability.capabilitySha256
       },
@@ -111,13 +114,6 @@ const findDefinitions = (run: StoredEnvironmentRun, actionId: string): { state: 
     if (action) return { state, action };
   }
   throw new Error(`Action ${actionId} is absent from immutable snapshot.`);
-};
-const requireInstruction = (run: StoredEnvironmentRun, composition: ActionRoleComposition): string => {
-  const resource = run.executionSnapshot.resources.find(
-    ({ kind, id }) => kind === "instruction" && id === composition.instructionResource
-  );
-  if (!resource) throw new Error(`Instruction ${composition.instructionResource} is absent from immutable snapshot.`);
-  return resource.content;
 };
 const required = (value: string | undefined, message: string): string => {
   if (!value?.trim()) throw new Error(message);

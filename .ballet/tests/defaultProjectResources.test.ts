@@ -6,8 +6,7 @@ import { parse as parseToml } from "smol-toml";
 import { describe, expect, test } from "vitest";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.js";
-import { validateActionInstruction } from "../../shared/orchestration/instructionContract.js";
-import { projectConfigurationV24Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV25Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
@@ -24,18 +23,35 @@ const walk = (directory: string): string[] => readdirSync(directory).flatMap((en
 });
 
 describe("canonical default project resources", () => {
-  test("loads a runnable five-State Environment with 13 exact approved Use Cases", () => {
-    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
+  test("loads the exact runnable five-State 21-Action lifecycle with 13 approved Use Cases", () => {
+    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
     expect(project.direction.useCases.map(({ id }) => id)).toEqual(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
     expect(project.direction.useCases.every(({ status }) => status === "approved")).toBe(true);
     expect(project.direction.useCases.every((useCase) => useCase.approval?.contentHash === useCaseApprovalHash(useCase))).toBe(true);
     expect(project.environment.states.map(({ order }) => order)).toEqual([1, 2, 3, 4, 5]);
-    expect(project.environment.states.reduce((total, state) => total + state.actions.length, 0)).toBe(14);
+    expect(project.environment.states.map(({ id, name }) => [id, name])).toEqual([
+      ["event-storming", "Event Storming"], ["arc42", "Arc42"], ["design", "Design"], ["build", "Build"], ["deploy", "Deploy"]
+    ]);
+    expect(project.environment.states.map(({ actions }) => actions.map(({ id }) => id))).toEqual([
+      ["event-storming-big-picture-exploration", "event-storming-process-modeling", "event-storming-software-design"],
+      ["arc42-introduction-goals", "arc42-constraints", "arc42-context-scope", "arc42-solution-strategy",
+        "arc42-building-block-view", "arc42-runtime-view", "arc42-deployment-view", "arc42-crosscutting-concepts",
+        "arc42-architectural-decisions", "arc42-quality-requirements", "arc42-risks-technical-debt", "arc42-glossary"],
+      ["design-wireframes", "design-reusable-components"],
+      ["build-write-tests", "build-write-code"],
+      ["deploy-to-dev", "deploy-acceptance-test"]
+    ]);
+    const actions = project.environment.states.flatMap(({ actions }) => actions);
+    expect(actions).toHaveLength(21);
+    expect(actions.every(({ id, input, validation, work }) => input !== undefined
+      && validation.agentId === `ballet-action-validation-${id}` && validation.skillResources.length > 0
+      && work.agentId === `ballet-action-work-${id}` && work.skillResources.length > 0)).toBe(true);
+    expect(actions.find(({ id }) => id === "deploy-to-dev")?.maxRetries).toBe(0);
     expect(validateRunnableEnvironment(project.environment)).toEqual([]);
   });
 
   test("keeps Use Case documents identical to the approved semantic values and hashes", () => {
-    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
     for (const useCase of project.direction.useCases) {
       const document = markdownFrontmatter(`.ballet/use-cases/${useCase.id}.md`);
       expect(document.frontmatter).toMatchObject({ id: useCase.id, title: useCase.name, status: useCase.status, approval: useCase.approval });
@@ -46,42 +62,59 @@ describe("canonical default project resources", () => {
     }
   });
 
-  test("resolves every selected instruction and Skill with no orphan runtime resource", () => {
-    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
+  test("resolves every selected Action Agent and shared Skill with no orphan runtime resource", () => {
+    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
     const actionRoles = project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]));
-    const instructionIds = new Set(actionRoles.map(({ instructionResource }) => instructionResource));
+    const agentIds = new Set(actionRoles.map(({ agentId }) => agentId));
     const skillIds = new Set([project.critic.agent, project.refinement.agent, ...actionRoles].flatMap(({ skillResources }) => skillResources));
-    for (const id of instructionIds) {
-      const filename = path.join(root, ".ballet/instructions", `${id}.md`);
-      expect(existsSync(filename), id).toBe(true);
-      expect(validateActionInstruction(readFileSync(filename, "utf8")), id).toEqual([]);
+    const instructions = [...agentIds].map((id) => {
+      const filename = path.join(root, ".codex/agents", `${id}.toml`); expect(existsSync(filename), id).toBe(true);
+      const agent = parseToml(readFileSync(filename, "utf8"));
+      expect(Object.keys(agent).sort()).toEqual(["description", "developer_instructions", "model", "model_reasoning_effort", "name"]);
+      expect(agent).toMatchObject({ name: id, model: "gpt-5.6-sol", model_reasoning_effort: "high" });
+      return String(agent.developer_instructions);
+    });
+    expect(new Set(instructions).size).toBe(42);
+    for (const state of project.environment.states) for (const action of state.actions) {
+      for (const role of ["validation", "work"] as const) {
+        const id = action[role].agentId;
+        const agent = parseToml(readFileSync(path.join(root, ".codex", "agents", `${id}.toml`), "utf8"));
+        const instruction = String(agent.developer_instructions);
+        expect(instruction, id).toContain(action.id); expect(instruction, id).toContain(action.name);
+        expect(instruction, id).toContain("Objective:"); expect(instruction, id).toMatch(/sources|source material/i);
+        expect(instruction, id).toMatch(/deliverables|Produce these Action-specific deliverables/i);
+        expect(instruction, id).toMatch(/acceptance checks/i);
+        if (role === "validation") expect(instruction).toMatch(/done.*delegate.*blocked/s);
+        else expect(instruction).toContain("completed or needs_input");
+      }
     }
     for (const id of skillIds) expect(existsSync(path.join(root, ".agents/skills", id, "SKILL.md")), id).toBe(true);
-    expect(walk(path.join(root, ".ballet/instructions")).filter((file) => file.endsWith(".md")).map((file) => path.basename(file, ".md")).sort())
-      .toEqual([...instructionIds].sort());
+    expect(readdirSync(path.join(root, ".codex", "agents")).filter((file) => file.startsWith("ballet-action-") && file.endsWith(".toml")).map((file) => path.basename(file, ".toml")).sort()).toEqual([...agentIds].sort());
     expect(walk(path.join(root, ".agents/skills")).filter((file) => file.endsWith("SKILL.md")).map((file) => path.relative(path.join(root, ".agents/skills"), path.dirname(file))).sort())
       .toEqual([...skillIds].sort());
   });
 
-  test("uses exactly two Codex TOML Agents and a disabled valid Critic schedule", () => {
-    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
+  test("uses two governance and 42 Action Codex TOML Agents with a disabled valid Critic schedule", () => {
+    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
     for (const [id, effort] of [["ballet-critic-agent", "low"], ["ballet-refinement-agent", "high"]] as const) {
       const agent = parseToml(readFileSync(path.join(root, ".codex", "agents", `${id}.toml`), "utf8"));
       expect(agent).toMatchObject({ name: id, model: "gpt-5.6-sol", model_reasoning_effort: effort, sandbox_mode: "read-only" });
       expect(String(agent.developer_instructions)).toContain("## Task");
     }
+    expect(readdirSync(path.join(root, ".codex", "agents")).filter((file) => file.endsWith(".toml"))).toHaveLength(44);
     expect(project.critic.enabled).toBe(false);
     expect(project.critic.schedules).toEqual([{ id: "weekday-quality-review", kind: "weekly", timeZone: "Europe/Helsinki", localTimes: ["09:00"], weekdays: [1, 3, 5] }]);
   });
 
   test("loads the compact fixture as a runnable two-State multi-Action project", () => {
-    const fixture = projectConfigurationV24Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
+    const fixture = projectConfigurationV25Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
     expect(fixture.environment.states).toHaveLength(2);
     expect(fixture.environment.states.flatMap(({ actions }) => actions)).toHaveLength(3);
     expect(fixture.direction.useCases).toHaveLength(2);
     expect(validateRunnableEnvironment(fixture.environment)).toEqual([]);
     expect(fixture.critic.enabled).toBe(false);
     expect(fixture.critic.schedules).toHaveLength(1);
+    expect(readdirSync(path.join(root, ".fixture-ballet-project", ".codex", "agents")).filter((file) => file.endsWith(".toml"))).toHaveLength(8);
   });
 
   test("keeps the editable drawio source well formed and canonical", () => {

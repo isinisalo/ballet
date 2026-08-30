@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
 import { afterEach, describe, expect, test } from "vitest";
-import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
+import { actionAgentId, type ActionAgentDefinition, type ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 import type { UseCase } from "../../../shared/orchestration/direction.js";
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -48,7 +48,7 @@ describe("orchestration HTTP integration", () => {
     });
 
     let response = await request("/project");
-    expect(response.status).toBe(200); expect((await response.json() as { config: { version: number } }).config.version).toBe(24); scenarios += 1;
+    expect(response.status).toBe(200); expect((await response.json() as { config: { version: number } }).config.version).toBe(25); scenarios += 1;
 
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: { ...fixture.config, graph: {} } }));
     expect(response.status).toBe(400); scenarios += 1;
@@ -64,9 +64,9 @@ describe("orchestration HTTP integration", () => {
     response = await request("/project", json("PUT", { expectedHash: "f".repeat(64), config: fixture.config }));
     expect(response.status).toBe(409); scenarios += 1;
 
-    response = await request("/project"); const authoringProject = await response.json() as { config: ProjectConfigurationV24 };
+    response = await request("/project"); const authoringProject = await response.json() as { config: ProjectConfigurationV25 };
     const authored = { ...authoringProject.config, environment: { ...authoringProject.config.environment, description: "Authored" } };
-    response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: authored }));
+    response = await request("/environment", json("PUT", { expectedConfigHash: fixture.configHash, environment: authored.environment }));
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
 
     const forged = structuredClone(authored);
@@ -107,11 +107,13 @@ describe("orchestration HTTP integration", () => {
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
 
     response = await request("/environment"); const environmentView = await response.json() as {
-      environment: ProjectConfigurationV24["environment"];
+      environment: ProjectConfigurationV25["environment"];
     };
     const secondState = structuredClone(environmentView.environment.states[0]!);
     secondState.id = "state-2"; secondState.name = "Second"; secondState.order = 2;
     secondState.actions[0]!.id = "action-state-2";
+    secondState.actions[0]!.validation.agentId = actionAgentId("action-state-2", "validation");
+    secondState.actions[0]!.work.agentId = actionAgentId("action-state-2", "work");
     response = await request("/environment/states", json("POST", { expectedConfigHash: fixture.configHash, state: secondState }));
     expect(response.status).toBe(201); const stateCreatedHash = (await response.json() as { configHash: string }).configHash;
     fixture.configHash = stateCreatedHash; scenarios += 1;
@@ -132,10 +134,12 @@ describe("orchestration HTTP integration", () => {
     response = await request("/environment/states/missing"); expect(response.status).toBe(404); scenarios += 1;
 
     response = await request("/environment"); const actionEnvironment = await response.json() as {
-      environment: ProjectConfigurationV24["environment"];
+      environment: ProjectConfigurationV25["environment"];
     };
     const secondAction = structuredClone(actionEnvironment.environment.states[0]!.actions[0]!);
     secondAction.id = "action-2"; secondAction.name = "Second Action"; secondAction.priority = 2;
+    secondAction.validation.agentId = actionAgentId("action-2", "validation");
+    secondAction.work.agentId = actionAgentId("action-2", "work");
     response = await request("/environment/states/state-1/actions", json("POST", {
       expectedConfigHash: fixture.configHash, action: secondAction
     }));
@@ -173,7 +177,7 @@ describe("orchestration HTTP integration", () => {
     expect(response.status).toBe(200); const updatedExtra = await response.json() as { contentHash: string }; scenarios += 1;
 
     response = await request("/instructions/instruction", json("DELETE", { expectedHash: fixture.instructionHash }));
-    expect(response.status).toBe(409); scenarios += 1;
+    expect(response.status).toBe(204); scenarios += 1;
 
     response = await request("/instructions/%2E%2E", json("PUT", { expectedHash: "absent", content: "unsafe" }));
     expect([400, 404]).toContain(response.status); scenarios += 1;
@@ -256,7 +260,7 @@ describe("orchestration HTTP integration", () => {
     response = await request(`/environment-runs/${encodeURIComponent(run.environmentRunId)}`); const runDetail = await response.json() as Record<string, unknown>;
     expect(response.status).toBe(200); expect(runDetail).not.toHaveProperty("executionSnapshot"); scenarios += 1;
 
-    response = await request("/project"); const activeProject = await response.json() as { config: ProjectConfigurationV24 };
+    response = await request("/project"); const activeProject = await response.json() as { config: ProjectConfigurationV25 };
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash,
       config: { ...activeProject.config, environment: { ...activeProject.config.environment, name: "Locked" } } }));
     expect(response.status).toBe(409); scenarios += 1;
@@ -264,12 +268,12 @@ describe("orchestration HTTP integration", () => {
     const activeRow = fixture.database().prepare("SELECT status, execution_snapshot_json FROM environment_runs WHERE environment_run_id = ?")
       .get(run.environmentRunId) as { status: string; execution_snapshot_json: string };
     expect(activeRow.status).toBe("running");
-    expect((JSON.parse(activeRow.execution_snapshot_json) as { resources: Array<{ id: string }> }).resources)
-      .toContainEqual(expect.objectContaining({ id: "instruction" }));
-    response = await request("/instructions/instruction", json("PUT", {
-      expectedHash: fixture.instructionHash, content: `${VALID_INSTRUCTION}\n`
+    expect((JSON.parse(activeRow.execution_snapshot_json) as { actionAgents: unknown[] }).actionAgents).toHaveLength(2);
+    response = await request("/instructions/extra", json("PUT", {
+      expectedHash: updatedExtra.contentHash, content: `${VALID_INSTRUCTION}\n\nupdated\n`
     }));
-    expect(response.status, await response.clone().text()).toBe(409); scenarios += 1;
+    expect(response.status, await response.clone().text()).toBe(200);
+    const latestExtra = await response.json() as { contentHash: string }; scenarios += 1;
 
     await fixture.runtime.processNext();
     response = await request(`/environment-runs/${encodeURIComponent(run.environmentRunId)}`);
@@ -349,16 +353,16 @@ describe("orchestration HTTP integration", () => {
     expect(response.status).toBe(201); const refinement = await response.json() as { refinementRunId: string; taskId: string };
     expect(refinement).toHaveProperty("taskId"); scenarios += 1;
 
-    const refinedInstruction = `${VALID_INSTRUCTION}\n\nRefined guidance.\n`;
+    const refinedInstruction = fixture.actionAgentSource.replace("validation action-1 exact instructions", "validation action-1 refined exact instructions");
     const refinementBase = {
       refinementProposalId: "refinement-proposal-manual", refinementRunId: refinement.refinementRunId,
       targetActionId: "action-1", expectedBaseCommit: String(runDetail.baseCommit),
       impactScope: { actionIds: ["action-1"] }, changeListHash: "",
       expectedBehavioralImprovement: "More exact instruction", risks: ["Prompt behavior changes"],
       validationPlan: ["instruction_contract" as const], rollback: "Discard the local branch.",
-      files: [{ operation: "replace" as const, relativePath: ".ballet/instructions/instruction.md",
-        expectedPreimageHash: fixture.instructionHash, proposedContentHash: sha256(refinedInstruction),
-        proposedContent: refinedInstruction, rationale: "Improve Action guidance", resourceId: "instruction" }],
+      files: [{ operation: "replace" as const, relativePath: ".codex/agents/ballet-action-validation-action-1.toml",
+        expectedPreimageHash: fixture.actionAgentHash, proposedContentHash: sha256(refinedInstruction),
+        proposedContent: refinedInstruction, rationale: "Improve Action guidance", resourceId: "ballet-action-validation-action-1" }],
       createdAt: TEST_AT
     };
     reviewStore.createRefinementProposal({ ...refinementBase, changeListHash: refinementChangeListHash(refinementBase) });
@@ -385,10 +389,10 @@ describe("orchestration HTTP integration", () => {
       "SELECT execution_snapshot_json FROM environment_runs WHERE environment_run_id = ?"
     ).get(continuation.continuation_run_id) as { execution_snapshot_json: string };
     const continuationSnapshot = JSON.parse(continuationRow.execution_snapshot_json) as {
-      resources: Array<{ id: string; sourceSha256: string }>;
+      actionAgents: Array<{ id: string; contentSha256: string }>;
     };
-    expect(continuationSnapshot.resources).toContainEqual(expect.objectContaining({
-      id: "instruction", sourceSha256: sha256(refinedInstruction)
+    expect(continuationSnapshot.actionAgents).toContainEqual(expect.objectContaining({
+      id: "ballet-action-validation-action-1", contentSha256: sha256(refinedInstruction)
     })); scenarios += 1;
     response = await request("/refinement/proposals/refinement-proposal-manual/apply", json("POST", {
       patch: [{ path: "../unsafe", content: "forged" }]
@@ -418,7 +422,7 @@ describe("orchestration HTTP integration", () => {
     }, body: `{"padding":"${"x".repeat(1_100_000)}"}` });
     expect(response.status).toBe(413); scenarios += 1;
 
-    response = await request("/instructions/extra", json("DELETE", { expectedHash: updatedExtra.contentHash }));
+    response = await request("/instructions/extra", json("DELETE", { expectedHash: latestExtra.contentHash }));
     expect(response.status).toBe(204); scenarios += 1;
     expect(scenarios).toBe(83);
   });
@@ -433,6 +437,12 @@ const startFixture = async () => {
     path.join(root, ".codex", "agents", `${id}.toml`),
     `name = "${id}"\ndescription = "Test Agent"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\ndeveloper_instructions = """\n${VALID_INSTRUCTION}\n"""\n`
   );
+  const config = validProjectConfig();
+  for (const action of config.environment.states.flatMap(({ actions }) => actions)) for (const role of ["validation", "work"] as const) {
+    const id = action[role].agentId;
+    writeFileSync(path.join(root, ".codex", "agents", `${id}.toml`),
+      `name = "${id}"\ndescription = "${role} Agent"\ndeveloper_instructions = "${role} ${action.id} exact instructions"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\n`);
+  }
   execFileSync("git", ["init", "-q"], { cwd: root });
   execFileSync("git", ["add", "README.md", ".codex/agents"], { cwd: root });
   execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"], { cwd: root });
@@ -441,7 +451,6 @@ const startFixture = async () => {
   const connection = () => manager.connection(); connection();
   const projects = new ProjectConfigurationRepository(path.join(root, ".ballet", "project.json"), connection);
   const documents = new ProjectDocumentRepository(path.join(root, ".ballet"), connection);
-  const config = validProjectConfig();
   let configHash = projects.save(config, "absent").configHash;
   const goalHash = documents.put("goal", "goal-1", "# Goal 1\n", "absent").contentHash;
   documents.put("adr", "adr-1", "# ADR 1\n", "absent");
@@ -449,6 +458,7 @@ const startFixture = async () => {
   documents.put("use-case", "UC-1", "# Use Case 1\n", "absent");
   const instructionHash = documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent").contentHash;
   const project = new ProjectDefinitionService(root, projects, documents);
+  const actionAgentSlot = project.agents.requireAction("ballet-action-validation-action-1");
   const agentCapability = (agentId: string) => ({
     subject: { kind: "agent" as const, agentId },
     provider: "codex" as const, model: "gpt-5.6-sol", reasoningEffort: "high",
@@ -456,17 +466,19 @@ const startFixture = async () => {
     supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"],
     supportsReadOnly: true, supportsWorkspaceWrite: true
   });
-  const actionCapability = (actionId: string) => ({
+  const actionCapability = (actionId: string, profiles: { validation: ActionAgentDefinition; work: ActionAgentDefinition }) => ({
     subject: { kind: "action" as const, actionId }, provider: "codex" as const,
     cliVersion: "1.0.0",
     roles: {
-      validation: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] },
-      work: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] }
+      validation: { agentId: profiles.validation.id, model: profiles.validation.model, reasoningEffort: profiles.validation.reasoningEffort, supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] },
+      work: { agentId: profiles.work.id, model: profiles.work.model, reasoningEffort: profiles.work.reasoningEffort, supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] }
     }, supportsReadOnly: true, supportsWorkspaceWrite: true
   });
   const preflight = {
     inspectAgent: async (agent: { id: string }) => { const value = agentCapability(agent.id); return { ...value, capabilitySha256: hash(value) }; },
-    inspectAction: async (actionId: string) => { const value = actionCapability(actionId); return { ...value, capabilitySha256: hash(value) }; }
+    inspectAction: async (actionId: string, profiles: { validation: ActionAgentDefinition; work: ActionAgentDefinition }) => {
+      const value = actionCapability(actionId, profiles); return { ...value, capabilitySha256: hash(value) };
+    }
   };
   const planner = new EnvironmentRunPlanner(project, preflight, () => TEST_AT);
   const environmentQueue = new DeterministicExecutionQueue();
@@ -511,7 +523,7 @@ const startFixture = async () => {
         refinementApprovalId: `${refinementProposalId}:decision`, refinementCommitSha: commitSha });
       return { ...seed, continuationLinkId: nextId("continuation-link"), continuationSnapshotHash: seed.executionSnapshotHash };
     }, () => TEST_AT, isAllowedRefinementPath);
-  const controller = new ApiController({ connection, project, planner, runtime, actionBindings: { removeActionBindings: () => undefined },
+  const controller = new ApiController({ connection, project, planner, runtime,
     workspace: { prepare: async (runId) => ({ worktreePath: root, branch: `test/${runId}` }), discard: async () => undefined },
     feedback: feedbackService, scheduler, governance, refinementApply,
     invalidations: new InvalidationBroadcaster(), nextId, now: () => TEST_AT });
@@ -528,7 +540,8 @@ const startFixture = async () => {
     rmSync(refinementWorktrees, { recursive: true, force: true });
   });
   return { base: `http://127.0.0.1:${address.port}/api`, root, config, get configHash() { return configHash; },
-    set configHash(value: string) { configHash = value; }, goalHash, instructionHash, database: connection, runtime };
+    set configHash(value: string) { configHash = value; }, goalHash, instructionHash,
+    actionAgentHash: actionAgentSlot.contentHash, actionAgentSource: actionAgentSlot.source, database: connection, runtime };
 };
 
 const hash = (value: unknown): string => sha256(canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue));

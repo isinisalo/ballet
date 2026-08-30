@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 33
+version: 34
 tags: [arc42, quality, scenarios]
 arc42Section: 10
 ---
@@ -29,6 +29,7 @@ arc42Section: 10
 | QS-040 | goal-023, goal-024 / REQ-023, REQ-024 | Codex-only strict cut rakennetaan ja käynnistetään | clean checkout, fresh/incompatible state, desktop/narrow UI | whole product | vain v24/v19/v11/v15/v17/v22, Codex Agent v2 ja Action binding v3 jäävät aktiiviseksi; automatic Use Case closure ja secondary-provider/Agent POST/DELETE/execution ovat 0; server-owned finalization säilyy | removal, arc42, full test/lint/build/design, desktop/narrow QA, make latest and startup smoke | 1 | EVID-040 | passed canonical |
 | QS-041 | goal-024 / REQ-024 | Agent tai Action execution tallennetaan ja Refinement ehdotetaan | kaksi fixed TOMLia, eri role model/reasoning, stale/invalid/symlink, active immutable Run | Codex Agent v2, ActionExecutionBindingV3 and Root Snapshot v19 | TOML+Skills rollback on atominen; Refinement muuttaa TOMLista vain developer instructions; parent Action ei muutu ja continuation ajaa korjauksen; Validation read-only ja Work managed-worktree-write | strict schema/API/persistence/planner/runtime/UI/refinement tests; removed routes 404; desktop/narrow overflow 0; fresh SQLite v22 startup | 1 | EVID-041 | passed canonical |
 | QS-042 | goal-002, goal-007, goal-022 / REQ-022 | Ihminen järjestää Stateja tai Actioneita ja agentti tarvitsee valikoidun project-kontekstin | desktop/narrow, pointer/keyboard, draft tai approved Use Caset | Project Config v24, Root Snapshot v19 and Loop Engineering UI | ID-only sortable tallentaa välittömästi normalisoidun järjestyksen; Use Caset eivät portita Runia tai siirry snapshottiin/task contextiin; instruction/Skill ohjaa dokumenttien lukemisen | legacy `useCaseIds` hylätään; snapshot/context property absence; reorder API/UI keyboard/stale tests; order/priority-kenttiä ei ole ja compact retry mahtuu workbenchiin | 1 | EVID-042 | passed locally |
+| QS-043 | goal-023, goal-024 / REQ-023, REQ-024 | Action luodaan, muokataan, poistetaan tai preflightataan | missing/extra/invalid/symlink TOML, stale hash, active Run ja unsupported Codex capability | Project Config v25, Codex Agent v3, Root Snapshot v20, SQLite v23 and Action Workspace | jokaisella Actionilla on exact Validation/Work Agent; config+pair muutos on atominen; TOML instruction/model/reasoning ja Skill closure jäätyvät; Validation on read-only ja Work managed-worktree; virhe tuottaa 0 dispatchia | 21 Actionia, 42 unique five-field TOMLia ja 44 total; repository/API/runtime/UI rollback, stale, lock, capability, keyboard ja 1440x900/390x844 testit; Action binding table/route/editor 0 | 1 | EVID-043 | passed canonical |
 <!-- quality-scenarios:end -->
 
 Compile yksin ei täytä mitään skenaariota. Verdict edellyttää scenario-kohtaista test/evidence-ketjua ja rajoitteiden raportointia.

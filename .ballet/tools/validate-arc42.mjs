@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Canonical validation stays in one executable inventory for deterministic repository checks. */
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, stat, lstat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -7,8 +7,7 @@ import YAML from "yaml";
 import { parse as parseToml } from "smol-toml";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
-import { governanceAgentDefinitionSchema, projectConfigurationV24Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
-import { validateActionInstruction } from "../../shared/orchestration/instructionContract.ts";
+import { actionAgentDefinitionSchema, governanceAgentDefinitionSchema, projectConfigurationV25Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 
 const root = process.cwd();
 const arc42Root = path.join(root, ".ballet/arc42");
@@ -154,7 +153,7 @@ for (const line of traceLines.slice(2)) for (const id of line.match(
 ) ?? []) if (!stableDefinitions.has(id)) addIssue(`TRACEABILITY references undefined ID ${id}.`);
 
 const rawConfig = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8"));
-const parsed = projectConfigurationV24Schema.safeParse(rawConfig);
+const parsed = projectConfigurationV25Schema.safeParse(rawConfig);
 let config;
 if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
@@ -167,21 +166,12 @@ if (!parsed.success) {
       addIssue(`Project Config ${field} reference ${item.id} has no Markdown source.`);
     }
   }
-  const instructionIds = new Set();
   const skillIds = new Set();
   for (const agent of actionCompositions(config)) {
-    instructionIds.add(agent.instructionResource);
     agent.skillResources.forEach((id) => skillIds.add(id));
   }
   for (const composition of [config.critic.agent, config.refinement.agent]) {
     composition.skillResources.forEach((id) => skillIds.add(id));
-  }
-  for (const id of instructionIds) {
-    const filename = path.join(root, ".ballet/instructions", `${id}.md`);
-    if (!(await exists(filename))) { addIssue(`Missing instruction resource ${id}.`); continue; }
-    for (const issue of validateActionInstruction(await readFile(filename, "utf8"))) {
-      addIssue(`Instruction ${id}: ${issue.message}.`);
-    }
   }
   for (const id of skillIds) {
     const filename = path.join(root, ".agents/skills", id, "SKILL.md");
@@ -215,11 +205,6 @@ if (!parsed.success) {
     }
   }
 
-  const allInstructionFiles = (await walk(path.join(root, ".ballet/instructions"))).filter((file) => file.endsWith(".md"));
-  for (const file of allInstructionFiles) {
-    const id = path.basename(file, ".md");
-    if (!instructionIds.has(id)) addIssue(`Orphan instruction resource ${rel(file)}.`);
-  }
   const allSkillFiles = (await walk(path.join(root, ".agents/skills"))).filter((file) => file.endsWith("/SKILL.md"));
   for (const file of allSkillFiles) {
     const id = rel(path.dirname(file)).replace(/^\.agents\/skills\//, "");
@@ -265,7 +250,7 @@ if (issues.length) {
 } else {
   const states = config?.environment.states.length ?? 0;
   const actions = config?.environment.states.reduce((total, state) => total + state.actions.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v24, ${states} States and ${actions} Actions.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v25, ${states} States and ${actions} Actions.\n`);
 }
 
 async function indexedMarkdown(directory) {
@@ -287,7 +272,7 @@ async function indexedMarkdownDocuments(directory) {
 async function validateFixtureProject() {
   const fixtureRoot = path.join(root, ".fixture-ballet-project");
   const raw = JSON.parse(await readFile(path.join(fixtureRoot, ".ballet/project.json"), "utf8"));
-  const parsedFixture = projectConfigurationV24Schema.safeParse(raw);
+  const parsedFixture = projectConfigurationV25Schema.safeParse(raw);
   if (!parsedFixture.success) { parsedFixture.error.issues.forEach((issue) => addIssue(
     `Fixture Project Config:${issue.path.join(".")}: ${issue.message}`)); return; }
   const fixture = parsedFixture.data;
@@ -297,9 +282,6 @@ async function validateFixtureProject() {
   if (fixture.critic.enabled || fixture.critic.schedules.length === 0) addIssue("Fixture Critic must be disabled with a valid example schedule.");
   await validateCodexAgents(fixtureRoot, fixture, "Fixture ");
   for (const agent of actionCompositions(fixture)) {
-    const instruction = path.join(fixtureRoot, ".ballet/instructions", `${agent.instructionResource}.md`);
-    if (!(await exists(instruction))) addIssue(`Fixture missing instruction ${agent.instructionResource}.`);
-    else for (const issue of validateActionInstruction(await readFile(instruction, "utf8"))) addIssue(`Fixture instruction ${agent.instructionResource}: ${issue.message}.`);
     for (const skill of agent.skillResources) if (!(await exists(path.join(fixtureRoot, ".agents/skills", skill, "SKILL.md")))) addIssue(`Fixture missing Skill ${skill}.`);
   }
 }
@@ -339,4 +321,36 @@ async function validateCodexAgents(projectRoot, project, prefix = "") {
         `${prefix}${rel(filename)}:${issue.path.join(".")}: ${issue.message}`));
     } catch (error) { addIssue(`${prefix}${rel(filename)}: invalid TOML: ${error instanceof Error ? error.message : String(error)}`); }
   }
+  await validateActionAgents(projectRoot, project, prefix);
+}
+
+async function validateActionAgents(projectRoot, project, prefix) {
+  const actionIds = project.environment.states.flatMap((state) => state.actions.flatMap((action) => [
+    [`ballet-action-validation-${action.id}`, action.validation.agentId],
+    [`ballet-action-work-${action.id}`, action.work.agentId]
+  ]));
+  const expectedActionIds = new Set(actionIds.map(([id]) => id));
+  const agentDirectory = path.join(projectRoot, ".codex", "agents");
+  const actualActionIds = (await readdir(agentDirectory)).filter((name) => /^ballet-action-.*\.toml$/.test(name))
+    .map((name) => name.slice(0, -5));
+  for (const id of actualActionIds) if (!expectedActionIds.has(id)) addIssue(`${prefix}extra Action Agent ${id}.`);
+  const instructions = [];
+  for (const [id, configuredId] of actionIds) {
+    if (configuredId !== id) { addIssue(`${prefix}Action composition must select ${id}.`); continue; }
+    const filename = path.join(agentDirectory, `${id}.toml`);
+    let metadata;
+    try { metadata = await lstat(filename); } catch { addIssue(`${prefix}missing Action Agent ${rel(filename)}.`); continue; }
+    if (!metadata.isFile() || metadata.isSymbolicLink()) { addIssue(`${prefix}${rel(filename)} must be an ordinary file.`); continue; }
+    try {
+      const value = parseToml(await readFile(filename, "utf8"));
+      const keys = Object.keys(value).sort();
+      const requiredKeys = ["name", "description", "developer_instructions", "model", "model_reasoning_effort"].sort();
+      if (JSON.stringify(keys) !== JSON.stringify(requiredKeys)) addIssue(`${prefix}${rel(filename)} must contain exactly five Action Agent fields.`);
+      const result = actionAgentDefinitionSchema.safeParse({ id, name: value.name, description: value.description,
+        developerInstructions: value.developer_instructions, model: value.model, reasoningEffort: value.model_reasoning_effort });
+      if (!result.success) result.error.issues.forEach((issue) => addIssue(`${prefix}${rel(filename)}:${issue.path.join(".")}: ${issue.message}`));
+      if (typeof value.developer_instructions === "string") instructions.push(value.developer_instructions);
+    } catch (error) { addIssue(`${prefix}${rel(filename)}: invalid TOML: ${error instanceof Error ? error.message : String(error)}`); }
+  }
+  if (new Set(instructions).size !== instructions.length) addIssue(`${prefix}Action Agent developer_instructions values must be unique.`);
 }

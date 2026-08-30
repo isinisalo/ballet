@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 32
+version: 33
 tags: [arc42, decisions]
 arc42Section: 9
 ---
@@ -20,6 +20,7 @@ arc42Section: 9
 | [adr-039](../adr/adr-039-action-shared-provider-policy.md) | superseded | Historical shared provider/policy binding, superseded by Codex-only Action binding v3 |
 | [adr-040](../adr/adr-040-codex-only-fixed-governance-agents.md) | accepted | Two fixed read-only Codex Agent TOMLs, Codex-only daemon and model/reasoning-only Action bindings |
 | [adr-041](../adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) | accepted | Project documents are instruction/Skill-directed and ordering is edited only with compact ID-only sortable lists |
+| [adr-042](../adr/adr-042-action-specific-codex-agents.md) | accepted | Every Action owns distinct Validation/Work TOMLs; removes shared role instruction and machine-local Action execution binding truths |
 | [adr-036](../adr/adr-036-loop-engineering-space-and-action-flow-projections.md) | accepted | shared ordered State/Action space canvas and Validation-led Action workflow projection without runtime ownership |
 
-ADR-034:n, ADR-035:n, ADR-037:n, ADR-038:n, ADR-039:n, ADR-040:n ja ADR-041:n supersession-listat määrittävät, mitkä aiemmat päätökset tai niiden osat ovat historiallisia. ADR-036 tarkentaa vain aktiivisen UI-projektion. Tässä indeksissä ei ylläpidetä rinnakkaista päätöstekstiä.
+ADR-034:n, ADR-035:n, ADR-037:n, ADR-038:n, ADR-039:n, ADR-040:n, ADR-041:n ja ADR-042:n supersession-listat määrittävät, mitkä aiemmat päätökset tai niiden osat ovat historiallisia. ADR-036 tarkentaa vain aktiivisen UI-projektion. Tässä indeksissä ei ylläpidetä rinnakkaista päätöstekstiä.

@@ -1,0 +1,5 @@
+name = "ballet-action-validation-fixture-review-evidence"
+description = "Read-only controller for reviewing fixture evidence."
+developer_instructions = "Validate fixture-review-evidence read-only. Compare the fixture result with its acceptance contract and return only done, delegate, or blocked with review evidence."
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"

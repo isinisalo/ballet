@@ -26,6 +26,7 @@ const isSafeRelativePath = (path: string): boolean => (
 export const isAllowedRefinementPath = (path: string): boolean => (
   isSafeRelativePath(path) && (
     /^\.codex\/agents\/(?:ballet-critic-agent|ballet-refinement-agent)\.toml$/.test(path)
+    || /^\.codex\/agents\/ballet-action-(?:validation|work)-[a-z0-9][a-z0-9-]*\.toml$/.test(path)
     || /^\.ballet\/instructions\/.+\.md$/.test(path)
     || /^\.agents\/skills\/[^/]+(?:\/[^/]+)*\/SKILL\.md$/.test(path)
   )

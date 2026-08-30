@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import express from "express";
 import { z } from "zod";
 import {
-  actionExecutionBindingBodySchema, actionExecutionParamsSchema, emptyRuntimeBodySchema,
+  emptyRuntimeBodySchema,
   executionTaskParamsSchema, localDaemonClaimBodySchema, localDaemonCompleteBodySchema,
   localDaemonDiagnosticsBodySchema, localDaemonEventBatchBodySchema, localDaemonFailBodySchema,
   localDaemonHeartbeatBodySchema, localDaemonLeaseBodySchema, runtimeLogQuerySchema
@@ -12,7 +12,6 @@ import type { LocalDaemonStore } from "../../orchestration/persistence/LocalDaem
 
 export const createLocalDaemonRouter = (options: {
   store: LocalDaemonStore; token: string;
-  actionExists(stateId: string, actionId: string): boolean;
 }): express.Router => {
   const router = express.Router();
   const authenticated = daemonAuth(options.token);
@@ -28,17 +27,6 @@ export const createLocalDaemonRouter = (options: {
   }));
   router.get("/runtimes/local/logs", route((req, res) => {
     const { limit } = parseUnknown(runtimeLogQuerySchema, req.query); res.json({ entries: options.store.logs(limit) });
-  }));
-
-  router.get("/environment/states/:stateId/actions/:actionId/execution", route((req, res) => {
-    const { stateId, actionId } = parseParams(actionExecutionParamsSchema, req);
-    if (!options.actionExists(stateId, actionId)) { res.status(404).json({ error: `Action ${actionId} was not found in State ${stateId}.` }); return; }
-    res.json(options.store.actionBinding(actionId) ?? null);
-  }));
-  router.put("/environment/states/:stateId/actions/:actionId/execution", route((req, res) => {
-    const { stateId, actionId } = parseParams(actionExecutionParamsSchema, req);
-    if (!options.actionExists(stateId, actionId)) { res.status(404).json({ error: `Action ${actionId} was not found in State ${stateId}.` }); return; }
-    res.json(options.store.putActionBinding(actionId, parseBody(actionExecutionBindingBodySchema, req)));
   }));
 
   router.post("/daemon/heartbeat", authenticated, route((req, res) => {

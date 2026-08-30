@@ -22,7 +22,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 ## Strict cut
 
-- Aktiiviset versiot ovat Project Config v24, Root Snapshot v19, Task Envelope ja role outcome v11, prompt composition v15, ExecutionSpec v17, SQLite v22 sekä Feedback/Critic/Refinement v2. Action execution binding on v3, Codex Agent v2 ja Run Evidence v1.
+- Aktiiviset versiot ovat Project Config v25, Root Snapshot v20, Task Envelope ja role outcome v11, prompt composition v16, ExecutionSpec v18, SQLite v23 sekä Feedback/Critic/Refinement v2. Codex Agent on v3 ja Run Evidence v1; Action execution bindingia ei ole.
 - Vanhasta datasta ei tehdä migraatiota, readeria, route-aliasta tai dual-write-polkuja. Epäyhteensopiva machine-local SQLite arkistoidaan tai poistetaan ennen käynnistystä.
 - Canonical URLit ovat `/automation/loops`, `/agents`, `/skills`, `/runtimes`, `/project/goals`, `/project/adrs`, `/project/constraints`, `/project/use-cases`, `/project/instructions`, `/run`, `/feedback`, `/reviews/critic` ja `/reviews/refinement`; Run Evidence näkyy omistavan Runin sisällä. API on `/api/*`.
 

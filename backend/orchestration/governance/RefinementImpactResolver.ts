@@ -7,6 +7,10 @@ export const resolveRefinementImpact = (
   targetActionId: string
 ): string[] => {
   const actionIds = new Set([targetActionId]);
+  for (const file of files) {
+    const actionAgent = /^\.codex\/agents\/ballet-action-(?:validation|work)-([a-z0-9][a-z0-9-]*)\.toml$/.exec(file.relativePath);
+    if (actionAgent) actionIds.add(actionAgent[1]!);
+  }
   const skillIds = new Set(files.filter(({ relativePath }) => isSkillPath(relativePath))
     .map(({ resourceId }) => resourceId).filter((id): id is string => Boolean(id)));
   for (const state of environment.states) for (const action of state.actions) {

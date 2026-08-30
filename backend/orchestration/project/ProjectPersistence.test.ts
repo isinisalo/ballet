@@ -19,8 +19,8 @@ describe("canonical project persistence", () => {
     const context = fixture(false);
     const rejectedOldVersion = { version: 19, projectModel: {} };
     writeFileSync(path.join(context.root, ".ballet", "project.json"), JSON.stringify(rejectedOldVersion));
-    expect(() => context.projects.load()).toThrow("Project Config v23 is required");
-    expect(() => context.projects.loadOptional()).toThrow("Project Config v23 is required");
+    expect(() => context.projects.load()).toThrow("Project Config v25 is required");
+    expect(() => context.projects.loadOptional()).toThrow("Project Config v25 is required");
   });
 
   test("writes stable canonical JSON atomically and enforces optimistic hashes", () => {
@@ -44,17 +44,17 @@ describe("canonical project persistence", () => {
     expect(() => context.documents.require("goal", "goal-1")).toThrow("ordinary file");
   });
 
-  test("locks snapshotted config and referenced resources while allowing unrelated resources", () => {
+  test("locks snapshotted config while allowing Action-unreferenced instruction documents", () => {
     const context = fixture();
     context.documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent");
     const extra = context.documents.put("instruction", "extra", VALID_INSTRUCTION, "absent");
     new EnvironmentRunStore(context.database).create(environmentSeed());
-    expect(context.documents.runReferences("instruction", "instruction")).toEqual(["run-1"]);
+    expect(context.documents.runReferences("instruction", "instruction")).toEqual([]);
     const loaded = context.projects.load();
     expect(() => context.projects.save({ ...loaded.config, environment: { ...loaded.config.environment, name: "Changed" } }, loaded.configHash))
       .toThrow("locked");
     const instruction = context.documents.require("instruction", "instruction");
-    expect(() => context.documents.put("instruction", "instruction", `${VALID_INSTRUCTION}\n`, instruction.contentHash)).toThrow("locked");
+    expect(context.documents.put("instruction", "instruction", `${VALID_INSTRUCTION}\n`, instruction.contentHash).content).toContain("Acceptance evidence");
     expect(context.documents.put("instruction", "extra", `${VALID_INSTRUCTION}\n`, extra.contentHash).content).toContain("Acceptance evidence");
   });
 
@@ -74,7 +74,8 @@ describe("canonical project persistence", () => {
     expect(index.for("goal", "goal-1")).toContainEqual(expect.objectContaining({ ownerType: "use-case" }));
     expect(index.for("use-case", "UC-1")).toEqual([]);
     expect(index.for("use-case", "UC-1")).not.toContainEqual(expect.objectContaining({ ownerType: "action" }));
-    expect(index.for("instruction", "instruction").length).toBe(2);
+    expect(index.for("instruction", "instruction")).toEqual([]);
+    expect(index.for("skill", "").length).toBe(0);
   });
 });
 
