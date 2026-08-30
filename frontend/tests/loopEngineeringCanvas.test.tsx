@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ActionDefinition } from "@shared/orchestration/environment";
 import { ActionFlow } from "../src/orchestration/configure/ActionFlow";
@@ -7,6 +9,11 @@ import { LoopEngineeringCanvas } from "../src/orchestration/configure/LoopEngine
 import { projectActionFlow } from "../src/orchestration/configure/actionFlowProjection";
 import { projectLoopEngineering } from "../src/orchestration/configure/loopEngineeringProjection";
 import { orchestrationConfig } from "./orchestrationFixtures";
+
+const loopEngineeringCanvasCss = readFileSync(
+  join(process.cwd(), "frontend/src/orchestration/configure/LoopEngineeringCanvas.css"),
+  "utf8",
+);
 
 describe("Loop Engineering space canvas", () => {
   it("projects State and selected Action order deterministically", () => {
@@ -120,6 +127,12 @@ describe("Loop Engineering space canvas", () => {
     });
     const first = projection.actions[0]!;
     expect(projection.edges.find(({ id }) => id === "state:state-1:actions")?.points.at(-1)).toEqual({ x: first.x, y: first.y - first.size / 2 - 4 });
+  });
+
+  it("centers the Action artwork inside its projected edge-anchor hitbox", () => {
+    expect(loopEngineeringCanvasCss).toMatch(
+      /\.loop-engineering-action\s*\{[^}]*display:\s*grid;[^}]*place-items:\s*center;/s,
+    );
   });
 });
 
