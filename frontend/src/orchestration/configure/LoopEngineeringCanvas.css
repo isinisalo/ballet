@@ -93,11 +93,10 @@
 .loop-engineering-state-label code { overflow: hidden; color: var(--muted-foreground); font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
 
 .loop-engineering-action {
-  display: grid;
-  width: 160px;
-  min-height: 132px;
-  place-items: center;
-  padding: .5rem;
+  display: block;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
   transform: translate(-50%, -50%);
 }
 
@@ -135,7 +134,7 @@
     0 0 6px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
-.loop-engineering-action-label { display: block; width: 150px; margin-top: .5rem; overflow: hidden; color: var(--muted-foreground); font-family: var(--font-mono); font-size: .58rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.loop-engineering-action-label { position: absolute; top: calc(100% + .5rem); left: 50%; display: block; width: 150px; overflow: hidden; transform: translateX(-50%); color: var(--muted-foreground); font-family: var(--font-mono); font-size: .58rem; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .loop-engineering-action[data-selected="true"] .loop-engineering-planet { box-shadow: 0 0 0 3px var(--primary), 0 0 18px color-mix(in srgb, var(--primary) 42%, transparent); }
 .loop-engineering-state:focus-visible,
 .loop-engineering-action:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: var(--radius-sm); }

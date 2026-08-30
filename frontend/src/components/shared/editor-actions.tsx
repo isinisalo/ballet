@@ -12,10 +12,11 @@ type DeleteActionProps = {
   onDelete: () => unknown | Promise<unknown>;
 };
 
-type EditorActionState = "pending" | "invalid" | "dirty" | "saved";
+type EditorActionState = "pending" | "locked" | "invalid" | "dirty" | "saved";
 
 const editorActionStateLabel: Record<EditorActionState, string> = {
   pending: "Saving…",
+  locked: "Locked by active Run",
   invalid: "Invalid",
   dirty: "Unsaved",
   saved: "Saved"
@@ -23,13 +24,15 @@ const editorActionStateLabel: Record<EditorActionState, string> = {
 
 const editorActionStateClass: Record<EditorActionState, string> = {
   pending: "text-primary",
+  locked: "text-tertiary",
   invalid: "text-destructive",
   dirty: "text-tertiary",
   saved: "text-muted-foreground"
 };
 
-function resolveEditorActionState({ pending, valid, dirty }: { pending: boolean; valid: boolean; dirty: boolean }): EditorActionState {
+function resolveEditorActionState({ pending, locked, valid, dirty }: { pending: boolean; locked: boolean; valid: boolean; dirty: boolean }): EditorActionState {
   if (pending) return "pending";
+  if (locked) return "locked";
   if (!valid) return "invalid";
   return dirty ? "dirty" : "saved";
 }
@@ -73,6 +76,7 @@ export function EditorActions({
   dirty = true,
   valid = true,
   pending = false,
+  locked = false,
   deleteLabel = "Delete",
   deleteType = "item",
   resourceName,
@@ -85,14 +89,15 @@ export function EditorActions({
   dirty?: boolean;
   valid?: boolean;
   pending?: boolean;
+  locked?: boolean;
   deleteLabel?: string;
   deleteType?: string;
   resourceName?: string;
   canDelete?: boolean;
   onDelete?: () => unknown | Promise<unknown>;
 }) {
-  const saveDisabled = pending || !dirty || !valid;
-  const state = resolveEditorActionState({ pending, valid, dirty });
+  const saveDisabled = pending || locked || !dirty || !valid;
+  const state = resolveEditorActionState({ pending, locked, valid, dirty });
 
   return (
     <div className="flex items-center justify-end gap-2" data-slot="editor-actions" data-state={state}>

@@ -7,15 +7,17 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { DeleteAction } from "@/components/shared/editor-actions";
 import { cn } from "@/lib/utils";
 
-export function SortableIdList({ ariaLabel, itemLabel, ids, disabled = false, onOpen, onReorder }: {
+export function SortableIdList({ ariaLabel, itemLabel, ids, disabled = false, onOpen, onReorder, onDelete }: {
   ariaLabel: string;
   itemLabel: "State" | "Action";
   ids: string[];
   disabled?: boolean;
   onOpen(id: string): void;
   onReorder(ids: string[]): Promise<boolean>;
+  onDelete?(id: string): Promise<void>;
 }) {
   const [orderedIds, setOrderedIds] = useState(ids);
   const [pending, setPending] = useState(false);
@@ -53,15 +55,16 @@ export function SortableIdList({ ariaLabel, itemLabel, ids, disabled = false, on
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void finish(event)}>
       <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
         <ol aria-label={ariaLabel} className="space-y-1.5">
-          {orderedIds.map((id) => <SortableIdRow key={id} id={id} itemLabel={itemLabel} disabled={disabled || pending} onOpen={onOpen} onKeyboardMove={moveWithKeyboard} />)}
+          {orderedIds.map((id) => <SortableIdRow key={id} id={id} itemLabel={itemLabel} disabled={disabled || pending} onOpen={onOpen} onKeyboardMove={moveWithKeyboard} onDelete={onDelete} />)}
         </ol>
       </SortableContext>
     </DndContext>
   </>;
 }
 
-function SortableIdRow({ id, itemLabel, disabled, onOpen, onKeyboardMove }: {
+function SortableIdRow({ id, itemLabel, disabled, onOpen, onKeyboardMove, onDelete }: {
   id: string; itemLabel: "State" | "Action"; disabled: boolean; onOpen(id: string): void; onKeyboardMove(id: string, delta: -1 | 1): void;
+  onDelete?(id: string): Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -78,5 +81,6 @@ function SortableIdRow({ id, itemLabel, disabled, onOpen, onKeyboardMove }: {
     </Button>
     <button type="button" className="min-h-10 min-w-0 flex-1 truncate px-2 text-left font-mono text-xs text-tertiary outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       aria-label={`Open ${itemLabel} ${id}`} onClick={() => onOpen(id)}>{id}</button>
+    {itemLabel === "Action" && onDelete ? <DeleteAction deleteLabel={`Delete Action ${id}`} deleteType="Action" resourceName={id} disabled={disabled} onDelete={() => onDelete(id)} /> : null}
   </li>;
 }

@@ -28,7 +28,7 @@ export function LoopEngineeringCanvas({ environment, selectedStateId, selectedAc
           <span className="loop-engineering-state-icon"><StateRouteArtwork /></span>
           <span className="loop-engineering-state-label"><small>STATE {state.order}</small><strong>{state.name}</strong><code>{state.id}</code></span>
         </button>)}
-        {projection.actions.map((action) => <button key={action.id} type="button" className="loop-engineering-action" data-selected={action.selected ? "true" : "false"} aria-pressed={action.selected} aria-label={`Open Action ${action.id}: ${action.name}`} style={{ left: action.x, top: action.y }} onClick={() => selectedStateId && navigate(orchestrationActionPath(selectedStateId, action.id))} onDoubleClick={() => selectedStateId && onActionFlowOpen?.(selectedStateId, action.id)}>
+        {projection.actions.map((action) => <button key={action.id} type="button" className="loop-engineering-action" data-selected={action.selected ? "true" : "false"} aria-pressed={action.selected} aria-label={`Open Action ${action.id}: ${action.name}`} style={{ left: action.x, top: action.y, width: action.size, height: action.size }} onClick={() => selectedStateId && navigate(orchestrationActionPath(selectedStateId, action.id))} onDoubleClick={() => selectedStateId && onActionFlowOpen?.(selectedStateId, action.id)}>
           <ActionPlanetArtwork artwork={action.artwork} size={action.size} />
           <code className="loop-engineering-action-label">{action.id}</code>
         </button>)}

@@ -85,6 +85,19 @@ describe("Loop Engineering space canvas", () => {
     await user.dblClick(action);
     expect(openFlow).toHaveBeenCalledWith("state-1", "action-2");
   });
+
+  it("aligns every rendered Action planet and edge on the same projected center", () => {
+    const environment = environmentWithActions(3);
+    const projection = projectLoopEngineering(environment, "state-1");
+    render(<LoopEngineeringCanvas environment={environment} selectedStateId="state-1" navigate={vi.fn()} />);
+    projection.actions.forEach((node) => {
+      expect(screen.getByRole("button", { name: `Open Action ${node.id}: ${node.name}` })).toHaveStyle({
+        left: `${node.x}px`, top: `${node.y}px`, width: `${node.size}px`, height: `${node.size}px`,
+      });
+    });
+    const first = projection.actions[0]!;
+    expect(projection.edges.find(({ id }) => id === "state:state-1:actions")?.points.at(-1)).toEqual({ x: first.x, y: first.y });
+  });
 });
 
 describe("industrial Validation-led Action flow", () => {
