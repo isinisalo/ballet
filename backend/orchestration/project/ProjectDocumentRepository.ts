@@ -14,6 +14,7 @@ const COLLECTIONS: Record<ProjectDocumentKind, string> = {
   agent: "agents", instruction: "instructions", skill: "../.agents/skills"
 };
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
+const SAFE_SKILL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}(?:\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,127})*$/;
 
 export interface ProjectDocument { kind: ProjectDocumentKind; id: string; content: string; contentHash: string }
 
@@ -30,9 +31,7 @@ export class ProjectDocumentRepository {
     if (!metadata) return [];
     assertOrdinaryDirectory(metadata, directory);
     const ids = kind === "skill"
-      ? readdirSync(directory, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink() && status(path.join(directory, entry.name, "SKILL.md"))?.isFile())
-        .map((entry) => entry.name)
+      ? listSkillIds(directory)
       : readdirSync(directory, { withFileTypes: true })
         .filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".md"))
         .map((entry) => documentId(path.join(directory, entry.name), entry.name.slice(0, -3)));
@@ -96,9 +95,9 @@ export class ProjectDocumentRepository {
   }
 
   private filename(kind: ProjectDocumentKind, id: string): string {
-    if (!SAFE_ID.test(id)) throw new ConflictError("Document id contains unsafe path characters.");
+    if (!(kind === "skill" ? SAFE_SKILL_ID : SAFE_ID).test(id)) throw new ConflictError("Document id contains unsafe path characters.");
     const directory = this.collectionPath(kind);
-    if (kind === "skill") return path.join(directory, id, "SKILL.md");
+    if (kind === "skill") return path.join(directory, ...id.split("/"), "SKILL.md");
     const matching = status(directory)?.isDirectory() ? readdirSync(directory, { withFileTypes: true })
       .find((entry) => entry.isFile() && entry.name.endsWith(".md")
         && documentId(path.join(directory, entry.name), entry.name.slice(0, -3)) === id) : undefined;
@@ -127,6 +126,20 @@ const snapshotContains = (snapshot: unknown, kind: ProjectDocumentKind, id: stri
   if (kind === "use-case") return value.approvedUseCases?.some((item) => item.useCase.id === id) ?? false;
   if (kind === "agent") return (value as { agents?: Array<{ id: string }> }).agents?.some((item) => item.id === id) ?? false;
   return value.resources?.some((item) => item.kind === kind && item.id === id) ?? false;
+};
+
+const listSkillIds = (root: string, relative = ""): string[] => {
+  const directory = relative ? path.join(root, ...relative.split("/")) : root;
+  const entries = readdirSync(directory, { withFileTypes: true });
+  const ids: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    const id = relative ? `${relative}/${entry.name}` : entry.name;
+    const skill = status(path.join(root, ...id.split("/"), "SKILL.md"));
+    if (skill?.isFile() && !skill.isSymbolicLink()) ids.push(id);
+    ids.push(...listSkillIds(root, id));
+  }
+  return ids;
 };
 
 const documentId = (filename: string, fallback: string): string => {

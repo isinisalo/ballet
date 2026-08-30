@@ -1,9 +1,9 @@
 import type { ContractIssue } from "@shared/orchestration/primitives";
-import type { ProjectConfigurationV21 } from "@shared/orchestration/environment";
+import type { ProjectConfigurationV22 } from "@shared/orchestration/environment";
 
 export interface ProjectRecord {
   path: string;
-  config: ProjectConfigurationV21;
+  config: ProjectConfigurationV22;
   configHash: string;
 }
 
@@ -28,7 +28,7 @@ export interface ReferenceIndexResponse {
 }
 
 export interface EnvironmentResponse {
-  environment: ProjectConfigurationV21["environment"];
+  environment: ProjectConfigurationV22["environment"];
   configHash: string;
   readinessIssues: ContractIssue[];
   activeRunIds: string[];

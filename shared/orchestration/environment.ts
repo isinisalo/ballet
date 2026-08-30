@@ -19,15 +19,19 @@ export interface AgentComposition {
   skillResources: string[];
 }
 
+export interface ActionRoleComposition {
+  instructionResource: string;
+  skillResources: string[];
+}
+
 export interface ActionDefinition {
   id: string;
   name: string;
   description: string;
   priority: number;
-  useCaseIds: string[];
   maxRetries: number;
-  validation: AgentComposition;
-  work: AgentComposition;
+  validation: ActionRoleComposition;
+  work: ActionRoleComposition;
   input?: JsonValue;
 }
 
@@ -70,7 +74,7 @@ export interface RefinementConfiguration {
   allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"];
 }
 
-export interface ProjectConfigurationV21 {
+export interface ProjectConfigurationV22 {
   version: typeof PROJECT_CONFIG_VERSION;
   direction: Direction;
   agents: AgentDefinition[];

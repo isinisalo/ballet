@@ -1,5 +1,6 @@
 import type { AgentDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
+import type { ActionExecutionRole, ActionRoleExecutionBinding, AgentExecutionBinding } from "../../../shared/domain/runtime.js";
+import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import type { LocalDaemonStore } from "../persistence/LocalDaemonStore.js";
@@ -12,9 +13,19 @@ const EXECUTION_TIMEOUT_MS = 30 * 60_000;
 export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimeProvider, OrchestrationProviderPreflightPort {
   constructor(private readonly daemon: LocalDaemonStore) {}
 
-  async inspect(agent: AgentDefinition): Promise<RuntimeCapabilitySnapshot> {
+  async inspectAgent(agent: AgentDefinition): Promise<RuntimeCapabilitySnapshot> {
     const binding = this.daemon.binding(agent.id);
     if (!binding) throw new Error(`Agent ${agent.id} has no local execution binding.`);
+    return this.inspectBinding({ kind: "agent", agentId: agent.id }, binding);
+  }
+
+  async inspectActionRole(actionId: string, role: ActionExecutionRole): Promise<RuntimeCapabilitySnapshot> {
+    const binding = this.daemon.actionRoleBinding(actionId, role);
+    if (!binding) throw new Error(`Action ${actionId} ${role} has no local execution binding.`);
+    return this.inspectBinding({ kind: "action_role", actionId, role }, binding);
+  }
+
+  private async inspectBinding(subject: RuntimeCapabilitySnapshot["subject"], binding: AgentExecutionBinding | ActionRoleExecutionBinding): Promise<RuntimeCapabilitySnapshot> {
     const status = this.daemon.status();
     if (status.status !== "online") throw new Error(`Local daemon is ${status.status}.`);
     const provider = status.providers.find((candidate) => candidate.provider === binding.provider);
@@ -30,7 +41,7 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
     const supportedReasoningEfforts = [...new Set(provider.capabilities.models
       .flatMap(({ reasoningOptions }) => reasoningOptions))].sort();
     const content = {
-      agentId: agent.id, provider: binding.provider, model: binding.model,
+      subject, provider: binding.provider, model: binding.model,
       reasoningEffort: binding.reasoningEffort, networkAccess: binding.policy.network,
       readOnlyRoots: binding.policy.readOnlyRoots, cliVersion: provider.cliVersion,
       supportedModels, supportedReasoningEfforts, supportsReadOnly: true,
@@ -39,7 +50,7 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
     return { ...content, capabilitySha256: hash(content) };
   }
 
-  async execute(spec: ExecutionSpecV14, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
+  async execute(spec: ExecutionSpecV15, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
     if (permissions.provider !== spec.runtime.provider
       || permissions.networkAccess !== spec.permissions.networkAccess
       || permissions.approvalPolicy !== spec.permissions.approvalPolicy) {

@@ -1,9 +1,9 @@
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
-import type { ActionDefinition, AgentDefinition, EnvironmentDefinition, ProjectConfigurationV21, StateDefinition } from "@shared/orchestration/environment";
+import type { ActionDefinition, AgentDefinition, EnvironmentDefinition, ProjectConfigurationV22, StateDefinition } from "@shared/orchestration/environment";
 import type { ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
-import type { AgentExecutionBinding, ExecutionPolicy, LocalDaemonLogEntry, LocalDaemonStatus, RuntimeProvider } from "@shared/domain/runtime";
+import type { ActionExecutionRole, ActionRoleExecutionBinding, AgentExecutionBinding, ExecutionPolicy, LocalDaemonLogEntry, LocalDaemonStatus, RuntimeProvider } from "@shared/domain/runtime";
 
 const base = "/api";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -15,7 +15,7 @@ export const orchestrationApi = {
   references: () => request<ReferenceIndexResponse>(`${base}/reference-index`),
   resources: (collection: "goals" | "adrs" | "constraints" | "use-cases" | "agents" | "instructions" | "skills") => request<ResourceDocument[]>(`${base}/${collection}`),
   schedules: () => request<Array<Record<string, unknown>>>(`${base}/critic/schedules`),
-  putProject: (config: ProjectConfigurationV21, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
+  putProject: (config: ProjectConfigurationV22, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
   saveDirection: (collection: "goals" | "adrs" | "constraints" | "use-cases", value: DirectionReference | Constraint | UseCase,
     markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {
@@ -36,6 +36,11 @@ export const orchestrationApi = {
   agentBinding: (id: string) => request<AgentExecutionBinding | null>(`${base}/agents/${encodeURIComponent(id)}/execution`),
   saveAgentBinding: (id: string, input: { provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy }) =>
     request<AgentExecutionBinding>(`${base}/agents/${encodeURIComponent(id)}/execution`, put(input)),
+  actionRoleBinding: (stateId: string, actionId: string, role: ActionExecutionRole) =>
+    request<ActionRoleExecutionBinding | null>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution/${role}`),
+  saveActionRoleBinding: (stateId: string, actionId: string, role: ActionExecutionRole,
+    input: { provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy }) =>
+    request<ActionRoleExecutionBinding>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution/${role}`, put(input)),
   approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(
     `${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash, expectedContentHash })),
   returnUseCaseToDraft: (id: string, expectedConfigHash: string) => request(`${base}/use-cases/${encodeURIComponent(id)}/return-to-draft`, body({ expectedConfigHash })),

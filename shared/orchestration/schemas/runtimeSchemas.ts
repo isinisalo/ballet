@@ -4,7 +4,7 @@ import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchem
 import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
 import { agentCompositionSchema, agentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
-export const rootSnapshotV15Schema = z.object({
+export const rootSnapshotV16Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
@@ -20,7 +20,11 @@ export const rootSnapshotV15Schema = z.object({
   }).strict(),
   agents: z.array(agentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()),
   runtimeCapabilities: z.array(z.object({
-    agentId: idSchema,
+    subject: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("action_role"), actionId: idSchema,
+        role: z.enum(["validation", "work"]) }).strict(),
+      z.object({ kind: z.literal("agent"), agentId: idSchema }).strict()
+    ]),
     provider: z.enum(["codex", "copilot"]),
     model: z.string().trim().min(1),
     reasoningEffort: z.string().trim().min(1),
@@ -54,7 +58,7 @@ export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV15Schema,
+  snapshot: rootSnapshotV16Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

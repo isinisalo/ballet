@@ -36,8 +36,8 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 
 | Path | Ownership |
 | --- | --- |
-| `.ballet/project.json` | strict Project Config v21: Direction, Agents, Environment and governance composition |
-| `.ballet/agents/**` | Markdown Agent definitions and stable resource ownership |
+| `.ballet/project.json` | strict Project Config v22: Direction, Environment Action compositions and governance composition |
+| `.ballet/agents/**` | Markdown Agent definitions for Critic and Refinement governance |
 | `.ballet/goals/**` | human WHAT/WHY |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
 | `.ballet/constraints/**` | required and prohibited operating boundaries |
@@ -45,7 +45,7 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 | `.ballet/instructions/**` | selected role instructions |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v18, checkout-daemon config/token/status, service logs and server-owned managed worktrees |
+| `.git/ballet/**` | machine-local SQLite v19, Action-role and governance Agent bindings, checkout-daemon state, logs and server-owned worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
@@ -55,7 +55,7 @@ This abbreviated example shows the ownership boundary; the repository default co
 
 ```json
 {
-  "version": 21,
+  "version": 22,
   "direction": {
     "goals": [{ "id": "goal-022", "name": "Human-directed orchestration", "status": "accepted" }],
     "adrs": [{ "id": "adr-034", "name": "Validation-led Environment", "status": "accepted" }],
@@ -75,18 +75,11 @@ This abbreviated example shows the ownership boundary; the repository default co
     }]
   },
   "agents": [{
-    "id": "validation",
-    "name": "Validation",
-    "description": "Read-only controller",
+    "id": "critic",
+    "name": "Critic",
+    "description": "Read-only governance reviewer",
     "enabled": true,
     "instructionResource": "environment-validation",
-    "skillResources": ["test-evidence-verification"]
-  }, {
-    "id": "work",
-    "name": "Work",
-    "description": "Bounded workspace implementation",
-    "enabled": true,
-    "instructionResource": "environment-work",
     "skillResources": ["test-evidence-verification"]
   }],
   "environment": {
@@ -104,25 +97,24 @@ This abbreviated example shows the ownership boundary; the repository default co
         "name": "Check evidence",
         "description": "Run exact accepted checks",
         "priority": 1,
-        "useCaseIds": ["UC-07"],
         "maxRetries": 1,
-        "validation": { "agentId": "validation", "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification"] },
-        "work": { "agentId": "work", "instructionResource": "environment-work", "skillResources": ["test-evidence-verification"] }
+        "validation": { "instructionResource": "environment-validation", "skillResources": ["test-evidence-verification"] },
+        "work": { "instructionResource": "environment-work", "skillResources": ["test-evidence-verification"] }
       }]
     }]
   }
 }
 ```
 
-The complete strict shape also requires Markdown-backed Agents, disabled-by-default Critic configuration and Refinement configuration. Provider, model and reasoning selection belong to the machine-local Agent-to-daemon binding, not Project Config. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
+The complete strict shape also requires Markdown-backed governance Agents, disabled-by-default Critic configuration and Refinement configuration. Validation/Work provider, model, reasoning and policy selection belong to the machine-local `actionId + role` binding, not Project Config. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
 
 ## Use Case approval
 
-Saving a draft is not approval. The human approval command binds the canonical semantic content to a SHA-256 and revision. Only valid approved Use Cases referenced by a State and Action are runnable. A semantic edit invalidates the approval and returns the Use Case to draft; an agent task cannot call the approval boundary.
+Saving a draft is not approval. The human approval command binds the canonical semantic content to a SHA-256 and revision. Only valid approved Use Cases referenced by a State are runnable; every Action in that State inherits the full approved closure. A semantic edit invalidates the approval and returns the Use Case to draft; an agent task cannot call the approval boundary.
 
 ## Environment authoring
 
-Author one Environment as dependency-ordered States. Keep each Action small enough for independent Validation, bind it to approved Use Cases, set a bounded `maxRetries`, and select one Validation and one Work composition. Instructions must contain Task, Role, Goals, Priorities, Method, Output contract, Tool policy and Acceptance evidence sections in that order.
+Author one Environment as dependency-ordered States. Bind approved Use Cases to the State, keep each Action small enough for independent Validation, set a bounded `maxRetries`, and select one Validation and one Work composition. Instructions must contain Task, Role, Goals, Priorities, Method, Output contract, Tool policy and Acceptance evidence sections in that order.
 
 The default project demonstrates:
 
@@ -163,7 +155,7 @@ JSON commands and projections live under canonical `/api/*` routes and SSE uses 
 
 ## Strict local state
 
-The active matrix is Project Config v21, Root Snapshot v15, Task Envelope and role outcome v11, prompt composition v12, ExecutionSpec v14 and SQLite v18. Feedback, Critic, Refinement and Agent/daemon binding are v2; Run Evidence is v1. Older local databases and control-plane state are intentionally unsupported: stop the service, archive or remove the incompatible `.git/ballet` state, and start fresh. There is no migration or compatibility reader.
+The active matrix is Project Config v22, Root Snapshot v16, Task Envelope and role outcome v11, prompt composition v13, ExecutionSpec v15 and SQLite v19. Feedback, Critic and Refinement are v2; Action-role binding is v1, governance Agent binding is v2 and Run Evidence is v1. Older local databases and control-plane state are intentionally unsupported: stop the service, archive or remove the incompatible `.git/ballet` state, and start fresh. There is no migration or compatibility reader.
 
 ## Verification
 

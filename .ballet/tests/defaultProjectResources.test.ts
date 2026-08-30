@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.js";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.js";
-import { projectConfigurationV21Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV22Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
@@ -24,7 +24,7 @@ const walk = (directory: string): string[] => readdirSync(directory).flatMap((en
 
 describe("canonical default project resources", () => {
   test("loads a runnable five-State Environment with 13 exact approved Use Cases", () => {
-    const project = projectConfigurationV21Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV22Schema.parse(load(".ballet/project.json"));
     expect(project.direction.useCases.map(({ id }) => id)).toEqual(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
     expect(project.direction.useCases.every(({ status }) => status === "approved")).toBe(true);
     expect(project.direction.useCases.every((useCase) => useCase.approval?.contentHash === useCaseApprovalHash(useCase))).toBe(true);
@@ -34,7 +34,7 @@ describe("canonical default project resources", () => {
   });
 
   test("keeps Use Case documents identical to the approved semantic values and hashes", () => {
-    const project = projectConfigurationV21Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV22Schema.parse(load(".ballet/project.json"));
     for (const useCase of project.direction.useCases) {
       const document = markdownFrontmatter(`.ballet/use-cases/${useCase.id}.md`);
       expect(document.frontmatter).toMatchObject({ id: useCase.id, title: useCase.name, status: useCase.status, approval: useCase.approval });
@@ -46,7 +46,7 @@ describe("canonical default project resources", () => {
   });
 
   test("resolves every selected instruction and Skill with no orphan runtime resource", () => {
-    const project = projectConfigurationV21Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV22Schema.parse(load(".ballet/project.json"));
     const agents = [project.critic.agent, project.refinement.agent,
       ...project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]))];
     const instructionIds = new Set(agents.map(({ instructionResource }) => instructionResource));
@@ -64,8 +64,8 @@ describe("canonical default project resources", () => {
   });
 
   test("uses Markdown-backed Agents and a disabled valid Critic schedule", () => {
-    const project = projectConfigurationV21Schema.parse(load(".ballet/project.json"));
-    expect(project.agents).toHaveLength(4);
+    const project = projectConfigurationV22Schema.parse(load(".ballet/project.json"));
+    expect(project.agents).toHaveLength(2);
     expect(project.agents.every(({ enabled }) => enabled)).toBe(true);
     for (const agent of project.agents) {
       const document = markdownFrontmatter(`.ballet/agents/${agent.id}.md`);
@@ -78,7 +78,7 @@ describe("canonical default project resources", () => {
   });
 
   test("loads the compact fixture as a runnable two-State multi-Action project", () => {
-    const fixture = projectConfigurationV21Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
+    const fixture = projectConfigurationV22Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
     expect(fixture.environment.states).toHaveLength(2);
     expect(fixture.environment.states.flatMap(({ actions }) => actions)).toHaveLength(3);
     expect(fixture.direction.useCases).toHaveLength(2);

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { approveUseCase, type UseCase } from "../../../shared/orchestration/direction.js";
-import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import { EnvironmentRunPlanner, type ProjectDefinition } from "./EnvironmentRunPlanner.js";
@@ -10,10 +10,11 @@ describe("EnvironmentRunPlanner immutable closure", () => {
   test("resolves approved direction, resources, capabilities, permissions and canonical snapshot", async () => {
     const project = definition();
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
-      inspect: async () => capability()
+      inspectAgent: async (agent) => capability({ kind: "agent", agentId: agent.id }),
+      inspectActionRole: async (actionId, role) => capability({ kind: "action_role", actionId, role })
     }, () => "2026-08-29T10:00:00.000Z");
     const result = await planner.plan();
-    expect(result.snapshot).toMatchObject({ version: 15, projectHeadSha: "a".repeat(40) });
+    expect(result.snapshot).toMatchObject({ version: 16, projectHeadSha: "a".repeat(40) });
     expect(result.snapshot.approvedUseCases).toHaveLength(1);
     expect(result.snapshot.resources.map(({ kind }) => kind)).toEqual(["instruction", "skill"]);
     expect(result.snapshot.permissions.find(({ role }) => role === "validation")?.toolPolicy).toBe("read_only");
@@ -24,14 +25,18 @@ describe("EnvironmentRunPlanner immutable closure", () => {
   test("fails before provider work on missing resource or invalid instruction sections", async () => {
     const project = definition();
     project.resources = project.resources.filter(({ kind }) => kind !== "skill");
-    const planner = new EnvironmentRunPlanner({ load: async () => project }, { inspect: async () => capability() }, () => new Date().toISOString());
+    const planner = new EnvironmentRunPlanner({ load: async () => project }, {
+      inspectAgent: async (agent) => capability({ kind: "agent", agentId: agent.id }),
+      inspectActionRole: async (actionId, role) => capability({ kind: "action_role", actionId, role })
+    }, () => new Date().toISOString());
     await expect(planner.plan()).rejects.toThrow(/Missing skill/);
   });
 
   test("fails closed on model capability mismatch", async () => {
     const project = definition();
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
-      inspect: async () => ({ ...capability(), supportedModels: ["different-model"] })
+      inspectAgent: async (agent) => ({ ...capability({ kind: "agent", agentId: agent.id }), supportedModels: ["different-model"] }),
+      inspectActionRole: async (actionId, role) => capability({ kind: "action_role", actionId, role })
     }, () => new Date().toISOString());
     await expect(planner.plan()).rejects.toThrow(/not supported/);
   });
@@ -59,9 +64,10 @@ const definition = (): ProjectDefinition => {
     goalIds: ["goal-1"], adrIds: ["adr-1"], constraintIds: ["constraint-1"]
   };
   const useCase = approveUseCase(draft, { approvedBy: "human-1", approvedAt: "2026-08-29T09:00:00.000Z", revision: 1 });
-  const agent = () => ({ agentId: "profile-1", instructionResource: "action-instruction", skillResources: ["skill-1"] });
-  const config: ProjectConfigurationV21 = {
-    version: 21,
+  const actionRole = () => ({ instructionResource: "action-instruction", skillResources: ["skill-1"] });
+  const agent = () => ({ agentId: "profile-1", ...actionRole() });
+  const config: ProjectConfigurationV22 = {
+    version: 22,
     direction: {
       goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
       adrs: [{ id: "adr-1", name: "ADR", status: "accepted" }],
@@ -75,8 +81,8 @@ const definition = (): ProjectDefinition => {
     environment: {
       id: "environment-1", name: "Environment", description: "Ordered environment", states: [{
         id: "state-1", name: "State", description: "First State", order: 1, useCaseIds: ["UC-1"], actions: [{
-          id: "action-1", name: "Action", description: "First Action", priority: 1, useCaseIds: ["UC-1"], maxRetries: 1,
-          validation: agent(), work: agent()
+          id: "action-1", name: "Action", description: "First Action", priority: 1, maxRetries: 1,
+          validation: actionRole(), work: actionRole()
         }]
       }]
     },
@@ -97,9 +103,9 @@ const definition = (): ProjectDefinition => {
     ]
   };
 };
-const capability = (): RuntimeCapabilitySnapshot => {
+const capability = (subject: RuntimeCapabilitySnapshot["subject"]): RuntimeCapabilitySnapshot => {
   const value = {
-    agentId: "profile-1",
+    subject,
     provider: "codex" as const, model: "gpt-test", reasoningEffort: "high", networkAccess: false,
     readOnlyRoots: [], cliVersion: "1.0.0", supportedModels: ["gpt-test"],
     supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true

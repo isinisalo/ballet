@@ -7,7 +7,7 @@ export const executionSchema = `
     role TEXT NOT NULL CHECK (role IN ('validation','work','critic','refinement')),
     kind TEXT NOT NULL CHECK (kind = 'agent_execution'),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','succeeded','failed','cancelled')),
-    spec_version INTEGER NOT NULL CHECK (spec_version = 14),
+    spec_version INTEGER NOT NULL CHECK (spec_version = 15),
     spec_json TEXT NOT NULL,
     spec_hash TEXT NOT NULL,
     provider_outcome_key TEXT UNIQUE,
@@ -36,6 +36,19 @@ export const executionSchema = `
     network_access INTEGER NOT NULL CHECK (network_access IN (0,1)),
     read_only_roots_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE action_role_execution_bindings (
+    action_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('validation','work')),
+    version INTEGER NOT NULL CHECK (version = 1),
+    provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
+    model TEXT NOT NULL,
+    reasoning_effort TEXT NOT NULL,
+    network_access INTEGER NOT NULL CHECK (network_access IN (0,1)),
+    read_only_roots_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (action_id, role)
   );
 
   CREATE TABLE local_daemon_state (

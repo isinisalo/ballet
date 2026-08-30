@@ -49,7 +49,7 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     context.root, path.join(context.worktreesRoot, "environment"), (kind) => `${kind}:${randomUUID()}`
   );
   const composition = await createCompositionRoot({
-    context, provider,
+    context, provider, actionBindings: daemonStore,
     environmentWorkspace,
     environmentFinalizer: environmentWorkspace
   });
@@ -70,7 +70,9 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
   app.use("/api", createLocalDaemonRouter({ store: daemonStore, token: daemonConfig.token,
-    listAgentIds: () => currentComposition().project.projects.load().config.agents.map(({ id }) => id) }));
+    listAgentIds: () => currentComposition().project.projects.load().config.agents.map(({ id }) => id),
+    actionExists: (stateId, actionId) => currentComposition().project.projects.load().config.environment.states
+      .some((state) => state.id === stateId && state.actions.some((action) => action.id === actionId)) }));
   app.use("/api", composition.router);
 
   const clientDist = resolveClientDist(options.webDist);

@@ -1,12 +1,12 @@
-import type { ActionDefinition, AgentComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
+import type { ActionDefinition, ActionRoleComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV15 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV16 } from "../../../shared/orchestration/runtime.js";
 
 export interface BoundedTaskContextInput {
-  snapshot: RootSnapshotV15;
+  snapshot: RootSnapshotV16;
   state?: StateDefinition;
   action?: ActionDefinition;
-  composition: AgentComposition;
+  composition: ActionRoleComposition;
   actionStatus?: string;
   workAttempt?: number;
   maxRetries?: number;
@@ -18,7 +18,7 @@ export interface BoundedTaskContextInput {
 }
 
 export const buildBoundedTaskContext = (input: BoundedTaskContextInput): JsonValue => {
-  const useCaseIds = new Set([...(input.state?.useCaseIds ?? []), ...(input.action?.useCaseIds ?? [])]);
+  const useCaseIds = new Set(input.state?.useCaseIds ?? []);
   const useCases = input.snapshot.approvedUseCases.filter(({ useCase }) => useCaseIds.has(useCase.id));
   const goalIds = new Set(useCases.flatMap(({ useCase }) => useCase.goalIds));
   const adrIds = new Set(useCases.flatMap(({ useCase }) => useCase.adrIds));

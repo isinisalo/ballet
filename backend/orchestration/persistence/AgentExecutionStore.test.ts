@@ -51,27 +51,24 @@ const setup = () => {
   outcomes.createPrecheck(action.actionExecutionId, action.revision, agentInput);
   const prompt = "Validate the Action";
   const spec = {
-    version: 14 as const,
+    version: 15 as const,
     taskId: "execution-task-1",
     kind: "agent_execution" as const,
     environmentRunId: "run-1",
     actionExecutionId: "action-execution-1",
     agentRunId: "precheck-1",
     evidence: {
-      compositionVersion: 12 as const,
+      compositionVersion: 13 as const,
       role: "validation" as const,
       phase: "precheck" as const,
-      agent: {
-        id: "profile", name: "Agent", description: "Test Agent", enabled: true,
-        instructionResource: "instruction", skillResources: []
-      },
+      subject: { kind: "action_role" as const, actionId: "action-1", role: "validation" as const },
       resources: [], prompt, promptSha256: sha256(prompt),
       taskEnvelopeVersion: 11 as const, taskEnvelopeSha256: agentInput.taskEnvelopeHash,
       outputSchemaVersion: 11 as const, outputSchemaId: "validation-outcome-v11" as const,
       outputSchemaSha256: HASH_A
     },
     runtime: {
-      agentId: "profile",
+      subject: { kind: "action_role" as const, actionId: "action-1", role: "validation" as const },
       provider: "codex" as const, cliVersion: "1.0.0", model: "gpt",
       reasoningEffort: "high", capabilityHash: HASH_A
     },

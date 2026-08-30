@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LocalDaemonTaskClaim } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
 import { FakeCliRuntimeAdapter } from "../providers/FakeCliRuntimeAdapter.js";
 import type { LocalDaemonTransport } from "../transport/LocalDaemonTransport.js";
 import { LeaseAwareJobRunner } from "./LeaseAwareJobRunner.js";
@@ -34,17 +34,16 @@ const taskClaim = (): LocalDaemonTaskClaim => ({
   leaseDurationMs: 60_000, renewAfterMs: 20_000, spec: spec(),
   permissions: { workspaceAccess: "read-only", network: false, readOnlyRoots: [] }
 });
-const spec = (): ExecutionSpecV14 => ({
-  version: 14, taskId: "task-1", kind: "agent_execution", environmentRunId: "run-1", agentRunId: "agent-run-1",
+const spec = (): ExecutionSpecV15 => ({
+  version: 15, taskId: "task-1", kind: "agent_execution", environmentRunId: "run-1", agentRunId: "agent-run-1",
   evidence: {
-    compositionVersion: 12, role: "validation", phase: "precheck",
-    agent: { id: "validation", name: "Validation", description: "Controller", enabled: true,
-      instructionResource: "instruction", skillResources: [] },
+    compositionVersion: 13, role: "validation", phase: "precheck",
+    subject: { kind: "action_role", actionId: "action-1", role: "validation" },
     resources: [], prompt: "Inspect.", promptSha256: "a".repeat(64),
     taskEnvelopeVersion: 11, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 11,
     outputSchemaId: "validation-outcome-v11", outputSchemaSha256: "c".repeat(64)
   },
-  runtime: { agentId: "validation", provider: "codex", cliVersion: "999.0.0", model: "gpt",
+  runtime: { subject: { kind: "action_role", actionId: "action-1", role: "validation" }, provider: "codex", cliVersion: "999.0.0", model: "gpt",
     reasoningEffort: "high", capabilityHash: "d".repeat(64) },
   permissions: { workspaceAccess: "read-only", networkAccess: false, readOnlyRoots: [], approvalPolicy: "never" },
   project: { checkoutRoot: "/tmp/ballet-worktree", headSha: "e".repeat(40),

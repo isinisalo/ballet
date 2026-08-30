@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV15, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV16, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -42,10 +42,11 @@ export const openTestDatabase = (): TestDatabase => {
 };
 
 const agent = () => ({ agentId: "profile", instructionResource: "instruction", skillResources: [] });
+const actionRole = () => ({ instructionResource: "instruction", skillResources: [] });
 
 export const actionDefinition = (id: string, priority: number, maxRetries = 1): ActionDefinition => ({
-  id, name: id, description: `${id} description`, priority, useCaseIds: ["UC-1"], maxRetries,
-  validation: agent(), work: agent()
+  id, name: id, description: `${id} description`, priority, maxRetries,
+  validation: actionRole(), work: actionRole()
 });
 
 export const environmentSeed = (options: {
@@ -73,8 +74,8 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV15 = {
-    version: 15, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const snapshot: RootSnapshotV16 = {
+    version: 16, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
@@ -84,11 +85,16 @@ export const environmentSeed = (options: {
       instructionResource: "instruction", skillResources: [], contentSha256: HASH_A
     }],
     runtimeCapabilities: [{
-      agentId: "profile", provider: "codex",
+      subject: { kind: "agent", agentId: "profile" }, provider: "codex",
       model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
       cliVersion: "1.0.0", supportedModels: ["test-model"],
       supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
-    }],
+    }, ...states.flatMap(({ definition }) => definition.actions.flatMap((action) => (["validation", "work"] as const).map((role) => ({
+      subject: { kind: "action_role" as const, actionId: action.id, role }, provider: "codex" as const,
+      model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
+      cliVersion: "1.0.0", supportedModels: ["test-model"], supportedReasoningEfforts: ["high"],
+      supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
+    }))))],
     resources: [{
       kind: "instruction", id: "instruction", relativePath: ".ballet/instructions/test.md",
       content: VALID_INSTRUCTION, sourceSha256: hash(VALID_INSTRUCTION)

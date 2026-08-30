@@ -64,6 +64,18 @@ export interface AgentExecutionBinding {
   updatedAt: string;
 }
 
+export type ActionExecutionRole = "validation" | "work";
+export interface ActionRoleExecutionBinding {
+  version: 1;
+  actionId: string;
+  role: ActionExecutionRole;
+  provider: RuntimeProvider;
+  model: string;
+  reasoningEffort: string;
+  policy: ExecutionPolicy;
+  updatedAt: string;
+}
+
 export type AgentLiveStatus = "running" | "idle" | "busy" | "attention" | "unbound" | "offline";
 export interface AgentExecutionState {
   agentId: string;
@@ -90,7 +102,7 @@ export interface LocalDaemonTaskClaim {
   leaseUntil: string;
   leaseDurationMs: number;
   renewAfterMs: number;
-  spec: import("../orchestration/execution.js").ExecutionSpecV14;
+  spec: import("../orchestration/execution.js").ExecutionSpecV15;
   permissions: { workspaceAccess: WorkspaceAccess; network: boolean; readOnlyRoots: string[] };
 }
 

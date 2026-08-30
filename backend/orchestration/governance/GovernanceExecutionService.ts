@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { AgentComposition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
 import type { CriticOutcome, RefinementOutcome } from "../../../shared/orchestration/outcomes.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
@@ -195,13 +195,15 @@ export class GovernanceExecutionService {
     checkoutRoot: string
   ): string {
     const agentDefinition = run.executionSnapshot.agents.find(({ id }) => id === composition.agentId)!;
-    const capability = run.executionSnapshot.runtimeCapabilities.find(({ agentId }) => agentId === agentDefinition.id)!;
+    const capability = run.executionSnapshot.runtimeCapabilities.find(({ subject }) => subject.kind === "agent" && subject.agentId === agentDefinition.id)!;
     const agentRunId = this.nextId(`${envelope.role}-agent`);
-    const evidence = composeOrchestrationPrompt({ snapshot: run.executionSnapshot, envelope, composition });
-    const spec: ExecutionSpecV14 = {
-      version: 14, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
+    const promptAgent = { ...agentDefinition }; delete (promptAgent as Partial<typeof promptAgent>).contentSha256;
+    const subject = { kind: "agent" as const, agent: promptAgent };
+    const evidence = composeOrchestrationPrompt({ snapshot: run.executionSnapshot, envelope, composition, subject });
+    const spec: ExecutionSpecV15 = {
+      version: 15, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
       agentRunId, evidence,
-      runtime: { agentId: agentDefinition.id, provider: capability.provider,
+      runtime: { subject: { kind: "agent", agentId: agentDefinition.id }, provider: capability.provider,
         cliVersion: capability.cliVersion, model: capability.model,
         reasoningEffort: capability.reasoningEffort,
         capabilityHash: capability.capabilitySha256 },

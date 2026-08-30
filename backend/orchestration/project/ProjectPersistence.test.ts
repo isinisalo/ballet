@@ -73,8 +73,9 @@ describe("canonical project persistence", () => {
     const index = new ProjectReferenceIndex(validProjectConfig());
     expect(index.for("goal", "goal-1")).toContainEqual(expect.objectContaining({ ownerType: "use-case" }));
     expect(index.for("use-case", "UC-1")).toEqual(expect.arrayContaining([
-      expect.objectContaining({ ownerType: "state" }), expect.objectContaining({ ownerType: "action" })
+      expect.objectContaining({ ownerType: "state" })
     ]));
+    expect(index.for("use-case", "UC-1")).not.toContainEqual(expect.objectContaining({ ownerType: "action" }));
     expect(index.for("instruction", "instruction").length).toBeGreaterThanOrEqual(4);
   });
 });

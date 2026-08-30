@@ -3,16 +3,16 @@ id: arc42-section-04
 title: Ratkaisustrategia
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-29'
-version: 20
+updatedAt: '2026-08-30'
+version: 21
 tags: [arc42, solution-strategy]
 arc42Section: 4
 ---
 
 # 4. Ratkaisustrategia
 
-1. Parse strict v21 project truth and close only approved Use Cases with accepted Goals, ADRs, Constraints and Markdown Agents.
-2. Freeze the closure and checkout-local daemon bindings into Root Snapshot v15 before dispatch.
+1. Parse strict v22 project truth and close approved Use Cases only from each owning State with accepted Goals, ADRs and Constraints.
+2. Freeze Action-role execution bindings and governance Agent bindings into Root Snapshot v16 before dispatch.
 3. Select the lowest eligible State order and Action priority transactionally.
 4. Let Validation precheck, delegate dynamic Work and postcheck every Work result.
 5. Persist state changes and causal Feedback atomically; recover work from durable queue/event facts.
@@ -20,4 +20,4 @@ arc42Section: 4
 7. Apply approved exact refinements in isolated Git worktrees and continue from a new immutable run.
 8. Project all control and approval facts through typed HTTP/SSE and responsive UI.
 
-Daemon provider adapters, Agent bindings, worktrees, resource composition, queue/events, SQLite wrapper, HTTP security, SSE and design tokens are generic primitives. The cut contains no compatibility path.
+Daemon provider adapters, Action-role and governance Agent bindings, worktrees, resource composition, queue/events, SQLite wrapper, HTTP security, SSE and design tokens are generic primitives. The cut contains no compatibility path.

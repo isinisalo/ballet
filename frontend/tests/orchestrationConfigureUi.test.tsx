@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ActionWorkspace } from "../src/orchestration/configure/ActionWorkspace";
@@ -11,7 +11,7 @@ import { RuntimesWorkspace } from "../src/orchestration/configure/RuntimesWorksp
 import { StateWorkspace } from "../src/orchestration/configure/StateWorkspace";
 import { UseCasesWorkspace } from "../src/orchestration/configure/UseCasesWorkspace";
 import { OrchestrationSidebar } from "../src/orchestration/OrchestrationSidebar";
-import { SidebarProvider } from "../src/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "../src/components/ui/sidebar";
 import { orchestrationApi, orchestrationApiBase } from "../src/orchestration/orchestrationApi";
 import { resources, orchestrationConfig } from "./orchestrationFixtures";
 
@@ -26,13 +26,57 @@ describe("orchestration Configure UI", () => {
   it("warns that an approved semantic edit returns to draft", async () => { const user = userEvent.setup(); const useCase = orchestrationConfig().direction.useCases[0]!; render(<UseCasesWorkspace useCases={[useCase]} documents={[]} locked={false} environmentUsage={[useCase.id]} onSave={vi.fn()} onApprove={vi.fn()} onDraft={vi.fn()} />); await user.click(screen.getByRole("button", { name: /UC-1/ })); await user.clear(screen.getByLabelText("Name")); await user.type(screen.getByLabelText("Name"), "Changed"); expect(screen.getByRole("alert")).toHaveTextContent("returns this Use Case to draft"); });
   it("renders Environment States in ascending order", () => { const config = orchestrationConfig(); render(<EnvironmentWorkspace environment={{ ...config.environment, states: [...config.environment.states].reverse() }} issues={[]} locked={false} navigate={vi.fn()} onMove={vi.fn()} />); const lanes = screen.getByRole("region", { name: "Ordered State lanes" }); const codes = within(lanes).getAllByText(/ORDER/); expect(codes[0]).toHaveTextContent("ORDER 1"); expect(codes[1]).toHaveTextContent("ORDER 2"); });
   it("owns authoring collection selection in the canonical sidebar URL", async () => { window.history.replaceState({}, "", "/agents?id=profile-1"); const user = userEvent.setup(); const navigate = vi.fn(); const config = orchestrationConfig(); const data = { project: { path: "/project", config, configHash: "a".repeat(64) }, references: { entries: [], runReferences: [], activeRunIds: [] }, instructions: resources().filter(({ kind }) => kind === "instruction"), skills: resources().filter(({ kind }) => kind === "skill"), goals: [], adrs: [], constraints: [], useCases: [], agents: [], schedules: [] }; render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "agents", entityId: "profile-1" }} data={data} navigate={navigate} /></SidebarProvider>); const entity = screen.getByRole("button", { name: /PrimaryEnabled/ }); expect(entity).toHaveAttribute("aria-current", "page"); await user.click(entity); expect(navigate).toHaveBeenCalledWith("/agents?id=profile-1"); });
+  it("renders the Loop Engineering State and Action hierarchy in canonical order", () => {
+    window.history.replaceState({}, "", "/automation/loops/states/state-1/actions/action-1");
+    const config = orchestrationConfig();
+    const firstState = config.environment.states[0]!;
+    const secondAction = { ...firstState.actions[0]!, id: "action-later", name: "Package", priority: 2 };
+    config.environment.states = [{ ...config.environment.states[1]! }, { ...firstState, actions: [secondAction, firstState.actions[0]!] }];
+    render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "action", stateId: "state-1", actionId: "action-1", canvasMode: "flow" }} data={sidebarData(config)} navigate={vi.fn()} /></SidebarProvider>);
+    const hierarchy = screen.getByRole("list", { name: "Loop Engineering hierarchy" });
+    expect(within(hierarchy).getAllByText(/^S\d$/).map((node) => node.textContent)).toEqual(["S1", "S2"]);
+    expect(within(hierarchy).getAllByText(/^A\d$/).map((node) => node.textContent)).toEqual(["A1", "A2"]);
+    expect(screen.getByRole("button", { name: "Open Action action-1: Implement" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Loop Engineering" })).not.toHaveAttribute("aria-current");
+  });
+  it("navigates the exact hierarchy URLs and toggles non-selected States from the keyboard", async () => {
+    window.history.replaceState({}, "", "/automation/loops/states/state-1");
+    const user = userEvent.setup(); const navigate = vi.fn();
+    render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "state", stateId: "state-1" }} data={sidebarData()} navigate={navigate} /></SidebarProvider>);
+    expect(screen.getByRole("button", { name: "Open State state-1: Build" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Open Action action-1: Implement" })).toBeInTheDocument();
+    const expand = screen.getByRole("button", { name: "Expand Actions for State Verify" });
+    expand.focus(); await user.keyboard("{Enter}");
+    expect(expand).toHaveAttribute("aria-expanded", "true");
+    const action = screen.getByRole("button", { name: "Open Action action-2: Verify" });
+    await user.click(action); expect(navigate).toHaveBeenLastCalledWith("/automation/loops/states/state-2/actions/action-2");
+    await user.click(screen.getByRole("button", { name: "Collapse Actions for State Verify" }));
+    expect(screen.queryByRole("button", { name: "Open Action action-2: Verify" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open State state-2: Verify" }));
+    expect(navigate).toHaveBeenLastCalledWith("/automation/loops/states/state-2");
+  });
+  it("keeps the mobile sidebar open for disclosure and closes it after hierarchy navigation", async () => {
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(390);
+    window.history.replaceState({}, "", "/automation/loops");
+    const user = userEvent.setup(); const navigate = vi.fn();
+    render(<SidebarProvider><SidebarTrigger aria-label="Open navigation" /><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "environment" }} data={sidebarData()} navigate={navigate} /></SidebarProvider>);
+    await waitFor(() => expect(screen.queryByText("Ballet")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Open navigation" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Loop Engineering" })).toHaveAttribute("aria-current", "page");
+    await user.click(within(dialog).getByRole("button", { name: "Expand Actions for State Build" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Open Action action-1: Implement" }));
+    expect(navigate).toHaveBeenCalledWith("/automation/loops/states/state-1/actions/action-1");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
   it("supports keyboard activation for State reorder in the detail toolbar", async () => { const user = userEvent.setup(); const move = vi.fn(); const state = orchestrationConfig().environment.states[1]!; render(<StateWorkspace state={state} locked={false} canMoveEarlier navigate={vi.fn()} onSave={vi.fn()} onMove={move} onCreateAction={vi.fn()} onDelete={vi.fn()} />); const button = screen.getByRole("button", { name: "Earlier" }); button.focus(); await user.keyboard("{Enter}"); expect(move).toHaveBeenCalledWith(-1); expect(screen.getAllByRole("toolbar")).toHaveLength(1); });
   it("renders State Actions by priority", () => { const state = orchestrationConfig().environment.states[0]!; const second = { ...state.actions[0]!, id: "action-0", priority: 2 }; render(<StateWorkspace state={{ ...state, actions: [second, state.actions[0]!] }} locked={false} navigate={vi.fn()} onSave={vi.fn()} onMoveAction={vi.fn()} />); const ids = screen.getAllByText(/PRIORITY/); expect(ids[0]).toHaveTextContent("action-1"); });
   it("presents Validation as main and Work as subordinate", () => { renderAction(); expect(screen.getByText("Validation Agent · main/controller")).toBeInTheDocument(); expect(screen.getByText("Work Agent · subordinate")).toBeInTheDocument(); });
   it("uses only the workspace title for Action metadata", () => { renderAction(); expect(screen.getAllByRole("heading", { name: "Implement" })).toHaveLength(1); expect(screen.queryByText("Action metadata")).not.toBeInTheDocument(); });
   it("explains the total attempts derived from maxRetries", () => { renderAction(); expect(screen.getByText("Total maximum Work attempts: 3")).toBeInTheDocument(); });
-  it("reports missing instruction sections", () => { const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} profiles={config.agents} instructions={[{ ...resources()[0]!, content: "# Missing" }, resources()[1]!]} skills={[resources()[2]!]} locked={false} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); expect(screen.getByRole("alert")).toHaveTextContent("Missing Task section"); });
-  it("opens and closes the Action flow with an accessible control", async () => { const user = userEvent.setup(); const changeMode = vi.fn(); const config = orchestrationConfig(); const props = { stateId: "state-1", action: config.environment.states[0]!.actions[0], profiles: config.agents, instructions: resources().filter((item) => item.kind === "instruction"), skills: resources().filter((item) => item.kind === "skill"), locked: false, navigate: vi.fn(), onCanvasModeChange: changeMode, onSave: vi.fn() }; const { rerender } = render(<ActionWorkspace {...props} />); await user.click(screen.getByRole("button", { name: "Open Action flow" })); expect(changeMode).toHaveBeenCalledWith("flow"); await user.type(screen.getByLabelText("Name"), " draft"); rerender(<ActionWorkspace {...props} canvasMode="flow" />); expect(screen.getByLabelText("Name")).toHaveValue(`${props.action.name} draft`); await user.click(screen.getByRole("button", { name: "Show space canvas" })); expect(changeMode).toHaveBeenLastCalledWith("space"); });
+  it("reports missing instruction sections", () => { mockActionExecution(); const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} instructions={[{ ...resources()[0]!, content: "# Missing" }, resources()[1]!]} skills={[resources()[2]!]} locked={false} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); expect(screen.getByRole("alert")).toHaveTextContent("Missing Task section"); });
+  it("opens and closes the Action flow with an accessible control", async () => { mockActionExecution(); const user = userEvent.setup(); const changeMode = vi.fn(); const config = orchestrationConfig(); const props = { stateId: "state-1", action: config.environment.states[0]!.actions[0], instructions: resources().filter((item) => item.kind === "instruction"), skills: resources().filter((item) => item.kind === "skill"), locked: false, navigate: vi.fn(), onCanvasModeChange: changeMode, onSave: vi.fn() }; const { rerender } = render(<ActionWorkspace {...props} />); await user.click(screen.getByRole("button", { name: "Open Action flow" })); expect(changeMode).toHaveBeenCalledWith("flow"); await user.type(screen.getByLabelText("Name"), " draft"); rerender(<ActionWorkspace {...props} canvasMode="flow" />); expect(screen.getByLabelText("Name")).toHaveValue(`${props.action.name} draft`); await user.click(screen.getByRole("button", { name: "Show space canvas" })); expect(changeMode).toHaveBeenLastCalledWith("space"); });
   it("locks authoring controls during an active Run", () => { renderAction(true); expect(screen.getByRole("button", { name: "Save Action" })).toBeDisabled(); expect(screen.getByText("Locked by active Run")).toBeInTheDocument(); });
   it("keeps a dirty resource draft when refreshed props arrive", async () => { const user = userEvent.setup(); const resource = resources()[0]!; const navigate = vi.fn(); const { rerender } = render(<ResourceWorkspace kind="instructions" resources={[resource]} references={[]} locked={false} selectedId="validation" navigate={navigate} onSave={vi.fn()} />); await user.type(screen.getByLabelText("Markdown Body"), "\nlocal draft"); rerender(<ResourceWorkspace kind="instructions" resources={[{ ...resource, content: `${resource.content}\nserver refresh` }]} references={[]} locked={false} selectedId="validation" navigate={navigate} onSave={vi.fn()} />); expect(screen.getByLabelText("Markdown Body")).toHaveValue(`${resource.content.trimEnd()}\nlocal draft`); });
   it("restores the compact Agent profile, Preview and editor composition", async () => { vi.spyOn(orchestrationApi, "localRuntime").mockResolvedValue({ status: "offline", daemonVersion: "unknown", uptimeSeconds: 0, activeTaskCount: 0, lastSeenAt: new Date(0).toISOString(), refreshRequested: false, restartRequested: false, providers: [] }); vi.spyOn(orchestrationApi, "agentBinding").mockResolvedValue(null); const agent = orchestrationConfig().agents[0]!; const content = `---\nid: ${agent.id}\ntitle: ${agent.name}\ndescription: ${agent.description}\nstatus: active\nenabled: true\ninstructionResource: ${agent.instructionResource}\nskillResources: [${agent.skillResources.join(", ")}]\n---\n# ${agent.name}\n${agent.description}`; render(<AgentDefinitionsWorkspace profiles={[agent]} documents={[{ kind: "agent", id: agent.id, content, contentHash: "d".repeat(64) }]} references={[]} selectedId={agent.id} locked={false} navigate={vi.fn()} onSave={vi.fn()} onDelete={vi.fn()} />); expect(screen.getByRole("complementary", { name: "Agent profile" })).toHaveTextContent(agent.id); expect(screen.getByRole("region", { name: "Agent execution settings" })).not.toHaveTextContent("Computer"); expect(screen.getByText("Preview")).toBeInTheDocument(); expect(screen.getByText("Markdown Workbench")).toBeInTheDocument(); expect(screen.getAllByRole("toolbar")).toHaveLength(1); });
@@ -44,7 +88,17 @@ describe("orchestration Configure UI", () => {
   it("renders invalid State deep links with recovery", () => { render(<StateWorkspace locked={false} navigate={vi.fn()} onSave={vi.fn()} onMoveAction={vi.fn()} />); expect(screen.getByRole("heading", { name: "State not found" })).toBeInTheDocument(); expect(screen.getByRole("button", { name: "Return to Environment" })).toBeInTheDocument(); });
   it("keeps core actions in one responsive toolbar", () => { renderAction(); const save = screen.getByRole("button", { name: "Save Action" }); expect(save).toHaveAttribute("form", "action-action-1"); expect(screen.getAllByRole("toolbar")).toHaveLength(1); expect(screen.getByRole("button", { name: "Open Action flow" })).toBeInTheDocument(); });
   it("uses the canonical API prefix in orchestration data modules", () => { expect(orchestrationApiBase).toBe("/api"); });
-  it("associates Action fields with labels", () => { renderAction(); expect(screen.getByLabelText("maxRetries")).toHaveAttribute("type", "number"); const validation = screen.getByRole("group", { name: "Validation Agent · main/controller" }); expect(within(validation).getByLabelText("Agent")).toHaveTextContent("Primary"); });
+  it("associates Action execution and composition fields with labels", () => { renderAction(); expect(screen.getByLabelText("maxRetries")).toHaveAttribute("type", "number"); const validation = screen.getByRole("group", { name: "Validation Agent · main/controller" }); expect(within(validation).getByLabelText("Provider")).toBeInTheDocument(); expect(within(validation).getByLabelText("Instruction")).toBeInTheDocument(); expect(within(validation).getByLabelText("Validation Skills")).toBeInTheDocument(); expect(screen.queryByLabelText("Agent")).not.toBeInTheDocument(); expect(screen.queryByLabelText("Use Case refs")).not.toBeInTheDocument(); });
+  it("reports each missing Action-role execution binding in Run readiness", async () => { renderAction(); await waitFor(() => expect(screen.getByText("validation: execution binding is missing.")).toBeInTheDocument()); expect(screen.getByText("work: execution binding is missing.")).toBeInTheDocument(); expect(screen.getByRole("toolbar")).toHaveTextContent("Not ready"); });
 });
 
-function renderAction(locked = false) { const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} profiles={config.agents} instructions={resources().filter((item) => item.kind === "instruction")} skills={resources().filter((item) => item.kind === "skill")} locked={locked} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); }
+function renderAction(locked = false) { mockActionExecution(); const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} instructions={resources().filter((item) => item.kind === "instruction")} skills={resources().filter((item) => item.kind === "skill")} locked={locked} navigate={vi.fn()} onCanvasModeChange={vi.fn()} onSave={vi.fn()} />); }
+
+function mockActionExecution() {
+  vi.spyOn(orchestrationApi, "localRuntime").mockResolvedValue({ status: "offline", daemonVersion: "unknown", uptimeSeconds: 0, activeTaskCount: 0, lastSeenAt: new Date(0).toISOString(), refreshRequested: false, restartRequested: false, providers: [] });
+  vi.spyOn(orchestrationApi, "actionRoleBinding").mockResolvedValue(null);
+}
+
+function sidebarData(config = orchestrationConfig()) {
+  return { project: { path: "/project", config, configHash: "a".repeat(64) }, references: { entries: [], runReferences: [], activeRunIds: [] }, instructions: resources().filter(({ kind }) => kind === "instruction"), skills: resources().filter(({ kind }) => kind === "skill"), goals: [], adrs: [], constraints: [], useCases: [], agents: [], schedules: [] };
+}

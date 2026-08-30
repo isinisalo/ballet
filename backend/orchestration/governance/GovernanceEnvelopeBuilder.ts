@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV15 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV16 } from "../../../shared/orchestration/runtime.js";
 import type { CriticTaskEnvelope, RefinementTaskEnvelope } from "../../../shared/orchestration/taskEnvelopes.js";
 
 export const buildCriticEnvelope = (input: {
@@ -13,7 +13,7 @@ export const buildCriticEnvelope = (input: {
     WHERE cr.critic_run_id = ?
   `).get(input.criticRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Critic Run ${input.criticRunId} has no immutable Run Evidence.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV15;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV16;
   const composition = snapshot.governance.critic;
   const instruction = requireInstruction(snapshot, composition.instructionResource);
   const feedback = input.connection.prepare(`
@@ -48,7 +48,7 @@ export const buildRefinementEnvelope = (input: {
     WHERE rr.refinement_run_id = ?
   `).get(input.refinementRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Refinement Run ${input.refinementRunId} has no immutable source.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV15;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV16;
   const selected = input.connection.prepare(`
     SELECT fe.* FROM refinement_run_feedback rrf
     JOIN feedback_entries fe ON fe.feedback_entry_id = rrf.feedback_entry_id
@@ -79,7 +79,7 @@ export const buildRefinementEnvelope = (input: {
   };
 };
 
-const requireInstruction = (snapshot: RootSnapshotV15, id: string): string => {
+const requireInstruction = (snapshot: RootSnapshotV16, id: string): string => {
   const resource = snapshot.resources.find(({ kind, id: resourceId }) => kind === "instruction" && resourceId === id);
   if (!resource) throw new Error(`Governance instruction ${id} is absent from snapshot.`);
   return resource.content;

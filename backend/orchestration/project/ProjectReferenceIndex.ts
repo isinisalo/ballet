@@ -1,4 +1,4 @@
-import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
 
 export type ProjectDocumentKind = "goal" | "adr" | "constraint" | "use-case" | "agent" | "instruction" | "skill";
 export type ProjectReferenceKind = ProjectDocumentKind;
@@ -12,7 +12,7 @@ export interface ProjectReference {
 export class ProjectReferenceIndex {
   private readonly references = new Map<string, ProjectReference[]>();
 
-  constructor(config: ProjectConfigurationV21) {
+  constructor(config: ProjectConfigurationV22) {
     for (const useCase of config.direction.useCases) {
       this.addMany("goal", useCase.goalIds, "use-case", useCase.id, "goalIds");
       this.addMany("adr", useCase.adrIds, "use-case", useCase.id, "adrIds");
@@ -28,18 +28,14 @@ export class ProjectReferenceIndex {
         this.addMany("constraint", useCase.constraintIds, ownerType, ownerId, "directionClosure");
       }
     };
-    const environmentUseCaseIds = new Set(config.environment.states.flatMap((state) => [
-      ...state.useCaseIds, ...state.actions.flatMap((action) => action.useCaseIds)
-    ]));
+    const environmentUseCaseIds = new Set(config.environment.states.flatMap((state) => state.useCaseIds));
     addDirectionClosure([...environmentUseCaseIds], "environment", config.environment.id);
     for (const state of config.environment.states) {
       addDirectionClosure(state.useCaseIds, "state", state.id);
       for (const action of state.actions) {
-        addDirectionClosure(action.useCaseIds, "action", action.id);
         for (const [role, composition] of [["validation", action.validation], ["work", action.work]] as const) {
           this.add("instruction", composition.instructionResource, "action", action.id, `${role}.instructionResource`);
           this.addMany("skill", composition.skillResources, "action", action.id, `${role}.skillResources`);
-          this.add("agent", composition.agentId, "action", action.id, `${role}.agentId`);
         }
       }
     }

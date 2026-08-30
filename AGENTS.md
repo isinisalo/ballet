@@ -51,5 +51,6 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 ## Työskentely
 
 - Säilytä käyttäjän ennestään tekemät muutokset. Älä tee riippumattomia refaktorointeja.
+- Noudata KISS- ja YAGNI-periaatteita: käytä olemassa olevia ratkaisuja ja abstraktioita ennen uuden rakentamista, äläkä lisää pyytämätöntä rakennetta, variaatiota tai tulevaisuusvaraa.
 - Pidä ratkaisu yksinkertaisena ja poista korvatuksi tullut aktiivinen legacy-koodi.
 - Pysähdy `needs_input`-tilaan vain, kun WHAT/WHY, laatumitta, merkittävä ADR tai uusi external-write-valtuutus aidosti vaatii ihmistä.

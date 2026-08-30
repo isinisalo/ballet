@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
 import { afterEach, describe, expect, test } from "vitest";
-import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
 import type { UseCase } from "../../../shared/orchestration/direction.js";
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -48,7 +48,7 @@ describe("orchestration HTTP integration", () => {
     });
 
     let response = await request("/project");
-    expect(response.status).toBe(200); expect((await response.json() as { config: { version: number } }).config.version).toBe(21); scenarios += 1;
+    expect(response.status).toBe(200); expect((await response.json() as { config: { version: number } }).config.version).toBe(22); scenarios += 1;
 
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: { ...fixture.config, graph: {} } }));
     expect(response.status).toBe(400); scenarios += 1;
@@ -64,7 +64,7 @@ describe("orchestration HTTP integration", () => {
     response = await request("/project", json("PUT", { expectedHash: "f".repeat(64), config: fixture.config }));
     expect(response.status).toBe(409); scenarios += 1;
 
-    response = await request("/project"); const authoringProject = await response.json() as { config: ProjectConfigurationV21 };
+    response = await request("/project"); const authoringProject = await response.json() as { config: ProjectConfigurationV22 };
     const authored = { ...authoringProject.config, environment: { ...authoringProject.config.environment, description: "Authored" } };
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: authored }));
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
@@ -107,7 +107,7 @@ describe("orchestration HTTP integration", () => {
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
 
     response = await request("/environment"); const environmentView = await response.json() as {
-      environment: ProjectConfigurationV21["environment"];
+      environment: ProjectConfigurationV22["environment"];
     };
     const secondState = structuredClone(environmentView.environment.states[0]!);
     secondState.id = "state-2"; secondState.name = "Second"; secondState.order = 2;
@@ -132,7 +132,7 @@ describe("orchestration HTTP integration", () => {
     response = await request("/environment/states/missing"); expect(response.status).toBe(404); scenarios += 1;
 
     response = await request("/environment"); const actionEnvironment = await response.json() as {
-      environment: ProjectConfigurationV21["environment"];
+      environment: ProjectConfigurationV22["environment"];
     };
     const secondAction = structuredClone(actionEnvironment.environment.states[0]!.actions[0]!);
     secondAction.id = "action-2"; secondAction.name = "Second Action"; secondAction.priority = 2;
@@ -241,7 +241,7 @@ describe("orchestration HTTP integration", () => {
     response = await request(`/environment-runs/${encodeURIComponent(run.environmentRunId)}`); const runDetail = await response.json() as Record<string, unknown>;
     expect(response.status).toBe(200); expect(runDetail).not.toHaveProperty("executionSnapshot"); scenarios += 1;
 
-    response = await request("/project"); const activeProject = await response.json() as { config: ProjectConfigurationV21 };
+    response = await request("/project"); const activeProject = await response.json() as { config: ProjectConfigurationV22 };
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash,
       config: { ...activeProject.config, environment: { ...activeProject.config.environment, name: "Locked" } } }));
     expect(response.status).toBe(409); scenarios += 1;
@@ -430,14 +430,18 @@ const startFixture = async () => {
   documents.put("agent", "profile", "# Agent\n\nTest execution agent.\n", "absent");
   const instructionHash = documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent").contentHash;
   const project = new ProjectDefinitionService(root, projects, documents);
-  const capability = {
-    agentId: "profile",
+  const capability = (subject: { kind: "agent"; agentId: string } | { kind: "action_role"; actionId: string; role: "validation" | "work" }) => ({
+    subject,
     provider: "codex" as const, model: "model", reasoningEffort: "high",
     networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
     supportedModels: ["model"], supportedReasoningEfforts: ["high"],
     supportsReadOnly: true, supportsWorkspaceWrite: true
+  });
+  const preflight = {
+    inspectAgent: async (agent: { id: string }) => { const value = capability({ kind: "agent", agentId: agent.id }); return { ...value, capabilitySha256: hash(value) }; },
+    inspectActionRole: async (actionId: string, role: "validation" | "work") => { const value = capability({ kind: "action_role", actionId, role }); return { ...value, capabilitySha256: hash(value) }; }
   };
-  const planner = new EnvironmentRunPlanner(project, { inspect: async () => ({ ...capability, capabilitySha256: hash(capability) }) }, () => TEST_AT);
+  const planner = new EnvironmentRunPlanner(project, preflight, () => TEST_AT);
   const environmentQueue = new DeterministicExecutionQueue();
   const provider = new ScriptedRuntimeProvider([
     providerOutput({ phase: "precheck", decision: "done", evidence: {} }),
@@ -469,8 +473,7 @@ const startFixture = async () => {
       const worktreeProject = new ProjectDefinitionService(worktreePath,
         new ProjectConfigurationRepository(path.join(worktreePath, ".ballet", "project.json"), connection),
         new ProjectDocumentRepository(path.join(worktreePath, ".ballet"), connection));
-      const replanned = await new EnvironmentRunPlanner(worktreeProject,
-        { inspect: async () => ({ ...capability, capabilitySha256: hash(capability) }) }, () => TEST_AT).plan();
+      const replanned = await new EnvironmentRunPlanner(worktreeProject, preflight, () => TEST_AT).plan();
       const continuationRunId = nextId("environment-run");
       const planned = replanned.createInput({ environmentRunId: continuationRunId, worktreePath,
         branch: `ballet/refinement/${refinementProposalId}`, createdAt: TEST_AT, input: parent.input });
@@ -481,7 +484,7 @@ const startFixture = async () => {
         refinementApprovalId: `${refinementProposalId}:decision`, refinementCommitSha: commitSha });
       return { ...seed, continuationLinkId: nextId("continuation-link"), continuationSnapshotHash: seed.executionSnapshotHash };
     }, () => TEST_AT, isAllowedRefinementPath);
-  const controller = new ApiController({ connection, project, planner, runtime,
+  const controller = new ApiController({ connection, project, planner, runtime, actionBindings: { removeActionBindings: () => undefined },
     workspace: { prepare: async (runId) => ({ worktreePath: root, branch: `test/${runId}` }), discard: async () => undefined },
     feedback: feedbackService, scheduler, governance, refinementApply,
     invalidations: new InvalidationBroadcaster(), nextId, now: () => TEST_AT });

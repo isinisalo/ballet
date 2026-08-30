@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
-import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
 import type { FeedbackCategory, FeedbackTargetType } from "../../../shared/orchestration/reviews.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -37,6 +37,7 @@ export interface OrchestrationControllerDependencies {
   project: ProjectDefinitionService;
   planner: EnvironmentRunPlanner;
   runtime: EnvironmentRuntimeService;
+  actionBindings: { removeActionBindings(actionIds: string[]): void };
   workspace: OrchestrationWorkspacePort;
   feedback: FeedbackBoxService;
   scheduler: CriticSchedulerService;
@@ -65,7 +66,7 @@ export class ApiController {
   }
 
   project(): unknown { return this.dependencies.project.projects.load(); }
-  putProject(config: ProjectConfigurationV21, expectedHash: string | "absent"): unknown {
+  putProject(config: ProjectConfigurationV22, expectedHash: string | "absent"): unknown {
     const current = this.dependencies.project.projects.loadOptional();
     if (current && canonical(current.config.direction) !== canonical(config.direction)) {
       throw new ConflictError("Direction and Use Case mutations require their dedicated document commands.");
@@ -207,8 +208,11 @@ export class ApiController {
   removeState(id: string, expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
     if (!loaded.config.environment.states.some((state) => state.id === id)) throw new NotFoundError(`State ${id} was not found.`);
-    return this.putEnvironment({ ...loaded.config.environment,
+    const actionIds = loaded.config.environment.states.find((state) => state.id === id)!.actions.map(({ id }) => id);
+    const result = this.putEnvironment({ ...loaded.config.environment,
       states: loaded.config.environment.states.filter((state) => state.id !== id) }, expectedConfigHash);
+    this.dependencies.actionBindings.removeActionBindings(actionIds);
+    return result;
   }
   reorderStates(ids: string[], expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
@@ -245,8 +249,10 @@ export class ApiController {
     const state = loaded.config.environment.states.find(({ id }) => id === stateId);
     if (!state) throw new NotFoundError(`State ${stateId} was not found.`);
     if (!state.actions.some(({ id }) => id === actionId)) throw new NotFoundError(`Action ${actionId} was not found.`);
-    return this.saveState(loaded.config.environment.states,
+    const result = this.saveState(loaded.config.environment.states,
       { ...state, actions: state.actions.filter(({ id }) => id !== actionId) }, loaded.config.environment, expectedConfigHash);
+    this.dependencies.actionBindings.removeActionBindings([actionId]);
+    return result;
   }
   reprioritizeActions(stateId: string, ids: string[], expectedConfigHash: string): unknown {
     const loaded = this.requireConfigHash(expectedConfigHash);
@@ -523,7 +529,7 @@ const assertExactOrder = (received: string[], current: string[], label: string):
   }
 };
 const directionValues = (
-  config: ProjectConfigurationV21, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
+  config: ProjectConfigurationV22, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
 ) => kind === "goal" ? config.direction.goals : kind === "adr" ? config.direction.adrs
   : kind === "constraint" ? config.direction.constraints : config.direction.useCases;
 

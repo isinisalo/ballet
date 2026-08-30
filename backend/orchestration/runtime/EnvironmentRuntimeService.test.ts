@@ -347,7 +347,21 @@ const twoActionSeed = (stateCount = 1, runId = "run-1", baseCommit = TEST_SHA): 
   seed.executionSnapshot = {
     ...seed.executionSnapshot,
     projectHeadSha: baseCommit,
-    environment: { ...seed.executionSnapshot.environment, states: seed.states.map(({ definition }) => definition) }
+    environment: { ...seed.executionSnapshot.environment, states: seed.states.map(({ definition }) => definition) },
+    runtimeCapabilities: [
+      ...seed.executionSnapshot.runtimeCapabilities,
+      ...(["validation", "work"] as const).map((role) => ({
+        ...seed.executionSnapshot.runtimeCapabilities.find(({ subject }) =>
+          subject.kind === "action_role" && subject.actionId === first.definition.actions[0]!.id && subject.role === role
+        )!,
+        subject: { kind: "action_role" as const, actionId: second.id, role }
+      }))
+    ],
+    permissions: [
+      ...seed.executionSnapshot.permissions,
+      { role: "validation", actionId: second.id, toolPolicy: "read_only", networkAccess: false, approvalPolicy: "never" },
+      { role: "work", actionId: second.id, toolPolicy: "workspace_write", networkAccess: false, approvalPolicy: "never" }
+    ]
   };
   seed.executionSnapshotHash = hash(seed.executionSnapshot);
   return seed;

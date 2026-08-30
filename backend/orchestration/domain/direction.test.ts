@@ -42,9 +42,9 @@ const environment = (): EnvironmentDefinition => ({
     id: "state-1", name: "State", description: "First state", order: 1, useCaseIds: ["UC-1"],
     actions: [{
       id: "action-1", name: "Action", description: "First action", priority: 1,
-      useCaseIds: ["UC-1"], maxRetries: 1,
-      validation: { agentId: "profile", instructionResource: "validation", skillResources: [] },
-      work: { agentId: "profile", instructionResource: "work", skillResources: [] }
+      maxRetries: 1,
+      validation: { instructionResource: "validation", skillResources: [] },
+      work: { instructionResource: "work", skillResources: [] }
     }]
   }]
 });

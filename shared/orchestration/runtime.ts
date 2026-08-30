@@ -10,7 +10,11 @@ export type AgentRunRole = "validation" | "work" | "critic" | "refinement";
 export type AgentRunPhase = "precheck" | "work" | "postwork" | "proposal";
 export type AgentRunStatus = "queued" | "running" | "waiting_for_input" | "completed" | "failed" | "cancelled" | "interrupted";
 
-export interface RootSnapshotV15 {
+export type RuntimeBindingSubject =
+  | { kind: "action_role"; actionId: string; role: "validation" | "work" }
+  | { kind: "agent"; agentId: string };
+
+export interface RootSnapshotV16 {
   version: typeof ROOT_SNAPSHOT_VERSION;
   projectHeadSha: string;
   projectConfigSha256: string;
@@ -39,7 +43,7 @@ export interface RootSnapshotV15 {
 }
 
 export interface RuntimeCapabilitySnapshot {
-  agentId: string;
+  subject: RuntimeBindingSubject;
   provider: RuntimeProvider;
   model: string;
   reasoningEffort: string;
@@ -73,7 +77,7 @@ export interface EnvironmentRun {
   id: string;
   environmentId: string;
   status: EnvironmentRunStatus;
-  snapshot: RootSnapshotV15;
+  snapshot: RootSnapshotV16;
   continuationOfRunId?: string;
   createdAt: string;
   updatedAt: string;

@@ -16,11 +16,15 @@ export interface ExecutionResourceEvidence {
   sourceSha256: string;
 }
 
-export interface ExecutionPromptEvidenceV12 {
+export type ExecutionPromptSubject =
+  | { kind: "action_role"; actionId: string; role: "validation" | "work" }
+  | { kind: "agent"; agent: AgentDefinition };
+
+export interface ExecutionPromptEvidenceV13 {
   compositionVersion: typeof PROMPT_COMPOSITION_VERSION;
   role: AgentRunRole;
   phase: AgentRunPhase;
-  agent: AgentDefinition;
+  subject: ExecutionPromptSubject;
   resources: ExecutionResourceEvidence[];
   prompt: string;
   promptSha256: string;
@@ -32,7 +36,7 @@ export interface ExecutionPromptEvidenceV12 {
 }
 
 export interface ExecutionRuntimeSnapshot {
-  agentId: string;
+  subject: import("./runtime.js").RuntimeBindingSubject;
   provider: RuntimeProvider;
   cliVersion: string;
   model: string;
@@ -51,14 +55,14 @@ export interface AgentExecutionBindingV2 {
   updatedAt: string;
 }
 
-export interface ExecutionSpecV14 {
+export interface ExecutionSpecV15 {
   version: typeof EXECUTION_SPEC_VERSION;
   taskId: string;
   kind: "agent_execution";
   environmentRunId: string;
   actionExecutionId?: string;
   agentRunId: string;
-  evidence: ExecutionPromptEvidenceV12;
+  evidence: ExecutionPromptEvidenceV13;
   runtime: ExecutionRuntimeSnapshot;
   permissions: {
     workspaceAccess: "read-only" | "workspace-write";

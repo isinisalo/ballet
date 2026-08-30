@@ -1,17 +1,18 @@
 import { approveUseCase } from "../../../shared/orchestration/direction.js";
-import type { ProjectConfigurationV21 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
 
 export const TEST_AT = "2026-08-29T10:00:00.000Z";
 
-export const validProjectConfig = (): ProjectConfigurationV21 => {
+export const validProjectConfig = (): ProjectConfigurationV22 => {
   const useCase = approveUseCase({
     id: "UC-1", name: "Use Case", status: "draft", examples: [{ given: "Context", when: "Action", then: "Outcome" }],
     successGoals: ["Succeeds"], failureGoals: ["Never skips"], expectedOutcomes: ["Completed"],
     goalIds: ["goal-1"], adrIds: ["adr-1"], constraintIds: ["constraint-1"]
   }, { approvedBy: "human", approvedAt: TEST_AT, revision: 1 });
-  const validation = { agentId: "profile", instructionResource: "instruction", skillResources: [] };
+  const actionRole = { instructionResource: "instruction", skillResources: [] };
+  const governance = { agentId: "profile", ...actionRole };
   return {
-    version: 21,
+    version: 22,
     direction: {
       goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
       adrs: [{ id: "adr-1", name: "ADR", status: "accepted" }],
@@ -22,12 +23,12 @@ export const validProjectConfig = (): ProjectConfigurationV21 => {
       instructionResource: "instruction", skillResources: [] }],
     environment: { id: "environment-1", name: "Environment", description: "Ordered work", states: [{
       id: "state-1", name: "State", description: "First", order: 1, useCaseIds: ["UC-1"], actions: [{
-        id: "action-1", name: "Action", description: "Perform", priority: 1, useCaseIds: ["UC-1"], maxRetries: 1,
-        validation, work: { ...validation }
+        id: "action-1", name: "Action", description: "Perform", priority: 1, maxRetries: 1,
+        validation: actionRole, work: { ...actionRole }
       }]
     }] },
-    critic: { version: 2, enabled: false, schedules: [], agent: validation },
-    refinement: { version: 2, enabled: true, agent: validation,
+    critic: { version: 2, enabled: false, schedules: [], agent: governance },
+    refinement: { version: 2, enabled: true, agent: governance,
       allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"] }
   };
 };

@@ -130,9 +130,6 @@ export const validateRunnableEnvironment = (environment: EnvironmentDefinition, 
     if (state.actions.length === 0) issues.push({ code: "empty_state", path: `${statePath}.actions`, message: "State needs an Action" });
     issues.push(...validateReferences(state.useCaseIds, direction, `${statePath}.useCaseIds`));
     issues.push(...duplicateNumberIssues(state.actions.map(({ priority }) => priority), `${statePath}.actions`, "duplicate_action_priority"));
-    for (const [actionIndex, action] of state.actions.entries()) {
-      issues.push(...validateReferences(action.useCaseIds, direction, `${statePath}.actions.${actionIndex}.useCaseIds`));
-    }
   }
   return issues;
 };

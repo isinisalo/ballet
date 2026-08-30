@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { LocalDaemonHeartbeat, LocalProviderStatus } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { ActionOutcomeCoordinator } from "./ActionOutcomeCoordinator.js";
 import { AgentExecutionStore } from "./AgentExecutionStore.js";
@@ -21,6 +21,39 @@ describe("checkout-local daemon persistence", () => {
     });
     expect(binding).toEqual(expect.objectContaining({ version: 2, agentId: "profile", provider: "codex" }));
     expect(binding).not.toHaveProperty("deviceId"); expect(binding).not.toHaveProperty("runtimeBackendId");
+  });
+
+  it("upserts and removes Action-role bindings by action and role", () => {
+    const { daemon } = setup(); daemon.heartbeat(heartbeat());
+    const first = daemon.putActionRoleBinding("action-1", "validation", {
+      provider: "codex", model: "gpt", reasoningEffort: "high",
+      policy: { network: false, readOnlyRoots: ["/tmp/reference"] }
+    });
+    expect(first).toEqual(expect.objectContaining({ version: 1, actionId: "action-1", role: "validation" }));
+    daemon.putActionRoleBinding("action-1", "validation", {
+      provider: "copilot", model: "claude", reasoningEffort: "high",
+      policy: { network: true, readOnlyRoots: [] }
+    });
+    expect(daemon.actionRoleBinding("action-1", "validation")).toEqual(expect.objectContaining({ provider: "copilot", policy: { network: true, readOnlyRoots: [] } }));
+    daemon.putActionRoleBinding("action-1", "work", {
+      provider: "codex", model: "gpt", reasoningEffort: "high", policy: { network: false, readOnlyRoots: [] }
+    });
+    daemon.removeActionBindings(["action-1"]);
+    expect(daemon.actionRoleBinding("action-1", "validation")).toBeUndefined();
+    expect(daemon.actionRoleBinding("action-1", "work")).toBeUndefined();
+  });
+
+  it("rejects unsupported Action-role model, reasoning, and policy selections", () => {
+    const { daemon } = setup(); const reports = heartbeat();
+    reports.providers[0] = { ...reports.providers[0]!, capabilities: { ...reports.providers[0]!.capabilities,
+      policy: { workspaceWrite: true, networkControl: false, readOnlyRoots: false } } };
+    daemon.heartbeat(reports);
+    const put = (model: string, reasoningEffort: string, network = false, roots: string[] = []) =>
+      daemon.putActionRoleBinding("action-1", "validation", { provider: "codex", model, reasoningEffort, policy: { network, readOnlyRoots: roots } });
+    expect(() => put("missing", "high")).toThrow(/unavailable/);
+    expect(() => put("gpt", "missing")).toThrow(/Reasoning effort/);
+    expect(() => put("gpt", "high", true)).toThrow(/network policy/);
+    expect(() => put("gpt", "high", false, ["/tmp/reference"])).toThrow(/read-only roots/);
   });
 
   it("claims once, fences stale callbacks, and applies one daemon terminal", () => {
@@ -78,17 +111,16 @@ const setup = (now = () => new Date(TEST_AT)) => {
   return { database, execution, daemon: new LocalDaemonStore(() => database.connection, now) };
 };
 
-const spec = (envelopeHash: string): ExecutionSpecV14 => {
+const spec = (envelopeHash: string): ExecutionSpecV15 => {
   const prompt = "Validate the Action";
   return {
-    version: 14, taskId: "execution-task-1", kind: "agent_execution", environmentRunId: "run-1",
+    version: 15, taskId: "execution-task-1", kind: "agent_execution", environmentRunId: "run-1",
     actionExecutionId: "action-execution-1", agentRunId: "precheck-1",
-    evidence: { compositionVersion: 12, role: "validation", phase: "precheck",
-      agent: { id: "profile", name: "Agent", description: "Agent", enabled: true,
-        instructionResource: "instruction", skillResources: [] }, resources: [], prompt, promptSha256: sha256(prompt),
+    evidence: { compositionVersion: 13, role: "validation", phase: "precheck",
+      subject: { kind: "action_role", actionId: "action-1", role: "validation" }, resources: [], prompt, promptSha256: sha256(prompt),
       taskEnvelopeVersion: 11, taskEnvelopeSha256: envelopeHash, outputSchemaVersion: 11,
       outputSchemaId: "validation-outcome-v11", outputSchemaSha256: HASH_A },
-    runtime: { agentId: "profile", provider: "codex", cliVersion: "1.0.0", model: "gpt",
+    runtime: { subject: { kind: "action_role", actionId: "action-1", role: "validation" }, provider: "codex", cliVersion: "1.0.0", model: "gpt",
       reasoningEffort: "high", capabilityHash: HASH_A },
     permissions: { workspaceAccess: "read-only", networkAccess: false, readOnlyRoots: [], approvalPolicy: "never" },
     project: { checkoutRoot: "/tmp/worktree", headSha: TEST_SHA, configHash: HASH_A, snapshotHash: HASH_A },

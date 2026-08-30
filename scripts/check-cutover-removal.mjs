@@ -56,6 +56,14 @@ const localOnlyProhibited = [
   "HttpWs" + "DaemonTransport",
   "DaemonWebSocket" + "Hub",
   "ControlPlane" + "Database",
+  "ProjectConfigurationV" + "21",
+  "projectConfigurationV" + "21Schema",
+  "ExecutionPromptEvidenceV" + "12",
+  "executionPromptEvidenceV" + "12Schema",
+  "ExecutionSpecV" + "14",
+  "executionSpecV" + "14Schema",
+  "RootSnapshotV" + "15",
+  "rootSnapshotV" + "15Schema",
   "ExecutionSpecV" + "13",
   "RootSnapshotV" + "14"
 ];

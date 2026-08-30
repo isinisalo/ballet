@@ -36,6 +36,7 @@ export interface CompositionOptions {
   provider: OrchestrationRuntimeProvider & OrchestrationProviderPreflightPort;
   environmentWorkspace: OrchestrationWorkspacePort;
   environmentFinalizer: RunEvidenceFinalizationPort;
+  actionBindings: { removeActionBindings(actionIds: string[]): void };
 }
 
 export const createCompositionRoot = async (options: CompositionOptions) => {
@@ -95,6 +96,7 @@ export const createCompositionRoot = async (options: CompositionOptions) => {
   );
   const invalidations = new InvalidationBroadcaster();
   const controller = new ApiController({ connection: database, project, planner, runtime: environment,
+    actionBindings: options.actionBindings,
     workspace: options.environmentWorkspace, feedback, scheduler, governance, refinementApply, invalidations, nextId, now });
   const router = createOrchestrationRouter({ controller, actor: localActor });
 

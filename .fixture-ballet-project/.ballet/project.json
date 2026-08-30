@@ -1,5 +1,5 @@
 {
-  "version": 21,
+  "version": 22,
   "direction": {
     "goals": [{ "id": "test-goal", "name": "Exercise a complete canonical fixture", "status": "accepted" }],
     "adrs": [{ "id": "0001-test-adr", "name": "Use Markdown-backed fixture resources", "status": "accepted" }],
@@ -10,19 +10,17 @@
     ]
   },
   "agents": [
-    { "id": "fixture-validation", "name": "Fixture Validation", "description": "Validation-first fixture controller.", "enabled": true, "instructionResource": "reviewer", "skillResources": ["fixture-skill"] },
-    { "id": "fixture-work", "name": "Fixture Work", "description": "Bounded fixture implementation agent.", "enabled": true, "instructionResource": "architect", "skillResources": ["fixture-skill"] },
     { "id": "fixture-governance", "name": "Fixture Governance", "description": "Read-only fixture governance agent.", "enabled": true, "instructionResource": "critic", "skillResources": ["fixture-skill"] }
   ],
   "environment": {
     "id": "fixture-environment", "name": "Fixture environment", "description": "A compact two-State canonical integration fixture.",
     "states": [
       { "id": "fixture-prepare", "name": "Prepare", "description": "Create deterministic local fixture evidence.", "order": 1, "useCaseIds": ["fixture-UC-01"], "actions": [
-        { "id": "fixture-create-evidence", "name": "Create evidence", "description": "Create one bounded local evidence artifact for later verification.", "priority": 1, "useCaseIds": ["fixture-UC-01"], "maxRetries": 1, "validation": { "agentId": "fixture-validation", "instructionResource": "reviewer", "skillResources": ["fixture-skill"] }, "work": { "agentId": "fixture-work", "instructionResource": "architect", "skillResources": ["fixture-skill"] } }
+        { "id": "fixture-create-evidence", "name": "Create evidence", "description": "Create one bounded local evidence artifact for later verification.", "priority": 1, "maxRetries": 1, "validation": { "instructionResource": "reviewer", "skillResources": ["fixture-skill"] }, "work": { "instructionResource": "architect", "skillResources": ["fixture-skill"] } }
       ] },
       { "id": "fixture-verify", "name": "Verify", "description": "Verify artifacts and terminal evidence after preparation is done.", "order": 2, "useCaseIds": ["fixture-UC-02"], "actions": [
-        { "id": "fixture-check-evidence", "name": "Check evidence", "description": "Validate the prepared artifact and record exact checks.", "priority": 1, "useCaseIds": ["fixture-UC-02"], "maxRetries": 0, "validation": { "agentId": "fixture-validation", "instructionResource": "reviewer", "skillResources": ["fixture-skill"] }, "work": { "agentId": "fixture-work", "instructionResource": "architect", "skillResources": ["fixture-skill"] } },
-        { "id": "fixture-review-evidence", "name": "Review run evidence", "description": "Verify the terminal projection is factual and complete.", "priority": 2, "useCaseIds": ["fixture-UC-02"], "maxRetries": 1, "validation": { "agentId": "fixture-validation", "instructionResource": "reviewer", "skillResources": ["fixture-skill"] }, "work": { "agentId": "fixture-work", "instructionResource": "architect", "skillResources": ["fixture-skill"] } }
+        { "id": "fixture-check-evidence", "name": "Check evidence", "description": "Validate the prepared artifact and record exact checks.", "priority": 1, "maxRetries": 0, "validation": { "instructionResource": "reviewer", "skillResources": ["fixture-skill"] }, "work": { "instructionResource": "architect", "skillResources": ["fixture-skill"] } },
+        { "id": "fixture-review-evidence", "name": "Review run evidence", "description": "Verify the terminal projection is factual and complete.", "priority": 2, "maxRetries": 1, "validation": { "instructionResource": "reviewer", "skillResources": ["fixture-skill"] }, "work": { "instructionResource": "architect", "skillResources": ["fixture-skill"] } }
       ] }
     ]
   },

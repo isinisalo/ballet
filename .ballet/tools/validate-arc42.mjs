@@ -6,7 +6,7 @@ import process from "node:process";
 import YAML from "yaml";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
-import { projectConfigurationV21Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
+import { projectConfigurationV22Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.ts";
 
 const root = process.cwd();
@@ -153,7 +153,7 @@ for (const line of traceLines.slice(2)) for (const id of line.match(
 ) ?? []) if (!stableDefinitions.has(id)) addIssue(`TRACEABILITY references undefined ID ${id}.`);
 
 const rawConfig = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8"));
-const parsed = projectConfigurationV21Schema.safeParse(rawConfig);
+const parsed = projectConfigurationV22Schema.safeParse(rawConfig);
 let config;
 if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
@@ -192,7 +192,7 @@ if (!parsed.success) {
   for (const id of expectedUseCases) if (!config.direction.useCases.some((useCase) => useCase.id === id)) addIssue(`Missing canonical Use Case ${id}.`);
   if (config.environment.states.length !== 5) addIssue(`Default project must contain five canonical States; found ${config.environment.states.length}.`);
   const agentDocuments = await indexedMarkdownDocuments(path.join(root, ".ballet/agents"));
-  if (config.agents.length < 4) addIssue("Default project needs explicit Validation, Work, Critic and Refinement Agents.");
+  if (config.agents.length !== 2) addIssue("Default project needs exactly the Critic and Refinement governance Agents.");
   for (const agent of config.agents) {
     const document = agentDocuments.get(agent.id);
     if (!document) { addIssue(`Agent ${agent.id} has no canonical Markdown document.`); continue; }
@@ -272,7 +272,7 @@ if (issues.length) {
 } else {
   const states = config?.environment.states.length ?? 0;
   const actions = config?.environment.states.reduce((total, state) => total + state.actions.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v21, ${states} States and ${actions} Actions.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v22, ${states} States and ${actions} Actions.\n`);
 }
 
 async function indexedMarkdown(directory) {
@@ -294,7 +294,7 @@ async function indexedMarkdownDocuments(directory) {
 async function validateFixtureProject() {
   const fixtureRoot = path.join(root, ".fixture-ballet-project");
   const raw = JSON.parse(await readFile(path.join(fixtureRoot, ".ballet/project.json"), "utf8"));
-  const parsedFixture = projectConfigurationV21Schema.safeParse(raw);
+  const parsedFixture = projectConfigurationV22Schema.safeParse(raw);
   if (!parsedFixture.success) { parsedFixture.error.issues.forEach((issue) => addIssue(
     `Fixture Project Config:${issue.path.join(".")}: ${issue.message}`)); return; }
   const fixture = parsedFixture.data;

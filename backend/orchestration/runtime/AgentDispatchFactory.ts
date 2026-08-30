@@ -1,5 +1,5 @@
-import type { ActionDefinition, AgentComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
+import type { ActionDefinition, ActionRoleComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
+import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
 import type { CreateAgentRunInput, ExecutionTaskSeed } from "../../../shared/orchestration/persistence.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
@@ -34,9 +34,8 @@ export class AgentDispatchFactory {
   }): PreparedAgentDispatch {
     const { state, action } = findDefinitions(input.run, input.action.actionDefinitionId);
     const composition = input.role === "work" ? action.work : action.validation;
-    const agentDefinition = input.run.executionSnapshot.agents.find(({ id }) => id === composition.agentId)!;
     const capability = input.run.executionSnapshot.runtimeCapabilities.find(
-      ({ agentId }) => agentId === composition.agentId
+      ({ subject }) => subject.kind === "action_role" && subject.actionId === action.id && subject.role === input.role
     )!;
     const agentRunId = this.nextId(`${input.role}-${input.phase}`);
     const taskId = this.nextId("task");
@@ -68,12 +67,13 @@ export class AgentDispatchFactory {
       workOutcome: requiredOutcome(input.workOutcome) as unknown as JsonValue
     };
     const parsedEnvelope = taskEnvelopeV11Schema.parse(envelope);
-    const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition });
-    const spec: ExecutionSpecV14 = {
-      version: 14, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
+    const subject = { kind: "action_role" as const, actionId: action.id, role: input.role };
+    const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition, subject });
+    const spec: ExecutionSpecV15 = {
+      version: 15, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
-        agentId: agentDefinition.id, provider: capability.provider, cliVersion: capability.cliVersion, model: capability.model,
+        subject, provider: capability.provider, cliVersion: capability.cliVersion, model: capability.model,
         reasoningEffort: capability.reasoningEffort,
         capabilityHash: capability.capabilitySha256
       },
@@ -113,7 +113,7 @@ const findDefinitions = (run: StoredEnvironmentRun, actionId: string): { state: 
   }
   throw new Error(`Action ${actionId} is absent from immutable snapshot.`);
 };
-const requireInstruction = (run: StoredEnvironmentRun, composition: AgentComposition): string => {
+const requireInstruction = (run: StoredEnvironmentRun, composition: ActionRoleComposition): string => {
   const resource = run.executionSnapshot.resources.find(
     ({ kind, id }) => kind === "instruction" && id === composition.instructionResource
   );

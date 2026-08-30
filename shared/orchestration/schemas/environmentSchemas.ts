@@ -20,15 +20,19 @@ export const agentCompositionSchema = z.object({
   skillResources: idListSchema
 }).strict();
 
+export const actionRoleCompositionSchema = z.object({
+  instructionResource: idSchema,
+  skillResources: idListSchema
+}).strict();
+
 export const actionDefinitionSchema = z.object({
   id: idSchema,
   name: nonEmptyTextSchema,
   description: nonEmptyTextSchema,
   priority: z.number().int().safe().positive(),
-  useCaseIds: idListSchema.min(1),
   maxRetries: z.number().int().min(0).max(CONTRACT_LIMITS.maxRetries),
-  validation: agentCompositionSchema,
-  work: agentCompositionSchema,
+  validation: actionRoleCompositionSchema,
+  work: actionRoleCompositionSchema,
   input: z.json().optional()
 }).strict();
 
@@ -96,7 +100,7 @@ const refinementConfigurationSchema = z.object({
   ])
 }).strict();
 
-export const projectConfigurationV21Schema = z.object({
+export const projectConfigurationV22Schema = z.object({
   version: z.literal(PROJECT_CONFIG_VERSION),
   direction: directionSchema,
   agents: z.array(agentDefinitionSchema).max(CONTRACT_LIMITS.agents),
@@ -115,9 +119,6 @@ export const projectConfigurationV21Schema = z.object({
     for (const id of state.useCaseIds) if (!useCaseIds.has(id)) {
       context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
     }
-    for (const [actionIndex, action] of state.actions.entries()) for (const id of action.useCaseIds) {
-      if (!useCaseIds.has(id)) context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "actions", actionIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
-    }
   }
   const agentIds = new Set(config.agents.map(({ id }) => id));
   if (agentIds.size !== config.agents.length) {
@@ -126,10 +127,6 @@ export const projectConfigurationV21Schema = z.object({
   const agents: Array<{ path: string; agent: z.infer<typeof agentCompositionSchema> }> = [
     { path: "critic.agent", agent: config.critic.agent },
     { path: "refinement.agent", agent: config.refinement.agent },
-    ...config.environment.states.flatMap((state, stateIndex) => state.actions.flatMap((action, actionIndex) => [
-      { path: `environment.states.${stateIndex}.actions.${actionIndex}.validation`, agent: action.validation },
-      { path: `environment.states.${stateIndex}.actions.${actionIndex}.work`, agent: action.work }
-    ]))
   ];
   for (const { path, agent } of agents) {
     if (!agentIds.has(agent.agentId)) {

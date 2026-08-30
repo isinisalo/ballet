@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import express from "express";
 import { z } from "zod";
 import {
-  agentExecutionParamsSchema, emptyRuntimeBodySchema, executionBindingBodySchema,
+  actionRoleExecutionParamsSchema, agentExecutionParamsSchema, emptyRuntimeBodySchema, executionBindingBodySchema,
   executionTaskParamsSchema, localDaemonClaimBodySchema, localDaemonCompleteBodySchema,
   localDaemonDiagnosticsBodySchema, localDaemonEventBatchBodySchema, localDaemonFailBodySchema,
   localDaemonHeartbeatBodySchema, localDaemonLeaseBodySchema, runtimeLogQuerySchema
@@ -12,6 +12,7 @@ import type { LocalDaemonStore } from "../../orchestration/persistence/LocalDaem
 
 export const createLocalDaemonRouter = (options: {
   store: LocalDaemonStore; token: string; listAgentIds(): string[];
+  actionExists(stateId: string, actionId: string): boolean;
 }): express.Router => {
   const router = express.Router();
   const authenticated = daemonAuth(options.token);
@@ -38,6 +39,16 @@ export const createLocalDaemonRouter = (options: {
   router.put("/agents/:agentId/execution", route((req, res) => {
     const { agentId } = parseParams(agentExecutionParamsSchema, req);
     res.json(options.store.putBinding(agentId, parseBody(executionBindingBodySchema, req)));
+  }));
+  router.get("/environment/states/:stateId/actions/:actionId/execution/:role", route((req, res) => {
+    const { stateId, actionId, role } = parseParams(actionRoleExecutionParamsSchema, req);
+    if (!options.actionExists(stateId, actionId)) { res.status(404).json({ error: `Action ${actionId} was not found in State ${stateId}.` }); return; }
+    res.json(options.store.actionRoleBinding(actionId, role) ?? null);
+  }));
+  router.put("/environment/states/:stateId/actions/:actionId/execution/:role", route((req, res) => {
+    const { stateId, actionId, role } = parseParams(actionRoleExecutionParamsSchema, req);
+    if (!options.actionExists(stateId, actionId)) { res.status(404).json({ error: `Action ${actionId} was not found in State ${stateId}.` }); return; }
+    res.json(options.store.putActionRoleBinding(actionId, role, parseBody(executionBindingBodySchema, req)));
   }));
 
   router.post("/daemon/heartbeat", authenticated, route((req, res) => {
