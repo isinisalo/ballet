@@ -27,6 +27,7 @@ export const routeFromPath = (path: string): RouteState => {
   }
 
   const patterns: Array<[RegExp, WorkspaceView]> = [
+    [/^\/agents\/([^/]+)\/?$/, "agents"],
     [/^\/automation\/loops\/states\/([^/]+)\/actions\/([^/]+)\/?$/, "action"],
     [/^\/automation\/loops\/states\/([^/]+)\/?$/, "state"],
     [/^\/run\/([^/]+)\/states\/([^/]+)\/actions\/([^/]+)\/?$/, "run-action"],
@@ -56,7 +57,9 @@ export const routeFromPath = (path: string): RouteState => {
   return { view: "orchestration", workspaceView: "invalid" };
 };
 
-export const orchestrationEntityPath = (base: string, id?: string) => `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
+export const orchestrationEntityPath = (base: string, id?: string) => id && base === "/agents"
+  ? `/agents/${encodeURIComponent(id)}`
+  : `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
 export const orchestrationStatePath = (stateId: string) => `/automation/loops/states/${encodeURIComponent(stateId)}`;
 export const orchestrationActionPath = (stateId: string, actionId: string) => `${orchestrationStatePath(stateId)}/actions/${encodeURIComponent(actionId)}`;
 export const orchestrationActionFlowPath = (stateId: string, actionId: string) => `${orchestrationActionPath(stateId, actionId)}?canvas=flow`;

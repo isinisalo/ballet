@@ -78,7 +78,9 @@ type SidebarEntity = { id: string; label: string; status: string; healthy: boole
 
 function entityItems(path: string, data?: OrchestrationConfigureData): SidebarEntity[] {
   if (!data) return [];
-  if (path === "/agents") return data.project.config.agents.map((item) => ({ id: item.id, label: item.name, status: item.enabled ? "Enabled" : "Disabled", healthy: item.enabled }));
+  if (path === "/agents") return data.agents.agents.map((item) => ({ id: item.id,
+    label: item.id === "ballet-critic-agent" ? "Critic Agent" : "Refinement Agent",
+    status: item.status, healthy: item.status === "ready" }));
   if (path === "/skills") return data.skills.map((item) => ({ id: item.id, label: item.id, status: "Skill", healthy: true }));
   if (path === "/project/instructions") return data.instructions.map((item) => ({ id: item.id, label: item.id, status: "Instruction", healthy: true }));
   const values = path === "/project/goals" ? data.project.config.direction.goals : path === "/project/adrs" ? data.project.config.direction.adrs : path === "/project/constraints" ? data.project.config.direction.constraints : path === "/project/use-cases" ? data.project.config.direction.useCases : [];

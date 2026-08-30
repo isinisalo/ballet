@@ -4,28 +4,28 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 27
+version: 28
 tags: [architecture, arc42, environment]
 ---
 
 # Ballet architecture
 
-Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). [ADR-038](.ballet/adr/adr-038-action-role-execution-bindings.md) makes State the Use Case closure owner and gives each Action role its own project composition. [ADR-039](.ballet/adr/adr-039-action-shared-provider-policy.md) gives Validation and its subordinate Work agent one machine-local Action provider and policy. [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) retains governance Markdown Agents, Feedback/Refinement and Run Evidence, while [ADR-037](.ballet/adr/adr-037-checkout-local-daemon.md) owns the checkout-local CLI worker. [ADR-036](.ballet/adr/adr-036-loop-engineering-space-and-action-flow-projections.md) owns the shared State/Action canvas.
+Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). [ADR-038](.ballet/adr/adr-038-action-role-execution-bindings.md) makes State the Use Case closure owner and gives each Action role its own project composition. [ADR-040](.ballet/adr/adr-040-codex-only-fixed-governance-agents.md) fixes governance to two Codex Custom Agent TOMLs and reduces Action execution to role-specific model/reasoning. [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) retains Feedback/Refinement and Run Evidence, while [ADR-037](.ballet/adr/adr-037-checkout-local-daemon.md) owns the checkout-local CLI worker. [ADR-036](.ballet/adr/adr-036-loop-engineering-space-and-action-flow-projections.md) owns the shared State/Action canvas.
 
-The active implementation is the atomic v22/v20 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized.
+The active implementation is the atomic v23/v21 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized.
 
 ## Active version matrix
 
 | Contract | Version |
 | --- | ---: |
-| Project Config | 22 |
-| Root Snapshot | 17 |
+| Project Config | 23 |
+| Root Snapshot | 18 |
 | Task Envelope / role outcome | 11 / 11 |
-| Prompt composition | 13 |
-| ExecutionSpec | 15 |
-| SQLite | 20 |
+| Prompt composition | 14 |
+| ExecutionSpec | 16 |
+| SQLite | 21 |
 | Feedback / Critic / Refinement | 2 / 2 / 2 |
-| Action execution binding / Agent binding / Run Evidence | 2 / 2 / 1 |
+| Action execution binding / Codex Agent / Run Evidence | 3 / 2 / 1 |
 
 The version cut is strict. Incompatible config or local state is rejected unchanged; there is no migration, reader, route alias or dual write.
 
@@ -35,9 +35,9 @@ The version cut is strict. Incompatible config or local state is rejected unchan
 flowchart LR
   Human[Human project owner] -->|authors direction and exact approvals| Ballet[Ballet local command center]
   Ballet -->|leased immutable task over loopback| Daemon[Checkout-local daemon]
-  Daemon -->|Codex CLI or Copilot CLI outcome| Ballet
+  Daemon -->|Codex CLI outcome| Ballet
   Ballet -->|local commits and artifacts| Git[Checkout-local Git repository]
-  Ballet -->|runtime facts| DB[(SQLite v20)]
+  Ballet -->|runtime facts| DB[(SQLite v21)]
   Browser[Same-origin browser UI] <-->|canonical JSON and SSE| Ballet
 ```
 
@@ -51,9 +51,9 @@ flowchart TB
   HTTP --> App[Project, runtime and governance application services]
   App --> Shared[Strict shared contracts and pure gates]
   App --> Persistence[SQLite repositories and transactions]
-  App --> LocalRuntime[Action execution and governance Agent bindings, queue, leases and local runtime registry]
+  App --> LocalRuntime[Action role selections, queue, leases and local runtime registry]
   LocalRuntime <-->|loopback polling and 0600 bearer token| Daemon[Checkout-local daemon]
-  Daemon --> Execution[Codex CLI and Copilot CLI adapters]
+  Daemon --> Execution[Codex CLI adapter]
   App --> Workspace[Managed Git worktrees and finalization]
   Project[Project-local config, Markdown and Skills] --> App
   Persistence --> Local[(.git/ballet)]
@@ -64,13 +64,13 @@ flowchart TB
 
 | Component | Responsibility | Primary source |
 | --- | --- | --- |
-| Direction and config | strict v22 load/save, State-owned Use Case closure, governance Markdown Agents, approval invalidation, references and resources | `shared/orchestration/schemas/**`, `backend/orchestration/project/**` |
-| Run planning | approved State closure, immutable Snapshot v17, Action execution bindings, ordered State/Action seeds and permissions | `backend/orchestration/runtime/EnvironmentRunPlanner.ts` |
+| Direction and config | strict v23 load/save, State-owned Use Case closure, two fixed Codex Agent TOMLs, approval invalidation, references and resources | `shared/orchestration/schemas/**`, `backend/orchestration/project/**` |
+| Run planning | approved State closure, immutable Snapshot v18, Action execution bindings, ordered State/Action seeds and permissions | `backend/orchestration/runtime/EnvironmentRunPlanner.ts` |
 | Action control | Validation-first transitions, retry formula and next eligible work | `backend/orchestration/persistence/ActionOutcomeCoordinator.ts`, `FlowCoordinator.ts` |
 | Runtime execution | queue, local-daemon dispatch, cancellation, recovery and server-owned finalization | `backend/orchestration/runtime/EnvironmentRuntimeService.ts`, `LocalDaemonOrchestrationProvider.ts` |
-| Local daemon | readiness, polling, leases and Codex/Copilot processes; no repository/finalization ownership | `backend/daemon/**`, `backend/orchestration/persistence/LocalDaemonStore.ts` |
+| Local daemon | readiness, polling, leases and the Codex process; no repository/finalization ownership | `backend/daemon/**`, `backend/orchestration/persistence/LocalDaemonStore.ts` |
 | Governance | Critic scheduling, proposal decisions, exact Refinement apply and continuation | `backend/orchestration/governance/**` |
-| Persistence | SQLite v20 schema, Action execution bindings, transactions, events, daemon facts, Feedback, reviews and Run Evidence | `backend/orchestration/persistence/**` |
+| Persistence | SQLite v21 schema, Action execution bindings, transactions, events, daemon facts, Feedback, reviews and Run Evidence | `backend/orchestration/persistence/**` |
 | API/security | canonical routes, strict request schemas, loopback/origin/body limits and trusted actor boundary | `backend/orchestration/http/**`, `backend/server/createBalletServer.ts` |
 | UI | deterministic Loop Engineering State/Action canvas and Action flow, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback and reviews | `frontend/src/orchestration/**` |
 
@@ -78,9 +78,9 @@ flowchart TB
 
 | Truth | Canonical owner | Forbidden substitute |
 | --- | --- | --- |
-| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases, governance Markdown Agents and Project Config v22 | provider prompt or client state |
+| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases, two `.codex/agents/*.toml` files and Project Config v23 | provider prompt or client state |
 | Environment authoring | Git: Config, instructions and Skills | SQLite completion flags |
-| Runtime status, attempts, gates, schedules, Action execution/governance Agent bindings and decisions | SQLite v20 plus immutable Root Snapshot | config `done`/`blocked` fields or provider prose |
+| Runtime status, attempts, gates, schedules, Action role selections and decisions | SQLite v21 plus immutable Root Snapshot | config `done`/`blocked` fields or provider prose |
 | Repository effect | local commit SHA plus exact artifact hashes | approval flag without applied bytes |
 | Terminal evidence | recomputable Run Evidence projection inside its owning Run | mutable copied evidence document |
 

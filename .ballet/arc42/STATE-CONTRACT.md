@@ -10,7 +10,7 @@ tags: [arc42, state, runtime-contract]
 
 # Environment runtime state contract
 
-Project Config v22 defines immutable intent: Environment, ordered States with approved Use Case references, prioritized Actions and role resources. An Action has no Use Case or Agent reference and inherits its owning State closure. SQLite v20 defines runtime truth: Environment/State/Action status, attempts, Action execution and governance Agent bindings, events, Feedback, proposals, decisions, local daemon execution facts and continuation lineage.
+Project Config v23 defines immutable intent: Environment, ordered States with approved Use Case references, prioritized Actions, role resources and fixed governance Agent Skill composition. An Action has no Use Case or Agent reference and inherits its owning State closure. SQLite v21 defines runtime truth: Environment/State/Action status, attempts, Action role model/reasoning selections, events, Feedback, proposals, decisions, local daemon execution facts and continuation lineage.
 
 | Runtime status | Derived `done` | Derived `blocked` | Permitted controller effect |
 | --- | --- | --- | --- |
@@ -21,4 +21,4 @@ Project Config v22 defines immutable intent: Environment, ordered States with ap
 | `done` | true | false | contributes to State completion |
 | `blocked` | false | true | gates Environment and has causal Feedback |
 
-Runtime never copies documents, bindings, diffs, logs, credentials or human authority into project config. Root Snapshot v17 freezes exact project/resource contents, State-owned approved closure, one shared-provider/policy Action capability with role-specific model/reasoning, governance Agent definitions/bindings, local provider capability evidence and hashes. A continuation imports only unchanged, unaffected done evidence; a relevant binding, instruction or Skill change invalidates that Action evidence while the parent remains byte-immutable.
+Runtime never copies documents, bindings, diffs, logs, credentials or human authority into project config. Root Snapshot v18 freezes exact project/resource contents, State-owned approved closure, one Codex Action capability with role-specific model/reasoning, the two fixed read-only Codex Agent definitions, local capability evidence and hashes. A continuation imports only unchanged, unaffected done evidence; a relevant binding, instruction, Agent instruction or Skill change invalidates that Action evidence while the parent remains byte-immutable.

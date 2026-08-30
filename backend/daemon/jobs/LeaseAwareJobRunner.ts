@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ExecutionPolicy, LocalDaemonEvent, LocalDaemonTaskClaim, RuntimeProvider } from "../../../shared/domain/runtime.js";
+import type { LocalDaemonEvent, LocalDaemonTaskClaim, RuntimeProvider } from "../../../shared/domain/runtime.js";
 import { roleOutcomeV11Schema } from "../../../shared/orchestration/schemas/outcomeSchemas.js";
 import type { CliRuntimeAdapter, RuntimeEvent, RuntimePermissionPolicy } from "../providers/CliRuntimeAdapter.js";
 import type { LocalDaemonTransport } from "../transport/LocalDaemonTransport.js";
@@ -63,15 +63,14 @@ export class LeaseAwareJobRunner {
   private async executeAdapter(adapter: CliRuntimeAdapter, claim: LocalDaemonTaskClaim, signal: AbortSignal): Promise<string> {
     const { spec } = claim;
     let sequence = 0; let raw: string | undefined;
-    const policy: ExecutionPolicy = { network: claim.permissions.network, readOnlyRoots: claim.permissions.readOnlyRoots };
     const permissionPolicy = this.options.permissionPolicy
-      ?? new WorkspacePermissionPolicy(spec.project.checkoutRoot, policy, claim.permissions.workspaceAccess);
+      ?? new WorkspacePermissionPolicy(spec.project.checkoutRoot, claim.permissions.workspaceAccess);
     const schema = z.toJSONSchema(roleOutcomeV11Schema) as Record<string, unknown>;
     for await (const event of adapter.execute({
       executionId: claim.taskId, prompt: spec.evidence.prompt,
       workingDirectory: spec.project.checkoutRoot, model: spec.runtime.model,
       reasoning: spec.runtime.reasoningEffort, workspaceAccess: claim.permissions.workspaceAccess,
-      policy, outputSchema: schema, signal, permissionPolicy
+      outputSchema: schema, signal, permissionPolicy
     })) {
       if (event.type === "execution.completed") {
         raw = event.structuredOutput === undefined ? event.output : JSON.stringify(event.structuredOutput);
@@ -90,12 +89,6 @@ export class LeaseAwareJobRunner {
       `${adapter.provider} version changed from ${spec.runtime.cliVersion} to ${probe.version ?? "unknown"}.`);
     if (claim.permissions.workspaceAccess === "workspace-write" && !probe.policyCapabilities.workspaceWrite) {
       throw new Error(`${adapter.provider} cannot enforce workspace-write isolation.`);
-    }
-    if (claim.permissions.network && !probe.policyCapabilities.networkControl) {
-      throw new Error(`${adapter.provider} cannot enforce network policy.`);
-    }
-    if (claim.permissions.readOnlyRoots.length > 0 && !probe.policyCapabilities.readOnlyRoots) {
-      throw new Error(`${adapter.provider} cannot enforce additional read-only roots.`);
     }
     const models = await adapter.listModels(signal);
     if (!models.some(({ id }) => id === spec.runtime.model)) throw new Error(

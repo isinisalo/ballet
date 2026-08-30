@@ -14,7 +14,7 @@ export function useOrchestrationConfigureData() {
       const [project, references, instructions, skills, goals, adrs, constraints, useCases, agents, schedules] = await Promise.all([
         orchestrationApi.project(), orchestrationApi.references(), orchestrationApi.resources("instructions"),
         orchestrationApi.resources("skills"), orchestrationApi.resources("goals"), orchestrationApi.resources("adrs"),
-        orchestrationApi.resources("constraints"), orchestrationApi.resources("use-cases"), orchestrationApi.resources("agents"), orchestrationApi.schedules()
+        orchestrationApi.resources("constraints"), orchestrationApi.resources("use-cases"), orchestrationApi.agents(), orchestrationApi.schedules()
       ]);
       if (requestSequence !== sequence.current) return;
       setData({ project, references, instructions, skills, goals, adrs, constraints, useCases, agents, schedules }); setError(undefined);

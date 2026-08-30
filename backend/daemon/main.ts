@@ -4,7 +4,6 @@ import { writeDaemonStatus } from "./DaemonStatusFile.js";
 import { DaemonConfigStore } from "./config/DaemonConfigStore.js";
 import { LeaseAwareJobRunner } from "./jobs/LeaseAwareJobRunner.js";
 import { CodexAppServerAdapter } from "./providers/codex/CodexAppServerAdapter.js";
-import { CopilotSdkAdapter } from "./providers/copilot/CopilotSdkAdapter.js";
 import { LocalDaemonTransport } from "./transport/LocalDaemonTransport.js";
 import { RotatingDaemonLogger } from "./RotatingDaemonLogger.js";
 
@@ -15,8 +14,7 @@ process.title = "ballet-local-daemon";
 const configStore = new DaemonConfigStore(stateRoot);
 const config = await configStore.load();
 const codex = config.providers.find(({ provider }) => provider === "codex")!;
-const copilot = config.providers.find(({ provider }) => provider === "copilot")!;
-const adapters = [new CodexAppServerAdapter({ command: codex.command }), new CopilotSdkAdapter({ command: copilot.command })];
+const adapters = [new CodexAppServerAdapter({ command: codex.command })];
 const transport = new LocalDaemonTransport(config.serverUrl, config.token);
 const runner = new LeaseAwareJobRunner({ adapters, transport });
 const logger = new RotatingDaemonLogger({ path: configStore.logPath() });

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import express from "express";
 import { afterEach, describe, expect, test } from "vitest";
-import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
 import type { UseCase } from "../../../shared/orchestration/direction.js";
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -38,7 +38,7 @@ const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { await Promise.all(cleanups.splice(0).map((cleanup) => cleanup())); });
 
 describe("orchestration HTTP integration", () => {
-  test("enforces 77 project, run, feedback, review, routing, and security scenarios", async () => {
+  test("enforces 84 project, run, feedback, review, routing, and security scenarios", async () => {
     const fixture = await startFixture();
     let scenarios = 0;
     const request = (route: string, init?: RequestInit) => fetch(`${fixture.base}${route}`, init);
@@ -48,7 +48,7 @@ describe("orchestration HTTP integration", () => {
     });
 
     let response = await request("/project");
-    expect(response.status).toBe(200); expect((await response.json() as { config: { version: number } }).config.version).toBe(22); scenarios += 1;
+    expect(response.status).toBe(200); expect((await response.json() as { config: { version: number } }).config.version).toBe(23); scenarios += 1;
 
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: { ...fixture.config, graph: {} } }));
     expect(response.status).toBe(400); scenarios += 1;
@@ -64,7 +64,7 @@ describe("orchestration HTTP integration", () => {
     response = await request("/project", json("PUT", { expectedHash: "f".repeat(64), config: fixture.config }));
     expect(response.status).toBe(409); scenarios += 1;
 
-    response = await request("/project"); const authoringProject = await response.json() as { config: ProjectConfigurationV22 };
+    response = await request("/project"); const authoringProject = await response.json() as { config: ProjectConfigurationV23 };
     const authored = { ...authoringProject.config, environment: { ...authoringProject.config.environment, description: "Authored" } };
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash, config: authored }));
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
@@ -107,7 +107,7 @@ describe("orchestration HTTP integration", () => {
     expect(response.status).toBe(200); fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
 
     response = await request("/environment"); const environmentView = await response.json() as {
-      environment: ProjectConfigurationV22["environment"];
+      environment: ProjectConfigurationV23["environment"];
     };
     const secondState = structuredClone(environmentView.environment.states[0]!);
     secondState.id = "state-2"; secondState.name = "Second"; secondState.order = 2;
@@ -132,7 +132,7 @@ describe("orchestration HTTP integration", () => {
     response = await request("/environment/states/missing"); expect(response.status).toBe(404); scenarios += 1;
 
     response = await request("/environment"); const actionEnvironment = await response.json() as {
-      environment: ProjectConfigurationV22["environment"];
+      environment: ProjectConfigurationV23["environment"];
     };
     const secondAction = structuredClone(actionEnvironment.environment.states[0]!.actions[0]!);
     secondAction.id = "action-2"; secondAction.name = "Second Action"; secondAction.priority = 2;
@@ -177,6 +177,26 @@ describe("orchestration HTTP integration", () => {
 
     response = await request("/instructions/%2E%2E", json("PUT", { expectedHash: "absent", content: "unsafe" }));
     expect([400, 404]).toContain(response.status); scenarios += 1;
+
+    response = await request("/agents");
+    const agents = await response.json() as { configHash: string; agents: Array<{ id: string; status: string; contentHash: string }> };
+    expect(response.status).toBe(200); expect(agents.agents.map(({ id }) => id)).toEqual([
+      "ballet-critic-agent", "ballet-refinement-agent"
+    ]); scenarios += 1;
+    response = await request("/agents/ballet-critic-agent");
+    const critic = await response.json() as { status: string; contentHash: string; agent: { model: string } };
+    expect(response.status).toBe(200); expect(critic).toMatchObject({ status: "ready", agent: { model: "gpt-5.6-sol" } }); scenarios += 1;
+    response = await request("/agents", json("POST", {})); expect(response.status).toBe(404); scenarios += 1;
+    response = await request("/agents/ballet-critic-agent", json("DELETE", {})); expect(response.status).toBe(404); scenarios += 1;
+    response = await request("/agents/ballet-critic-agent/execution"); expect(response.status).toBe(404); scenarios += 1;
+    response = await request("/agents/ballet-critic-agent/execution", json("PUT", {})); expect(response.status).toBe(404); scenarios += 1;
+    response = await request("/agents/ballet-critic-agent", json("PUT", {
+      expectedConfigHash: agents.configHash, expectedDocumentHash: critic.contentHash,
+      developerInstructions: "Inspect immutable evidence and propose only.", model: "gpt-5.6-sol",
+      reasoningEffort: "low", skillResources: []
+    }));
+    expect(response.status, await response.clone().text()).toBe(200);
+    fixture.configHash = (await response.json() as { configHash: string }).configHash; scenarios += 1;
 
     response = await request("/goals", json("POST", {
       expectedConfigHash: fixture.configHash, expectedDocumentHash: "absent", markdown: "# Extra\n",
@@ -241,7 +261,7 @@ describe("orchestration HTTP integration", () => {
     response = await request(`/environment-runs/${encodeURIComponent(run.environmentRunId)}`); const runDetail = await response.json() as Record<string, unknown>;
     expect(response.status).toBe(200); expect(runDetail).not.toHaveProperty("executionSnapshot"); scenarios += 1;
 
-    response = await request("/project"); const activeProject = await response.json() as { config: ProjectConfigurationV22 };
+    response = await request("/project"); const activeProject = await response.json() as { config: ProjectConfigurationV23 };
     response = await request("/project", json("PUT", { expectedHash: fixture.configHash,
       config: { ...activeProject.config, environment: { ...activeProject.config.environment, name: "Locked" } } }));
     expect(response.status).toBe(409); scenarios += 1;
@@ -405,16 +425,21 @@ describe("orchestration HTTP integration", () => {
 
     response = await request("/instructions/extra", json("DELETE", { expectedHash: updatedExtra.contentHash }));
     expect(response.status).toBe(204); scenarios += 1;
-    expect(scenarios).toBe(77);
+    expect(scenarios).toBe(84);
   });
 });
 
 const startFixture = async () => {
   const root = mkdtempSync(path.join(tmpdir(), "ballet-orchestration-http-"));
   mkdirSync(path.join(root, ".ballet"), { recursive: true });
+  mkdirSync(path.join(root, ".codex", "agents"), { recursive: true });
   writeFileSync(path.join(root, "README.md"), "fixture\n");
+  for (const id of ["ballet-critic-agent", "ballet-refinement-agent"] as const) writeFileSync(
+    path.join(root, ".codex", "agents", `${id}.toml`),
+    `name = "${id}"\ndescription = "Test Agent"\nmodel = "gpt-5.6-sol"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\ndeveloper_instructions = """\n${VALID_INSTRUCTION}\n"""\n`
+  );
   execFileSync("git", ["init", "-q"], { cwd: root });
-  execFileSync("git", ["add", "README.md"], { cwd: root });
+  execFileSync("git", ["add", "README.md", ".codex/agents"], { cwd: root });
   execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"], { cwd: root });
   const stateDirectory = mkdtempSync(path.join(tmpdir(), "ballet-orchestration-http-state-"));
   const manager = new LocalDatabase(path.join(stateDirectory, "state.sqlite"));
@@ -427,22 +452,21 @@ const startFixture = async () => {
   documents.put("adr", "adr-1", "# ADR 1\n", "absent");
   documents.put("constraint", "constraint-1", "# Constraint 1\n", "absent");
   documents.put("use-case", "UC-1", "# Use Case 1\n", "absent");
-  documents.put("agent", "profile", "# Agent\n\nTest execution agent.\n", "absent");
   const instructionHash = documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent").contentHash;
   const project = new ProjectDefinitionService(root, projects, documents);
   const agentCapability = (agentId: string) => ({
     subject: { kind: "agent" as const, agentId },
-    provider: "codex" as const, model: "model", reasoningEffort: "high",
-    networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
-    supportedModels: ["model"], supportedReasoningEfforts: ["high"],
+    provider: "codex" as const, model: "gpt-5.6-sol", reasoningEffort: "high",
+    cliVersion: "1.0.0",
+    supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"],
     supportsReadOnly: true, supportsWorkspaceWrite: true
   });
   const actionCapability = (actionId: string) => ({
     subject: { kind: "action" as const, actionId }, provider: "codex" as const,
-    networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
+    cliVersion: "1.0.0",
     roles: {
-      validation: { model: "model", reasoningEffort: "high", supportedModels: ["model"], supportedReasoningEfforts: ["high"] },
-      work: { model: "model", reasoningEffort: "high", supportedModels: ["model"], supportedReasoningEfforts: ["high"] }
+      validation: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] },
+      work: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] }
     }, supportsReadOnly: true, supportsWorkspaceWrite: true
   });
   const preflight = {

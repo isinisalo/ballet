@@ -23,7 +23,7 @@ export function RuntimesWorkspace(props: { selectedId?: string; navigate(path: s
     try { await operation(); await refresh(); } catch (reason) { setError(message(reason)); } finally { setPending(false); }
   };
   return <>
-    <ConfigureHeader title="Runtimes" description="Inspect the checkout-local daemon and its Codex CLI and GitHub Copilot CLI providers." />
+    <ConfigureHeader title="Runtimes" description="Inspect the checkout-local daemon and its Codex CLI runtime." />
     <ConfigureToolbar status={runtime?.status ?? "Loading local daemon"} label="Local daemon">
       <Button size="sm" variant="outline" disabled={pending} onClick={() => void action(() => orchestrationApi.refreshRuntime())}><RefreshCw />Refresh providers</Button>
       <Button size="sm" variant="outline" disabled={pending || !runtime || runtime.activeTaskCount > 0}
@@ -50,7 +50,7 @@ export function RuntimesWorkspace(props: { selectedId?: string; navigate(path: s
       </section>
       <section aria-labelledby="providers-heading"><h2 id="providers-heading" className="mb-2 font-semibold">Local providers</h2>
         <div className="grid gap-3 sm:grid-cols-2">{runtime?.providers.map((provider) => <article key={provider.provider} className="border bg-card p-3">
-          <div className="flex items-center justify-between gap-3"><strong>{provider.provider === "codex" ? "Codex CLI" : "GitHub Copilot CLI"}</strong>
+          <div className="flex items-center justify-between gap-3"><strong>Codex CLI</strong>
             <OperationalStatus compact label={provider.health} tone={provider.health === "ready" ? "healthy" : "neutral"} /></div>
           <p className="mt-1 text-xs text-muted-foreground">{provider.cliVersion ?? "Version unavailable"} · auth {provider.authStatus}</p>
           <p className="mt-2 text-xs">{provider.capabilities.models.length} models · {provider.busy ? "busy" : "idle"}</p>

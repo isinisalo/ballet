@@ -227,7 +227,7 @@ describe("orchestration validation-led Environment runtime", () => {
 
   test("read-only provider permission denies write and has no writable root", () => {
     const spec = mapProviderPermissions({ provider: "codex", role: "validation", toolPolicy: "read_only",
-      networkAccess: false, worktreePath: "/tmp/worktree" });
+      worktreePath: "/tmp/worktree" });
     const audit: unknown[] = [];
     expect(spec.writableRoots).toEqual([]);
     expect(authorizeProviderReadPath(spec, "/tmp/worktree/README.md")).toBe(true);
@@ -237,11 +237,10 @@ describe("orchestration validation-led Environment runtime", () => {
   });
 
   test("Work permission allows only managed worktree paths", () => {
-    const spec = mapProviderPermissions({ provider: "copilot", role: "work", toolPolicy: "workspace_write",
-      networkAccess: true, worktreePath: "/tmp/worktree" });
+    const spec = mapProviderPermissions({ provider: "codex", role: "work", toolPolicy: "workspace_write",
+      worktreePath: "/tmp/worktree" });
     expect(authorizeProviderPath(spec, "/tmp/worktree/file", () => undefined)).toBe(true);
     expect(authorizeProviderPath(spec, "/tmp/elsewhere", () => undefined)).toBe(false);
-    expect(spec.networkAccess).toBe(true);
     expect(spec.approvalPolicy).toBe("never");
   });
 
@@ -361,8 +360,8 @@ const twoActionSeed = (stateCount = 1, runId = "run-1", baseCommit = TEST_SHA): 
     ],
     permissions: [
       ...seed.executionSnapshot.permissions,
-      { role: "validation", actionId: second.id, toolPolicy: "read_only", networkAccess: false, approvalPolicy: "never" },
-      { role: "work", actionId: second.id, toolPolicy: "workspace_write", networkAccess: false, approvalPolicy: "never" }
+      { role: "validation", actionId: second.id, toolPolicy: "read_only", approvalPolicy: "never" },
+      { role: "work", actionId: second.id, toolPolicy: "workspace_write", approvalPolicy: "never" }
     ]
   };
   seed.executionSnapshotHash = hash(seed.executionSnapshot);

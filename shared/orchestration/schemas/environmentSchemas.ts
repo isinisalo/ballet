@@ -5,18 +5,20 @@ import { PROJECT_CONFIG_VERSION } from "../versions.js";
 import { idListSchema, idSchema, nonEmptyTextSchema } from "./common.js";
 import { directionSchema } from "./directionSchemas.js";
 
-export const agentDefinitionSchema = z.object({
-  id: idSchema,
-  name: nonEmptyTextSchema,
-  description: z.string().max(CONTRACT_LIMITS.text),
-  enabled: z.boolean(),
-  instructionResource: idSchema,
-  skillResources: idListSchema
-}).strict();
+export const governanceAgentDefinitionSchema = z.object({
+  id: z.enum(["ballet-critic-agent", "ballet-refinement-agent"]),
+  name: z.enum(["ballet-critic-agent", "ballet-refinement-agent"]),
+  description: nonEmptyTextSchema,
+  developerInstructions: nonEmptyTextSchema,
+  model: z.enum(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"]),
+  reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]),
+  sandboxMode: z.literal("read-only")
+}).strict().superRefine((agent, context) => {
+  if (agent.id !== agent.name) context.addIssue({ code: "custom", path: ["name"], message: "Agent name must match its fixed id" });
+});
 
 export const agentCompositionSchema = z.object({
-  agentId: idSchema,
-  instructionResource: idSchema,
+  agentId: z.enum(["ballet-critic-agent", "ballet-refinement-agent"]),
   skillResources: idListSchema
 }).strict();
 
@@ -96,14 +98,13 @@ const refinementConfigurationSchema = z.object({
   enabled: z.boolean(),
   agent: agentCompositionSchema,
   allowedRoots: z.tuple([
-    z.literal(".ballet/agents"), z.literal(".ballet/instructions"), z.literal(".agents/skills")
+    z.literal(".codex/agents"), z.literal(".ballet/instructions"), z.literal(".agents/skills")
   ])
 }).strict();
 
-export const projectConfigurationV22Schema = z.object({
+export const projectConfigurationV23Schema = z.object({
   version: z.literal(PROJECT_CONFIG_VERSION),
   direction: directionSchema,
-  agents: z.array(agentDefinitionSchema).max(CONTRACT_LIMITS.agents),
   environment: environmentDefinitionSchema,
   critic: criticConfigurationSchema,
   refinement: refinementConfigurationSchema
@@ -120,22 +121,10 @@ export const projectConfigurationV22Schema = z.object({
       context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
     }
   }
-  const agentIds = new Set(config.agents.map(({ id }) => id));
-  if (agentIds.size !== config.agents.length) {
-    context.addIssue({ code: "custom", path: ["agents"], message: "Agent IDs must be unique" });
-  }
-  const agents: Array<{ path: string; agent: z.infer<typeof agentCompositionSchema> }> = [
-    { path: "critic.agent", agent: config.critic.agent },
-    { path: "refinement.agent", agent: config.refinement.agent },
-  ];
-  for (const { path, agent } of agents) {
-    if (!agentIds.has(agent.agentId)) {
-      context.addIssue({ code: "custom", path: [...path.split("."), "agentId"], message: "Unknown Agent" });
-    }
-  }
-  for (const [index, agent] of config.agents.entries()) {
-    if (!agent.enabled && agents.some(({ agent: composition }) => composition.agentId === agent.id)) {
-      context.addIssue({ code: "custom", path: ["agents", index, "enabled"], message: "Referenced Agent must be enabled" });
-    }
-  }
+  if (config.critic.agent.agentId !== "ballet-critic-agent") context.addIssue({
+    code: "custom", path: ["critic", "agent", "agentId"], message: "Critic must use ballet-critic-agent"
+  });
+  if (config.refinement.agent.agentId !== "ballet-refinement-agent") context.addIssue({
+    code: "custom", path: ["refinement", "agent", "agentId"], message: "Refinement must use ballet-refinement-agent"
+  });
 });

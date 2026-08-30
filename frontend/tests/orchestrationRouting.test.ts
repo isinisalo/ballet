@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeFromPath, orchestrationActionFlowPath, orchestrationActionPath, orchestrationRunPath, orchestrationStatePath } from "../src/workspace/routing";
+import { routeFromPath, orchestrationActionFlowPath, orchestrationActionPath, orchestrationEntityPath, orchestrationRunPath, orchestrationStatePath } from "../src/workspace/routing";
 
 describe("orchestration URL-owned routing", () => {
   it.each([
@@ -17,6 +17,11 @@ describe("orchestration URL-owned routing", () => {
     expect(routeFromPath(`${orchestrationActionPath("state a", "action/b")}?canvas=unknown`).canvasMode).toBeUndefined();
   });
   it("builds deep links without aliases", () => { expect(orchestrationStatePath("state-1")).toBe("/automation/loops/states/state-1"); expect(orchestrationRunPath("run-1")).toBe("/run/run-1"); });
+  it("uses a canonical path segment for fixed Agents", () => {
+    const path = orchestrationEntityPath("/agents", "ballet-critic-agent");
+    expect(path).toBe("/agents/ballet-critic-agent");
+    expect(routeFromPath(path)).toMatchObject({ workspaceView: "agents", entityId: "ballet-critic-agent" });
+  });
   it("projects unknown orchestration paths as invalid", () => expect(routeFromPath("/not-real")).toMatchObject({ view: "orchestration", workspaceView: "invalid" }));
   it.each([
     ["/run", "run-list"], ["/run/run%201", "run-detail"],

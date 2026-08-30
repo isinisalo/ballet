@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
-import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentId, ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
 import type { FeedbackCategory, FeedbackTargetType } from "../../../shared/orchestration/reviews.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -66,16 +66,13 @@ export class ApiController {
   }
 
   project(): unknown { return this.dependencies.project.projects.load(); }
-  putProject(config: ProjectConfigurationV22, expectedHash: string | "absent"): unknown {
+  putProject(config: ProjectConfigurationV23, expectedHash: string | "absent"): unknown {
     const current = this.dependencies.project.projects.loadOptional();
     if (current && canonical(current.config.direction) !== canonical(config.direction)) {
       throw new ConflictError("Direction and Use Case mutations require their dedicated document commands.");
     }
     if (!current && config.direction.useCases.some(({ status }) => status === "approved")) {
       throw new ConflictError("Initial Use Cases must be draft and use the dedicated human approval command.");
-    }
-    if (current && canonical(current.config.agents) !== canonical(config.agents)) {
-      throw new ConflictError("Agent mutations require their dedicated Markdown document commands.");
     }
     const saved = this.dependencies.project.projects.save(config, expectedHash);
     this.changed("project_changed");
@@ -87,29 +84,32 @@ export class ApiController {
     const document = this.dependencies.project.documents.require(kind, id);
     if (kind === "instruction" || kind === "skill") return document;
     const config = this.dependencies.project.projects.load().config;
-    if (kind === "agent") return { ...document, value: config.agents.find((value) => value.id === id) };
     return { ...document, value: directionValues(config, kind).find((value) => value.id === id) };
   }
-  createAgent(input: Parameters<ProjectDefinitionService["putAgent"]>[0]): unknown {
-    if (input.expectedDocumentHash !== "absent" || this.dependencies.project.documents.list("agent").some(({ id }) => id === input.id)) {
-      throw new ConflictError(`Agent ${input.id} already exists.`);
-    }
-    const saved = this.dependencies.project.putAgent(input); this.changed("project_changed", input.id); return saved;
+  agents(): unknown {
+    const loaded = this.dependencies.project.projects.load();
+    return { configHash: loaded.configHash, agents: this.dependencies.project.agents.list().map((value) => {
+      const { source, ...slot } = value; void source;
+      return { ...slot, skillResources: slot.id === "ballet-critic-agent"
+        ? loaded.config.critic.agent.skillResources : loaded.config.refinement.agent.skillResources };
+    }) };
+  }
+  agent(id: GovernanceAgentId): unknown {
+    const loaded = this.dependencies.project.projects.load();
+    const { source, ...slot } = this.dependencies.project.agents.inspect(id); void source;
+    return { ...slot, configHash: loaded.configHash,
+      skillResources: id === "ballet-critic-agent"
+        ? loaded.config.critic.agent.skillResources : loaded.config.refinement.agent.skillResources };
   }
   updateAgent(input: Parameters<ProjectDefinitionService["putAgent"]>[0]): unknown {
-    if (input.expectedDocumentHash === "absent") throw new NotFoundError(`Agent ${input.id} was not found.`);
-    this.dependencies.project.documents.require("agent", input.id);
     const saved = this.dependencies.project.putAgent(input); this.changed("project_changed", input.id); return saved;
-  }
-  removeAgent(input: Parameters<ProjectDefinitionService["removeAgent"]>[0]): unknown {
-    const hash = this.dependencies.project.removeAgent(input); this.changed("project_changed", input.id); return { configHash: hash };
   }
   referenceIndex(): unknown {
     const config = this.dependencies.project.projects.load().config;
     const activeRunIds = (this.dependencies.connection().prepare(
       "SELECT environment_run_id FROM environment_runs WHERE status IN ('pending','running') ORDER BY environment_run_id"
     ).all() as Array<{ environment_run_id: string }>).map(({ environment_run_id }) => environment_run_id);
-    const runReferences = (["goal", "adr", "constraint", "use-case", "agent", "instruction", "skill"] as const)
+    const runReferences = (["goal", "adr", "constraint", "use-case", "instruction", "skill"] as const)
       .flatMap((kind) => this.dependencies.project.documents.list(kind).flatMap(({ id }) => {
         const runIds = this.dependencies.project.documents.runReferences(kind, id);
         return runIds.length > 0 ? [{ kind, id, runIds }] : [];
@@ -529,7 +529,7 @@ const assertExactOrder = (received: string[], current: string[], label: string):
   }
 };
 const directionValues = (
-  config: ProjectConfigurationV22, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
+  config: ProjectConfigurationV23, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
 ) => kind === "goal" ? config.direction.goals : kind === "adr" ? config.direction.adrs
   : kind === "constraint" ? config.direction.constraints : config.direction.useCases;
 

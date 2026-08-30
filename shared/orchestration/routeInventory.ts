@@ -7,7 +7,8 @@ const documentRoutes = (collection: string) => [
 export const OrchestrationRouteInventory = [
   "GET /api/project", "PUT /api/project", "GET /api/events",
   ...documentRoutes("goals"), ...documentRoutes("adrs"), ...documentRoutes("constraints"),
-  ...documentRoutes("use-cases"), ...documentRoutes("agents"), ...documentRoutes("instructions"), ...documentRoutes("skills"),
+  ...documentRoutes("use-cases"), "GET /api/agents", "GET /api/agents/:id", "PUT /api/agents/:id",
+  ...documentRoutes("instructions"), ...documentRoutes("skills"),
   "POST /api/use-cases/:id/approve", "POST /api/use-cases/:id/return-to-draft",
   "GET /api/reference-index", "GET /api/environment", "PUT /api/environment",
   "POST /api/environment/states", "GET /api/environment/states/:stateId",
@@ -34,9 +35,9 @@ export const OrchestrationRouteInventory = [
 ] as const;
 
 export const RuntimeSchemaInventory = Object.freeze({
-  projectConfig: 21, rootSnapshot: 14, taskEnvelope: 11, roleOutcome: 11,
-  promptComposition: 12, executionSpec: 13, sqlite: 17,
-  feedback: 2, critic: 2, refinement: 2, agentDaemonBinding: 1, runEvidence: 1
+  projectConfig: 23, rootSnapshot: 18, taskEnvelope: 11, roleOutcome: 11,
+  promptComposition: 14, executionSpec: 16, sqlite: 21,
+  feedback: 2, critic: 2, refinement: 2, codexAgent: 2, actionBinding: 3, runEvidence: 1
 });
 
 export const OrchestrationProhibitedRoutes = [

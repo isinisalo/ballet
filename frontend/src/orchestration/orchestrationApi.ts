@@ -1,9 +1,9 @@
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
-import type { ActionDefinition, AgentDefinition, EnvironmentDefinition, ProjectConfigurationV22, StateDefinition } from "@shared/orchestration/environment";
-import type { ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
+import type { ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV23, StateDefinition } from "@shared/orchestration/environment";
+import type { GovernanceAgentsResponse, GovernanceAgentSlot, ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
-import type { ActionExecutionBinding, ActionRoleModelSelection, AgentExecutionBinding, ExecutionPolicy, LocalDaemonLogEntry, LocalDaemonStatus, RuntimeProvider } from "@shared/domain/runtime";
+import type { ActionExecutionBinding, ActionRoleModelSelection, LocalDaemonLogEntry, LocalDaemonStatus } from "@shared/domain/runtime";
 
 const base = "/api";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -13,9 +13,11 @@ const remove = (value: unknown): RequestInit => ({ method: "DELETE", body: JSON.
 export const orchestrationApi = {
   project: () => request<ProjectRecord>(`${base}/project`),
   references: () => request<ReferenceIndexResponse>(`${base}/reference-index`),
-  resources: (collection: "goals" | "adrs" | "constraints" | "use-cases" | "agents" | "instructions" | "skills") => request<ResourceDocument[]>(`${base}/${collection}`),
+  resources: (collection: "goals" | "adrs" | "constraints" | "use-cases" | "instructions" | "skills") => request<ResourceDocument[]>(`${base}/${collection}`),
+  agents: () => request<GovernanceAgentsResponse>(`${base}/agents`),
+  agent: (id: GovernanceAgentId) => request<GovernanceAgentSlot & { configHash: string }>(`${base}/agents/${encodeURIComponent(id)}`),
   schedules: () => request<Array<Record<string, unknown>>>(`${base}/critic/schedules`),
-  putProject: (config: ProjectConfigurationV22, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
+  putProject: (config: ProjectConfigurationV23, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
   saveDirection: (collection: "goals" | "adrs" | "constraints" | "use-cases", value: DirectionReference | Constraint | UseCase,
     markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {
@@ -23,22 +25,16 @@ export const orchestrationApi = {
     }),
   deleteDirection: (collection: string, id: string, expectedConfigHash: string, expectedHash: string) =>
     request(`${base}/${collection}/${encodeURIComponent(id)}`, remove({ expectedConfigHash, expectedHash })),
-  saveAgent: (value: AgentDefinition, markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
-    request(`${base}/agents${creating ? "" : `/${encodeURIComponent(value.id)}`}`, creating
-      ? body({ value, markdown, expectedConfigHash, expectedDocumentHash })
-      : put({ value, markdown, expectedConfigHash, expectedDocumentHash })),
-  deleteAgent: (id: string, expectedConfigHash: string, expectedHash: string) =>
-    request(`${base}/agents/${encodeURIComponent(id)}`, remove({ expectedConfigHash, expectedHash })),
+  saveAgent: (id: GovernanceAgentId, input: { developerInstructions: string; model: string; reasoningEffort: string;
+    skillResources: string[]; expectedConfigHash: string; expectedDocumentHash: string }) =>
+    request(`${base}/agents/${encodeURIComponent(id)}`, put(input)),
   localRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local`),
   refreshRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local/refresh`, body({})),
   restartRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local/restart`, body({})),
   runtimeLogs: (limit = 200) => request<{ entries: LocalDaemonLogEntry[] }>(`${base}/runtimes/local/logs?limit=${limit}`),
-  agentBinding: (id: string) => request<AgentExecutionBinding | null>(`${base}/agents/${encodeURIComponent(id)}/execution`),
-  saveAgentBinding: (id: string, input: { provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy }) =>
-    request<AgentExecutionBinding>(`${base}/agents/${encodeURIComponent(id)}/execution`, put(input)),
   actionBinding: (stateId: string, actionId: string) =>
     request<ActionExecutionBinding | null>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution`),
-  saveActionBinding: (stateId: string, actionId: string, input: { provider: RuntimeProvider; policy: ExecutionPolicy;
+  saveActionBinding: (stateId: string, actionId: string, input: {
     validation: ActionRoleModelSelection; work: ActionRoleModelSelection }) =>
     request<ActionExecutionBinding>(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}/execution`, put(input)),
   approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(

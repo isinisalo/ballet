@@ -6,7 +6,7 @@ import {
   ROLE_OUTCOME_VERSION,
   TASK_ENVELOPE_VERSION
 } from "../versions.js";
-import { agentDefinitionSchema } from "./environmentSchemas.js";
+import { governanceAgentDefinitionSchema } from "./environmentSchemas.js";
 import { gitObjectIdSchema, idSchema, nonEmptyTextSchema, sha256Schema, timestampSchema } from "./common.js";
 
 const resourceEvidenceSchema = z.object({
@@ -17,14 +17,14 @@ const resourceEvidenceSchema = z.object({
   sourceSha256: sha256Schema
 }).strict();
 
-export const executionPromptEvidenceV13Schema = z.object({
+export const executionPromptEvidenceV14Schema = z.object({
   compositionVersion: z.literal(PROMPT_COMPOSITION_VERSION),
   role: z.enum(["validation", "work", "critic", "refinement"]),
   phase: z.enum(["precheck", "work", "postwork", "proposal"]),
   subject: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("action_role"), actionId: idSchema,
       role: z.enum(["validation", "work"]) }).strict(),
-    z.object({ kind: z.literal("agent"), agent: agentDefinitionSchema }).strict()
+    z.object({ kind: z.literal("agent"), agent: governanceAgentDefinitionSchema }).strict()
   ]),
   resources: z.array(resourceEvidenceSchema).max(256),
   prompt: nonEmptyTextSchema,
@@ -56,37 +56,24 @@ const executionRuntimeSnapshotSchema = z.object({
       role: z.enum(["validation", "work"]) }).strict(),
     z.object({ kind: z.literal("agent"), agentId: idSchema }).strict()
   ]),
-  provider: z.enum(["codex", "copilot"]),
+  provider: z.literal("codex"),
   cliVersion: nonEmptyTextSchema,
   model: nonEmptyTextSchema,
   reasoningEffort: nonEmptyTextSchema,
   capabilityHash: sha256Schema
 }).strict();
 
-export const agentExecutionBindingV2Schema = z.object({
-  version: z.literal(2),
-  agentId: idSchema,
-  provider: z.enum(["codex", "copilot"]),
-  model: nonEmptyTextSchema,
-  reasoningEffort: nonEmptyTextSchema,
-  networkAccess: z.boolean(),
-  readOnlyRoots: z.array(nonEmptyTextSchema).max(32),
-  updatedAt: timestampSchema
-}).strict();
-
-export const executionSpecV15Schema = z.object({
+export const executionSpecV16Schema = z.object({
   version: z.literal(EXECUTION_SPEC_VERSION),
   taskId: idSchema,
   kind: z.literal("agent_execution"),
   environmentRunId: idSchema,
   actionExecutionId: idSchema.optional(),
   agentRunId: idSchema,
-  evidence: executionPromptEvidenceV13Schema,
+  evidence: executionPromptEvidenceV14Schema,
   runtime: executionRuntimeSnapshotSchema,
   permissions: z.object({
     workspaceAccess: z.enum(["read-only", "workspace-write"]),
-    networkAccess: z.boolean(),
-    readOnlyRoots: z.array(z.string().trim().min(1).regex(/^\//)).max(32),
     approvalPolicy: z.literal("never")
   }).strict(),
   project: z.object({

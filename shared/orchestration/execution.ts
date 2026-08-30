@@ -1,4 +1,4 @@
-import type { AgentDefinition, RuntimeProvider } from "./environment.js";
+import type { GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
 import type { JsonValue } from "./primitives.js";
 import type { AgentRunPhase, AgentRunRole } from "./runtime.js";
 import {
@@ -18,9 +18,9 @@ export interface ExecutionResourceEvidence {
 
 export type ExecutionPromptSubject =
   | { kind: "action_role"; actionId: string; role: "validation" | "work" }
-  | { kind: "agent"; agent: AgentDefinition };
+  | { kind: "agent"; agent: GovernanceAgentDefinition };
 
-export interface ExecutionPromptEvidenceV13 {
+export interface ExecutionPromptEvidenceV14 {
   compositionVersion: typeof PROMPT_COMPOSITION_VERSION;
   role: AgentRunRole;
   phase: AgentRunPhase;
@@ -44,30 +44,17 @@ export interface ExecutionRuntimeSnapshot {
   capabilityHash: string;
 }
 
-export interface AgentExecutionBindingV2 {
-  version: 2;
-  agentId: string;
-  provider: RuntimeProvider;
-  model: string;
-  reasoningEffort: string;
-  networkAccess: boolean;
-  readOnlyRoots: string[];
-  updatedAt: string;
-}
-
-export interface ExecutionSpecV15 {
+export interface ExecutionSpecV16 {
   version: typeof EXECUTION_SPEC_VERSION;
   taskId: string;
   kind: "agent_execution";
   environmentRunId: string;
   actionExecutionId?: string;
   agentRunId: string;
-  evidence: ExecutionPromptEvidenceV13;
+  evidence: ExecutionPromptEvidenceV14;
   runtime: ExecutionRuntimeSnapshot;
   permissions: {
     workspaceAccess: "read-only" | "workspace-write";
-    networkAccess: boolean;
-    readOnlyRoots: string[];
     approvalPolicy: "never";
   };
   project: { checkoutRoot: string; headSha: string; configHash: string; snapshotHash: string };

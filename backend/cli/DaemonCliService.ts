@@ -42,7 +42,10 @@ export class DaemonCliService {
 
   async stopIfIdle(): Promise<void> {
     try { await this.assertIdle(); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    catch (error) {
+      if (error instanceof Error && error.message === "Ballet local daemon has an active provider task.") throw error;
+      // A strict-cut restart must be able to stop an incompatible daemon before the server archives its config.
+    }
     await this.launchd.stop();
   }
   async status(): Promise<{ launchd: Awaited<ReturnType<DaemonLaunchdService["status"]>>; runtime?: LocalDaemonStatus }> {

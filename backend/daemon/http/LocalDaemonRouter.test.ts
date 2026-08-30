@@ -13,7 +13,7 @@ describe("LocalDaemonRouter", () => {
   it("rejects a wrong daemon bearer token before touching runtime state", async () => {
     const heartbeat = vi.fn();
     const app = express(); app.use(express.json());
-    app.use("/api", createLocalDaemonRouter({ store: { heartbeat } as unknown as LocalDaemonStore, token: "a".repeat(64), listAgentIds: () => [], actionExists: () => false }));
+    app.use("/api", createLocalDaemonRouter({ store: { heartbeat } as unknown as LocalDaemonStore, token: "a".repeat(64), actionExists: () => false }));
     const server = app.listen(0, "127.0.0.1"); servers.push(server);
     await new Promise<void>((resolve) => server.once("listening", resolve));
     const { port } = server.address() as AddressInfo;
@@ -22,12 +22,12 @@ describe("LocalDaemonRouter", () => {
   });
 
   it("validates the State/Action pair, strict body and removed role route", async () => {
-    const binding = { version: 2, actionId: "action-1", provider: "codex", policy: { network: false, readOnlyRoots: [] },
+    const binding = { version: 3, actionId: "action-1",
       validation: { model: "gpt", reasoningEffort: "high" }, work: { model: "gpt", reasoningEffort: "medium" }, updatedAt: "2026-08-30T00:00:00.000Z" };
     const actionBinding = vi.fn().mockReturnValue(binding); const putActionBinding = vi.fn().mockReturnValue(binding);
     const app = express(); app.use(express.json());
     app.use("/api", createLocalDaemonRouter({ store: { actionBinding, putActionBinding } as unknown as LocalDaemonStore,
-      token: "a".repeat(64), listAgentIds: () => [], actionExists: (stateId, actionId) => stateId === "state-1" && actionId === "action-1" }));
+      token: "a".repeat(64), actionExists: (stateId, actionId) => stateId === "state-1" && actionId === "action-1" }));
     app.use(((error, _req, res, _next) => { void _next; res.status(400).json({ error: String(error) }); }) as ErrorRequestHandler);
     const server = app.listen(0, "127.0.0.1"); servers.push(server);
     await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -39,10 +39,10 @@ describe("LocalDaemonRouter", () => {
     response = await fetch(`${base}/state-1/actions/action-1/execution/validation`);
     expect(response.status).toBe(404);
     response = await fetch(`${base}/state-1/actions/action-1/execution`, { method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "codex", policy: binding.policy, validation: binding.validation, work: binding.work }) });
-    expect(response.status).toBe(200); expect(putActionBinding).toHaveBeenCalledWith("action-1", expect.objectContaining({ provider: "codex" }));
+      body: JSON.stringify({ validation: binding.validation, work: binding.work }) });
+    expect(response.status).toBe(200); expect(putActionBinding).toHaveBeenCalledWith("action-1", expect.objectContaining({ validation: binding.validation }));
     response = await fetch(`${base}/state-1/actions/action-1/execution`, { method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "codex", policy: binding.policy, validation: binding.validation, work: binding.work, role: "validation" }) });
+      body: JSON.stringify({ validation: binding.validation, work: binding.work, role: "validation" }) });
     expect(response.status).toBe(400);
   });
 });

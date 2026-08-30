@@ -48,7 +48,7 @@ block
   business("<b>LIIKETOIMINTAPERUSTE</b><br/>Paikallinen ja auditoitava AI-työ<br/>Versionoitu intentio + evidenssi<br/>Ihmisen päätösvalta · talousbaseline puuttuu"):3
 
   functions("<b>TOIMINNOT</b><br/>Project + Loop authoring<br/>Root Run + recovery<br/>Mission control + modules")
-  context("<b>KONTEKSTI</b><br/>Omistaja / operaattori ↔ Ballet ↔ Git<br/>Codex + Copilot provider-rajalla<br/>GitHub/release vain valtuutettuna")
+  context("<b>KONTEKSTI</b><br/>Omistaja / operaattori ↔ Ballet ↔ Git<br/>Codex-only execution<br/>GitHub/release vain valtuutettuna")
   organisation("<b>ORGANISATORISET<br/>RAJAT</b><br/>Omistaja: WHAT/WHY<br/>ADR: merkittävät päätökset<br/>External write: ihmisvaltuutus")
 
   quality("<b>TOP-3<br/>LAATUTAVOITTEET</b><br/>1. Turvallisuus<br/>2. Jäljitettävyys + determinismi<br/>3. Palautettavuus + eheys")
@@ -85,7 +85,7 @@ Rakenne perustuu viralliseen [Architecture Inception Canvasiin](https://canvas.a
 
 1. **Paikallinen komentokeskus (REQ-001):** selaa ja hallitse yhtä täsmällistä Git-checkoutia ilman Ballet-tiliä tai remote control planea.
 2. **Versionhallittu project truth (REQ-002, REQ-009):** Goals, ADR:t, arc42, project config, instructionit, skillit ja initiative-evidenssi pysyvät katselmoitavina.
-3. **Provider task composition (REQ-003):** ratkaise `ExecutionProfile`, primary instruction, skillit, `TaskEnvelope` ja output schema deterministisesti Codexille tai Copilotille.
+3. **Codex task composition (REQ-003):** ratkaise model/reasoning, primary instruction, skillit, `TaskEnvelope` ja output schema deterministisesti Codexille.
 4. **Loop runtime (REQ-004, REQ-006):** aja Work/Validation sekventiaalisesti revisionoidulla Statella, retryllä, repair call/returnilla, persistoidulla jonolla ja restart-recoveryllä.
 5. **Eristetty toimitustyö (REQ-005):** snapshottaa ja suorita dedicated Git branch/worktreessä; älä mergeä tai pushaa automaattisesti.
 6. **Operaattorikokemus (REQ-007, REQ-011):** authoroi Context/composition/detail-tasoilla ja tarkasta Run Mission / All Loops / live inspector -näkymässä ilman keksittyä runtime-tilaa.
@@ -110,7 +110,7 @@ Yksiselitteinen UI (QS-010, QS-013) on tärkeä vastaus näihin kolmeen tavoitte
 | Kehittäjä / AI-agentti | Rajattu muutos, analyysi tai strict outcome. | Rooli, `TaskEnvelope`, resurssit, State ja repair request. |
 | Riippumaton katselmoija | Conformance- ja hyväksymishavainto. | BRIEF, PLAN, diffi, testit, EVIDENCE ja REVIEW. |
 | Git-checkout | Lähdekoodi, project truth ja historia. | Dedicated worktree -tulos; integraatio vain ihmisvaltuutuksella. |
-| Codex / GitHub Copilot | Provider-eventit ja schema-validi outcome tai virhe. | Exact prompt, profiili, oikeudet ja output schema adapterin kautta. |
+| Codex CLI | Provider-eventit ja schema-validi outcome tai virhe. | Exact prompt, model/reasoning, fail-closed-oikeudet ja output schema adapterin kautta. |
 | macOS / launchd | Paikallinen process/filesystem/lifecycle. | Checkout-kohtainen daemon, status ja rotating logs. |
 | GitHub / CI/CD / Homebrew | Remote-status, build- ja release-evidenssi. | Push/release/deploy/update vain täsmällisen valtuutuksen polussa. |
 

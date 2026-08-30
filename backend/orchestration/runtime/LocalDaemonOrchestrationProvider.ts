@@ -1,6 +1,6 @@
-import type { AgentDefinition } from "../../../shared/orchestration/environment.js";
-import type { ActionExecutionBinding, AgentExecutionBinding, LocalProviderStatus } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
+import type { GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
+import type { LocalProviderStatus } from "../../../shared/domain/runtime.js";
+import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import type { LocalDaemonStore } from "../persistence/LocalDaemonStore.js";
@@ -13,15 +13,12 @@ const EXECUTION_TIMEOUT_MS = 30 * 60_000;
 export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimeProvider, OrchestrationProviderPreflightPort {
   constructor(private readonly daemon: LocalDaemonStore) {}
 
-  async inspectAgent(agent: AgentDefinition): Promise<RuntimeAgentCapabilitySnapshot> {
-    const binding = this.daemon.binding(agent.id);
-    if (!binding) throw new Error(`Agent ${agent.id} has no local execution binding.`);
-    const provider = this.readyProvider(binding);
-    const model = requireModel(provider, binding.model, binding.reasoningEffort);
+  async inspectAgent(agent: GovernanceAgentDefinition): Promise<RuntimeAgentCapabilitySnapshot> {
+    const provider = this.readyProvider();
+    const model = requireModel(provider, agent.model, agent.reasoningEffort);
     const content = {
-      subject: { kind: "agent" as const, agentId: agent.id }, provider: binding.provider,
-      model: binding.model, reasoningEffort: binding.reasoningEffort,
-      networkAccess: binding.policy.network, readOnlyRoots: binding.policy.readOnlyRoots,
+      subject: { kind: "agent" as const, agentId: agent.id }, provider: "codex" as const,
+      model: agent.model, reasoningEffort: agent.reasoningEffort,
       cliVersion: provider.cliVersion!, supportedModels: provider.capabilities.models.map(({ id }) => id).sort(),
       supportedReasoningEfforts: [...model.reasoningOptions].sort(), supportsReadOnly: true,
       supportsWorkspaceWrite: provider.capabilities.policy.workspaceWrite
@@ -32,16 +29,15 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
   async inspectAction(actionId: string): Promise<RuntimeActionCapabilitySnapshot> {
     const binding = this.daemon.actionBinding(actionId);
     if (!binding) throw new Error(`Action ${actionId} has no local execution binding.`);
-    const provider = this.readyProvider(binding);
+    const provider = this.readyProvider();
     if (!provider.capabilities.policy.workspaceWrite) {
-      throw new Error(`${binding.provider} cannot provide managed workspace-write for Work.`);
+      throw new Error("Codex cannot provide managed workspace-write for Work.");
     }
     const validation = requireModel(provider, binding.validation.model, binding.validation.reasoningEffort);
     const work = requireModel(provider, binding.work.model, binding.work.reasoningEffort);
     const supportedModels = provider.capabilities.models.map(({ id }) => id).sort();
     const content = {
-      subject: { kind: "action" as const, actionId }, provider: binding.provider,
-      networkAccess: binding.policy.network, readOnlyRoots: binding.policy.readOnlyRoots,
+      subject: { kind: "action" as const, actionId }, provider: "codex" as const,
       cliVersion: provider.cliVersion!, supportsReadOnly: true,
       supportsWorkspaceWrite: provider.capabilities.policy.workspaceWrite,
       roles: {
@@ -52,22 +48,18 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
     return { ...content, capabilitySha256: hash(content) };
   }
 
-  private readyProvider(binding: AgentExecutionBinding | ActionExecutionBinding): LocalProviderStatus {
+  private readyProvider(): LocalProviderStatus {
     const status = this.daemon.status();
     if (status.status !== "online") throw new Error(`Local daemon is ${status.status}.`);
-    const provider = status.providers.find((candidate) => candidate.provider === binding.provider);
+    const provider = status.providers.find((candidate) => candidate.provider === "codex");
     if (!provider || provider.health !== "ready" || !provider.cliVersion) {
-      throw new Error(provider?.healthMessage ?? `${binding.provider} is unavailable on the local daemon.`);
+      throw new Error(provider?.healthMessage ?? "Codex is unavailable on the local daemon.");
     }
-    if (binding.policy.network && !provider.capabilities.policy.networkControl) throw new Error(`${binding.provider} cannot enforce network policy.`);
-    if (binding.policy.readOnlyRoots.length > 0 && !provider.capabilities.policy.readOnlyRoots) throw new Error(`${binding.provider} cannot enforce additional read-only roots.`);
     return provider;
   }
 
-  async execute(spec: ExecutionSpecV15, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
-    if (permissions.provider !== spec.runtime.provider
-      || permissions.networkAccess !== spec.permissions.networkAccess
-      || permissions.approvalPolicy !== spec.permissions.approvalPolicy) {
+  async execute(spec: ExecutionSpecV16, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
+    if (permissions.provider !== spec.runtime.provider || permissions.approvalPolicy !== spec.permissions.approvalPolicy) {
       throw new Error("Local daemon permission snapshot differs from the ExecutionSpec.");
     }
     const deadline = Date.now() + EXECUTION_TIMEOUT_MS;

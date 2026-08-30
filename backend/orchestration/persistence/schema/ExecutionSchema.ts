@@ -3,11 +3,11 @@ export const executionSchema = `
     execution_task_id TEXT PRIMARY KEY,
     environment_run_id TEXT NOT NULL REFERENCES environment_runs(environment_run_id) ON DELETE CASCADE,
     agent_run_id TEXT NOT NULL UNIQUE REFERENCES agent_runs(agent_run_id) ON DELETE CASCADE,
-    provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
+    provider TEXT NOT NULL CHECK (provider = 'codex'),
     role TEXT NOT NULL CHECK (role IN ('validation','work','critic','refinement')),
     kind TEXT NOT NULL CHECK (kind = 'agent_execution'),
     status TEXT NOT NULL CHECK (status IN ('queued','running','waiting_for_input','succeeded','failed','cancelled')),
-    spec_version INTEGER NOT NULL CHECK (spec_version = 15),
+    spec_version INTEGER NOT NULL CHECK (spec_version = 16),
     spec_json TEXT NOT NULL,
     spec_hash TEXT NOT NULL,
     provider_outcome_key TEXT UNIQUE,
@@ -27,23 +27,9 @@ export const executionSchema = `
     , daemon_error_message TEXT
   );
 
-  CREATE TABLE agent_execution_bindings (
-    agent_id TEXT PRIMARY KEY,
-    version INTEGER NOT NULL CHECK (version = 2),
-    provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
-    model TEXT NOT NULL,
-    reasoning_effort TEXT NOT NULL,
-    network_access INTEGER NOT NULL CHECK (network_access IN (0,1)),
-    read_only_roots_json TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-
   CREATE TABLE action_execution_bindings (
     action_id TEXT PRIMARY KEY,
-    version INTEGER NOT NULL CHECK (version = 2),
-    provider TEXT NOT NULL CHECK (provider IN ('codex','copilot')),
-    network_access INTEGER NOT NULL CHECK (network_access IN (0,1)),
-    read_only_roots_json TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK (version = 3),
     validation_model TEXT NOT NULL,
     validation_reasoning_effort TEXT NOT NULL,
     work_model TEXT NOT NULL,
@@ -67,7 +53,7 @@ export const executionSchema = `
   );
 
   CREATE TABLE local_provider_capabilities (
-    provider TEXT PRIMARY KEY CHECK (provider IN ('codex','copilot')),
+    provider TEXT PRIMARY KEY CHECK (provider = 'codex'),
     cli_version TEXT,
     auth_status TEXT NOT NULL CHECK (auth_status IN ('ready','required','expired','unknown')),
     health TEXT NOT NULL CHECK (health IN ('ready','probing','auth_required','unsupported_version','policy_unsupported','error','offline')),
@@ -88,7 +74,7 @@ export const executionSchema = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     execution_task_id TEXT NOT NULL REFERENCES execution_tasks(execution_task_id) ON DELETE CASCADE,
     sequence INTEGER NOT NULL CHECK (sequence >= 1),
-    source TEXT NOT NULL CHECK (source IN ('ballet','codex','copilot')),
+    source TEXT NOT NULL CHECK (source IN ('ballet','codex')),
     kind TEXT NOT NULL,
     level TEXT NOT NULL CHECK (level IN ('info','warn','error')),
     phase TEXT NOT NULL CHECK (phase IN ('started','delta','completed')),

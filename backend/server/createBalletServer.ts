@@ -70,7 +70,6 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
   app.use("/api", createLocalDaemonRouter({ store: daemonStore, token: daemonConfig.token,
-    listAgentIds: () => currentComposition().project.projects.load().config.agents.map(({ id }) => id),
     actionExists: (stateId, actionId) => currentComposition().project.projects.load().config.environment.states
       .some((state) => state.id === stateId && state.actions.some((action) => action.id === actionId)) }));
   app.use("/api", composition.router);

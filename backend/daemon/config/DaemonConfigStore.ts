@@ -28,19 +28,19 @@ export class DaemonConfigStore {
   }
 
   async ensure(input: Omit<DaemonConfig, "version" | "token" | "providers"> & {
-    codexCommand?: string; copilotCommand?: string;
+    codexCommand?: string;
   }): Promise<DaemonConfig> {
-    const existing = await this.load().catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") return undefined;
-      throw error;
-    });
+    let existing: DaemonConfig | undefined;
+    try { existing = await this.load(); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") await this.archiveIncompatible();
+    }
     const config: DaemonConfig = {
       version: 2, instanceId: input.instanceId, checkoutRoot: input.checkoutRoot,
       serverUrl: input.serverUrl, daemonVersion: input.daemonVersion,
       token: existing?.token ?? randomBytes(32).toString("hex"),
       providers: [
-        { provider: "codex", command: input.codexCommand ?? existing?.providers.find(({ provider }) => provider === "codex")?.command ?? "codex" },
-        { provider: "copilot", command: input.copilotCommand ?? existing?.providers.find(({ provider }) => provider === "copilot")?.command ?? "copilot" }
+        { provider: "codex", command: input.codexCommand ?? existing?.providers[0]?.command ?? "codex" }
       ]
     };
     await this.save(config); return config;
@@ -59,6 +59,12 @@ export class DaemonConfigStore {
   statusPath(): string { return path.join(this.home, "status.json"); }
   logDirectory(): string { return path.join(path.dirname(this.home), "logs"); }
   logPath(): string { return path.join(this.logDirectory(), "daemon.log"); }
+
+  private async archiveIncompatible(): Promise<void> {
+    const archive = path.join(path.dirname(this.home), "archive");
+    await mkdir(archive, { recursive: true, mode: 0o700 });
+    await rename(this.path, path.join(archive, `daemon-config-incompatible-${Date.now()}.json`));
+  }
 }
 
 const validateDaemonConfig = (value: unknown): DaemonConfig => {
@@ -77,9 +83,8 @@ const validateDaemonConfig = (value: unknown): DaemonConfig => {
   }
   if (!path.isAbsolute(String(config.checkoutRoot))) throw new Error("Daemon checkoutRoot must be absolute.");
   if (!/^[0-9a-f]{64}$/i.test(String(config.token))) throw new Error("Daemon token must contain 32 random bytes.");
-  if (!Array.isArray(config.providers) || config.providers.length !== 2) throw new Error("Daemon config must contain Codex and Copilot providers.");
+  if (!Array.isArray(config.providers) || config.providers.length !== 1) throw new Error("Daemon config must contain exactly one Codex provider.");
   const providers = config.providers.map((candidate) => validateProvider(candidate));
-  if (new Set(providers.map(({ provider }) => provider)).size !== 2) throw new Error("Daemon providers must be unique.");
   return { ...config, providers } as DaemonConfig;
 };
 const validateProvider = (value: unknown): ConfiguredRuntimeProvider => {
@@ -87,7 +92,7 @@ const validateProvider = (value: unknown): ConfiguredRuntimeProvider => {
   const provider = value as Record<string, unknown>;
   const unknown = Object.keys(provider).filter((field) => field !== "provider" && field !== "command");
   if (unknown.length > 0) throw new Error(`Unknown daemon provider fields: ${unknown.join(", ")}.`);
-  if (provider.provider !== "codex" && provider.provider !== "copilot") throw new Error("Daemon provider is invalid.");
+  if (provider.provider !== "codex") throw new Error("Daemon provider must be codex.");
   if (typeof provider.command !== "string" || !provider.command.trim()) throw new Error("Daemon provider command is required.");
   return provider as unknown as ConfiguredRuntimeProvider;
 };

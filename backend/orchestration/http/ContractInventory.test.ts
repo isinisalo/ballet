@@ -15,10 +15,10 @@ describe("orchestration API contract inventory", () => {
 
   test("pins every strict contract version at the HTTP composition boundary", () => {
     expect(RuntimeSchemaInventory).toEqual({
-      projectConfig: 21, rootSnapshot: 14, taskEnvelope: 11, roleOutcome: 11,
-      promptComposition: 12, executionSpec: 13, sqlite: 17,
+      projectConfig: 23, rootSnapshot: 18, taskEnvelope: 11, roleOutcome: 11,
+      promptComposition: 14, executionSpec: 16, sqlite: 21,
       feedback: 2, critic: 2, refinement: 2,
-      agentDaemonBinding: 1, runEvidence: 1
+      codexAgent: 2, actionBinding: 3, runEvidence: 1
     });
   });
 

@@ -11,7 +11,7 @@ import type { ProjectDocumentKind } from "./ProjectReferenceIndex.js";
 
 const COLLECTIONS: Record<ProjectDocumentKind, string> = {
   goal: "goals", adr: "adr", constraint: "constraints", "use-case": "use-cases",
-  agent: "agents", instruction: "instructions", skill: "../.agents/skills"
+  instruction: "instructions", skill: "../.agents/skills"
 };
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 const SAFE_SKILL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}(?:\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,127})*$/;
@@ -113,7 +113,6 @@ export class ProjectDocumentRepository {
   }
 }
 
-// eslint-disable-next-line complexity -- Every closed document kind maps to a distinct immutable snapshot collection.
 const snapshotContains = (snapshot: unknown, kind: ProjectDocumentKind, id: string): boolean => {
   const value = snapshot as {
     direction?: { goals?: Array<{ id: string }>; adrs?: Array<{ id: string }>; constraints?: Array<{ id: string }> };
@@ -124,7 +123,6 @@ const snapshotContains = (snapshot: unknown, kind: ProjectDocumentKind, id: stri
   if (kind === "adr") return value.direction?.adrs?.some((item) => item.id === id) ?? false;
   if (kind === "constraint") return value.direction?.constraints?.some((item) => item.id === id) ?? false;
   if (kind === "use-case") return value.approvedUseCases?.some((item) => item.useCase.id === id) ?? false;
-  if (kind === "agent") return (value as { agents?: Array<{ id: string }> }).agents?.some((item) => item.id === id) ?? false;
   return value.resources?.some((item) => item.kind === kind && item.id === id) ?? false;
 };
 

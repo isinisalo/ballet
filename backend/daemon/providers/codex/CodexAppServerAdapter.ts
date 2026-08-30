@@ -65,7 +65,7 @@ export class CodexAppServerAdapter implements CliRuntimeAdapter {
       authStatus: process.env.OPENAI_API_KEY || auth?.exitCode === 0
         ? "ready"
         : /expired/i.test(`${auth?.stdout ?? ""}\n${auth?.stderr ?? ""}`) ? "expired" : auth ? "required" : "unknown",
-      policyCapabilities: { workspaceWrite: true, networkControl: true, readOnlyRoots: false },
+      policyCapabilities: { workspaceWrite: true },
       reason: result.reason
         ?? (!compatible ? `Codex ${this.minimumVersion} or newer is required.` : auth?.exitCode === 0 || process.env.OPENAI_API_KEY ? undefined : (auth?.stderr || auth?.stdout || "Codex authentication is required.").trim())
     };
@@ -239,11 +239,11 @@ export class CodexAppServerAdapter implements CliRuntimeAdapter {
 }
 
 const codexSandboxPolicy = (request: RuntimeExecutionRequest): Record<string, unknown> => request.workspaceAccess === "read-only"
-  ? { type: "readOnly", networkAccess: request.policy.network }
+  ? { type: "readOnly", networkAccess: false }
   : {
       type: "workspaceWrite",
       writableRoots: [path.resolve(request.workingDirectory)],
-      networkAccess: request.policy.network,
+      networkAccess: false,
       excludeTmpdirEnvVar: true,
       excludeSlashTmp: true
     };

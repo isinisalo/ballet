@@ -1,19 +1,30 @@
 import type { ContractIssue } from "@shared/orchestration/primitives";
-import type { ProjectConfigurationV22 } from "@shared/orchestration/environment";
+import type { GovernanceAgentDefinition, GovernanceAgentId, ProjectConfigurationV23 } from "@shared/orchestration/environment";
 
 export interface ProjectRecord {
   path: string;
-  config: ProjectConfigurationV22;
+  config: ProjectConfigurationV23;
   configHash: string;
 }
 
 export interface ResourceDocument {
-  kind: "goal" | "adr" | "constraint" | "use-case" | "agent" | "instruction" | "skill";
+  kind: "goal" | "adr" | "constraint" | "use-case" | "instruction" | "skill";
   id: string;
   content: string;
   contentHash: string;
   value?: unknown;
 }
+
+export interface GovernanceAgentSlot {
+  id: GovernanceAgentId;
+  relativePath: string;
+  status: "ready" | "missing" | "invalid";
+  contentHash?: string;
+  agent?: GovernanceAgentDefinition;
+  error?: string;
+  skillResources: string[];
+}
+export interface GovernanceAgentsResponse { configHash: string; agents: GovernanceAgentSlot[] }
 
 export interface ReferenceEntry {
   kind: string;
@@ -28,7 +39,7 @@ export interface ReferenceIndexResponse {
 }
 
 export interface EnvironmentResponse {
-  environment: ProjectConfigurationV22["environment"];
+  environment: ProjectConfigurationV23["environment"];
   configHash: string;
   readinessIssues: ContractIssue[];
   activeRunIds: string[];
@@ -44,6 +55,6 @@ export interface OrchestrationConfigureData {
   adrs: ResourceDocument[];
   constraints: ResourceDocument[];
   useCases: ResourceDocument[];
-  agents: ResourceDocument[];
+  agents: GovernanceAgentsResponse;
   schedules: Array<Record<string, unknown>>;
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type {
   StoredActionExecution, StoredAgentRun, StoredEnvironmentRun, StoredStateExecution
 } from "../../../shared/orchestration/persistenceRecords.js";
-import { rootSnapshotV17Schema } from "../../../shared/orchestration/schemas/runtimeSchemas.js";
+import { rootSnapshotV18Schema } from "../../../shared/orchestration/schemas/runtimeSchemas.js";
 
 const nullableString = z.string().nullable();
 
@@ -53,7 +53,7 @@ export const toEnvironmentRun = (value: unknown): StoredEnvironmentRun => {
     environmentRunId: row.environment_run_id, environmentDefinitionId: row.environment_definition_id,
     source: row.source, previousRunId: optional(row.previous_run_id), input: optional(row.input_text), status: row.status, revision: row.revision,
     baseCommit: row.base_commit, resultCommit: optional(row.result_commit), worktreePath: row.worktree_path,
-    branch: row.branch, executionSnapshot: rootSnapshotV17Schema.parse(JSON.parse(row.execution_snapshot_json)),
+    branch: row.branch, executionSnapshot: rootSnapshotV18Schema.parse(JSON.parse(row.execution_snapshot_json)),
     executionSnapshotHash: row.execution_snapshot_hash, activeStateExecutionId: optional(row.active_state_execution_id),
     activeActionExecutionId: optional(row.active_action_execution_id), activeAgentRunId: optional(row.active_agent_run_id),
     transitionCount: row.transition_count, transitionLimit: row.transition_limit,

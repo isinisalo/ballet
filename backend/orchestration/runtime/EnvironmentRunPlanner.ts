@@ -1,23 +1,24 @@
-import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
-import { projectConfigurationV22Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
+import { projectConfigurationV23Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../../shared/orchestration/gates.js";
 import type {
-  RootSnapshotV17, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
+  RootSnapshotV18, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
   RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/orchestration/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
-import { mapProviderPermissions } from "./ProviderPermissions.js";
 import { resolveOrchestrationResources, type ProjectResourceInput } from "./ResourceContextBuilder.js";
 import { ConflictError } from "../persistence/PersistenceErrors.js";
 
 export interface ProjectDefinition {
-  config: ProjectConfigurationV22;
+  config: ProjectConfigurationV23;
   configSha256: string;
   baseCommit: string;
   checkoutRoot: string;
   resources: ProjectResourceInput[];
+  agents: Array<GovernanceAgentDefinition & { contentSha256: string }>;
   directionDocumentHashes: {
     goals: Record<string, string>;
     adrs: Record<string, string>;
@@ -32,7 +33,7 @@ export interface ProjectDefinitionPort {
 
 export interface OrchestrationProviderPreflightPort {
   inspectAgent(
-    profile: ProjectConfigurationV22["agents"][number],
+    profile: GovernanceAgentDefinition,
     project: { headSha: string; configHash: string }
   ): Promise<RuntimeAgentCapabilitySnapshot>;
   inspectAction(
@@ -42,7 +43,7 @@ export interface OrchestrationProviderPreflightPort {
 }
 
 export interface PlannedEnvironmentRun {
-  snapshot: RootSnapshotV17;
+  snapshot: RootSnapshotV18;
   snapshotSha256: string;
   createInput(input: {
     environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
@@ -58,7 +59,7 @@ export class EnvironmentRunPlanner {
 
   async plan(): Promise<PlannedEnvironmentRun> {
     const loaded = await this.projects.load();
-    const config = projectConfigurationV22Schema.parse(loaded.config);
+    const config = projectConfigurationV23Schema.parse(loaded.config);
     const readinessIssues = validateRunnableEnvironment(config.environment, config.direction);
     if (readinessIssues.length > 0) {
       throw new ConflictError(`Environment is not runnable: ${readinessIssues.map(({ code, path }) => `${code}@${path}`).join(", ")}.`);
@@ -66,10 +67,8 @@ export class EnvironmentRunPlanner {
     if (sha256(canonicalJson(config)) !== loaded.configSha256) throw new Error("Project Config hash differs from explicit input.");
     const resources = resolveOrchestrationResources(config, loaded.resources);
     const governanceAgentIds = new Set([config.critic.agent.agentId, config.refinement.agent.agentId]);
-    const agents = config.agents.filter(({ id }) => governanceAgentIds.has(id))
-      .sort((left, right) => left.id.localeCompare(right.id)).map((agent) => ({
-      ...agent, contentSha256: requireDirectionHash("Agent", agent.id, loaded.agentDocumentHashes)
-    }));
+    const agents = loaded.agents.filter(({ id }) => governanceAgentIds.has(id))
+      .sort((left, right) => left.id.localeCompare(right.id));
     const capabilities: RuntimeCapabilitySnapshot[] = [];
     for (const agent of agents) {
       const capability = await this.providers.inspectAgent(agent, { headSha: loaded.baseCommit, configHash: loaded.configSha256 });
@@ -82,7 +81,7 @@ export class EnvironmentRunPlanner {
       assertActionCapability(action.id, capability);
       capabilities.push(capability);
     }
-    const permissions = permissionSnapshot(config, capabilities, loaded.checkoutRoot);
+    const permissions = permissionSnapshot(config, capabilities);
     const referencedUseCaseIds = new Set(config.environment.states.flatMap((state) => state.useCaseIds));
     const approvedUseCases = config.direction.useCases.filter(({ id }) => referencedUseCaseIds.has(id)).map((useCase) => ({
       useCase, contentSha256: useCaseApprovalHash(useCase)
@@ -98,8 +97,8 @@ export class EnvironmentRunPlanner {
         ...value, contentSha256: requireDirectionHash("Constraint", value.id, loaded.directionDocumentHashes.constraints)
       }))
     };
-    const snapshot: RootSnapshotV17 = {
-      version: 17,
+    const snapshot: RootSnapshotV18 = {
+      version: 18,
       projectHeadSha: loaded.baseCommit,
       projectConfigSha256: loaded.configSha256,
       directionSha256: contentHash(config.direction),
@@ -164,7 +163,7 @@ const assertCapabilityHash = (capability: RuntimeCapabilitySnapshot): void => {
 };
 
 const permissionSnapshot = (
-  config: ProjectConfigurationV22, capabilities: RuntimeCapabilitySnapshot[], worktreePath: string
+  config: ProjectConfigurationV23, capabilities: RuntimeCapabilitySnapshot[]
 ): RuntimePermissionSnapshot[] => {
   const rows: RuntimePermissionSnapshot[] = [];
   for (const state of config.environment.states) for (const action of state.actions) {
@@ -174,19 +173,12 @@ const permissionSnapshot = (
       if (toolPolicy === "workspace_write" && !capability.supportsWorkspaceWrite) {
         throw new Error(`Action ${action.id} Work binding cannot provide workspace-write.`);
       }
-      const mapped = mapProviderPermissions({
-        provider: capability.provider, role, toolPolicy,
-        networkAccess: capability.networkAccess, worktreePath
-      });
-      rows.push({ role, actionId: action.id, toolPolicy,
-        networkAccess: mapped.networkAccess, approvalPolicy: mapped.approvalPolicy });
+      rows.push({ role, actionId: action.id, toolPolicy, approvalPolicy: "never" });
     }
   }
   for (const [role, composition] of [["critic", config.critic.agent], ["refinement", config.refinement.agent]] as const) {
-    const capability = capabilities.find(({ subject }) => subject.kind === "agent" && subject.agentId === composition.agentId)!;
-    const mapped = mapProviderPermissions({ provider: capability.provider, role,
-      toolPolicy: "read_only", networkAccess: capability.networkAccess, worktreePath });
-    rows.push({ role, toolPolicy: "read_only", networkAccess: mapped.networkAccess, approvalPolicy: "never" });
+    capabilities.find(({ subject }) => subject.kind === "agent" && subject.agentId === composition.agentId)!;
+    rows.push({ role, toolPolicy: "read_only", approvalPolicy: "never" });
   }
   return rows;
 };
@@ -197,6 +189,6 @@ const requireDirectionHash = (label: string, id: string, hashes: Record<string, 
   if (!value || !/^[0-9a-f]{64}$/.test(value)) throw new Error(`${label} ${id} has no source content hash.`);
   return value;
 };
-const transitionLimit = (config: ProjectConfigurationV22): number => 16 + config.environment.states.reduce(
+const transitionLimit = (config: ProjectConfigurationV23): number => 16 + config.environment.states.reduce(
   (total, state) => total + state.actions.reduce((count, action) => count + 4 + action.maxRetries * 3, 0), 0
 );

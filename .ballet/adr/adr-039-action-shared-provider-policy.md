@@ -1,10 +1,10 @@
 ---
 id: adr-039
 title: Action-tason yhteinen provider ja policy
-status: accepted
+status: superseded
 createdAt: '2026-08-30'
 updatedAt: '2026-08-30'
-version: 1
+version: 2
 tags: [arkkitehtuuripaatos, action, runtime-binding, strict-cut]
 ---
 

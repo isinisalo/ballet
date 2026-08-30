@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV17 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV18 } from "../../../shared/orchestration/runtime.js";
 import type { CriticTaskEnvelope, RefinementTaskEnvelope } from "../../../shared/orchestration/taskEnvelopes.js";
 
 export const buildCriticEnvelope = (input: {
@@ -13,9 +13,9 @@ export const buildCriticEnvelope = (input: {
     WHERE cr.critic_run_id = ?
   `).get(input.criticRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Critic Run ${input.criticRunId} has no immutable Run Evidence.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV17;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV18;
   const composition = snapshot.governance.critic;
-  const instruction = requireInstruction(snapshot, composition.instructionResource);
+  const instruction = requireAgent(snapshot, composition.agentId).developerInstructions;
   const feedback = input.connection.prepare(`
     SELECT feedback_entry_id, category, target_type, target_id, comment, evidence_refs_json
     FROM feedback_entries WHERE environment_run_id = ? AND status = 'open' ORDER BY created_at
@@ -48,7 +48,7 @@ export const buildRefinementEnvelope = (input: {
     WHERE rr.refinement_run_id = ?
   `).get(input.refinementRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Refinement Run ${input.refinementRunId} has no immutable source.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV17;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV18;
   const selected = input.connection.prepare(`
     SELECT fe.* FROM refinement_run_feedback rrf
     JOIN feedback_entries fe ON fe.feedback_entry_id = rrf.feedback_entry_id
@@ -56,10 +56,14 @@ export const buildRefinementEnvelope = (input: {
   `).all(input.refinementRunId);
   const composition = snapshot.governance.refinement;
   const resources = snapshot.resources;
-  const preimageHashes = Object.fromEntries(resources.map(({ relativePath, sourceSha256 }) => [relativePath, sourceSha256]));
+  const agentPreimages = snapshot.agents.map(({ id, contentSha256 }) => [`.codex/agents/${id}.toml`, contentSha256] as const);
+  const preimageHashes = Object.fromEntries([
+    ...resources.map(({ relativePath, sourceSha256 }) => [relativePath, sourceSha256] as const),
+    ...agentPreimages
+  ]);
   return {
     version: 11, taskId: input.taskId, environmentRunId: String(row.source_environment_run_id),
-    snapshotSha256: input.snapshotSha256, instruction: requireInstruction(snapshot, composition.instructionResource),
+    snapshotSha256: input.snapshotSha256, instruction: requireAgent(snapshot, composition.agentId).developerInstructions,
     context: json({
       boundary: "read-only proposal; no write and no approval",
       feedback: selected,
@@ -68,7 +72,10 @@ export const buildRefinementEnvelope = (input: {
       actions: snapshot.environment.states.flatMap(({ actions }) => actions).map((action) => ({
         id: action.id, validationSkillIds: action.validation.skillResources, workSkillIds: action.work.skillResources
       })),
-      allowedPathPolicy: ["immutable snapshot resource paths in the active composition namespace"]
+      allowedPathPolicy: [
+        "immutable snapshot instruction and Skill paths",
+        "fixed governance Agent TOMLs; only developer_instructions may change"
+      ]
     }),
     role: "refinement", phase: "proposal", refinementRunId: input.refinementRunId,
     approvedCriticProposalIds: selected.flatMap((item) => {
@@ -79,9 +86,9 @@ export const buildRefinementEnvelope = (input: {
   };
 };
 
-const requireInstruction = (snapshot: RootSnapshotV17, id: string): string => {
-  const resource = snapshot.resources.find(({ kind, id: resourceId }) => kind === "instruction" && resourceId === id);
-  if (!resource) throw new Error(`Governance instruction ${id} is absent from snapshot.`);
-  return resource.content;
+const requireAgent = (snapshot: RootSnapshotV18, id: string) => {
+  const agent = snapshot.agents.find(({ id: agentId }) => agentId === id);
+  if (!agent) throw new Error(`Governance Agent ${id} is absent from snapshot.`);
+  return agent;
 };
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;

@@ -1,4 +1,4 @@
-import type { ExecutionPolicy, RuntimeProvider, WorkspaceAccess } from "../../../shared/domain/runtime.js";
+import type { RuntimeProvider, WorkspaceAccess } from "../../../shared/domain/runtime.js";
 
 export type { RuntimeProvider } from "../../../shared/domain/runtime.js";
 
@@ -12,8 +12,6 @@ export interface RuntimeProbe {
   authStatus: "ready" | "required" | "expired" | "unknown";
   policyCapabilities: {
     workspaceWrite: boolean;
-    networkControl: boolean;
-    readOnlyRoots: boolean;
   };
   reason?: string;
 }
@@ -58,7 +56,6 @@ export interface RuntimeExecutionRequest {
   model: string;
   reasoning: string;
   workspaceAccess: WorkspaceAccess;
-  policy: ExecutionPolicy;
   sessionId?: string;
   systemInstructions?: string;
   outputSchema?: Record<string, unknown>;

@@ -1,21 +1,8 @@
 import { z } from "zod";
 
 const idSchema = z.string().trim().min(1).max(200);
-const providerSchema = z.enum(["codex", "copilot"]);
+const providerSchema = z.literal("codex");
 const isoDateSchema = z.iso.datetime({ offset: true });
-
-export const executionPolicySchema = z.object({
-  network: z.boolean(),
-  readOnlyRoots: z.array(z.string().trim().min(1).max(4096)
-    .regex(/^\//, "Read-only roots must be absolute paths.")).max(32)
-}).strict();
-
-export const executionBindingBodySchema = z.object({
-  provider: providerSchema,
-  model: z.string().trim().min(1).max(200),
-  reasoningEffort: z.string().trim().min(1).max(100),
-  policy: executionPolicySchema
-}).strict();
 
 const actionRoleModelSelectionSchema = z.object({
   model: z.string().trim().min(1).max(200),
@@ -23,13 +10,10 @@ const actionRoleModelSelectionSchema = z.object({
 }).strict();
 
 export const actionExecutionBindingBodySchema = z.object({
-  provider: providerSchema,
-  policy: executionPolicySchema,
   validation: actionRoleModelSelectionSchema,
   work: actionRoleModelSelectionSchema
 }).strict();
 
-export const agentExecutionParamsSchema = z.object({ agentId: idSchema }).strict();
 export const actionExecutionParamsSchema = z.object({ stateId: idSchema, actionId: idSchema }).strict();
 export const executionTaskParamsSchema = z.object({ taskId: idSchema }).strict();
 export const emptyRuntimeBodySchema = z.object({}).strict();
@@ -47,7 +31,7 @@ export const runtimeCapabilitiesSchema = z.object({
   supportsResume: z.boolean(),
   supportsStructuredOutput: z.boolean(),
   policy: z.object({
-    workspaceWrite: z.boolean(), networkControl: z.boolean(), readOnlyRoots: z.boolean()
+    workspaceWrite: z.boolean()
   }).strict(),
   refreshedAt: isoDateSchema
 }).strict();
@@ -68,14 +52,14 @@ export const localDaemonHeartbeatBodySchema = z.object({
   daemonVersion: z.string().trim().min(1).max(100),
   uptimeSeconds: z.number().int().nonnegative(),
   activeTaskCount: z.number().int().nonnegative(),
-  providers: z.array(localProviderStatusSchema).length(2),
+  providers: z.array(localProviderStatusSchema).length(1),
   recentError: z.string().max(4000).optional()
 }).strict();
 
 export const localDaemonClaimBodySchema = z.object({ provider: providerSchema }).strict();
 export const localDaemonLeaseBodySchema = z.object({ fencing: z.number().int().positive() }).strict();
 export const localDaemonEventSchema = z.object({
-  sequence: z.number().int().positive(), source: z.enum(["ballet", "codex", "copilot"]),
+  sequence: z.number().int().positive(), source: z.enum(["ballet", "codex"]),
   kind: z.string().trim().min(1).max(100), level: z.enum(["info", "warn", "error"]),
   phase: z.enum(["started", "delta", "completed"]), message: z.string().max(256_000),
   data: z.record(z.string(), z.unknown()).optional(), terminal: z.boolean(), createdAt: isoDateSchema

@@ -2,7 +2,6 @@ import type { Constraint, DirectionReference, UseCase, UseCaseExample } from "@s
 import { invalidateUseCaseApproval } from "@shared/orchestration/direction";
 import { parseFrontmatterYaml, frontmatterToYaml } from "@/workspace/documents/frontmatter";
 import type { ResourceDocument } from "../types";
-import type { AgentDefinition } from "@shared/orchestration/environment";
 
 export type MarkdownDirectionKind = "goals" | "adrs" | "constraints" | "use-cases";
 export type MarkdownDirectionValue = DirectionReference | Constraint | UseCase;
@@ -51,30 +50,6 @@ export const createMarkdownDocument = (kind: MarkdownDirectionKind): ResourceDoc
   return { kind: kind.slice(0, -1) as ResourceDocument["kind"], id: "new", content: joinMarkdownSource(draft), contentHash: "absent" };
 };
 
-export const createAgentMarkdownDocument = (): ResourceDocument => {
-  const frontmatter = {
-    id: "", title: "New Agent", description: "", status: "active", enabled: true,
-    instructionResource: "", skillResources: []
-  };
-  return { kind: "agent", id: "new", contentHash: "absent", content: joinMarkdownSource({
-    frontmatterText: frontmatterToYaml(frontmatter), bodyText: "# New Agent\n\nDescribe this Agent's stable responsibility."
-  }) };
-};
-
-export const agentValueFromMarkdown = (draft: MarkdownDraft): { value: AgentDefinition; source: string } => {
-  const frontmatter = parseFrontmatterYaml(draft.frontmatterText);
-  const id = requiredString(frontmatter.id, "Frontmatter id is required.");
-  const value: AgentDefinition = {
-    id,
-    name: requiredString(frontmatter.title ?? frontmatter.name, "Frontmatter title is required."),
-    description: stringValue(frontmatter.description) ?? firstParagraph(draft.bodyText),
-    enabled: frontmatter.enabled !== false,
-    instructionResource: requiredString(frontmatter.instructionResource, "instructionResource is required."),
-    skillResources: strings(frontmatter.skillResources)
-  };
-  return { value, source: joinMarkdownSource(draft) };
-};
-
 /* eslint-disable complexity -- One closed authoring boundary preserves kind-specific frontmatter without parallel form truth. */
 export const directionValueFromMarkdown = (
   kind: MarkdownDirectionKind,
@@ -119,7 +94,6 @@ export const directionValueFromMarkdown = (
 const relativePath = (kind: ResourceDocument["kind"], id: string): string => {
   if (kind === "skill") return `.agents/skills/${id}/SKILL.md`;
   if (kind === "instruction") return `.ballet/instructions/${id}.md`;
-  if (kind === "agent") return `.ballet/agents/${id}.md`;
   const folder = kind === "adr" ? "adr" : kind === "use-case" ? "use-cases" : `${kind}s`;
   return `.ballet/${folder}/${id}.md`;
 };

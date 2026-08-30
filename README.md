@@ -30,14 +30,14 @@ ballet status
 
 `make latest` builds and installs a local artifact and restarts the checkout-local service. It does not publish, merge, push or deploy.
 
-Agent execution is performed by one checkout-local daemon. `ballet start` provisions its checkout-specific launchd config, starts the server and daemon, and waits for both to become healthy. Open `/runtimes` to inspect local status and Codex/Copilot readiness or to refresh, restart and read logs. There is no Computer selection or pairing step.
+Agent execution is performed by one checkout-local daemon. `ballet start` provisions its checkout-specific launchd config, starts the server and daemon, and waits for both to become healthy. Open `/runtimes` to inspect local status and Codex readiness or to refresh, restart and read logs. There is no Computer, provider or pairing selection step.
 
 ## Project truth layout
 
 | Path | Ownership |
 | --- | --- |
-| `.ballet/project.json` | strict Project Config v22: Direction, Environment Action compositions and governance composition |
-| `.ballet/agents/**` | Markdown Agent definitions for Critic and Refinement governance |
+| `.ballet/project.json` | strict Project Config v23: Direction, Environment Action compositions and fixed governance composition |
+| `.codex/agents/*.toml` | The two fixed read-only Codex Agent definitions for Critic and Refinement governance |
 | `.ballet/goals/**` | human WHAT/WHY |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
 | `.ballet/constraints/**` | required and prohibited operating boundaries |
@@ -45,7 +45,7 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 | `.ballet/instructions/**` | selected role instructions |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v20, Action execution and governance Agent bindings, checkout-daemon state, logs and server-owned worktrees |
+| `.git/ballet/**` | machine-local SQLite v21, Action role selections, checkout-daemon state, logs and server-owned worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
@@ -155,7 +155,7 @@ JSON commands and projections live under canonical `/api/*` routes and SSE uses 
 
 ## Strict local state
 
-The active matrix is Project Config v22, Root Snapshot v17, Task Envelope and role outcome v11, prompt composition v13, ExecutionSpec v15 and SQLite v20. Feedback, Critic and Refinement are v2; Action execution binding and governance Agent binding are v2 and Run Evidence is v1. Validation and its subordinate Work agent share one Action provider and network/read-only-roots policy while retaining role-specific model and reasoning selections. Older local databases and control-plane state are intentionally unsupported: stop the service, archive or remove the incompatible `.git/ballet` state, and start fresh. There is no migration or compatibility reader.
+The active matrix is Project Config v23, Root Snapshot v18, Task Envelope and role outcome v11, prompt composition v14, ExecutionSpec v16 and SQLite v21. Feedback, Critic, Refinement and Codex Agent are v2; Action execution binding is v3 and Run Evidence is v1. Validation and its subordinate Work agent have role-specific model/reasoning selections on the single fixed Codex runtime; network is denied and external read-only roots are not configurable. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
 
 ## Verification
 

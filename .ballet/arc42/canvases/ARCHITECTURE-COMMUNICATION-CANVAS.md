@@ -50,7 +50,7 @@ block
   functions("<b>YDINTOIMINNOT</b><br/>Authoroi Loops<br/>Aja + palauta Root Run<br/>Tarkasta Mission + reuse")
 
   quality("<b>LAATUVAATIMUKSET</b><br/>Turvallisuus<br/>Determinismi + trace<br/>Recovery + canonical UI")
-  context("<b>KONTEKSTI</b><br/>Omistaja ↔ Ballet ↔ Git<br/>Codex + Copilot<br/>Valtuutettu release-raja")
+  context("<b>KONTEKSTI</b><br/>Omistaja ↔ Ballet ↔ Git<br/>Codex-only execution<br/>Valtuutettu release-raja")
   components("<b>RAKENNUSOSAT</b><br/>UI + HTTP + catalog<br/>Planner + runtime + provider<br/>Lifecycle + Method + modules")
 
   decisions("<b>YDINPÄÄTÖKSET</b><br/>Checkout-local monoliitti<br/>Git + SQLite<br/>Snapshot/worktree + strict-v10")
@@ -96,7 +96,7 @@ Arvo syntyy erityisesti siitä, että ihmisen päätösvalta, providerille annet
 1. **Project authoring:** Goals-, ADR-, arc42-, Loop-, ExecutionProfile-, instruction- ja skill-resurssien lukeminen ja hallittu muokkaus.
 2. **Loop authoring:** Context-, composition- ja selected-Loop detail -projektiot sekä yksiselitteinen `LoopEdge`/`Edge`-omistajuus.
 3. **Root Run lifecycle:** reachable automationin validointi, immutable snapshot, branch/worktree, käynnistys, Human Validation, cancellation ja finalization.
-4. **Deterministinen execution:** exact prompt/hash, vakaa resource order, strict output schema ja provider-kohtaiset FIFO-kaistat Codexille ja Copilotille ilman fallbackia.
+4. **Deterministinen execution:** exact prompt/hash, vakaa resource order, strict output schema ja yksi Codex FIFO-kaista ilman provider-fallbackia.
 5. **Work Loop runtime:** sekventiaalinen Work/Validation-ohjaus, atomiset State-revisiot, rajattu retry sekä capability repair call/return.
 6. **Persistence ja recovery:** SQLiteen commitoitu runtime-, queue-, event-, schedule- ja control-flow-evidenssi sekä restart/reconciliation ilman implisiittistä replayta.
 7. **Mission control:** Mission / All Loops / live inspector canonical snapshotista ja persistence-read modelista.
@@ -122,7 +122,7 @@ Koko laatupuu, ärsyke–vaste–mitta ja evidenssistatus ovat [arc42-osiossa 10
 | Projektin omistaja ja operaattori | Intentio, Run-komento, Human Validation, havainto ja ulkoinen valtuutus. | Ihminen säilyttää WHAT/WHY:n ja external write -vallan. |
 | Kehittäjä / AI-agentti | Rajattu toteutus tai arvio; saa täsmällisen tehtävän, tilan ja output-skeeman. | Provider-vastaus ei ole kanoninen ennen schema- ja runtime-validointia. |
 | Git-checkout | Lähdekoodi, project truth, historia ja Root Run -worktree. | Active checkout ja Run-worktree ovat erillisiä kirjoitusalueita. |
-| Codex ja GitHub Copilot | Saavat canonical taskin adapterin kautta ja palauttavat tapahtumat/outcomen. | Provider ei päätä continuationia eikä Ballet vaihda provideria fallbackina. |
+| Codex CLI | Saa canonical taskin adapterin kautta ja palauttaa tapahtumat/outcomen. | Provider ei päätä continuationia eikä Ballet tarjoa provider-fallbackia. |
 | macOS / launchd | Prosessi-, tiedosto- ja lifecycle-palvelut. | Nykyinen tuettu host-raja on macOS `arm64`/`x64`. |
 | GitHub, CI/CD ja Homebrew | Release-evidenssi, artefaktit ja jakelu. | Verkko ja ulkoinen kirjoitus ovat erikseen valtuutettuja toimia. |
 | Loop module -paketti | Selain tuo rajatun JSON-sisällön tai valitsee versionhallittua library dataa. | Paketti on epäluotettua dataa, ei executable codea tai live-riippuvuus. |
@@ -164,7 +164,7 @@ Canvas ei luokittele hyväksyttyä päätöstä jälkikäteen mielipiteellä “
 - **Frontend:** strict TypeScript, React 18, Vite 6, Tailwind 4, shadcn/Base UI sekä XYFlow/Dagre.
 - **Backend:** Node.js 22 release-baseline, TypeScript/ESM, Express 4 ja Zod 4.
 - **Data:** Git + Markdown/JSON/YAML project truthille; SQLite schema v9 + `better-sqlite3` runtime- ja tracker-outboxille; `.tickets/orchestration` ja `.tickets/work` issueille; Git branch/worktree lähdekooditulokselle.
-- **Execution:** Codex app-server -adapteri, `@github/copilot-sdk`, provider-kohtaiset FIFO-kaistat ja strict outcome schemas.
+- **Execution:** Codex app-server -adapteri, yksi FIFO-kaista ja strict outcome schemas.
 - **Lifecycle:** macOS `arm64`/`x64`, launchd, npm, GitHub Actions, GitHub Releases/attestations ja Homebrew.
 - **Quality:** Vitest, Testing Library, strict TypeScript build, ESLint, arc42-validator ja design.md-lint.
 

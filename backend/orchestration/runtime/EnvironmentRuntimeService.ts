@@ -350,7 +350,7 @@ const permissionsFor = (task: StoredExecutionTask) => {
   const role = task.spec.evidence.role;
   const policy = role === "work" ? "workspace_write" : "read_only";
   return mapProviderPermissions({ provider: task.spec.runtime.provider, role, toolPolicy: policy,
-    networkAccess: task.spec.permissions.networkAccess, worktreePath: task.spec.project.checkoutRoot });
+    worktreePath: task.spec.project.checkoutRoot });
 };
 
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;

@@ -77,7 +77,7 @@ export class BalletDaemon {
   }
 
   private async probeProviders(): Promise<LocalProviderStatus[]> {
-    return Promise.all((["codex", "copilot"] as const).map(async (provider) => {
+    return Promise.all((["codex"] as const).map(async (provider) => {
       const adapter = this.adapters.get(provider);
       if (!adapter) return errorReport(provider, new Error(`${provider} adapter is not configured.`));
       try {

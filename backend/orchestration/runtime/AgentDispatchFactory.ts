@@ -1,5 +1,5 @@
 import type { ActionDefinition, ActionRoleComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
 import type { CreateAgentRunInput, ExecutionTaskSeed } from "../../../shared/orchestration/persistence.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
@@ -72,8 +72,8 @@ export class AgentDispatchFactory {
     const parsedEnvelope = taskEnvelopeV11Schema.parse(envelope);
     const subject = { kind: "action_role" as const, actionId: action.id, role: input.role };
     const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition, subject });
-    const spec: ExecutionSpecV15 = {
-      version: 15, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
+    const spec: ExecutionSpecV16 = {
+      version: 16, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
         subject, provider: capability.provider, cliVersion: capability.cliVersion, model: roleCapability.model,
@@ -82,7 +82,6 @@ export class AgentDispatchFactory {
       },
       permissions: {
         workspaceAccess: input.role === "work" ? "workspace-write" : "read-only",
-        networkAccess: capability.networkAccess, readOnlyRoots: capability.readOnlyRoots,
         approvalPolicy: "never"
       },
       project: {
@@ -100,11 +99,8 @@ export class AgentDispatchFactory {
         taskEnvelopeHash: sha256(canonicalJson(parsedEnvelope as unknown as JsonValue)), createdAt: input.at
       },
       task: { spec, specHash: sha256(canonicalJson(spec as unknown as JsonValue)) },
-      permissions: mapProviderPermissions({
-        provider: capability.provider, role: input.role,
-        toolPolicy: input.role === "work" ? "workspace_write" : "read_only",
-        networkAccess: capability.networkAccess, worktreePath: input.run.worktreePath
-      })
+      permissions: mapProviderPermissions({ provider: "codex", role: input.role,
+        toolPolicy: input.role === "work" ? "workspace_write" : "read_only", worktreePath: input.run.worktreePath })
     };
   }
 }

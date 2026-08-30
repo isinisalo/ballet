@@ -21,7 +21,7 @@ import { FeedbackBoxService } from "./FeedbackBoxService.js";
 import { FeedbackResolutionService } from "./FeedbackResolutionService.js";
 import { RefinementApplyService } from "./RefinementApplyService.js";
 import { resolveRefinementImpact } from "./RefinementImpactResolver.js";
-import { GovernanceExecutionService } from "./GovernanceExecutionService.js";
+import { GovernanceExecutionService, validAgentTomlRefinement } from "./GovernanceExecutionService.js";
 import { DeterministicExecutionQueue } from "../runtime/ExecutionQueueBoundary.js";
 import { mapProviderPermissions } from "../runtime/ProviderPermissions.js";
 
@@ -118,6 +118,17 @@ describe("Feedback Box trust and lifecycle", () => {
 });
 
 describe("read-only governance proposal execution", () => {
+  test("Refinement can change only developer_instructions in a fixed Agent TOML", () => {
+    const snapshot = environmentSeed().executionSnapshot;
+    const current = snapshot.agents[0]!;
+    const toml = (model: string, instructions: string) => `name = "${current.name}"\ndescription = "${current.description}"\nmodel = "${model}"\nmodel_reasoning_effort = "${current.reasoningEffort}"\nsandbox_mode = "read-only"\ndeveloper_instructions = "${instructions}"\n`;
+    const file = { operation: "replace" as const, relativePath: `.codex/agents/${current.id}.toml`,
+      preimageSha256: current.contentSha256, proposedContentSha256: HASH_A, proposedContent: toml(current.model, "Clarified"), rationale: "Feedback" };
+    expect(validAgentTomlRefinement(file, snapshot)).toBe(true);
+    expect(validAgentTomlRefinement({ ...file, proposedContent: toml("gpt-5.6-luna", "Clarified") }, snapshot)).toBe(false);
+    expect(validAgentTomlRefinement({ ...file, operation: "delete", proposedContent: undefined }, snapshot)).toBe(false);
+  });
+
   test("Critic callback creates only pending human proposal, never Feedback or approval", async () => {
     const context = completedDb();
     const config = { id: "daily", kind: "daily" as const, timeZone: "UTC", localTimes: ["10:00"] };
@@ -163,7 +174,7 @@ describe("read-only governance proposal execution", () => {
     }, actor);
     expect(new FeedbackStore(() => context.db.connection).list("run-1")).toEqual([]);
     const permission = mapProviderPermissions({ provider: "codex", role: "refinement", toolPolicy: "read_only",
-      networkAccess: false, worktreePath: "/tmp/worktree" });
+      worktreePath: "/tmp/worktree" });
     expect(permission).toMatchObject({ approvalPolicy: "never", writableRoots: [] });
   });
 });

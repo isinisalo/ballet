@@ -12,7 +12,7 @@ const request = (kind: "read" | "write" | "command") => ({
 
 describe("WorkspacePermissionPolicy", () => {
   it("allows reads but denies writes and commands for read-only roles", () => {
-    const policy = new WorkspacePermissionPolicy(workspace, { network: false, readOnlyRoots: [] }, "read-only");
+    const policy = new WorkspacePermissionPolicy(workspace, "read-only");
 
     expect(policy.authorize(request("read"))).toBe(true);
     expect(policy.authorize(request("write"))).toBe(false);
@@ -20,7 +20,7 @@ describe("WorkspacePermissionPolicy", () => {
   });
 
   it("allows scoped writes and commands for workspace-write roles", () => {
-    const policy = new WorkspacePermissionPolicy(workspace, { network: false, readOnlyRoots: [] }, "workspace-write");
+    const policy = new WorkspacePermissionPolicy(workspace, "workspace-write");
 
     expect(policy.authorize(request("write"))).toBe(true);
     expect(policy.authorize(request("command"))).toBe(true);

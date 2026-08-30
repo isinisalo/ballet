@@ -8,7 +8,6 @@ export interface ProviderPermissionSpec {
   provider: RuntimeProvider;
   role: AgentRunRole;
   approvalPolicy: "never";
-  networkAccess: boolean;
   sandbox: "read-only" | "workspace-write";
   readableRoots: string[];
   writableRoots: string[];
@@ -26,7 +25,6 @@ export const mapProviderPermissions = (input: {
   provider: RuntimeProvider;
   role: AgentRunRole;
   toolPolicy: RuntimeToolPolicy;
-  networkAccess: boolean;
   worktreePath: string;
 }): ProviderPermissionSpec => {
   const required = input.role === "work" ? "workspace_write" : "read_only";
@@ -35,7 +33,6 @@ export const mapProviderPermissions = (input: {
     provider: input.provider,
     role: input.role,
     approvalPolicy: "never",
-    networkAccess: input.networkAccess,
     sandbox: input.toolPolicy === "read_only" ? "read-only" : "workspace-write",
     readableRoots: [path.resolve(input.worktreePath)],
     writableRoots: input.toolPolicy === "read_only" ? [] : [input.worktreePath]

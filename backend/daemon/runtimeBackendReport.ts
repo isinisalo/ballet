@@ -22,7 +22,7 @@ export const errorReport = (provider: RuntimeProvider, error: unknown, busy = fa
   const now = new Date().toISOString();
   return { provider, authStatus: "unknown", health: "error", healthMessage: message(error), busy, updatedAt: now,
     capabilities: { models: [], supportsResume: false, supportsStructuredOutput: false,
-      policy: { workspaceWrite: false, networkControl: false, readOnlyRoots: false }, refreshedAt: now } };
+      policy: { workspaceWrite: false }, refreshedAt: now } };
 };
 
 const health = (probe: RuntimeProbe): LocalProviderStatus["health"] => {

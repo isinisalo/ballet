@@ -12,7 +12,7 @@ arc42Section: 2
 # 2. Rajoitteet
 
 - Yksi tarkka Git-checkout ja loopback-only paikallinen palvelu muodostavat järjestelmärajan.
-- Project Config v22 ja SQLite v20 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
+- Project Config v23 ja SQLite v21 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
 - Environment on ainoa root run. Standalone State- tai Action-ajoa ei ole.
 - State `order` ja Action `priority` ovat positiivisia ja yksikäsitteisiä.
 - Provider approval mode on aina `never`; Validation ja Work jakavat Actionin machine-local provider/network/read-only-roots-bindingin, governance käyttää Agent-bindingiä ja kirjoitusoikeus johdetaan roolista.

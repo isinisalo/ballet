@@ -1,6 +1,7 @@
+/* eslint-disable max-lines -- Governance dispatch, durable outcomes and proposal validation share one transactional service. */
 import type Database from "better-sqlite3";
 import type { AgentComposition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV15 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
 import type { CriticOutcome, RefinementOutcome } from "../../../shared/orchestration/outcomes.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
@@ -16,6 +17,8 @@ import type { OrchestrationRuntimeProvider } from "../runtime/RuntimeProvider.js
 import { mapProviderPermissions } from "../runtime/ProviderPermissions.js";
 import { buildCriticEnvelope, buildRefinementEnvelope } from "./GovernanceEnvelopeBuilder.js";
 import { isAllowedCanonicalRefinementPath } from "../../../shared/orchestration/refinement.js";
+import type { RootSnapshotV18 } from "../../../shared/orchestration/runtime.js";
+import { parse as parseToml } from "smol-toml";
 
 export class GovernanceExecutionService {
   private readonly execution: AgentExecutionStore;
@@ -115,7 +118,6 @@ export class GovernanceExecutionService {
       const terminal = await provider.execute(task.spec, mapProviderPermissions({
         provider: task.spec.runtime.provider, role: task.spec.evidence.role,
         toolPolicy: "read_only",
-        networkAccess: task.spec.permissions.networkAccess,
         worktreePath: task.spec.project.checkoutRoot
       }));
       if (this.stopping) return true;
@@ -202,15 +204,14 @@ export class GovernanceExecutionService {
     const promptAgent = { ...agentDefinition }; delete (promptAgent as Partial<typeof promptAgent>).contentSha256;
     const subject = { kind: "agent" as const, agent: promptAgent };
     const evidence = composeOrchestrationPrompt({ snapshot: run.executionSnapshot, envelope, composition, subject });
-    const spec: ExecutionSpecV15 = {
-      version: 15, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
+    const spec: ExecutionSpecV16 = {
+      version: 16, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
       agentRunId, evidence,
       runtime: { subject: { kind: "agent", agentId: agentDefinition.id }, provider: capability.provider,
         cliVersion: capability.cliVersion, model: capability.model,
         reasoningEffort: capability.reasoningEffort,
         capabilityHash: capability.capabilitySha256 },
-      permissions: { workspaceAccess: "read-only", networkAccess: capability.networkAccess,
-        readOnlyRoots: capability.readOnlyRoots, approvalPolicy: "never" },
+      permissions: { workspaceAccess: "read-only", approvalPolicy: "never" },
       project: { checkoutRoot, headSha: run.resultCommit ?? run.baseCommit,
         configHash: run.executionSnapshot.projectConfigSha256, snapshotHash: run.executionSnapshotHash },
       createdAt: this.now()
@@ -252,17 +253,22 @@ export class GovernanceExecutionService {
       this.failGovernanceRun(undefined, refinementRunId, at);
       throw new Error("Refinement outcome contains a path outside this composition namespace.");
     }
+    const source = this.connection().prepare(`
+      SELECT er.base_commit, er.result_commit, er.execution_snapshot_json FROM refinement_runs rr
+      JOIN environment_runs er ON er.environment_run_id = rr.source_environment_run_id
+      WHERE rr.refinement_run_id = ?
+    `).get(refinementRunId) as { base_commit: string; result_commit: string | null; execution_snapshot_json: string };
+    const snapshot = JSON.parse(source.execution_snapshot_json) as RootSnapshotV18;
+    if (outcome.files.some((file) => !validAgentTomlRefinement(file, snapshot))) {
+      this.failGovernanceRun(undefined, refinementRunId, at);
+      throw new Error("Refinement may change only developer_instructions in a fixed governance Agent TOML.");
+    }
     const selectedFeedback = (this.connection().prepare(`
       SELECT feedback_entry_id FROM refinement_run_feedback WHERE refinement_run_id = ? ORDER BY feedback_entry_id
     `).all(refinementRunId) as Array<{ feedback_entry_id: string }>).map(({ feedback_entry_id }) => feedback_entry_id);
     if (JSON.stringify(selectedFeedback) !== JSON.stringify([...outcome.feedbackIds].sort())) {
       throw new Error("Refinement outcome Feedback IDs differ from the human-selected set.");
     }
-    const source = this.connection().prepare(`
-      SELECT er.base_commit, er.result_commit FROM refinement_runs rr
-      JOIN environment_runs er ON er.environment_run_id = rr.source_environment_run_id
-      WHERE rr.refinement_run_id = ?
-    `).get(refinementRunId) as { base_commit: string; result_commit: string | null };
     const proposal = {
       refinementProposalId: outcome.proposalId, refinementRunId, targetActionId: outcome.targetActionId,
       expectedBaseCommit: source.result_commit ?? source.base_commit,
@@ -300,3 +306,20 @@ const passthroughGovernanceWorkspace: GovernanceWorkspaceBoundary = {
 
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;
 const hash = (value: unknown): string => sha256(canonicalJson(json(value)));
+
+export const validAgentTomlRefinement = (file: RefinementOutcome["files"][number], snapshot: RootSnapshotV18): boolean => {
+  const match = /^\.codex\/agents\/(ballet-(?:critic|refinement)-agent)\.toml$/.exec(file.relativePath);
+  if (!match) return true;
+  if (file.operation !== "replace" || file.proposedContent === undefined) return false;
+  const current = snapshot.agents.find(({ id }) => id === match[1]);
+  if (!current) return false;
+  try {
+    const proposed = parseToml(file.proposedContent);
+    return proposed.name === current.name
+      && proposed.description === current.description
+      && proposed.model === current.model
+      && proposed.model_reasoning_effort === current.reasoningEffort
+      && proposed.sandbox_mode === "read-only"
+      && typeof proposed.developer_instructions === "string";
+  } catch { return false; }
+};

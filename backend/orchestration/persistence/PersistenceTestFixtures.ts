@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV17, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV18, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -41,7 +41,7 @@ export const openTestDatabase = (): TestDatabase => {
   };
 };
 
-const agent = () => ({ agentId: "profile", instructionResource: "instruction", skillResources: [] });
+const agent = (agentId: "ballet-critic-agent" | "ballet-refinement-agent") => ({ agentId, skillResources: [] });
 const actionRole = () => ({ instructionResource: "instruction", skillResources: [] });
 
 export const actionDefinition = (id: string, priority: number, maxRetries = 1): ActionDefinition => ({
@@ -74,27 +74,27 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV17 = {
-    version: 17, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const snapshot: RootSnapshotV18 = {
+    version: 18, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
     approvedUseCases: [], direction: { goals: [], adrs: [], constraints: [] },
-    agents: [{
-      id: "profile", name: "Test Agent", description: "Test Agent", enabled: true,
-      instructionResource: "instruction", skillResources: [], contentSha256: HASH_A
-    }],
-    runtimeCapabilities: [{
-      subject: { kind: "agent", agentId: "profile" }, provider: "codex",
-      model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
-      cliVersion: "1.0.0", supportedModels: ["test-model"],
+    agents: (["ballet-critic-agent", "ballet-refinement-agent"] as const).map((id) => ({
+      id, name: id, description: "Test Agent", developerInstructions: VALID_INSTRUCTION,
+      model: "gpt-5.6-sol", reasoningEffort: "high", sandboxMode: "read-only" as const, contentSha256: HASH_A
+    })),
+    runtimeCapabilities: [...(["ballet-critic-agent", "ballet-refinement-agent"] as const).map((agentId) => ({
+      subject: { kind: "agent" as const, agentId }, provider: "codex" as const,
+      model: "gpt-5.6-sol", reasoningEffort: "high",
+      cliVersion: "1.0.0", supportedModels: ["gpt-5.6-sol"],
       supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
-    }, ...states.flatMap(({ definition }) => definition.actions.map((action) => ({
+    })), ...states.flatMap(({ definition }) => definition.actions.map((action) => ({
       subject: { kind: "action" as const, actionId: action.id }, provider: "codex" as const,
-      networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
+      cliVersion: "1.0.0",
       roles: {
-        validation: { model: "test-model", reasoningEffort: "high", supportedModels: ["test-model"], supportedReasoningEfforts: ["high"] },
-        work: { model: "test-model", reasoningEffort: "high", supportedModels: ["test-model"], supportedReasoningEfforts: ["high"] }
+        validation: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] },
+        work: { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] }
       },
       supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A
     })))],
@@ -103,9 +103,9 @@ export const environmentSeed = (options: {
       content: VALID_INSTRUCTION, sourceSha256: hash(VALID_INSTRUCTION)
     }],
     permissions: [
-      { role: "validation", actionId: "action-1", toolPolicy: "read_only", networkAccess: false, approvalPolicy: "never" },
-      { role: "work", actionId: "action-1", toolPolicy: "workspace_write", networkAccess: false, approvalPolicy: "never" }
-    ], governance: { critic: agent(), refinement: agent() }, createdAt: TEST_AT
+      { role: "validation", actionId: "action-1", toolPolicy: "read_only", approvalPolicy: "never" },
+      { role: "work", actionId: "action-1", toolPolicy: "workspace_write", approvalPolicy: "never" }
+    ], governance: { critic: agent("ballet-critic-agent"), refinement: agent("ballet-refinement-agent") }, createdAt: TEST_AT
   };
   return {
     environmentRunId: runId,

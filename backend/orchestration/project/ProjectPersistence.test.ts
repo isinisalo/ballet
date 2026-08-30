@@ -19,8 +19,8 @@ describe("canonical project persistence", () => {
     const context = fixture(false);
     const rejectedOldVersion = { version: 19, projectModel: {} };
     writeFileSync(path.join(context.root, ".ballet", "project.json"), JSON.stringify(rejectedOldVersion));
-    expect(() => context.projects.load()).toThrow("Project Config v21 is required");
-    expect(() => context.projects.loadOptional()).toThrow("Project Config v21 is required");
+    expect(() => context.projects.load()).toThrow("Project Config v23 is required");
+    expect(() => context.projects.loadOptional()).toThrow("Project Config v23 is required");
   });
 
   test("writes stable canonical JSON atomically and enforces optimistic hashes", () => {
@@ -76,7 +76,7 @@ describe("canonical project persistence", () => {
       expect.objectContaining({ ownerType: "state" })
     ]));
     expect(index.for("use-case", "UC-1")).not.toContainEqual(expect.objectContaining({ ownerType: "action" }));
-    expect(index.for("instruction", "instruction").length).toBeGreaterThanOrEqual(4);
+    expect(index.for("instruction", "instruction").length).toBe(2);
   });
 });
 

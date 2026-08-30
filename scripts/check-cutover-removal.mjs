@@ -46,7 +46,7 @@ const replacedContractTerms = [
   "Local" + "RuntimeService",
   "Local" + "ProviderAdapter"
 ];
-const daemonOnlyCliFlags = ["--codex-command", "--copilot-command"];
+const daemonOnlyCliFlags = ["--codex-command"];
 const localOnlyProhibited = [
   "device" + "Id",
   "runtime" + "BackendId",
@@ -73,7 +73,17 @@ const localOnlyProhibited = [
   "action_role_execution_" + "bindings",
   "useActionRoleExecution" + "Binding",
   "ExecutionSpecV" + "13",
-  "RootSnapshotV" + "14"
+  "RootSnapshotV" + "14",
+  "ProjectConfigurationV" + "22",
+  "projectConfigurationV" + "22Schema",
+  "ExecutionSpecV" + "15",
+  "executionSpecV" + "15Schema",
+  "RootSnapshotV" + "17",
+  "rootSnapshotV" + "17Schema",
+  "AgentExecution" + "Binding",
+  "agent_execution_" + "bindings",
+  ".ballet/" + "agents",
+  "readOnly" + "Roots"
 ];
 const self = path.resolve(import.meta.filename);
 
@@ -104,6 +114,9 @@ for (const filename of files) {
       failures.push(`${relative}: removed local-only contract term ${JSON.stringify(term)}`);
     }
   }
+  if (source.toLocaleLowerCase().includes("copilot") && !allowedCodexOnlyHistory(relative)) {
+    failures.push(`${relative}: removed Copilot capability remains`);
+  }
   if (source.toLocaleLowerCase().includes(transitionMarker)
     && !allowedHistoricalMatch(relative, source, transitionMarker)) {
     failures.push(`${relative}: transition namespace marker remains`);
@@ -133,6 +146,13 @@ function allowedLocalOnlyHistory(relative) {
   return relative.includes(".test.")
     || relative.startsWith(".ballet/")
     || ["README.md", "ARCHITECTURE.md", "DESIGN.md", "AGENTS.md"].includes(relative);
+}
+
+function allowedCodexOnlyHistory(relative) {
+  return relative.includes(".test.")
+    || relative.startsWith(".ballet/adr/")
+    || relative.startsWith(".ballet/goals/")
+    || relative.startsWith(".ballet/arc42/initiatives/");
 }
 
 if (failures.length > 0) {

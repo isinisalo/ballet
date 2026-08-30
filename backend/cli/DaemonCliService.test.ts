@@ -5,6 +5,15 @@ import { DaemonCliService } from "./DaemonCliService.js";
 import type { DaemonLaunchdService } from "./DaemonLaunchdService.js";
 
 describe("DaemonCliService", () => {
+  it("stops a daemon with an incompatible strict-cut config so the server can archive it", async () => {
+    const stop = vi.fn().mockResolvedValue(undefined);
+    const service = new DaemonCliService(
+      { load: async () => { throw new Error("Daemon config must contain exactly one Codex provider."); } } as unknown as DaemonConfigStore,
+      { stop } as unknown as DaemonLaunchdService, { stdout: vi.fn() }
+    );
+    await service.stopIfIdle(); expect(stop).toHaveBeenCalledOnce();
+  });
+
   it("waits for the current launchd PID instead of accepting a stale online heartbeat", async () => {
     const config = { load: async () => ({ serverUrl: "http://127.0.0.1:53321" }) } as unknown as DaemonConfigStore;
     const launchd = { start: vi.fn(), status: async () => ({ loaded: true, running: true, pid: 22 }) } as unknown as DaemonLaunchdService;

@@ -1,5 +1,5 @@
 {
-  "version": 22,
+  "version": 23,
   "direction": {
     "goals": [{ "id": "test-goal", "name": "Exercise a complete canonical fixture", "status": "accepted" }],
     "adrs": [{ "id": "0001-test-adr", "name": "Use Markdown-backed fixture resources", "status": "accepted" }],
@@ -9,9 +9,6 @@
       { "id": "fixture-UC-02", "name": "Verify fixture evidence", "status": "approved", "examples": [{ "given": "the preparation State is done", "when": "verification Actions execute by priority", "then": "the fixture reaches a terminal evidence projection" }, { "given": "preparation is incomplete", "when": "verification is considered", "then": "no verification Action starts" }], "successGoals": ["Verify deterministic gate and terminal projection"], "failureGoals": ["Do not bypass the first State"], "expectedOutcomes": ["A completed fixture Environment or visible blocked Feedback"], "goalIds": ["test-goal"], "adrIds": ["0001-test-adr"], "constraintIds": ["fixture-constraint"], "approval": { "approvedBy": "fixture-human", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "a4e176b053000c23cd2b951e5be849509b8b92febf3fa95ad0925549bcd2230c" } }
     ]
   },
-  "agents": [
-    { "id": "fixture-governance", "name": "Fixture Governance", "description": "Read-only fixture governance agent.", "enabled": true, "instructionResource": "critic", "skillResources": ["fixture-skill"] }
-  ],
   "environment": {
     "id": "fixture-environment", "name": "Fixture environment", "description": "A compact two-State canonical integration fixture.",
     "states": [
@@ -24,6 +21,6 @@
       ] }
     ]
   },
-  "critic": { "version": 2, "enabled": false, "schedules": [{ "id": "fixture-weekly", "kind": "weekly", "timeZone": "Etc/UTC", "localTimes": ["09:00"], "weekdays": [1] }], "agent": { "agentId": "fixture-governance", "instructionResource": "critic", "skillResources": ["fixture-skill"] } },
-  "refinement": { "version": 2, "enabled": true, "agent": { "agentId": "fixture-governance", "instructionResource": "refinement", "skillResources": ["fixture-skill"] }, "allowedRoots": [".ballet/agents", ".ballet/instructions", ".agents/skills"] }
+  "critic": { "version": 2, "enabled": false, "schedules": [{ "id": "fixture-weekly", "kind": "weekly", "timeZone": "Etc/UTC", "localTimes": ["09:00"], "weekdays": [1] }], "agent": { "agentId": "ballet-critic-agent", "skillResources": ["fixture-skill"] } },
+  "refinement": { "version": 2, "enabled": true, "agent": { "agentId": "ballet-refinement-agent", "skillResources": ["fixture-skill"] }, "allowedRoots": [".codex/agents", ".ballet/instructions", ".agents/skills"] }
 }

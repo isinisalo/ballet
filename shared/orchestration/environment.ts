@@ -2,20 +2,22 @@ import type { Direction } from "./direction.js";
 import type { JsonValue } from "./primitives.js";
 import { PROJECT_CONFIG_VERSION } from "./versions.js";
 
-export type RuntimeProvider = "codex" | "copilot";
+export type RuntimeProvider = "codex";
 
-export interface AgentDefinition {
-  id: string;
-  name: string;
+export type GovernanceAgentId = "ballet-critic-agent" | "ballet-refinement-agent";
+
+export interface GovernanceAgentDefinition {
+  id: GovernanceAgentId;
+  name: GovernanceAgentId;
   description: string;
-  enabled: boolean;
-  instructionResource: string;
-  skillResources: string[];
+  developerInstructions: string;
+  model: string;
+  reasoningEffort: string;
+  sandboxMode: "read-only";
 }
 
 export interface AgentComposition {
-  agentId: string;
-  instructionResource: string;
+  agentId: GovernanceAgentId;
   skillResources: string[];
 }
 
@@ -71,13 +73,12 @@ export interface RefinementConfiguration {
   version: 2;
   enabled: boolean;
   agent: AgentComposition;
-  allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"];
+  allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"];
 }
 
-export interface ProjectConfigurationV22 {
+export interface ProjectConfigurationV23 {
   version: typeof PROJECT_CONFIG_VERSION;
   direction: Direction;
-  agents: AgentDefinition[];
   environment: EnvironmentDefinition;
   critic: CriticConfiguration;
   refinement: RefinementConfiguration;

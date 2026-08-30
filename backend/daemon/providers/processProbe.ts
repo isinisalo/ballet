@@ -92,7 +92,7 @@ export const resolveCommandPath = async (command: string): Promise<string> => {
 export const providerChildEnvironment = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => {
   const inherited = Object.fromEntries([
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE",
-    "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "CODEX_HOME", "COPILOT_HOME", "TERM", "COLORTERM"
+    "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "CODEX_HOME", "TERM", "COLORTERM"
   ].flatMap((key) => process.env[key] === undefined ? [] : [[key, process.env[key]]])) as NodeJS.ProcessEnv;
   return { ...inherited, ...extra };
 };

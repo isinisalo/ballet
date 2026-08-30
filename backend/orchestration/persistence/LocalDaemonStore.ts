@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { ActionExecutionBinding, ActionRoleModelSelection, AgentExecutionBinding, AgentExecutionState, ExecutionPolicy, LocalDaemonEvent, LocalDaemonHeartbeat,
+import type { ActionExecutionBinding, ActionRoleModelSelection, LocalDaemonEvent, LocalDaemonHeartbeat,
   LocalDaemonLogEntry, LocalDaemonStatus, LocalDaemonTaskClaim, LocalProviderStatus, RuntimeProvider } from "../../../shared/domain/runtime.js";
 import { localProviderStatusSchema } from "../../../shared/api/runtime-schemas.js";
 import { canonicalJson, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -17,40 +17,6 @@ export class LocalDaemonStore {
     this.executions = new AgentExecutionStore(connection);
   }
 
-  binding(agentId: string): AgentExecutionBinding | undefined {
-    const row = this.connection().prepare("SELECT * FROM agent_execution_bindings WHERE agent_id = ?").get(agentId) as BindingRow | undefined;
-    return row ? toBinding(row) : undefined;
-  }
-
-  putBinding(agentId: string, input: {
-    provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy;
-  }): AgentExecutionBinding {
-    const provider = this.provider(input.provider);
-    if (!provider || provider.health !== "ready") throw new ConflictError(`${input.provider} is not ready on the local daemon.`);
-    const model = provider.capabilities.models.find(({ id }) => id === input.model);
-    if (!model) throw new ConflictError(`Model ${input.model} is unavailable for ${input.provider}.`);
-    if (!model.reasoningOptions.includes(input.reasoningEffort)) {
-      throw new ConflictError(`Reasoning effort ${input.reasoningEffort} is unavailable for model ${input.model}.`);
-    }
-    if (input.policy.network && !provider.capabilities.policy.networkControl) {
-      throw new ConflictError(`${input.provider} cannot enforce network policy.`);
-    }
-    if (input.policy.readOnlyRoots.length > 0 && !provider.capabilities.policy.readOnlyRoots) {
-      throw new ConflictError(`${input.provider} cannot enforce additional read-only roots.`);
-    }
-    const at = this.now().toISOString();
-    this.connection().prepare(`
-      INSERT INTO agent_execution_bindings (
-        agent_id, version, provider, model, reasoning_effort, network_access, read_only_roots_json, updated_at
-      ) VALUES (?, 2, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(agent_id) DO UPDATE SET provider = excluded.provider, model = excluded.model,
-        reasoning_effort = excluded.reasoning_effort, network_access = excluded.network_access,
-        read_only_roots_json = excluded.read_only_roots_json, updated_at = excluded.updated_at
-    `).run(agentId, input.provider, input.model, input.reasoningEffort, input.policy.network ? 1 : 0,
-      canonical(input.policy.readOnlyRoots), at);
-    return this.binding(agentId)!;
-  }
-
   actionBinding(actionId: string): ActionExecutionBinding | undefined {
     const row = this.connection().prepare("SELECT * FROM action_execution_bindings WHERE action_id = ?")
       .get(actionId) as ActionBindingRow | undefined;
@@ -58,28 +24,26 @@ export class LocalDaemonStore {
   }
 
   putActionBinding(actionId: string, input: {
-    provider: RuntimeProvider; policy: ExecutionPolicy;
     validation: ActionRoleModelSelection; work: ActionRoleModelSelection;
   }): ActionExecutionBinding {
-    this.assertBindingSupported({ ...input.validation, provider: input.provider, policy: input.policy });
-    this.assertBindingSupported({ ...input.work, provider: input.provider, policy: input.policy });
-    const provider = this.provider(input.provider)!;
+    this.assertBindingSupported(input.validation);
+    this.assertBindingSupported(input.work);
+    const provider = this.provider("codex")!;
     if (!provider.capabilities.policy.workspaceWrite) {
-      throw new ConflictError(`${input.provider} cannot provide managed workspace-write for Work.`);
+      throw new ConflictError("Codex cannot provide managed workspace-write for Work.");
     }
     const at = this.now().toISOString();
     this.connection().prepare(`
       INSERT INTO action_execution_bindings (
-        action_id, version, provider, network_access, read_only_roots_json,
-        validation_model, validation_reasoning_effort, work_model, work_reasoning_effort, updated_at
-      ) VALUES (?, 2, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(action_id) DO UPDATE SET provider = excluded.provider,
-        network_access = excluded.network_access, read_only_roots_json = excluded.read_only_roots_json,
-        validation_model = excluded.validation_model, validation_reasoning_effort = excluded.validation_reasoning_effort,
+        action_id, version, validation_model, validation_reasoning_effort,
+        work_model, work_reasoning_effort, updated_at
+      ) VALUES (?, 3, ?, ?, ?, ?, ?)
+      ON CONFLICT(action_id) DO UPDATE SET validation_model = excluded.validation_model,
+        validation_reasoning_effort = excluded.validation_reasoning_effort,
         work_model = excluded.work_model, work_reasoning_effort = excluded.work_reasoning_effort,
         updated_at = excluded.updated_at
-    `).run(actionId, input.provider, input.policy.network ? 1 : 0, canonical(input.policy.readOnlyRoots),
-      input.validation.model, input.validation.reasoningEffort, input.work.model, input.work.reasoningEffort, at);
+    `).run(actionId, input.validation.model, input.validation.reasoningEffort,
+      input.work.model, input.work.reasoningEffort, at);
     return this.actionBinding(actionId)!;
   }
 
@@ -136,7 +100,7 @@ export class LocalDaemonStore {
 
   status(): LocalDaemonStatus {
     const row = this.connection().prepare("SELECT * FROM local_daemon_state WHERE singleton = 1").get() as DaemonRow | undefined;
-    const providers = (["codex", "copilot"] as const).map((provider) => this.provider(provider) ?? offlineProvider(provider, this.now()));
+    const providers = [this.provider("codex") ?? offlineProvider(this.now())];
     if (!row) return {
       status: "offline", daemonVersion: "unknown", uptimeSeconds: 0, activeTaskCount: 0,
       lastSeenAt: new Date(0).toISOString(), refreshRequested: false, restartRequested: false, providers
@@ -163,15 +127,13 @@ export class LocalDaemonStore {
   }
 
   private assertBindingSupported(input: {
-    provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy;
+    model: string; reasoningEffort: string;
   }): void {
-    const provider = this.provider(input.provider);
-    if (!provider || provider.health !== "ready") throw new ConflictError(`${input.provider} is not ready on the local daemon.`);
+    const provider = this.provider("codex");
+    if (!provider || provider.health !== "ready") throw new ConflictError("Codex is not ready on the local daemon.");
     const model = provider.capabilities.models.find(({ id }) => id === input.model);
-    if (!model) throw new ConflictError(`Model ${input.model} is unavailable for ${input.provider}.`);
+    if (!model) throw new ConflictError(`Model ${input.model} is unavailable for Codex.`);
     if (!model.reasoningOptions.includes(input.reasoningEffort)) throw new ConflictError(`Reasoning effort ${input.reasoningEffort} is unavailable for model ${input.model}.`);
-    if (input.policy.network && !provider.capabilities.policy.networkControl) throw new ConflictError(`${input.provider} cannot enforce network policy.`);
-    if (input.policy.readOnlyRoots.length > 0 && !provider.capabilities.policy.readOnlyRoots) throw new ConflictError(`${input.provider} cannot enforce additional read-only roots.`);
   }
 
   private activeClaimCount(): number {
@@ -180,26 +142,6 @@ export class LocalDaemonStore {
       WHERE status = 'running' AND claim_fencing > 0 AND daemon_output_key IS NULL
     `).get() as { count: number };
     return row.count;
-  }
-
-  executionStates(agentIds: string[]): AgentExecutionState[] {
-    return agentIds.map((agentId) => {
-      const binding = this.binding(agentId);
-      if (!binding) return { agentId, status: "unbound", reason: "Agent has no local execution binding." };
-      const status = this.status();
-      const provider = status.providers.find((candidate) => candidate.provider === binding.provider);
-      const active = this.connection().prepare(`
-        SELECT execution_task_id FROM execution_tasks task
-        WHERE task.status = 'running' AND json_extract(task.spec_json, '$.runtime.subject.agentId') = ? LIMIT 1
-      `).get(agentId) as { execution_task_id: string } | undefined;
-      if (active) return { agentId, status: "running", provider: binding.provider, activeTaskId: active.execution_task_id };
-      if (status.status === "offline") return { agentId, status: "offline", provider: binding.provider, reason: "Local daemon is offline." };
-      if (!provider || provider.health !== "ready") return {
-        agentId, status: "attention", provider: binding.provider,
-        reason: provider?.healthMessage ?? `${binding.provider} is not ready.`
-      };
-      return { agentId, status: provider.busy ? "busy" : "idle", provider: binding.provider };
-    });
   }
 
   claim(provider: RuntimeProvider): LocalDaemonTaskClaim | undefined {
@@ -222,11 +164,7 @@ export class LocalDaemonStore {
       return {
         taskId: task.taskId, fencing: 1, leaseUntil, leaseDurationMs: LEASE_DURATION_MS,
         renewAfterMs: RENEW_AFTER_MS, spec: task.spec,
-        permissions: {
-          workspaceAccess: task.spec.permissions.workspaceAccess,
-          network: task.spec.permissions.networkAccess,
-          readOnlyRoots: task.spec.permissions.readOnlyRoots
-        }
+        permissions: { workspaceAccess: task.spec.permissions.workspaceAccess }
       };
     })();
   }
@@ -348,10 +286,7 @@ export class LocalDaemonStore {
   }
 }
 
-interface BindingRow { agent_id: string; provider: RuntimeProvider; model: string; reasoning_effort: string;
-  network_access: 0 | 1; read_only_roots_json: string; updated_at: string }
-interface ActionBindingRow { action_id: string; provider: RuntimeProvider; network_access: 0 | 1;
-  read_only_roots_json: string; validation_model: string; validation_reasoning_effort: string;
+interface ActionBindingRow { action_id: string; validation_model: string; validation_reasoning_effort: string;
   work_model: string; work_reasoning_effort: string; updated_at: string }
 interface DaemonRow { status: LocalDaemonStatus["status"]; pid: number; daemon_version: string; uptime_seconds: number;
   active_task_count: number; last_seen_at: string; recent_error: string | null; refresh_requested_at: string | null;
@@ -366,23 +301,16 @@ interface ClaimedTaskRow {
   daemon_output_key: string | null; daemon_output: string | null; daemon_error_message: string | null;
 }
 
-const toBinding = (row: BindingRow): AgentExecutionBinding => ({
-  version: 2, agentId: row.agent_id, provider: row.provider, model: row.model,
-  reasoningEffort: row.reasoning_effort,
-  policy: { network: Boolean(row.network_access), readOnlyRoots: JSON.parse(row.read_only_roots_json) as string[] },
-  updatedAt: row.updated_at
-});
 const toActionBinding = (row: ActionBindingRow): ActionExecutionBinding => ({
-  version: 2, actionId: row.action_id, provider: row.provider,
-  policy: { network: Boolean(row.network_access), readOnlyRoots: JSON.parse(row.read_only_roots_json) as string[] },
+  version: 3, actionId: row.action_id,
   validation: { model: row.validation_model, reasoningEffort: row.validation_reasoning_effort },
   work: { model: row.work_model, reasoningEffort: row.work_reasoning_effort },
   updatedAt: row.updated_at
 });
 const canonical = (value: unknown): string => canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue);
 const levelFor = (line: string): LocalDaemonLogEntry["level"] => /\berror\b/i.test(line) ? "error" : /\bwarn/i.test(line) ? "warn" : "info";
-const offlineProvider = (provider: RuntimeProvider, now: Date): LocalProviderStatus => ({
-  provider, authStatus: "unknown", health: "offline", busy: false, updatedAt: now.toISOString(),
+const offlineProvider = (now: Date): LocalProviderStatus => ({
+  provider: "codex", authStatus: "unknown", health: "offline", busy: false, updatedAt: now.toISOString(),
   capabilities: { models: [], supportsResume: false, supportsStructuredOutput: false,
-    policy: { workspaceWrite: false, networkControl: false, readOnlyRoots: false }, refreshedAt: now.toISOString() }
+    policy: { workspaceWrite: false }, refreshedAt: now.toISOString() }
 });

@@ -1,5 +1,5 @@
 /** Checkout-local daemon contracts. Device and pairing concepts are intentionally absent. */
-export type RuntimeProvider = "codex" | "copilot";
+export type RuntimeProvider = "codex";
 export type RuntimeAuthStatus = "ready" | "required" | "expired" | "unknown";
 export type RuntimeBackendHealth = "ready" | "probing" | "auth_required" | "unsupported_version"
   | "policy_unsupported" | "error" | "offline";
@@ -13,8 +13,6 @@ export interface RuntimeModelCapability {
 
 export interface RuntimePolicyCapabilities {
   workspaceWrite: boolean;
-  networkControl: boolean;
-  readOnlyRoots: boolean;
 }
 
 export interface RuntimeCapabilities {
@@ -25,7 +23,6 @@ export interface RuntimeCapabilities {
   refreshedAt: string;
 }
 
-export interface ExecutionPolicy { network: boolean; readOnlyRoots: string[] }
 export type WorkspaceAccess = "read-only" | "workspace-write";
 
 export interface LocalProviderStatus {
@@ -54,38 +51,17 @@ export interface LocalDaemonStatus {
   providers: LocalProviderStatus[];
 }
 
-export interface AgentExecutionBinding {
-  version: 2;
-  agentId: string;
-  provider: RuntimeProvider;
-  model: string;
-  reasoningEffort: string;
-  policy: ExecutionPolicy;
-  updatedAt: string;
-}
-
 export type ActionExecutionRole = "validation" | "work";
 export interface ActionRoleModelSelection {
   model: string;
   reasoningEffort: string;
 }
 export interface ActionExecutionBinding {
-  version: 2;
+  version: 3;
   actionId: string;
-  provider: RuntimeProvider;
-  policy: ExecutionPolicy;
   validation: ActionRoleModelSelection;
   work: ActionRoleModelSelection;
   updatedAt: string;
-}
-
-export type AgentLiveStatus = "running" | "idle" | "busy" | "attention" | "unbound" | "offline";
-export interface AgentExecutionState {
-  agentId: string;
-  status: AgentLiveStatus;
-  provider?: RuntimeProvider;
-  activeTaskId?: string;
-  reason?: string;
 }
 
 export interface LocalDaemonHeartbeat {
@@ -105,8 +81,8 @@ export interface LocalDaemonTaskClaim {
   leaseUntil: string;
   leaseDurationMs: number;
   renewAfterMs: number;
-  spec: import("../orchestration/execution.js").ExecutionSpecV15;
-  permissions: { workspaceAccess: WorkspaceAccess; network: boolean; readOnlyRoots: string[] };
+  spec: import("../orchestration/execution.js").ExecutionSpecV16;
+  permissions: { workspaceAccess: WorkspaceAccess };
 }
 
 export interface LocalDaemonLeaseResult { accepted: boolean; leaseUntil?: string; cancelRequested: boolean }

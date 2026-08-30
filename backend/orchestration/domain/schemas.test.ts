@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   EXECUTION_SPEC_VERSION, PROJECT_CONFIG_VERSION, ROLE_OUTCOME_VERSION,
-  TASK_ENVELOPE_VERSION, agentRunSchema, approveUseCase, projectConfigurationV22Schema,
+  TASK_ENVELOPE_VERSION, agentRunSchema, approveUseCase, projectConfigurationV23Schema,
   refinementOutcomeSchema, roleOutcomeV11Schema, sha256, taskEnvelopeV11Schema,
   validationDecisionSchema, workOutcomeSchema
 } from "../../../shared/orchestration/index.js";
-import { actionExecutionBindingBodySchema, executionBindingBodySchema } from "../../../shared/api/runtime-schemas.js";
+import { actionExecutionBindingBodySchema } from "../../../shared/api/runtime-schemas.js";
 import { DAEMON_BINDING_CONTRACT_VERSION, ROOT_SNAPSHOT_VERSION } from "../../../shared/orchestration/versions.js";
 import { DATABASE_SCHEMA_VERSION } from "../persistence/RuntimeSchema.js";
 
@@ -114,32 +114,24 @@ describe("task and runtime boundary schemas", () => {
   });
 });
 
-describe("Project Configuration v22 boundary", () => {
+describe("Project Configuration v23 boundary", () => {
   it("publishes the canonical strict versions", () => {
-    expect(PROJECT_CONFIG_VERSION).toBe(22);
+    expect(PROJECT_CONFIG_VERSION).toBe(23);
     expect(TASK_ENVELOPE_VERSION).toBe(11);
     expect(ROLE_OUTCOME_VERSION).toBe(11);
-    expect(EXECUTION_SPEC_VERSION).toBe(15);
-    expect(ROOT_SNAPSHOT_VERSION).toBe(17);
-    expect(DATABASE_SCHEMA_VERSION).toBe(20);
-    expect(DAEMON_BINDING_CONTRACT_VERSION).toBe(2);
+    expect(EXECUTION_SPEC_VERSION).toBe(16);
+    expect(ROOT_SNAPSHOT_VERSION).toBe(18);
+    expect(DATABASE_SCHEMA_VERSION).toBe(21);
+    expect(DAEMON_BINDING_CONTRACT_VERSION).toBe(3);
   });
 
   it("accepts only the atomic Action execution binding body", () => {
-    const binding = { provider: "codex", policy: { network: false, readOnlyRoots: [] },
+    const binding = {
       validation: { model: "gpt", reasoningEffort: "medium" }, work: { model: "gpt", reasoningEffort: "high" } };
     expect(actionExecutionBindingBodySchema.safeParse(binding).success).toBe(true);
     expect(actionExecutionBindingBodySchema.safeParse({ ...binding, role: "validation" }).success).toBe(false);
-    expect(actionExecutionBindingBodySchema.safeParse({ ...binding, validation: { ...binding.validation, provider: "copilot" } }).success).toBe(false);
+    expect(actionExecutionBindingBodySchema.safeParse({ ...binding, provider: "copilot" }).success).toBe(false);
     expect(actionExecutionBindingBodySchema.safeParse({ ...binding, work: { model: "" } }).success).toBe(false);
-  });
-
-  it("rejects Computer-era binding identity fields", () => {
-    const binding = { provider: "codex", model: "gpt", reasoningEffort: "medium",
-      policy: { network: false, readOnlyRoots: [] } };
-    expect(executionBindingBodySchema.safeParse(binding).success).toBe(true);
-    expect(executionBindingBodySchema.safeParse({ ...binding, deviceId: "legacy" }).success).toBe(false);
-    expect(executionBindingBodySchema.safeParse({ ...binding, runtimeBackendId: "legacy" }).success).toBe(false);
   });
 
   it("accepts a runnable bounded Environment and rejects unknown fields", () => {
@@ -150,9 +142,10 @@ describe("Project Configuration v22 boundary", () => {
       goalIds: ["goal"], adrIds: ["adr"], constraintIds: ["constraint"]
     }, { approvedBy: "human", approvedAt: "2026-08-29T10:00:00.000Z", revision: 1 });
     const actionRole = { instructionResource: "instruction", skillResources: [] };
-    const agent = { agentId: "profile", ...actionRole };
+    const criticAgent = { agentId: "ballet-critic-agent", skillResources: [] };
+    const refinementAgent = { agentId: "ballet-refinement-agent", skillResources: [] };
     const config = {
-      version: 22,
+      version: 23,
       direction: {
         goals: [{ id: "goal", name: "Goal", status: "accepted" }],
         adrs: [{ id: "adr", name: "ADR", status: "accepted" }],
@@ -162,8 +155,6 @@ describe("Project Configuration v22 boundary", () => {
         }],
         useCases: [useCase]
       },
-      agents: [{ id: "profile", name: "Profile", description: "Agent", enabled: true,
-        instructionResource: "instruction", skillResources: [] }],
       environment: {
         id: "environment", name: "Environment", description: "Description",
         states: [{
@@ -171,19 +162,19 @@ describe("Project Configuration v22 boundary", () => {
           actions: [{ id: "action", name: "Action", description: "Description", priority: 1, maxRetries: 1, validation: actionRole, work: { ...actionRole } }]
         }]
       },
-      critic: { version: 2, enabled: true, schedules: [{ id: "daily-1", kind: "daily", timeZone: "Europe/Helsinki", localTimes: ["09:00"] }], agent },
-      refinement: { version: 2, enabled: true, agent,
-        allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"] }
+      critic: { version: 2, enabled: true, schedules: [{ id: "daily-1", kind: "daily", timeZone: "Europe/Helsinki", localTimes: ["09:00"] }], agent: criticAgent },
+      refinement: { version: 2, enabled: true, agent: refinementAgent,
+        allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"] }
     };
-    expect(projectConfigurationV22Schema.safeParse(config).success).toBe(true);
-    expect(projectConfigurationV22Schema.safeParse({ ...config, version: 21 }).success).toBe(false);
-    expect(projectConfigurationV22Schema.safeParse({ ...config, environment: { ...config.environment,
+    expect(projectConfigurationV23Schema.safeParse(config).success).toBe(true);
+    expect(projectConfigurationV23Schema.safeParse({ ...config, version: 21 }).success).toBe(false);
+    expect(projectConfigurationV23Schema.safeParse({ ...config, environment: { ...config.environment,
       states: [{ ...config.environment.states[0], actions: [{ ...config.environment.states[0]!.actions[0], useCaseIds: ["UC-1"] }] }] } }).success).toBe(false);
-    expect(projectConfigurationV22Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
+    expect(projectConfigurationV23Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
     const duplicateAction = structuredClone(config);
     duplicateAction.environment.states.push({ ...duplicateAction.environment.states[0]!, id: "state-2", order: 2 });
-    expect(projectConfigurationV22Schema.safeParse(duplicateAction).success).toBe(false);
-    expect(projectConfigurationV22Schema.safeParse({
+    expect(projectConfigurationV23Schema.safeParse(duplicateAction).success).toBe(false);
+    expect(projectConfigurationV23Schema.safeParse({
       ...config,
       critic: { ...config.critic, schedules: [{ ...config.critic.schedules[0], timeZone: "Mars/Olympus" }] }
     }).success).toBe(false);

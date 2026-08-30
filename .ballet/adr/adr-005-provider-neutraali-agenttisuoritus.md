@@ -1,14 +1,14 @@
 ---
 id: adr-005
 title: Palveluntarjoajariippumaton Codex- ja Copilot-suoritus
-status: accepted
+status: superseded
 createdAt: '2026-07-18T00:00:00.000Z'
 updatedAt: '2026-07-19T06:45:37.000Z'
 tags:
   - arkkitehtuuripäätös
   - agenttisuoritus
   - palveluntarjoajarajapinta
-version: 3
+version: 4
 ---
 
 # Palveluntarjoajariippumaton Codex- ja Copilot-suoritus

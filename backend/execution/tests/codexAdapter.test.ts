@@ -81,7 +81,6 @@ describe("CodexAppServerAdapter", () => {
       model: "provider-default",
       reasoning: "provider-default",
       workspaceAccess: "workspace-write",
-      policy: { network: false, readOnlyRoots: [] },
       outputSchema: {
         type: "object",
         required: ["role", "state", "summary", "artifacts", "checks"],
@@ -130,7 +129,6 @@ describe("CodexAppServerAdapter", () => {
     for await (const event of adapter.execute({
       executionId: "task-read-only", prompt: distinctivePrompt, workingDirectory: context.root,
       model: "provider-default", reasoning: "provider-default", workspaceAccess: "read-only",
-      policy: { network: false, readOnlyRoots: [] }
     })) events.push(event);
     expect(events).toContainEqual(expect.objectContaining({ type: "execution.completed" }));
   });
@@ -147,7 +145,6 @@ describe("CodexAppServerAdapter", () => {
         model: "provider-default",
         reasoning: "provider-default",
         workspaceAccess: "workspace-write",
-        policy: { network: false, readOnlyRoots: [] }
       })) { void event; }
     };
 
@@ -167,7 +164,6 @@ describe("CodexAppServerAdapter", () => {
         model: "provider-default",
         reasoning: "provider-default",
         workspaceAccess: "workspace-write",
-        policy: { network: false, readOnlyRoots: [] },
         signal: controller.signal
       })) { void event; }
     };

@@ -3,23 +3,26 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { Constraint, DirectionReference, UseCase } from "../../../shared/orchestration/direction.js";
 import { approveUseCase, invalidateUseCaseApproval, useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
-import type { AgentDefinition, ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentId, ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDefinition, ProjectDefinitionPort } from "../runtime/EnvironmentRunPlanner.js";
 import { ProjectDocumentRepository } from "./ProjectDocumentRepository.js";
 import { ProjectConfigurationRepository } from "./ProjectConfigurationRepository.js";
 import { ProjectReferenceIndex, type ProjectDocumentKind } from "./ProjectReferenceIndex.js";
+import { CodexAgentRepository } from "./CodexAgentRepository.js";
 
 const runFile = promisify(execFile);
 export type DirectionValue = DirectionReference | Constraint | UseCase;
 
 export class ProjectDefinitionService implements ProjectDefinitionPort {
+  readonly agents: CodexAgentRepository;
+
   constructor(
     readonly root: string,
     readonly projects: ProjectConfigurationRepository,
     readonly documents: ProjectDocumentRepository
-  ) {}
+  ) { this.agents = new CodexAgentRepository(root); }
 
   putDirection(input: {
     kind: Exclude<ProjectDocumentKind, "instruction" | "skill">;
@@ -44,29 +47,31 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
   }
 
   putAgent(input: {
-    id: string; value: AgentDefinition; markdown: string;
-    expectedConfigHash: string; expectedDocumentHash: string | "absent";
+    id: GovernanceAgentId;
+    developerInstructions: string;
+    model: string;
+    reasoningEffort: string;
+    skillResources: string[];
+    expectedConfigHash: string;
+    expectedDocumentHash: string;
   }): { configHash: string; documentHash: string } {
-    if (input.id !== input.value.id) throw new ConflictError("Agent path id differs from Markdown value id.");
+    this.projects.assertUnlocked();
     const loaded = this.projects.load();
     if (loaded.configHash !== input.expectedConfigHash) throw new ConflictError("Project Config optimistic hash is stale.");
-    const config = { ...loaded.config, agents: replace(loaded.config.agents, input.value) };
+    const current = this.agents.require(input.id);
+    if (current.contentHash !== input.expectedDocumentHash) throw new ConflictError(`Agent ${input.id} optimistic hash is stale.`);
+    const config = input.id === "ballet-critic-agent"
+      ? { ...loaded.config, critic: { ...loaded.config.critic, agent: { agentId: input.id, skillResources: input.skillResources } } }
+      : { ...loaded.config, refinement: { ...loaded.config.refinement, agent: { agentId: input.id, skillResources: input.skillResources } } };
     const saved = this.projects.save(config, input.expectedConfigHash);
     try {
-      const document = this.documents.put("agent", input.id, input.markdown, input.expectedDocumentHash);
-      return { configHash: saved.configHash, documentHash: document.contentHash };
-    } catch (error) { this.projects.save(loaded.config, saved.configHash); throw error; }
-  }
-
-  removeAgent(input: { id: string; expectedConfigHash: string; expectedDocumentHash: string }): string {
-    const loaded = this.projects.load();
-    if (loaded.configHash !== input.expectedConfigHash) throw new ConflictError("Project Config optimistic hash is stale.");
-    const blockers = new ProjectReferenceIndex(loaded.config).for("agent", input.id);
-    if (blockers.length > 0) throw new ConflictError(`Agent ${input.id} has reference blockers.`);
-    const saved = this.projects.save({ ...loaded.config, agents: loaded.config.agents.filter(({ id }) => id !== input.id) }, input.expectedConfigHash);
-    try { this.documents.remove("agent", input.id, input.expectedDocumentHash, []); }
-    catch (error) { this.projects.save(loaded.config, saved.configHash); throw error; }
-    return saved.configHash;
+      const agent = this.agents.put(input.id, { developerInstructions: input.developerInstructions,
+        model: input.model, reasoningEffort: input.reasoningEffort, expectedHash: input.expectedDocumentHash });
+      return { configHash: saved.configHash, documentHash: agent.contentHash };
+    } catch (error) {
+      this.projects.save(loaded.config, saved.configHash);
+      throw error;
+    }
   }
 
   removeDirection(input: {
@@ -114,6 +119,12 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
 
   async load(): Promise<ProjectDefinition> {
     const loaded = this.projects.load();
+    const agents = this.agents.list().map((slot) => {
+      if (slot.status !== "ready" || !slot.agent || !slot.contentHash) {
+        throw new ConflictError(slot.error ?? `Governance Agent ${slot.id} is not ready.`);
+      }
+      return { ...slot.agent, contentSha256: slot.contentHash };
+    });
     const resources = (["instruction", "skill"] as const).flatMap((kind) =>
       this.documents.list(kind).map(({ id, content }) => ({
         kind, id, content, relativePath: kind === "instruction"
@@ -128,17 +139,18 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
     return {
       config: loaded.config, configSha256: loaded.configHash,
       baseCommit: result.stdout.trim(), checkoutRoot: this.root, resources,
+      agents,
       directionDocumentHashes: { goals: hashes("goal"), adrs: hashes("adr"), constraints: hashes("constraint") },
-      agentDocumentHashes: Object.fromEntries(this.documents.list("agent").map(({ id, contentHash }) => [id, contentHash]))
+      agentDocumentHashes: Object.fromEntries(agents.map(({ id, contentSha256 }) => [id, contentSha256]))
     };
   }
 }
 
 const replaceDirectionValue = (
-  config: ProjectConfigurationV22,
+  config: ProjectConfigurationV23,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   input: DirectionValue
-): ProjectConfigurationV22 => {
+): ProjectConfigurationV23 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = replace(direction.goals, input as DirectionReference);
   else if (kind === "adr") direction.adrs = replace(direction.adrs, input as DirectionReference);
@@ -160,10 +172,10 @@ const replaceDirectionValue = (
   return { ...config, direction };
 };
 const removeDirectionValue = (
-  config: ProjectConfigurationV22,
+  config: ProjectConfigurationV23,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   id: string
-): ProjectConfigurationV22 => {
+): ProjectConfigurationV23 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = direction.goals.filter((value) => value.id !== id);
   else if (kind === "adr") direction.adrs = direction.adrs.filter((value) => value.id !== id);
@@ -173,6 +185,6 @@ const removeDirectionValue = (
 };
 const replace = <T extends { id: string }>(values: T[], value: T): T[] =>
   [...values.filter((candidate) => candidate.id !== value.id), value].sort((left, right) => left.id.localeCompare(right.id));
-const replaceUseCase = (config: ProjectConfigurationV22, useCase: UseCase): ProjectConfigurationV22 => ({
+const replaceUseCase = (config: ProjectConfigurationV23, useCase: UseCase): ProjectConfigurationV23 => ({
   ...config, direction: { ...config.direction, useCases: replace(config.direction.useCases, useCase) }
 });

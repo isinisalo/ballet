@@ -52,7 +52,7 @@ block
 
   backend("<b>BACKEND</b><br/>Node.js 22 + TypeScript/ESM<br/>Express 4 + Zod 4<br/>Strict application services")
   data("<b>DATA</b><br/>Git = project truth<br/>SQLite v9 = runtime/outbox<br/>tk stores = issues")
-  api("<b>API & INTEGRATIONS</b><br/>Loopback JSON + SSE<br/>Codex + Copilot adapters<br/>Git + pinned tk")
+  api("<b>API & INTEGRATIONS</b><br/>Loopback JSON + SSE<br/>Codex app-server adapter<br/>Git + pinned tk")
   security("<b>SECURITY</b><br/>Origin + checkout identity<br/>Worktree / network policy<br/>Ei credential-persistenssiä")
 
   infra("<b>INFRA &<br/>DEPLOYMENT</b><br/>macOS arm64 / x64<br/>launchd + Ballet CLI<br/>Attested release bundle")
@@ -80,7 +80,7 @@ Rakenne perustuu viralliseen [Tech Stack Canvasiin](https://techstackcanvas.io/)
 
 1. **Checkout-local-komentokeskus:** määrittele, suorita ja tarkasta AI-avusteiset työnkulut ilman Ballet-tiliä tai remote control planea (`goal-001`, REQ-001).
 2. **Versionhallittu ja toistettava automaatio:** pidä intentio, Loops, ExecutionProfiles, instructionit, skillit ja arkkitehtuurievidenssi Gitissä (`goal-002`, REQ-002, REQ-009).
-3. **Hallittu multi-provider-suoritus:** suorita Codex- ja Copilot-roolit deterministisesti, eristetyssä worktreessä ja palautettavalla canonical Statella (`goal-003`–`goal-006`, REQ-003–REQ-006).
+3. **Hallittu Codex-suoritus:** suorita roolit deterministisesti, eristetyssä worktreessä ja palautettavalla canonical Statella (`goal-003`–`goal-006`, REQ-003–REQ-006).
 
 ## Sizing
 
@@ -88,7 +88,7 @@ Rakenne perustuu viralliseen [Tech Stack Canvasiin](https://techstackcanvas.io/)
 | --- | --- | --- | --- |
 | Deployment boundary | 1 täsmällinen checkout → 1 service identity, Node/Express-prosessi ja SQLite-kanta | Ei keskitettyä monen checkoutin kontrollitasoa; checkoutit skaalautuvat erillisinä yksikköinä. | DEP-001, CTR-001 |
 | Root Run -samanaikaisuus | Yksi Statea muuttava Node-rooli kerrallaan yhdessä Root Runissa | Control flow ja State-revisiot pysyvät yksiselitteisinä. | RT-001, CON-002 |
-| Provider-samanaikaisuus | 1 running task / provider FIFO lane; Codex- ja Copilot-kaistat voivat edetä rinnakkain | Provider-kohtainen järjestys säilyy ilman koko järjestelmän globaalia serialisointia. | RT-008, BB-006 |
+| Runtime-samanaikaisuus | 1 running task Codex FIFO -kaistalla | Deterministinen järjestys säilyy daemonin ja serverin lease/fencing-rajalla. | RT-008, BB-006 |
 | State ja prompt context | State 256 KiB; relevant history 64 KiB; Task Envelope 384 KiB; valmis prompt 512 KiB | Oversize failaa suljetusti; sisältöä ei typistetä semanttisesti. | `README.md`, QS-011 |
 | Project execution resource | Primary instruction 128 KiB; yksittäinen skill 128 KiB | Resource catalog estää liian suuren prompt supply chain -resurssin preflightissa. | `ExecutionResourceCatalog.ts` |
 | Snapshot | 32 MiB / tiedosto; 256 MiB / configuration snapshot | Root Run pysyy paikallisesti käsiteltävänä ja liian suuri snapshot estyy ennen suoritusta. | `LocalWorkspaceManager.ts` |
@@ -182,7 +182,7 @@ Kanoninen deployment-kuvaus: [osio 7](../07-deployment-view.md), DEP-001–DEP-0
 | --- | --- | --- |
 | Browser ↔ Ballet | Loopback HTTP JSON ja SSE, shared TypeScript/Zod schemas | Origin/request-validointi; browser ei lue SQLitea suoraan. |
 | Ballet ↔ Codex | Codex CLI app-server, JSON-RPC/event-normalization | Exact prompt + schema; credentials/provider ambient context jää providerille. |
-| Ballet ↔ GitHub Copilot | `@github/copilot-sdk` 1.0.6 ja CLI-capability probe | Sama canonical task/outcome -portti; ei fallbackia. |
+| Ballet ↔ Codex | app-server JSON-RPC ja CLI-capability probe | Canonical task/outcome -portti; ei provider-fallbackia. |
 | Ballet ↔ Git | Paikalliset Git-komennot | Root Run -worktree write boundary; remote ei ole Run-oletus. |
 | Ballet ↔ `tk` | Rajattu argv-adapteri ja `ballet tracker` -CLI | Vain konfiguroitu worktree; strict probe/output, timeoutit, external-ref-idempotenssi ja SQLite-outbox. |
 | Release ↔ GitHub/Homebrew | GitHub Actions, Releases, attestations ja tap repository | Ulkoinen kirjoitus vain erikseen valtuutetussa release-polussa. |

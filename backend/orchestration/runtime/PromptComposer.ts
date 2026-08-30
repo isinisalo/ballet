@@ -1,8 +1,8 @@
 import type { ActionRoleComposition, AgentComposition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionPromptEvidenceV13 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionPromptEvidenceV14 } from "../../../shared/orchestration/execution.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV17 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV18 } from "../../../shared/orchestration/runtime.js";
 import type { TaskEnvelopeV11 } from "../../../shared/orchestration/taskEnvelopes.js";
 
 const MAX_PROMPT_BYTES = 512 * 1024;
@@ -10,18 +10,23 @@ const MAX_ENVELOPE_BYTES = 192 * 1024;
 const SYSTEM_ROLE_CONTRACT = "Ballet owns orchestration and human approvals. Obey the role, permissions, immutable context, and exact output contract.";
 
 export const composeOrchestrationPrompt = (input: {
-  snapshot: RootSnapshotV17;
+  snapshot: RootSnapshotV18;
   envelope: TaskEnvelopeV11;
   composition: ActionRoleComposition | AgentComposition;
-  subject: ExecutionPromptEvidenceV13["subject"];
-}): ExecutionPromptEvidenceV13 => {
+  subject: ExecutionPromptEvidenceV14["subject"];
+}): ExecutionPromptEvidenceV14 => {
   const envelopeJson = canonicalJson(input.envelope as unknown as JsonValue);
   if (Buffer.byteLength(envelopeJson, "utf8") > MAX_ENVELOPE_BYTES) throw new Error("Task Envelope exceeds 192 KiB.");
-  const primary = requireResource(input.snapshot, "instruction", input.composition.instructionResource);
+  const primary = input.subject.kind === "agent"
+    ? { kind: "instruction" as const, id: input.subject.agent.id,
+      relativePath: `.codex/agents/${input.subject.agent.id}.toml`,
+      content: input.subject.agent.developerInstructions,
+      sourceSha256: sha256(input.subject.agent.developerInstructions) }
+    : requireResource(input.snapshot, "instruction", (input.composition as ActionRoleComposition).instructionResource);
   const skills = [...input.composition.skillResources].sort(compareUtf8).map(
     (id) => requireResource(input.snapshot, "skill", id)
   );
-  const outputSchemaId = `${input.envelope.role}-outcome-v11` as ExecutionPromptEvidenceV13["outputSchemaId"];
+  const outputSchemaId = `${input.envelope.role}-outcome-v11` as ExecutionPromptEvidenceV14["outputSchemaId"];
   const outputRequirement = canonicalJson(outputContract(input.envelope.role, input.envelope.phase));
   const context = input.envelope.context;
   const prompt = [
@@ -34,7 +39,7 @@ export const composeOrchestrationPrompt = (input: {
   ].join("\n\n");
   if (Buffer.byteLength(prompt, "utf8") > MAX_PROMPT_BYTES) throw new Error("Execution prompt exceeds 512 KiB.");
   return {
-    compositionVersion: 13,
+    compositionVersion: 14,
     role: input.envelope.role,
     phase: input.envelope.phase,
     subject: input.subject,
@@ -59,13 +64,13 @@ const outputContract = (role: TaskEnvelopeV11["role"], phase: TaskEnvelopeV11["p
 });
 const hardConstraints = (role: TaskEnvelopeV11["role"]): string =>
   `Role=${role}; toolPolicy=${role === "work" ? "workspace_write" : "read_only"}; provider approvalPolicy=never; no routing, approval, or orchestration-state mutation.`;
-const section = (name: string, content: string): string => `<<< BALLET ORCHESTRATION COMPOSITION V13 · ${name} >>>\n${content}\n<<< END ${name} >>>`;
+const section = (name: string, content: string): string => `<<< BALLET ORCHESTRATION COMPOSITION V14 · ${name} >>>\n${content}\n<<< END ${name} >>>`;
 const evidence = (
-  resource: RootSnapshotV17["resources"][number], kind: "primary" | "skill"
-): ExecutionPromptEvidenceV13["resources"][number] => ({
+  resource: RootSnapshotV18["resources"][number], kind: "primary" | "skill"
+): ExecutionPromptEvidenceV14["resources"][number] => ({
   kind, origin: "project", id: resource.id, relativePath: resource.relativePath, sourceSha256: resource.sourceSha256
 });
-const requireResource = (snapshot: RootSnapshotV17, kind: "instruction" | "skill", id: string) => {
+const requireResource = (snapshot: RootSnapshotV18, kind: "instruction" | "skill", id: string) => {
   const resource = snapshot.resources.find((candidate) => candidate.kind === kind && candidate.id === id);
   if (!resource) throw new Error(`Snapshot is missing ${kind} ${id}.`);
   return resource;

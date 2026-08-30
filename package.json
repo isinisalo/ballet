@@ -18,12 +18,12 @@
     "preview": "npm run build && node dist-server/backend/index.js --root . --state-root .git/ballet --port 4317"
   },
   "dependencies": {
-    "@github/copilot-sdk": "1.0.6",
     "@js-temporal/polyfill": "^0.5.1",
     "better-sqlite3": "^12.11.1",
     "express": "^4.19.2",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "smol-toml": "^1.4.2",
     "uuid": "^14.0.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

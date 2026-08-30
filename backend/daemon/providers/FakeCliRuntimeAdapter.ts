@@ -27,7 +27,7 @@ export class FakeCliRuntimeAdapter implements CliRuntimeAdapter {
       version: "999.0.0",
       minimumVersion: this.minimumVersion,
       authStatus: "ready",
-      policyCapabilities: { workspaceWrite: true, networkControl: true, readOnlyRoots: true }
+      policyCapabilities: { workspaceWrite: true }
     };
   }
 

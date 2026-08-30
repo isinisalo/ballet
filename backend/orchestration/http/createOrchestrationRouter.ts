@@ -6,7 +6,7 @@ import type { ApiController } from "./ApiController.js";
 import {
   actionParamsSchema, createFeedbackSchema, criticDecisionSchema,
   directionDecisionSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
-  idParamsSchema, putActionSchema, putAgentSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
+  governanceAgentParamsSchema, idParamsSchema, putActionSchema, putAgentSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
   putResourceSchema, putStateSchema, refinementDecisionSchema, removeDirectionSchema,
   removeResourceSchema, reorderSchema, runParamsSchema, startRunSchema, stateParamsSchema,
   workInputResponseSchema,
@@ -71,17 +71,11 @@ const registerDocumentRoutes = (
         expectedDocumentHash: input.expectedHash }));
     }));
   }
-  router.get("/agents", route(async (_req, res) => res.json(controller.documents("agent"))));
-  router.post("/agents", route(async (req, res) => {
-    const input = parseBody(putAgentSchema, req); res.status(201).json(controller.createAgent({ id: input.value.id, ...input }));
-  }));
-  router.get("/agents/:id", route(async (req, res) => res.json(controller.document("agent", parseParams(idParamsSchema, req).id))));
+  router.get("/agents", route(async (_req, res) => res.json(controller.agents())));
+  router.get("/agents/:id", route(async (req, res) => res.json(controller.agent(parseParams(governanceAgentParamsSchema, req).id))));
   router.put("/agents/:id", route(async (req, res) => {
-    const { id } = parseParams(idParamsSchema, req); res.json(controller.updateAgent({ id, ...parseBody(putAgentSchema, req) }));
-  }));
-  router.delete("/agents/:id", route(async (req, res) => {
-    const { id } = parseParams(idParamsSchema, req); const input = parseBody(removeDirectionSchema, req);
-    res.json(controller.removeAgent({ id, expectedConfigHash: input.expectedConfigHash, expectedDocumentHash: input.expectedHash }));
+    const { id } = parseParams(governanceAgentParamsSchema, req);
+    res.json(controller.updateAgent({ id, ...parseBody(putAgentSchema, req) }));
   }));
   for (const [collection, kind] of [["instructions", "instruction"], ["skills", "skill"]] as const) {
     router.get(`/${collection}`, route(async (_req, res) => res.json(controller.documents(kind))));

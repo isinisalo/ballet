@@ -1,9 +1,9 @@
 import type Database from "better-sqlite3";
 import type {
-  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV15, ExecutionTaskSeed, JsonValue, StoredAgentRun
+  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV16, ExecutionTaskSeed, JsonValue, StoredAgentRun
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import { executionSpecV15Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
+import { executionSpecV16Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
 import { roleOutcomeV11Schema } from "../../../shared/orchestration/schemas/outcomeSchemas.js";
 import { taskEnvelopeV11Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
 import { toAgentRun } from "./RowMappers.js";
@@ -22,7 +22,7 @@ export interface StoredExecutionTask {
   outcome?: unknown;
   errorCode?: string;
   errorMessage?: string;
-  spec: ExecutionSpecV15;
+  spec: ExecutionSpecV16;
 }
 
 export class AgentExecutionStore {
@@ -94,7 +94,7 @@ export class AgentExecutionStore {
   }
 
   createTask(input: ExecutionTaskSeed): void {
-    const spec = executionSpecV15Schema.parse(input.spec);
+    const spec = executionSpecV16Schema.parse(input.spec);
     assertHash(spec, input.specHash, "ExecutionSpec");
     const agent = this.requireAgent(spec.agentRunId);
     if (agent.environmentRunId !== spec.environmentRunId || agent.role !== spec.evidence.role) {
@@ -105,9 +105,9 @@ export class AgentExecutionStore {
         INSERT INTO execution_tasks (
           execution_task_id, environment_run_id, agent_run_id, provider, role, kind, status,
         spec_version, spec_json, spec_hash, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'agent_execution', 'queued', 15, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, 'agent_execution', 'queued', ?, ?, ?, ?, ?)
       `).run(spec.taskId, spec.environmentRunId, spec.agentRunId, spec.runtime.provider,
-        spec.evidence.role, canonical(spec), input.specHash, spec.createdAt, spec.createdAt);
+        spec.evidence.role, spec.version, canonical(spec), input.specHash, spec.createdAt, spec.createdAt);
       const attached = this.connection().prepare(`
         UPDATE agent_runs SET execution_task_id = ?, updated_at = ?
         WHERE agent_run_id = ? AND execution_task_id IS NULL AND status = 'queued'
@@ -130,7 +130,7 @@ export class AgentExecutionStore {
       outcome: row.outcome_json === null ? undefined : roleOutcomeV11Schema.parse(JSON.parse(String(row.outcome_json))),
       errorCode: row.error_code === null ? undefined : String(row.error_code),
       errorMessage: row.error_message === null ? undefined : String(row.error_message),
-      spec: executionSpecV15Schema.parse(JSON.parse(String(row.spec_json)))
+      spec: executionSpecV16Schema.parse(JSON.parse(String(row.spec_json)))
     };
   }
 

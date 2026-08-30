@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { approveUseCase, type UseCase } from "../../../shared/orchestration/direction.js";
-import type { ProjectConfigurationV22 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import { EnvironmentRunPlanner, type ProjectDefinition } from "./EnvironmentRunPlanner.js";
@@ -14,7 +14,7 @@ describe("EnvironmentRunPlanner immutable closure", () => {
       inspectAction: async (actionId) => actionCapability(actionId)
     }, () => "2026-08-29T10:00:00.000Z");
     const result = await planner.plan();
-    expect(result.snapshot).toMatchObject({ version: 17, projectHeadSha: "a".repeat(40) });
+    expect(result.snapshot).toMatchObject({ version: 18, projectHeadSha: "a".repeat(40) });
     expect(result.snapshot.approvedUseCases).toHaveLength(1);
     expect(result.snapshot.resources.map(({ kind }) => kind)).toEqual(["instruction", "skill"]);
     expect(result.snapshot.permissions.find(({ role }) => role === "validation")?.toolPolicy).toBe("read_only");
@@ -80,19 +80,16 @@ const definition = (): ProjectDefinition => {
   };
   const useCase = approveUseCase(draft, { approvedBy: "human-1", approvedAt: "2026-08-29T09:00:00.000Z", revision: 1 });
   const actionRole = () => ({ instructionResource: "action-instruction", skillResources: ["skill-1"] });
-  const agent = () => ({ agentId: "profile-1", ...actionRole() });
-  const config: ProjectConfigurationV22 = {
-    version: 22,
+  const critic = { agentId: "ballet-critic-agent" as const, skillResources: ["skill-1"] };
+  const refinement = { agentId: "ballet-refinement-agent" as const, skillResources: ["skill-1"] };
+  const config: ProjectConfigurationV23 = {
+    version: 23,
     direction: {
       goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
       adrs: [{ id: "adr-1", name: "ADR", status: "accepted" }],
       constraints: [{ id: "constraint-1", name: "Constraint", status: "accepted", kind: "required", description: "Safe", rationale: "Required" }],
       useCases: [useCase]
     },
-    agents: [{
-      id: "profile-1", name: "Agent", description: "Test Agent", enabled: true,
-      instructionResource: "action-instruction", skillResources: ["skill-1"]
-    }],
     environment: {
       id: "environment-1", name: "Environment", description: "Ordered environment", states: [{
         id: "state-1", name: "State", description: "First State", order: 1, useCaseIds: ["UC-1"], actions: [{
@@ -101,17 +98,20 @@ const definition = (): ProjectDefinition => {
         }]
       }]
     },
-    critic: { version: 2, enabled: false, schedules: [], agent: agent() },
-    refinement: { version: 2, enabled: false, agent: agent(),
-      allowedRoots: [".ballet/agents", ".ballet/instructions", ".agents/skills"] }
+    critic: { version: 2, enabled: false, schedules: [], agent: critic },
+    refinement: { version: 2, enabled: false, agent: refinement,
+      allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"] }
   };
   return {
     config, configSha256: contentHash(config), baseCommit: "a".repeat(40), checkoutRoot: "/tmp/worktree",
+    agents: (["ballet-critic-agent", "ballet-refinement-agent"] as const).map((id) => ({ id, name: id,
+      description: "Test Agent", developerInstructions: instruction(), model: "gpt-5.6-sol", reasoningEffort: "high",
+      sandboxMode: "read-only" as const, contentSha256: "4".repeat(64) })),
     directionDocumentHashes: {
       goals: { "goal-1": "1".repeat(64) }, adrs: { "adr-1": "2".repeat(64) },
       constraints: { "constraint-1": "3".repeat(64) }
     },
-    agentDocumentHashes: { "profile-1": "4".repeat(64) },
+    agentDocumentHashes: { "ballet-critic-agent": "4".repeat(64), "ballet-refinement-agent": "4".repeat(64) },
     resources: [
       { kind: "instruction", id: "action-instruction", relativePath: ".ballet/instructions/action.md", content: instruction() },
       { kind: "skill", id: "skill-1", relativePath: ".agents/skills/test/SKILL.md", content: "# Test Skill\nUse evidence." }
@@ -121,17 +121,17 @@ const definition = (): ProjectDefinition => {
 const agentCapability = (agentId: string): RuntimeAgentCapabilitySnapshot => {
   const value = {
     subject: { kind: "agent" as const, agentId },
-    provider: "codex" as const, model: "gpt-test", reasoningEffort: "high", networkAccess: false,
-    readOnlyRoots: [], cliVersion: "1.0.0", supportedModels: ["gpt-test"],
+    provider: "codex" as const, model: "gpt-5.6-sol", reasoningEffort: "high",
+    cliVersion: "1.0.0", supportedModels: ["gpt-5.6-sol"],
     supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true
   };
   return { ...value, capabilitySha256: contentHash(value) };
 };
 const actionCapability = (actionId: string): RuntimeActionCapabilitySnapshot => {
-  const role = { model: "gpt-test", reasoningEffort: "high", supportedModels: ["gpt-test"], supportedReasoningEfforts: ["high"] };
+  const role = { model: "gpt-5.6-sol", reasoningEffort: "high", supportedModels: ["gpt-5.6-sol"], supportedReasoningEfforts: ["high"] };
   const value = {
     subject: { kind: "action" as const, actionId }, provider: "codex" as const,
-    networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
+    cliVersion: "1.0.0",
     roles: { validation: role, work: role }, supportsReadOnly: true, supportsWorkspaceWrite: true
   };
   return { ...value, capabilitySha256: contentHash(value) };

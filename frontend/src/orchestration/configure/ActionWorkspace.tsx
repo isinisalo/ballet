@@ -1,9 +1,8 @@
 import { ArrowLeft, ArrowDown, ArrowUp } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { EditorActions, SelectField, TextAreaField, TextField } from "@/components/shared/workspace-ui";
+import { EditorActions, SelectField, TextField } from "@/components/shared/workspace-ui";
 import type { ActionDefinition } from "@shared/orchestration/environment";
 import type { ResourceDocument } from "../types";
 import { validateActionInstruction, REQUIRED_ACTION_INSTRUCTION_SECTIONS } from "@shared/orchestration/instructionContract";
@@ -26,12 +25,8 @@ export function ActionWorkspace({ stateId, action, instructions, skills, locked,
 }
 
 function ExecutionEditor({ execution }: { execution: ActionExecutionState }) {
-  const labelClass = "grid gap-1 text-xs md:grid-cols-[9rem_minmax(0,1fr)] md:items-center";
-  return <fieldset className="space-y-3 rounded-sm border p-3"><legend className="font-semibold">Action execution</legend><p className="text-xs text-muted-foreground">Provider and policy are shared by Validation and its subordinate Work agent. Changes apply to future Runs.</p>
+  return <fieldset className="space-y-3 rounded-sm border p-3"><legend className="font-semibold">Action execution</legend><p className="text-xs text-muted-foreground">Codex CLI is fixed. Network access is denied and file access is limited to the Run checkout/worktree.</p>
     {execution.error ? <p role="alert" className="text-xs text-destructive">{execution.error}</p> : null}
-    <SelectField label="Provider" layout="row" density="compact" value={execution.provider} placeholder="Select…" options={execution.providers.map((item) => ({ value: item.provider, label: `${item.provider} · ${item.health}` }))} onChange={execution.selectProvider} />
-    <label className={labelClass}><span className="text-muted-foreground">Network</span><Switch checked={execution.policy.network} disabled={!execution.providerStatus?.capabilities.policy.networkControl} onCheckedChange={execution.setNetwork} /></label>
-    <TextAreaField label="Read-only roots" layout="row" density="compact" value={execution.policy.readOnlyRoots.join("\n")} disabled={!execution.providerStatus?.capabilities.policy.readOnlyRoots} placeholder="One absolute path per line" onChange={execution.setReadOnlyRoots} />
     {execution.draftIssues.length > 0 ? <IssueList issues={execution.draftIssues.map((message) => ({ path: "execution", message }))} /> : null}
     <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{execution.binding ? "Local Action execution binding saved" : "Action execution binding required"}</p><Button type="button" size="sm" disabled={execution.pending || !execution.canSave} onClick={() => void execution.save()}>{execution.pending ? "Saving execution…" : "Save execution"}</Button></div>
   </fieldset>;

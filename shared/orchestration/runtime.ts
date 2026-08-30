@@ -1,5 +1,5 @@
 import type { JsonValue } from "./primitives.js";
-import type { AgentComposition, AgentDefinition, EnvironmentDefinition, RuntimeProvider } from "./environment.js";
+import type { AgentComposition, EnvironmentDefinition, GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
 import type { Constraint, DirectionReference, UseCase } from "./direction.js";
 import { ROOT_SNAPSHOT_VERSION } from "./versions.js";
 
@@ -14,7 +14,7 @@ export type RuntimeBindingSubject =
   | { kind: "action_role"; actionId: string; role: "validation" | "work" }
   | { kind: "agent"; agentId: string };
 
-export interface RootSnapshotV17 {
+export interface RootSnapshotV18 {
   version: typeof ROOT_SNAPSHOT_VERSION;
   projectHeadSha: string;
   projectConfigSha256: string;
@@ -28,7 +28,7 @@ export interface RootSnapshotV17 {
     adrs: Array<DirectionReference & { contentSha256: string }>;
     constraints: Array<Constraint & { contentSha256: string }>;
   };
-  agents: Array<AgentDefinition & { contentSha256: string }>;
+  agents: Array<GovernanceAgentDefinition & { contentSha256: string }>;
   runtimeCapabilities: RuntimeCapabilitySnapshot[];
   resources: RuntimeResourceSnapshot[];
   permissions: RuntimePermissionSnapshot[];
@@ -44,8 +44,6 @@ export interface RootSnapshotV17 {
 
 interface RuntimeCapabilityBase {
   provider: RuntimeProvider;
-  networkAccess: boolean;
-  readOnlyRoots: string[];
   cliVersion: string;
   supportsReadOnly: boolean;
   supportsWorkspaceWrite: boolean;
@@ -89,7 +87,6 @@ export interface RuntimePermissionSnapshot {
   role: AgentRunRole;
   actionId?: string;
   toolPolicy: "read_only" | "workspace_write";
-  networkAccess: boolean;
   approvalPolicy: "never";
 }
 
@@ -97,7 +94,7 @@ export interface EnvironmentRun {
   id: string;
   environmentId: string;
   status: EnvironmentRunStatus;
-  snapshot: RootSnapshotV17;
+  snapshot: RootSnapshotV18;
   continuationOfRunId?: string;
   createdAt: string;
   updatedAt: string;

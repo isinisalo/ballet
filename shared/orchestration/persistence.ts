@@ -1,7 +1,7 @@
 import type { ActionDefinition, CriticScheduleDefinition, StateDefinition } from "./environment.js";
-import type { ExecutionSpecV15 } from "./execution.js";
+import type { ExecutionSpecV16 } from "./execution.js";
 import type { JsonValue } from "./primitives.js";
-import type { AgentRunPhase, AgentRunRole, RootSnapshotV17 } from "./runtime.js";
+import type { AgentRunPhase, AgentRunRole, RootSnapshotV18 } from "./runtime.js";
 import type { TaskEnvelopeV11 } from "./taskEnvelopes.js";
 import type { ValidationOutcome, WorkOutcome } from "./outcomes.js";
 import type { FeedbackCategory, FeedbackTargetType } from "./reviews.js";
@@ -31,7 +31,7 @@ export interface CreateEnvironmentRunInput {
   baseCommit: string;
   worktreePath: string;
   branch: string;
-  executionSnapshot: RootSnapshotV17;
+  executionSnapshot: RootSnapshotV18;
   executionSnapshotHash: string;
   transitionLimit: number;
   states: StateExecutionSeed[];
@@ -184,13 +184,13 @@ export interface RefinementApplySeed {
 }
 
 export interface ExecutionTaskSeed {
-  spec: ExecutionSpecV15;
+  spec: ExecutionSpecV16;
   specHash: string;
 }
 
 export interface ExecutionEventSeed {
   sequence: number;
-  source: "ballet" | "codex" | "copilot";
+  source: "ballet" | "codex";
   kind: string;
   level: "info" | "warn" | "error";
   phase: "started" | "delta" | "completed";

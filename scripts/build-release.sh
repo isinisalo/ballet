@@ -123,7 +123,7 @@ curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/environment" -o "$SMOKE_ROOT/envir
 const fs = require("node:fs");
 const project = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 const environment = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-if (project.config?.version !== 22
+if (project.config?.version !== 23
   || project.config?.environment?.id !== "fixture-environment"
   || project.config?.direction?.useCases?.[0]?.status !== "approved"
   || environment.environment?.id !== "fixture-environment"
@@ -139,7 +139,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "20") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 20`);
+if (version !== "21") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 21`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || { git -C "$SMOKE_ROOT/project" status --short >&2; exit 1; }
 [ -z "$(find "$SMOKE_ROOT/home" -mindepth 1 -print -quit)" ] || { printf 'packaged Ballet wrote mutable state outside the checkout\n' >&2; exit 1; }

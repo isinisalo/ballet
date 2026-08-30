@@ -2,12 +2,10 @@ import { z } from "zod";
 import { ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
 import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
-import { agentCompositionSchema, agentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
+import { agentCompositionSchema, governanceAgentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
 const runtimeCapabilityBase = {
-  provider: z.enum(["codex", "copilot"]),
-  networkAccess: z.boolean(),
-  readOnlyRoots: z.array(z.string().trim().min(1)),
+  provider: z.literal("codex"),
   cliVersion: z.string().trim().min(1),
   supportsReadOnly: z.boolean(),
   supportsWorkspaceWrite: z.boolean(),
@@ -19,7 +17,7 @@ const roleModelCapabilitySchema = z.object({
   supportedReasoningEfforts: z.array(z.string().trim().min(1))
 }).strict();
 
-export const rootSnapshotV17Schema = z.object({
+export const rootSnapshotV18Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
@@ -33,7 +31,7 @@ export const rootSnapshotV17Schema = z.object({
     adrs: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
     constraints: z.array(constraintSchema.extend({ contentSha256: sha256Schema }).strict())
   }).strict(),
-  agents: z.array(agentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()),
+  agents: z.array(governanceAgentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()).length(2),
   runtimeCapabilities: z.array(z.union([
     z.object({
       ...runtimeCapabilityBase,
@@ -54,7 +52,7 @@ export const rootSnapshotV17Schema = z.object({
   }).strict()),
   permissions: z.array(z.object({
     role: z.enum(["validation", "work", "critic", "refinement"]), actionId: idSchema.optional(),
-    toolPolicy: z.enum(["read_only", "workspace_write"]), networkAccess: z.boolean(), approvalPolicy: z.literal("never")
+    toolPolicy: z.enum(["read_only", "workspace_write"]), approvalPolicy: z.literal("never")
   }).strict()),
   governance: z.object({ critic: agentCompositionSchema, refinement: agentCompositionSchema }).strict(),
   lineage: z.object({
@@ -69,7 +67,7 @@ export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV17Schema,
+  snapshot: rootSnapshotV18Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

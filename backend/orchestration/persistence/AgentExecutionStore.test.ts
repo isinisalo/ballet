@@ -51,14 +51,14 @@ const setup = () => {
   outcomes.createPrecheck(action.actionExecutionId, action.revision, agentInput);
   const prompt = "Validate the Action";
   const spec = {
-    version: 15 as const,
+    version: 16 as const,
     taskId: "execution-task-1",
     kind: "agent_execution" as const,
     environmentRunId: "run-1",
     actionExecutionId: "action-execution-1",
     agentRunId: "precheck-1",
     evidence: {
-      compositionVersion: 13 as const,
+      compositionVersion: 14 as const,
       role: "validation" as const,
       phase: "precheck" as const,
       subject: { kind: "action_role" as const, actionId: "action-1", role: "validation" as const },
@@ -72,8 +72,7 @@ const setup = () => {
       provider: "codex" as const, cliVersion: "1.0.0", model: "gpt",
       reasoningEffort: "high", capabilityHash: HASH_A
     },
-    permissions: { workspaceAccess: "read-only" as const, networkAccess: false,
-      readOnlyRoots: [], approvalPolicy: "never" as const },
+    permissions: { workspaceAccess: "read-only" as const, approvalPolicy: "never" as const },
     project: { checkoutRoot: "/tmp/worktree", headSha: TEST_SHA, configHash: HASH_A, snapshotHash: HASH_A },
     createdAt: TEST_AT
   };
