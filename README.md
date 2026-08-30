@@ -30,7 +30,7 @@ ballet status
 
 `make latest` builds and installs a local artifact and restarts the checkout-local service. It does not publish, merge, push or deploy.
 
-Agent execution is performed by a paired daemon on the computer selected for that Agent. Open `/runtimes`, create and approve a pairing session, then run the displayed `ballet daemon setup` command on the execution computer. Daemon setup registers both Codex CLI and Copilot CLI backends; custom command paths can be supplied with `--codex-command` and `--copilot-command`.
+Agent execution is performed by one checkout-local daemon. `ballet start` provisions its checkout-specific launchd config, starts the server and daemon, and waits for both to become healthy. Open `/runtimes` to inspect local status and Codex/Copilot readiness or to refresh, restart and read logs. There is no Computer selection or pairing step.
 
 ## Project truth layout
 
@@ -45,7 +45,7 @@ Agent execution is performed by a paired daemon on the computer selected for tha
 | `.ballet/instructions/**` | selected role instructions |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v17, control-plane state, service state, logs and managed worktrees |
+| `.git/ballet/**` | machine-local SQLite v18, checkout-daemon config/token/status, service logs and server-owned managed worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
@@ -163,7 +163,7 @@ JSON commands and projections live under canonical `/api/*` routes and SSE uses 
 
 ## Strict local state
 
-The active matrix is Project Config v21, Root Snapshot v14, Task Envelope and role outcome v11, prompt composition v12, ExecutionSpec v13 and SQLite v17. Feedback, Critic and Refinement are v2; Agent/daemon binding and Run Evidence are v1. Older local databases are intentionally unsupported: stop the service, archive or remove the old `.git/ballet/state.sqlite`, and start a fresh database. There is no migration or compatibility reader.
+The active matrix is Project Config v21, Root Snapshot v15, Task Envelope and role outcome v11, prompt composition v12, ExecutionSpec v14 and SQLite v18. Feedback, Critic, Refinement and Agent/daemon binding are v2; Run Evidence is v1. Older local databases and control-plane state are intentionally unsupported: stop the service, archive or remove the incompatible `.git/ballet` state, and start fresh. There is no migration or compatibility reader.
 
 ## Verification
 

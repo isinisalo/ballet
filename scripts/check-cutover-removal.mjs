@@ -47,6 +47,18 @@ const replacedContractTerms = [
   "Local" + "ProviderAdapter"
 ];
 const daemonOnlyCliFlags = ["--codex-command", "--copilot-command"];
+const localOnlyProhibited = [
+  "device" + "Id",
+  "runtime" + "BackendId",
+  "/api/runtimes/" + "devices",
+  "/api/" + "pairing",
+  "ballet daemon " + "setup",
+  "HttpWs" + "DaemonTransport",
+  "DaemonWebSocket" + "Hub",
+  "ControlPlane" + "Database",
+  "ExecutionSpecV" + "13",
+  "RootSnapshotV" + "14"
+];
 const self = path.resolve(import.meta.filename);
 
 const files = (await Promise.all(scanRoots.map((entry) => collect(path.join(repositoryRoot, entry))))).flat();
@@ -69,6 +81,11 @@ for (const filename of files) {
   for (const term of daemonOnlyCliFlags) {
     if (source.includes(term) && !allowedDaemonCliFlag(relative)) {
       failures.push(`${relative}: daemon-only CLI flag ${JSON.stringify(term)} leaked outside daemon setup`);
+    }
+  }
+  for (const term of localOnlyProhibited) {
+    if (source.includes(term) && !allowedLocalOnlyHistory(relative)) {
+      failures.push(`${relative}: removed local-only contract term ${JSON.stringify(term)}`);
     }
   }
   if (source.toLocaleLowerCase().includes(transitionMarker)
@@ -94,6 +111,12 @@ function allowedDaemonCliFlag(relative) {
     "backend/cli/tests/cli.test.ts",
     "README.md"
   ].includes(relative);
+}
+
+function allowedLocalOnlyHistory(relative) {
+  return relative.includes(".test.")
+    || relative.startsWith(".ballet/")
+    || ["README.md", "ARCHITECTURE.md", "DESIGN.md", "AGENTS.md"].includes(relative);
 }
 
 if (failures.length > 0) {

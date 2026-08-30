@@ -33,21 +33,16 @@ export interface ExecutionPromptEvidenceV12 {
 
 export interface ExecutionRuntimeSnapshot {
   agentId: string;
-  deviceId: string;
-  runtimeBackendId: string;
   provider: RuntimeProvider;
   cliVersion: string;
   model: string;
   reasoningEffort: string;
-  networkAccess: boolean;
   capabilityHash: string;
 }
 
-export interface AgentExecutionBindingV1 {
-  version: 1;
+export interface AgentExecutionBindingV2 {
+  version: 2;
   agentId: string;
-  deviceId: string;
-  runtimeBackendId: string;
   provider: RuntimeProvider;
   model: string;
   reasoningEffort: string;
@@ -56,7 +51,7 @@ export interface AgentExecutionBindingV1 {
   updatedAt: string;
 }
 
-export interface ExecutionSpecV13 {
+export interface ExecutionSpecV14 {
   version: typeof EXECUTION_SPEC_VERSION;
   taskId: string;
   kind: "agent_execution";
@@ -65,6 +60,12 @@ export interface ExecutionSpecV13 {
   agentRunId: string;
   evidence: ExecutionPromptEvidenceV12;
   runtime: ExecutionRuntimeSnapshot;
+  permissions: {
+    workspaceAccess: "read-only" | "workspace-write";
+    networkAccess: boolean;
+    readOnlyRoots: string[];
+    approvalPolicy: "never";
+  };
   project: { checkoutRoot: string; headSha: string; configHash: string; snapshotHash: string };
   input?: JsonValue;
   createdAt: string;

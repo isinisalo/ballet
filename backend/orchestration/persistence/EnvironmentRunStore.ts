@@ -4,7 +4,7 @@ import type {
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { actionDefinitionSchema, stateDefinitionSchema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
-import { rootSnapshotV14Schema } from "../../../shared/orchestration/schemas/runtimeSchemas.js";
+import { rootSnapshotV15Schema } from "../../../shared/orchestration/schemas/runtimeSchemas.js";
 import { ControlFlowStore } from "./ControlFlowStore.js";
 import { toActionExecution, toEnvironmentRun, toStateExecution } from "./RowMappers.js";
 import { ConflictError, NotFoundError } from "./PersistenceErrors.js";
@@ -16,7 +16,7 @@ export class EnvironmentRunStore {
   ) {}
 
   create(input: CreateEnvironmentRunInput): StoredEnvironmentRun {
-    const snapshot = rootSnapshotV14Schema.parse(input.executionSnapshot);
+    const snapshot = rootSnapshotV15Schema.parse(input.executionSnapshot);
     assertHash(snapshot, input.executionSnapshotHash, "execution snapshot");
     if (input.states.length === 0) throw new ConflictError("Environment Run requires at least one State.");
     if (snapshot.environment.id !== input.environmentDefinitionId || snapshot.projectHeadSha !== input.baseCommit) {

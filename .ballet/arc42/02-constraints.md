@@ -12,7 +12,7 @@ arc42Section: 2
 # 2. Rajoitteet
 
 - Yksi tarkka Git-checkout ja loopback-only paikallinen palvelu muodostavat järjestelmärajan.
-- Project Config v21 ja SQLite v17 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
+- Project Config v21 ja SQLite v18 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
 - Environment on ainoa root run. Standalone State- tai Action-ajoa ei ole.
 - State `order` ja Action `priority` ovat positiivisia ja yksikäsitteisiä.
 - Provider approval mode on aina `never`; verkko ja kirjoitettavat juuret tulevat hyväksytystä machine-local Agent/daemon-bindingistä ja roolista.
@@ -20,3 +20,4 @@ arc42Section: 2
 - Refinement kirjoittaa vain hyväksyttyihin instruction- ja Skill-poluihin managed worktreessä.
 - UI todentuu 1440x900- ja 390x844-viewporteissa sekä keyboardilla ja reduced motionilla.
 - CON-016 targetissa Project Config v21 ja SQLite v17 ovat strict, Agent binding on machine-local, yhden Runin kaikki Agentit käyttävät samaa paritettua Computeria ja remote daemon liikennöi vain HTTPS:llä (HTTP vain loopbackissa).
+- CON-017 supersedoi CON-016:n execution placementin: daemon on checkout-kohtainen loopback-worker, bindingissä ei ole device/runtime backend -identiteettiä ja serveri omistaa SQLite/worktree/finalization/evidence-rajat.

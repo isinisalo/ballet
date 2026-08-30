@@ -431,7 +431,7 @@ const startFixture = async () => {
   const instructionHash = documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent").contentHash;
   const project = new ProjectDefinitionService(root, projects, documents);
   const capability = {
-    agentId: "profile", deviceId: "device-1", runtimeBackendId: "backend-1",
+    agentId: "profile",
     provider: "codex" as const, model: "model", reasoningEffort: "high",
     networkAccess: false, readOnlyRoots: [], cliVersion: "1.0.0",
     supportedModels: ["model"], supportedReasoningEfforts: ["high"],

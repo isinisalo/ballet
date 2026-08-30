@@ -7,7 +7,8 @@
       { "id": "goal-006", "name": "Durable state and immutable evidence", "status": "accepted" },
       { "id": "goal-007", "name": "Accessible operator experience", "status": "accepted" },
       { "id": "goal-009", "name": "Continuous arc42 architecture method", "status": "accepted" },
-      { "id": "goal-022", "name": "Human-directed validation-led environment orchestration", "status": "accepted" }
+      { "id": "goal-022", "name": "Human-directed validation-led environment orchestration", "status": "accepted" },
+      { "id": "goal-024", "name": "Reliable checkout-local daemon", "status": "accepted" }
     ],
     "adrs": [
       { "id": "adr-002", "name": "Version-controlled project truth and machine-local runtime truth", "status": "accepted" },
@@ -19,7 +20,8 @@
       { "id": "adr-011", "name": "arc42 template and continuous method", "status": "accepted" },
       { "id": "adr-012", "name": "Execution profiles separate from instructions and Skills", "status": "accepted" },
       { "id": "adr-013", "name": "Reusable procedures belong to Skills", "status": "accepted" },
-      { "id": "adr-034", "name": "Validation-led deterministic Environment orchestration", "status": "accepted" }
+      { "id": "adr-034", "name": "Validation-led deterministic Environment orchestration", "status": "accepted" },
+      { "id": "adr-037", "name": "Checkout-local daemon is the only CLI execution worker", "status": "accepted" }
     ],
     "constraints": [
       { "id": "constraint-001", "name": "Human approval and ordered execution integrity", "status": "accepted", "kind": "required", "description": "Human decisions and deterministic State and Action gates remain authoritative.", "rationale": "The runtime must preserve operator authority and explain every progression decision." },

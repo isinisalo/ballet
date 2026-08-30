@@ -9,6 +9,9 @@ import {
 import type { LaunchdService, LaunchdStatus } from "./LaunchdService.js";
 import type { ProjectContext } from "../project/ProjectContext.js";
 import { LocalDatabase } from "../orchestration/persistence/LocalDatabase.js";
+import { RuntimeSchemaVersionError } from "../orchestration/persistence/PersistenceErrors.js";
+import { mkdir, rename } from "node:fs/promises";
+import path from "node:path";
 
 export interface LocalHealth {
   ok: true;
@@ -95,7 +98,21 @@ export class LocalServerService {
 
   async restart(timeoutMs = 90_000): Promise<ServiceState> {
     await this.stopGracefully(timeoutMs);
+    await this.archiveIncompatibleDatabase();
     return this.ensureStarted();
+  }
+
+  private async archiveIncompatibleDatabase(): Promise<void> {
+    try { this.preflightDatabase(); return; }
+    catch (error) { if (!(error instanceof RuntimeSchemaVersionError)) throw error; }
+    const archive = path.join(this.options.project.stateRoot, "archive", `strict-v18-${timestamp()}`);
+    await mkdir(archive, { recursive: true, mode: 0o700 });
+    for (const suffix of ["", "-wal", "-shm"]) {
+      const source = `${this.options.project.databasePath}${suffix}`;
+      await rename(source, path.join(archive, `state.sqlite${suffix}`)).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+    }
   }
 
   async stopGracefully(timeoutMs = 90_000): Promise<boolean> {
@@ -196,3 +213,4 @@ const findDifferentLoopbackPort = async (previousPort: number): Promise<number> 
   }
   throw new Error(`Ballet could not allocate a replacement for loopback port ${previousPort}.`);
 };
+const timestamp = (): string => new Date().toISOString().replaceAll(":", "").replaceAll(".", "-");

@@ -6,10 +6,10 @@ import { EditorActions } from "@/components/shared/editor-actions";
 import { MarkdownWorkbench } from "@/workspace/documents/MarkdownWorkbench";
 import { orchestrationEntityPath } from "@/workspace/routing";
 import type { ReferenceEntry, ResourceDocument } from "../types";
-import { AgentExecutionProfile } from "./AgentExecutionProfile";
+import { AgentExecutionBinding } from "./AgentExecutionBinding";
 import { ConfigureToolbar } from "./ConfigureToolbar";
 import { agentValueFromMarkdown, createAgentMarkdownDocument, markdownEntity, splitMarkdownSource } from "./markdownAuthoring";
-import { useAgentExecutionProfile } from "./useAgentExecutionProfile";
+import { useAgentExecutionBinding } from "./useAgentExecutionBinding";
 
 export function AgentDefinitionsWorkspace({ profiles, documents, selectedId, locked, navigate, onSave, onDelete }: {
   profiles: AgentDefinition[]; documents: ResourceDocument[]; references: ReferenceEntry[]; selectedId?: string; locked: boolean;
@@ -34,7 +34,7 @@ function AgentEditor({ document, current, creating, locked, status, onCreate, na
   const original = useMemo(() => splitMarkdownSource(document.content), [document.content]);
   const [frontmatterText, setFrontmatterText] = useState(original.frontmatterText); const [bodyText, setBodyText] = useState(original.bodyText);
   const [pending, setPending] = useState(false); const [error, setError] = useState("");
-  const execution = useAgentExecutionProfile(current?.id);
+  const execution = useAgentExecutionBinding(current?.id);
   const dirty = original.frontmatterText !== frontmatterText || original.bodyText !== bodyText;
   let validation = ""; try { agentValueFromMarkdown({ frontmatterText, bodyText }); } catch (reason) { validation = message(reason); }
   const entity = markdownEntity(document, { frontmatterText, bodyText });
@@ -43,7 +43,7 @@ function AgentEditor({ document, current, creating, locked, status, onCreate, na
   const toolbarActions = <><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}><Plus />New Agent</Button><EditorActions saveLabel="Save Agent Markdown" formId={formId} dirty={dirty} valid={valid} pending={pending} canDelete={Boolean(deleteAgent)} deleteLabel="Delete Agent" deleteType="agent" resourceName={current?.name} onDelete={deleteAgent} />{current ? <Button size="sm" disabled={execution.pending || !execution.canSave} onClick={() => void execution.save()}>{execution.pending ? "Saving execution…" : execution.binding ? "Update execution" : "Save execution"}</Button> : null}</>;
   const editor = <MarkdownWorkbench document={entity} emptyTitle="Select an Agent" formId={formId} saveLabel="Save Agent Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={valid} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={error} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} />;
   if (!current) return <div className="min-w-0"><ConfigureToolbar status={status} label="New Agent">{toolbarActions}</ConfigureToolbar><div className="p-3 md:p-4">{editor}</div></div>;
-  return <div className="min-w-0"><ConfigureToolbar status={status} label={current.id}>{toolbarActions}</ConfigureToolbar><section className="@container/agent-detail grid min-h-[42rem] min-w-0 border-b border-divider-strong bg-card lg:grid-cols-[18rem_minmax(0,1fr)]"><AgentExecutionProfile agent={current} execution={execution} /><div className="min-w-0">{editor}</div></section></div>;
+  return <div className="min-w-0"><ConfigureToolbar status={status} label={current.id}>{toolbarActions}</ConfigureToolbar><section className="@container/agent-detail grid min-h-[42rem] min-w-0 border-b border-divider-strong bg-card lg:grid-cols-[18rem_minmax(0,1fr)]"><AgentExecutionBinding agent={current} execution={execution} /><div className="min-w-0">{editor}</div></section></div>;
 }
 
 const message = (reason: unknown): string => reason instanceof Error ? reason.message : "Agent operation failed.";

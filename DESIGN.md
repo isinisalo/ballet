@@ -141,7 +141,8 @@ Configure workspaces have exactly one sticky toolbar directly below the workspac
 
 - Markdown-backed project documents use one shared workbench: sidebar selection, YAML-frontmatter + Markdown body editor, preview and an explicit unsaved-change guard. Forms may display derived validation facts but never become a second document truth.
 - Configure metadata and execution forms use compact aligned label/control rows at workbench widths and stack them at the narrow viewport. Markdown source areas remain vertically labelled editors.
-- Agent detail follows the compact 15.7 profile composition: a narrow Avatar/Execution/Details rail beside Markdown Preview and the source editor. Computer, provider, model and reasoning are explicit labelled controls; unavailable/auth-missing/dirty states include text explanations and block Save or Run as appropriate.
+- Agent detail follows the compact 15.7 profile composition: a narrow Avatar/Execution/Details rail beside Markdown Preview and the source editor. Provider, model, reasoning, network and read-only roots are explicit labelled controls; Computer/pairing controls do not exist. Unavailable/auth-missing/local-daemon states include text explanations and block Save or Run as appropriate.
+- Runtimes is a singleton checkout-local diagnostic: daemon status/PID/uptime/last seen/error, active tasks, Codex/Copilot readiness and keyboard-operable Refresh, Restart and Logs. Restart is visibly disabled during active work.
 - Status badges use factual DTO values and a label, never inferred prose.
 - Cards have one primary purpose and expose stable entity IDs in Geist.
 - Reordering previews the resulting integer order/priority before mutation.

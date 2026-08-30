@@ -1,5 +1,5 @@
 import type { ActionDefinition, AgentComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV13 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
 import type { CreateAgentRunInput, ExecutionTaskSeed } from "../../../shared/orchestration/persistence.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
@@ -69,14 +69,18 @@ export class AgentDispatchFactory {
     };
     const parsedEnvelope = taskEnvelopeV11Schema.parse(envelope);
     const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition });
-    const spec: ExecutionSpecV13 = {
-      version: 13, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
+    const spec: ExecutionSpecV14 = {
+      version: 14, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
-        agentId: agentDefinition.id, deviceId: capability.deviceId, runtimeBackendId: capability.runtimeBackendId,
-        provider: capability.provider, cliVersion: capability.cliVersion, model: capability.model,
-        reasoningEffort: capability.reasoningEffort, networkAccess: capability.networkAccess,
+        agentId: agentDefinition.id, provider: capability.provider, cliVersion: capability.cliVersion, model: capability.model,
+        reasoningEffort: capability.reasoningEffort,
         capabilityHash: capability.capabilitySha256
+      },
+      permissions: {
+        workspaceAccess: input.role === "work" ? "workspace-write" : "read-only",
+        networkAccess: capability.networkAccess, readOnlyRoots: capability.readOnlyRoots,
+        approvalPolicy: "never"
       },
       project: {
         checkoutRoot: input.run.worktreePath, headSha: input.run.baseCommit,

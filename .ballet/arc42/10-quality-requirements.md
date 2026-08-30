@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 29
+version: 30
 tags: [arc42, quality, scenarios]
 arc42Section: 10
 ---
@@ -24,6 +24,9 @@ arc42Section: 10
 | QS-035 | goal-023 / REQ-023 | Environment Run preflightaa Agentit | mixed device, dirty checkout, missing auth/model/policy | Agent binding and CLI adapters | kaikki Agentit resolveoituvat yhdelle exact-ready Computerille tai dispatch on 0 | binding schema, same-device matrix sekä Codex/Copilot capability/dispatch tests | 1 | EVID-035 | pending |
 | QS-036 | goal-023 / REQ-023 | ihminen antaa Feedbackin ja aloittaa Refinementin | valid/invalid body sekä allowed/forbidden path | Feedback and Refinement v2 | vain category+comment hyväksytään ja proposal pysyy resource-allowlistissa | strict HTTP, provenance, path/symlink/preimage/hash/approval tests; forbidden write 0 | 1 | EVID-036 | pending |
 | QS-037 | goal-023 / REQ-023 | strict v21/v17 cut rakennetaan | fresh local state and packaged startup | whole product | vain target versions/routes/entities jäävät ja Run Evidence finalisoituu | removal, full tests/lint/build/docs/design, release smoke, make latest, startup and clean tree | 1 | EVID-037 | pending |
+| QS-038 | goal-024 / REQ-024 | server/daemon käynnistyy, daemon crashaa tai taskin lease katoaa | fresh SQLite v18, launchd restart ja aktiivinen taski | local daemon lifecycle and execution queue | fresh ready <=60 s, crash recovery <=30 s, claimed task yksi runtime_lost <=90 s ja queued task restartin jälkeen kerran | lifecycle/claim/lease/fencing/restart tests and packaged smoke | 1 | EVID-038 | passed canonical; measured daemon recovery 8 s and stable PID |
+| QS-039 | goal-024 / REQ-024 | Agent binding tallennetaan tai daemon kutsuu sisäistä APIa | ready/missing provider, valid/wrong token ja extra legacy fields | binding v2, loopback HTTP and provider capabilities | vain strict provider/model/reasoning/policy hyväksytään; väärä token ja device/Computer/runtimeBackendId hylätään; restart estyy aktiivisena | schema, auth, capability, 0600 mode, callback and UI tests | 1 | EVID-039 | passed canonical |
+| QS-040 | goal-024 / REQ-024 | local-only strict cut rakennetaan ja käynnistetään | clean checkout, fresh/incompatible state, desktop/narrow UI | whole product | vain v21/v15/v11/v12/v14/v18/v2 jää aktiiviseksi; pairing/control-plane/remote concepts 0; server-owned finalization ja immutable Run Evidence säilyvät | removal, arc42, full test/lint/build/design, make latest and startup/restart smoke | 1 | EVID-040 | passed canonical |
 <!-- quality-scenarios:end -->
 
 Compile yksin ei täytä mitään skenaariota. Verdict edellyttää scenario-kohtaista test/evidence-ketjua ja rajoitteiden raportointia.

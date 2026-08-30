@@ -64,7 +64,7 @@ export class EnvironmentRuntimeService {
       await this.applyPersistedTerminal(task);
       return true;
     }
-    if (task.status !== "queued" || !this.execution.claimTask(taskId, this.now())) return true;
+    if (task.status !== "running" && (task.status !== "queued" || !this.execution.claimTask(taskId, this.now()))) return true;
     const agent = this.execution.requireAgent(task.agentRunId);
     const run = this.runs.require(agent.environmentRunId);
     if (!["pending", "running"].includes(run.status)) return true;
@@ -350,7 +350,7 @@ const permissionsFor = (task: StoredExecutionTask) => {
   const role = task.spec.evidence.role;
   const policy = role === "work" ? "workspace_write" : "read_only";
   return mapProviderPermissions({ provider: task.spec.runtime.provider, role, toolPolicy: policy,
-    networkAccess: task.spec.runtime.networkAccess, worktreePath: task.spec.project.checkoutRoot });
+    networkAccess: task.spec.permissions.networkAccess, worktreePath: task.spec.project.checkoutRoot });
 };
 
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;

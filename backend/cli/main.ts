@@ -24,12 +24,6 @@ if (argv[0] === "daemon-internal-run") {
   const daemonProgramArguments = packagedExecutable
     ? [packagedExecutable, "daemon-internal-run"]
     : [process.execPath, cliEntry, "daemon-internal-run"];
-  const daemonConfig = new DaemonConfigStore();
-  const daemonLaunchd = new DaemonLaunchdService({
-    balletHome: daemonConfig.home,
-    logDirectory: daemonConfig.logDirectory(),
-    programArguments: daemonProgramArguments
-  });
   const output = {
     stdout: (message: string) => process.stdout.write(`${message}\n`),
     stderr: (message: string) => process.stderr.write(`${message}\n`)
@@ -46,7 +40,14 @@ if (argv[0] === "daemon-internal-run") {
     },
     updater: new VerifiedReleaseUpdater(),
     output,
-    daemon: new DaemonCliService(daemonConfig, daemonLaunchd, version, output),
+    daemon: (project) => {
+      const daemonConfig = new DaemonConfigStore(project.stateRoot);
+      const daemonLaunchd = new DaemonLaunchdService({
+        label: `${project.serviceLabel}.daemon`, stateRoot: project.stateRoot,
+        logDirectory: daemonConfig.logDirectory(), programArguments: daemonProgramArguments
+      });
+      return new DaemonCliService(daemonConfig, daemonLaunchd, output);
+    },
     openUrl: defaultOpenUrl,
     version
   });

@@ -1,9 +1,9 @@
 import type Database from "better-sqlite3";
 import type {
-  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV13, ExecutionTaskSeed, JsonValue, StoredAgentRun
+  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV14, ExecutionTaskSeed, JsonValue, StoredAgentRun
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import { executionSpecV13Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
+import { executionSpecV14Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
 import { roleOutcomeV11Schema } from "../../../shared/orchestration/schemas/outcomeSchemas.js";
 import { taskEnvelopeV11Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
 import { toAgentRun } from "./RowMappers.js";
@@ -22,7 +22,7 @@ export interface StoredExecutionTask {
   outcome?: unknown;
   errorCode?: string;
   errorMessage?: string;
-  spec: ExecutionSpecV13;
+  spec: ExecutionSpecV14;
 }
 
 export class AgentExecutionStore {
@@ -94,7 +94,7 @@ export class AgentExecutionStore {
   }
 
   createTask(input: ExecutionTaskSeed): void {
-    const spec = executionSpecV13Schema.parse(input.spec);
+    const spec = executionSpecV14Schema.parse(input.spec);
     assertHash(spec, input.specHash, "ExecutionSpec");
     const agent = this.requireAgent(spec.agentRunId);
     if (agent.environmentRunId !== spec.environmentRunId || agent.role !== spec.evidence.role) {
@@ -104,8 +104,8 @@ export class AgentExecutionStore {
       this.connection().prepare(`
         INSERT INTO execution_tasks (
           execution_task_id, environment_run_id, agent_run_id, provider, role, kind, status,
-          spec_version, spec_json, spec_hash, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'agent_execution', 'queued', 13, ?, ?, ?, ?)
+        spec_version, spec_json, spec_hash, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'agent_execution', 'queued', 14, ?, ?, ?, ?)
       `).run(spec.taskId, spec.environmentRunId, spec.agentRunId, spec.runtime.provider,
         spec.evidence.role, canonical(spec), input.specHash, spec.createdAt, spec.createdAt);
       const attached = this.connection().prepare(`
@@ -130,7 +130,7 @@ export class AgentExecutionStore {
       outcome: row.outcome_json === null ? undefined : roleOutcomeV11Schema.parse(JSON.parse(String(row.outcome_json))),
       errorCode: row.error_code === null ? undefined : String(row.error_code),
       errorMessage: row.error_message === null ? undefined : String(row.error_message),
-      spec: executionSpecV13Schema.parse(JSON.parse(String(row.spec_json)))
+      spec: executionSpecV14Schema.parse(JSON.parse(String(row.spec_json)))
     };
   }
 
@@ -145,11 +145,13 @@ export class AgentExecutionStore {
     return this.connection().transaction(() => {
       const tasks = this.connection().prepare(`
         UPDATE execution_tasks SET status = 'queued', started_at = NULL, updated_at = ?
-        WHERE status = 'running'
+        WHERE status = 'running' AND claim_fencing = 0
       `).run(at).changes;
       this.connection().prepare(`
         UPDATE agent_runs SET status = 'queued', started_at = NULL, revision = revision + 1, updated_at = ?
-        WHERE status = 'running'
+        WHERE status = 'running' AND execution_task_id IN (
+          SELECT execution_task_id FROM execution_tasks WHERE status = 'queued' AND claim_fencing = 0
+        )
       `).run(at);
       return tasks;
     })();
@@ -160,7 +162,7 @@ export class AgentExecutionStore {
       SELECT task.execution_task_id
       FROM execution_tasks task
       JOIN agent_runs agent ON agent.agent_run_id = task.agent_run_id
-      WHERE task.status IN ('queued','succeeded','failed')
+      WHERE task.status IN ('queued','running','succeeded','failed')
         AND agent.status IN ('queued','running')
       ORDER BY task.created_at, task.execution_task_id
     `).all() as Array<{ execution_task_id: string }>;

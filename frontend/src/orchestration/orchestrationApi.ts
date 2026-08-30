@@ -3,14 +3,7 @@ import type { Constraint, DirectionReference, UseCase } from "@shared/orchestrat
 import type { ActionDefinition, AgentDefinition, EnvironmentDefinition, ProjectConfigurationV21, StateDefinition } from "@shared/orchestration/environment";
 import type { ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
-import type { AgentExecutionBinding, ExecutionPolicy, PairingSession, RuntimeDevice } from "@shared/domain/runtime";
-
-export interface PairingSessionView extends PairingSession {
-  claimedDevice?: RuntimeDevice;
-  verificationUri: string;
-  interval: number;
-  installCommand?: string;
-}
+import type { AgentExecutionBinding, ExecutionPolicy, LocalDaemonLogEntry, LocalDaemonStatus, RuntimeProvider } from "@shared/domain/runtime";
 
 const base = "/api";
 const body = (value: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(value) });
@@ -36,15 +29,12 @@ export const orchestrationApi = {
       : put({ value, markdown, expectedConfigHash, expectedDocumentHash })),
   deleteAgent: (id: string, expectedConfigHash: string, expectedHash: string) =>
     request(`${base}/agents/${encodeURIComponent(id)}`, remove({ expectedConfigHash, expectedHash })),
-  runtimeDevices: () => request<RuntimeDevice[]>(`${base}/runtimes/devices`),
-  createPairing: (displayName?: string) => request<PairingSessionView>(`${base}/pairing/sessions`, body(displayName ? { displayName } : {})),
-  pairing: (id: string) => request<PairingSessionView>(`${base}/pairing/sessions/${encodeURIComponent(id)}`),
-  approvePairing: (id: string) => request<PairingSessionView>(`${base}/pairing/sessions/${encodeURIComponent(id)}/approve`, body({})),
-  refreshRuntime: (id: string) => request<RuntimeDevice>(`${base}/runtimes/devices/${encodeURIComponent(id)}/refresh`, body({})),
-  restartRuntime: (id: string) => request<RuntimeDevice>(`${base}/runtimes/devices/${encodeURIComponent(id)}/restart`, body({})),
-  revokeRuntime: (id: string) => request<void>(`${base}/runtimes/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  localRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local`),
+  refreshRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local/refresh`, body({})),
+  restartRuntime: () => request<LocalDaemonStatus>(`${base}/runtimes/local/restart`, body({})),
+  runtimeLogs: (limit = 200) => request<{ entries: LocalDaemonLogEntry[] }>(`${base}/runtimes/local/logs?limit=${limit}`),
   agentBinding: (id: string) => request<AgentExecutionBinding | null>(`${base}/agents/${encodeURIComponent(id)}/execution`),
-  saveAgentBinding: (id: string, input: { runtimeBackendId: string; model: string; reasoning: string; policy: ExecutionPolicy }) =>
+  saveAgentBinding: (id: string, input: { provider: RuntimeProvider; model: string; reasoningEffort: string; policy: ExecutionPolicy }) =>
     request<AgentExecutionBinding>(`${base}/agents/${encodeURIComponent(id)}/execution`, put(input)),
   approveUseCase: (id: string, expectedConfigHash: string, expectedContentHash: string) => request(
     `${base}/use-cases/${encodeURIComponent(id)}/approve`, body({ expectedConfigHash, expectedContentHash })),

@@ -51,7 +51,7 @@ const setup = () => {
   outcomes.createPrecheck(action.actionExecutionId, action.revision, agentInput);
   const prompt = "Validate the Action";
   const spec = {
-    version: 13 as const,
+    version: 14 as const,
     taskId: "execution-task-1",
     kind: "agent_execution" as const,
     environmentRunId: "run-1",
@@ -71,10 +71,12 @@ const setup = () => {
       outputSchemaSha256: HASH_A
     },
     runtime: {
-      agentId: "profile", deviceId: "device-1", runtimeBackendId: "backend-1",
+      agentId: "profile",
       provider: "codex" as const, cliVersion: "1.0.0", model: "gpt",
-      reasoningEffort: "high", networkAccess: false, capabilityHash: HASH_A
+      reasoningEffort: "high", capabilityHash: HASH_A
     },
+    permissions: { workspaceAccess: "read-only" as const, networkAccess: false,
+      readOnlyRoots: [], approvalPolicy: "never" as const },
     project: { checkoutRoot: "/tmp/worktree", headSha: TEST_SHA, configHash: HASH_A, snapshotHash: HASH_A },
     createdAt: TEST_AT
   };

@@ -1,96 +1,52 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ExecutionSpec, ExecutionTask } from "../../../shared/domain/runtime.js";
-import type { GitWorkspaceManager } from "../git/GitWorkspaceManager.js";
-import type { PreparedGitWorkspace } from "../git/GitWorkspaceTypes.js";
+import type { LocalDaemonTaskClaim } from "../../../shared/domain/runtime.js";
+import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
 import { FakeCliRuntimeAdapter } from "../providers/FakeCliRuntimeAdapter.js";
-import { FakeDaemonControlPlane } from "../transport/FakeDaemonControlPlane.js";
+import type { LocalDaemonTransport } from "../transport/LocalDaemonTransport.js";
 import { LeaseAwareJobRunner } from "./LeaseAwareJobRunner.js";
 
 describe("LeaseAwareJobRunner", () => {
-  it("preserves read-only access through adapter execution and finalization", async () => {
-    const transport = new FakeDaemonControlPlane();
+  it("executes the immutable v14 spec in the server-owned read-only worktree", async () => {
+    const transport = {
+      renew: vi.fn(async () => ({ accepted: true, leaseUntil: "2099-08-29T12:01:00.000Z", cancelRequested: false })),
+      appendEvents: vi.fn(async (_claim, events) => ({ accepted: events.length })),
+      complete: vi.fn(async () => ({ applied: true })), fail: vi.fn(async () => ({ applied: true }))
+    } as unknown as LocalDaemonTransport;
     const adapter = new FakeCliRuntimeAdapter("codex", "0.0.0", [
       { type: "execution.started", executionId: "task-1", provider: "codex", at: "2026-08-29T12:00:00.000Z" },
-      { type: "execution.completed", output: "done", structuredOutput: {
-        outcome: "ready", summary: "Validated.", checks: [{ name: "review", status: "passed" }]
-      } }
-    ]);
-    const workspace: PreparedGitWorkspace = {
-      executionId: "task-1", rootRunId: "root-1", projectId: "project-1",
-      repositoryUrl: "https://example.test/ballet.git", mode: "managed-worktree",
-      path: "/tmp/ballet-worktree", headSha: "a".repeat(40), treeSha: "b".repeat(40),
-      snapshotHash: "c".repeat(64), branch: "ballet/run/root-1",
-      repositoryPath: "/tmp/ballet-repository", lockPath: "/tmp/ballet.lock"
-    };
-    const git = {
-      prepare: vi.fn(async () => workspace),
-      release: vi.fn(async () => undefined),
-      finalize: vi.fn(async () => ({
-        success: true, retained: false, branch: workspace.branch, worktreePath: workspace.path,
-        commitSha: "d".repeat(40), changedFiles: [], snapshotHash: workspace.snapshotHash
-      })),
-      acknowledgeFinalization: vi.fn(async () => undefined)
-    } as unknown as GitWorkspaceManager;
-    const runner = new LeaseAwareJobRunner({
-      deviceId: "device-1",
-      adapters: [adapter],
-      runtimeBackends: [{ id: "backend-1", provider: "codex" }],
-      transport,
-      git
-    });
-
-    await runner.run({
-      task: task(spec("read-only")),
-      taskToken: "t".repeat(32),
-      leaseDurationMs: 60_000,
-      renewAfterMs: 20_000
-    });
-
+      { type: "execution.completed", output: JSON.stringify({ version: 11, role: "validation", phase: "precheck",
+        decision: "done", summary: "Validated", checks: [] }) }
+    ], [{ id: "gpt", name: "GPT", reasoningOptions: ["high"] }]);
+    const runner = new LeaseAwareJobRunner({ adapters: [adapter], transport });
+    const claim = taskClaim();
+    await runner.run(claim);
     expect(adapter.executions).toHaveLength(1);
-    expect(adapter.executions[0]).toMatchObject({ workspaceAccess: "read-only", workingDirectory: workspace.path });
+    expect(adapter.executions[0]).toMatchObject({ workspaceAccess: "read-only", workingDirectory: "/tmp/ballet-worktree" });
     expect(await adapter.executions[0]!.permissionPolicy!.authorize({
-      provider: "codex", kind: "write", operation: "write", path: `${workspace.path}/README.md`
+      provider: "codex", kind: "write", operation: "write", path: "/tmp/ballet-worktree/README.md"
     })).toBe(false);
-    expect(transport.states).toEqual(["preparing", "running"]);
-    expect(transport.completed).toHaveLength(1);
-    expect(git.finalize).toHaveBeenCalledWith(workspace, true, expect.any(AbortSignal));
-    expect(transport.rootFinalizations).toEqual([expect.objectContaining({ success: true, retained: false })]);
+    expect(transport.complete).toHaveBeenCalledWith(claim, "codex:task-1:1", expect.stringContaining("Validated"), expect.any(AbortSignal));
   });
 });
 
-const spec = (workspaceAccess: ExecutionSpec["workspaceAccess"]): ExecutionSpec => ({
-  version: 1,
-  projectId: "project-1",
-  taskId: "task-1",
-  kind: "agent_run",
-  rootRunId: "root-1",
-  agentRunId: "agent-run-1",
-  workspaceAccess,
-  agent: { id: "validation", name: "Validation", description: "Controller", instructions: "Inspect.", skillIds: [], configHash: "e".repeat(64) },
-  runtime: {
-    deviceId: "device-1", deviceName: "Test Mac", runtimeBackendId: "backend-1", provider: "codex",
-    cliVersion: "999.0.0", model: "provider-default", reasoning: "provider-default",
-    policy: { network: false, readOnlyRoots: [] }, capabilityHash: "f".repeat(64)
-  },
-  project: {
-    checkoutId: "checkout-1", repositoryUrl: "https://example.test/ballet.git",
-    headSha: "a".repeat(40), configHash: "e".repeat(64), snapshotHash: "c".repeat(64)
-  },
-  createdAt: "2026-08-29T12:00:00.000Z"
+const taskClaim = (): LocalDaemonTaskClaim => ({
+  taskId: "task-1", fencing: 1, leaseUntil: "2099-08-29T12:01:00.000Z",
+  leaseDurationMs: 60_000, renewAfterMs: 20_000, spec: spec(),
+  permissions: { workspaceAccess: "read-only", network: false, readOnlyRoots: [] }
 });
-
-const task = (executionSpec: ExecutionSpec): ExecutionTask => ({
-  id: executionSpec.taskId,
-  projectId: executionSpec.projectId,
-  runtimeBackendId: executionSpec.runtime.runtimeBackendId,
-  deviceId: executionSpec.runtime.deviceId,
-  kind: executionSpec.kind,
-  rootRunId: executionSpec.rootRunId,
-  status: "claimed",
-  spec: executionSpec,
-  fencing: 1,
-  leaseUntil: "2099-08-29T12:01:00.000Z",
-  claimedAt: executionSpec.createdAt,
-  createdAt: executionSpec.createdAt,
-  updatedAt: executionSpec.createdAt
+const spec = (): ExecutionSpecV14 => ({
+  version: 14, taskId: "task-1", kind: "agent_execution", environmentRunId: "run-1", agentRunId: "agent-run-1",
+  evidence: {
+    compositionVersion: 12, role: "validation", phase: "precheck",
+    agent: { id: "validation", name: "Validation", description: "Controller", enabled: true,
+      instructionResource: "instruction", skillResources: [] },
+    resources: [], prompt: "Inspect.", promptSha256: "a".repeat(64),
+    taskEnvelopeVersion: 11, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 11,
+    outputSchemaId: "validation-outcome-v11", outputSchemaSha256: "c".repeat(64)
+  },
+  runtime: { agentId: "validation", provider: "codex", cliVersion: "999.0.0", model: "gpt",
+    reasoningEffort: "high", capabilityHash: "d".repeat(64) },
+  permissions: { workspaceAccess: "read-only", networkAccess: false, readOnlyRoots: [], approvalPolicy: "never" },
+  project: { checkoutRoot: "/tmp/ballet-worktree", headSha: "e".repeat(40),
+    configHash: "f".repeat(64), snapshotHash: "0".repeat(64) }, createdAt: "2026-08-29T12:00:00.000Z"
 });

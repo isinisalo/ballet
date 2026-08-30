@@ -12,6 +12,7 @@ import {
 } from "../CheckoutState.js";
 import { renderPlist, type LaunchdService } from "../LaunchdService.js";
 import { LocalServerService } from "../LocalServerService.js";
+import { renderDaemonPlist } from "../DaemonLaunchdService.js";
 import { resolveProjectContext, type ProjectContext } from "../../project/ProjectContext.js";
 import type { VerifiedReleaseUpdater } from "../VerifiedReleaseUpdater.js";
 
@@ -101,14 +102,14 @@ describe("Ballet checkout CLI", () => {
     expect(output.join("\n")).toContain("\"serviceLabel\": \"ai.ballet.");
   });
 
-  it("exposes the local server and paired daemon command surfaces", async () => {
+  it("exposes the local server and checkout-local daemon command surfaces", async () => {
     const output: string[] = [];
     const code = await runBalletCli(["--help"], services(process.cwd(), {
       output: { stdout: (message) => output.push(message), stderr: (message) => output.push(message) }
     }));
     expect(code).toBe(0);
     expect(output[0]).toContain("ballet restart");
-    expect(output[0]).toContain("ballet daemon setup");
+    expect(output[0]).not.toContain("ballet daemon setup");
     expect(output[0]).toContain("ballet daemon start|stop|restart|status|logs");
     expect(output[0]).not.toContain("pair");
   });
@@ -167,6 +168,16 @@ describe("checkout-local state and launchd contract", () => {
     expect(plist).not.toContain("daemon");
     expect(plist).not.toContain("BALLET_HOME");
     expect(plist).not.toContain("BALLET_PROJECT_ROOT");
+  });
+
+  it("renders a checkout-specific local daemon without global or pairing configuration", async () => {
+    const root = await gitProject(); const project = await resolveProjectContext({ root });
+    const plist = renderDaemonPlist({ label: `${project.serviceLabel}.daemon`, stateRoot: project.stateRoot,
+      logDirectory: path.join(project.stateRoot, "logs"), programArguments: ["/usr/local/bin/ballet", "daemon-internal-run"] });
+    expect(plist).toContain(`<key>Label</key><string>${project.serviceLabel}.daemon</string>`);
+    expect(plist).toContain(`<key>BALLET_STATE_ROOT</key><string>${project.stateRoot}</string>`);
+    expect(plist).toContain("daemon-internal-run");
+    expect(plist).not.toContain("BALLET_HOME"); expect(plist).not.toContain("pair");
   });
 });
 

@@ -4,7 +4,7 @@ import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.
 import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../../shared/orchestration/gates.js";
 import type {
-  RootSnapshotV14, RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
+  RootSnapshotV15, RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/orchestration/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
 import { mapProviderPermissions } from "./ProviderPermissions.js";
@@ -37,7 +37,7 @@ export interface OrchestrationProviderPreflightPort {
 }
 
 export interface PlannedEnvironmentRun {
-  snapshot: RootSnapshotV14;
+  snapshot: RootSnapshotV15;
   snapshotSha256: string;
   createInput(input: {
     environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
@@ -69,8 +69,6 @@ export class EnvironmentRunPlanner {
       assertCapability(agent, capability);
       capabilities.push(capability);
     }
-    const devices = new Set(capabilities.map(({ deviceId }) => deviceId));
-    if (devices.size !== 1) throw new ConflictError("Every Agent in an Environment Run must use the same Computer.");
     const permissions = permissionSnapshot(config, capabilities, loaded.checkoutRoot);
     const referencedUseCaseIds = new Set(config.environment.states.flatMap((state) => [
       ...state.useCaseIds, ...state.actions.flatMap((action) => action.useCaseIds)
@@ -89,8 +87,8 @@ export class EnvironmentRunPlanner {
         ...value, contentSha256: requireDirectionHash("Constraint", value.id, loaded.directionDocumentHashes.constraints)
       }))
     };
-    const snapshot: RootSnapshotV14 = {
-      version: 14,
+    const snapshot: RootSnapshotV15 = {
+      version: 15,
       projectHeadSha: loaded.baseCommit,
       projectConfigSha256: loaded.configSha256,
       directionSha256: contentHash(config.direction),
@@ -136,8 +134,7 @@ const assertCapability = (
     throw new Error(`Agent ${agent.id} binding is not supported by provider preflight.`);
   }
   const expectedHash = contentHash({
-    agentId: capability.agentId, deviceId: capability.deviceId, runtimeBackendId: capability.runtimeBackendId,
-    provider: capability.provider, model: capability.model, reasoningEffort: capability.reasoningEffort,
+    agentId: capability.agentId, provider: capability.provider, model: capability.model, reasoningEffort: capability.reasoningEffort,
     networkAccess: capability.networkAccess, readOnlyRoots: capability.readOnlyRoots,
     cliVersion: capability.cliVersion, supportedModels: capability.supportedModels,
     supportedReasoningEfforts: capability.supportedReasoningEfforts,

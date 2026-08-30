@@ -12,7 +12,7 @@ arc42Section: 4
 # 4. Ratkaisustrategia
 
 1. Parse strict v21 project truth and close only approved Use Cases with accepted Goals, ADRs, Constraints and Markdown Agents.
-2. Freeze the closure and one-device daemon bindings into Root Snapshot v14 before dispatch.
+2. Freeze the closure and checkout-local daemon bindings into Root Snapshot v15 before dispatch.
 3. Select the lowest eligible State order and Action priority transactionally.
 4. Let Validation precheck, delegate dynamic Work and postcheck every Work result.
 5. Persist state changes and causal Feedback atomically; recover work from durable queue/event facts.

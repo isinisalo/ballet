@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { AgentComposition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV13 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV14 } from "../../../shared/orchestration/execution.js";
 import type { CriticOutcome, RefinementOutcome } from "../../../shared/orchestration/outcomes.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
@@ -109,13 +109,13 @@ export class GovernanceExecutionService {
       this.applyPersistedTerminal(task);
       return true;
     }
-    if (task.status !== "queued" || !this.execution.claimTask(taskId, this.now())) return true;
+    if (task.status !== "running" && (task.status !== "queued" || !this.execution.claimTask(taskId, this.now()))) return true;
     this.activeTaskId = taskId;
     try {
       const terminal = await provider.execute(task.spec, mapProviderPermissions({
         provider: task.spec.runtime.provider, role: task.spec.evidence.role,
         toolPolicy: "read_only",
-        networkAccess: task.spec.runtime.networkAccess,
+        networkAccess: task.spec.permissions.networkAccess,
         worktreePath: task.spec.project.checkoutRoot
       }));
       if (this.stopping) return true;
@@ -198,14 +198,15 @@ export class GovernanceExecutionService {
     const capability = run.executionSnapshot.runtimeCapabilities.find(({ agentId }) => agentId === agentDefinition.id)!;
     const agentRunId = this.nextId(`${envelope.role}-agent`);
     const evidence = composeOrchestrationPrompt({ snapshot: run.executionSnapshot, envelope, composition });
-    const spec: ExecutionSpecV13 = {
-      version: 13, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
+    const spec: ExecutionSpecV14 = {
+      version: 14, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
       agentRunId, evidence,
-      runtime: { agentId: agentDefinition.id, deviceId: capability.deviceId,
-        runtimeBackendId: capability.runtimeBackendId, provider: capability.provider,
+      runtime: { agentId: agentDefinition.id, provider: capability.provider,
         cliVersion: capability.cliVersion, model: capability.model,
-        reasoningEffort: capability.reasoningEffort, networkAccess: capability.networkAccess,
+        reasoningEffort: capability.reasoningEffort,
         capabilityHash: capability.capabilitySha256 },
+      permissions: { workspaceAccess: "read-only", networkAccess: capability.networkAccess,
+        readOnlyRoots: capability.readOnlyRoots, approvalPolicy: "never" },
       project: { checkoutRoot, headSha: run.resultCommit ?? run.baseCommit,
         configHash: run.executionSnapshot.projectConfigSha256, snapshotHash: run.executionSnapshotHash },
       createdAt: this.now()

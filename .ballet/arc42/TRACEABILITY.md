@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-29'
-version: 35
+version: 36
 tags: [arc42, traceability, evidence]
 ---
 
@@ -23,6 +23,9 @@ tags: [arc42, traceability, evidence]
 | goal-023 / REQ-023 | QS-035 | adr-035 / CON-016 | BB-016 | RT-030 / DEP-006 | TEST-035 | EVID-035 | RISK-024 | passed locally |
 | goal-023 / REQ-023 | QS-036 | adr-035 / CON-016 | BB-016 | RT-031 / DEP-006 | TEST-036 | EVID-036 | RISK-024 | passed locally |
 | goal-023 / REQ-023 | QS-037 | adr-035 / CON-016 | BB-016 | RT-029 / RT-030 / RT-031 / DEP-006 | TEST-037 | EVID-037 | RISK-024 | passed locally |
+| goal-024 / REQ-024 | QS-038 | adr-037 / CON-017 | BB-017 | RT-032 / DEP-007 | TEST-038 | EVID-038 | RISK-025 | passed canonical |
+| goal-024 / REQ-024 | QS-039 | adr-037 / CON-017 | BB-017 | RT-032 / DEP-007 | TEST-039 | EVID-039 | RISK-025 | passed locally |
+| goal-024 / REQ-024 | QS-040 | adr-037 / CON-017 | BB-017 | RT-032 / DEP-007 | TEST-040 | EVID-040 | RISK-025 | passed canonical |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
@@ -57,6 +60,9 @@ tags: [arc42, traceability, evidence]
 | TEST-035 | Agent definition/binding, same-device exact checkout/config preflight and Codex/Copilot adapter tests |
 | TEST-036 | strict minimal Feedback API, trusted provenance and resource-only Refinement path/hash/approval tests |
 | TEST-037 | exact v21/v14/v11/v12/v13/v17 contracts, Run Evidence, removal/full/release/install/startup/clean-tree gates |
+| TEST-038 | local daemon lifecycle, atomic one-time claim, lease renewal/expiry, stale fencing, duplicate terminal, queued restart and fail-closed recovery tests |
+| TEST-039 | strict binding v2, provider readiness, loopback bearer auth, config/token 0600, local runtime API and Computer/pairing-free UI tests |
+| TEST-040 | exact v21/v15/v11/v12/v14/v18/v2 contracts, removal/full/docs/design, make latest and packaged server+daemon startup/restart smoke |
 
 | ID | Evidenssi |
 | --- | --- |
@@ -70,3 +76,6 @@ tags: [arc42, traceability, evidence]
 | EVID-035 | Agent binding and two-CLI readiness/dispatch evidence |
 | EVID-036 | Feedback/Refinement v2 strict boundary evidence |
 | EVID-037 | final strict cutover, Run Evidence and packaged startup evidence |
+| EVID-038 | checkout-local-daemon initiative transaction and lifecycle command log |
+| EVID-039 | checkout-local-daemon initiative schema/security/UI command log |
+| EVID-040 | checkout-local-daemon final repository and packaged startup evidence |

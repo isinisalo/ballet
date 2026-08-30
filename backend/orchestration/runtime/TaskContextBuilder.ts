@@ -1,9 +1,9 @@
 import type { ActionDefinition, AgentComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV14 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV15 } from "../../../shared/orchestration/runtime.js";
 
 export interface BoundedTaskContextInput {
-  snapshot: RootSnapshotV14;
+  snapshot: RootSnapshotV15;
   state?: StateDefinition;
   action?: ActionDefinition;
   composition: AgentComposition;

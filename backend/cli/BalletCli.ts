@@ -8,6 +8,7 @@ import type { LocalServerService } from "./LocalServerService.js";
 import { resolveProjectContext, type ProjectContext } from "../project/ProjectContext.js";
 import type { VerifiedReleaseUpdater } from "./VerifiedReleaseUpdater.js";
 import type { DaemonCliService } from "./DaemonCliService.js";
+import { archiveLegacyDaemonState, hasLegacyDaemonState, stopLegacyGlobalDaemon } from "./LegacyDaemonCutover.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -24,7 +25,7 @@ export interface BalletCliServices {
   version: string;
   cwd?: () => string;
   stopTimeoutMs?: number;
-  daemon?: DaemonCliService;
+  daemon?(project: ProjectContext): DaemonCliService;
 }
 
 export const runBalletCli = async (argv: readonly string[], services: BalletCliServices): Promise<number> => {
@@ -53,7 +54,7 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
         return 0;
       case "daemon":
         if (!services.daemon) throw new Error("Daemon service is unavailable in this build.");
-        await services.daemon.run(args);
+        await services.daemon(await currentProject(services)).run(args);
         return 0;
       case "version":
         requireNoArguments(args, "ballet version");
@@ -86,27 +87,40 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
 const start = async (args: readonly string[], services: BalletCliServices): Promise<void> => {
   const options = parseStartOptions(args);
   const project = await currentProject(services);
-  const state = await services.server(project).ensureStarted();
+  const legacy = await hasLegacyDaemonState(project);
+  if (legacy) await stopLegacyGlobalDaemon();
+  const state = legacy
+    ? await services.server(project).restart(services.stopTimeoutMs ?? 90_000)
+    : await services.server(project).ensureStarted();
+  if (legacy) await archiveLegacyDaemonState(project);
   const url = `http://127.0.0.1:${state.port}`;
+  await services.daemon?.(project).ensureStarted();
   services.output.stdout(`Ballet is running for ${project.root} at ${url}.`);
   if (options.openBrowser) await services.openUrl(url);
 };
 
 const stop = async (services: BalletCliServices): Promise<void> => {
   const project = await currentProject(services);
+  await services.daemon?.(project).stopIfIdle();
   const stopped = await services.server(project).stopGracefully(services.stopTimeoutMs ?? 90_000);
   services.output.stdout(stopped ? "Ballet stopped." : "Ballet is not configured for this checkout.");
 };
 
 const restart = async (services: BalletCliServices): Promise<void> => {
   const project = await currentProject(services);
+  await services.daemon?.(project).stopIfIdle();
+  const legacy = await hasLegacyDaemonState(project);
+  if (legacy) await stopLegacyGlobalDaemon();
   const state = await services.server(project).restart(services.stopTimeoutMs ?? 90_000);
+  if (legacy) await archiveLegacyDaemonState(project);
+  await services.daemon?.(project).ensureStarted();
   services.output.stdout(`Ballet restarted at http://127.0.0.1:${state.port}.`);
 };
 
 const status = async (services: BalletCliServices): Promise<void> => {
   const project = await currentProject(services);
   const value = await services.server(project).status();
+  const daemon = await services.daemon?.(project).status().catch(() => undefined);
   services.output.stdout(JSON.stringify({
     checkoutRoot: project.root,
     stateRoot: project.stateRoot,
@@ -116,7 +130,8 @@ const status = async (services: BalletCliServices): Promise<void> => {
     instanceId: value.state?.instanceId,
     url: value.state ? `http://127.0.0.1:${value.state.port}` : undefined,
     launchd: value.launchd,
-    health: value.health
+    health: value.health,
+    daemon
   }, null, 2));
 };
 
@@ -126,7 +141,10 @@ const logs = async (args: readonly string[], services: BalletCliServices): Promi
   const targets = [
     applicationLogPath(project),
     path.join(project.stateRoot, "logs", "launchd.out.log"),
-    path.join(project.stateRoot, "logs", "launchd.err.log")
+    path.join(project.stateRoot, "logs", "launchd.err.log"),
+    path.join(project.stateRoot, "logs", "daemon.log"),
+    path.join(project.stateRoot, "logs", "daemon.bootstrap.log"),
+    path.join(project.stateRoot, "logs", "daemon.err.log")
   ];
   if (options.follow) {
     const existing = (await Promise.all(targets.map(async (target) =>
@@ -149,7 +167,12 @@ const logs = async (args: readonly string[], services: BalletCliServices): Promi
 const update = async (services: BalletCliServices): Promise<void> => {
   const project = await currentProject(services);
   services.output.stdout(await services.updater.update());
+  await services.daemon?.(project).stopIfIdle();
+  const legacy = await hasLegacyDaemonState(project);
+  if (legacy) await stopLegacyGlobalDaemon();
   const state = await services.server(project).restart(services.stopTimeoutMs ?? 90_000);
+  if (legacy) await archiveLegacyDaemonState(project);
+  await services.daemon?.(project).ensureStarted();
   services.output.stdout(`Ballet restarted for this checkout at http://127.0.0.1:${state.port}.`);
 };
 
@@ -183,6 +206,5 @@ Usage:
   ballet status
   ballet logs [--lines N] [--follow]
   ballet update
-  ballet daemon setup --server <url> --device-code <code> --repo <git-url> --project <id> [--codex-command <path>] [--copilot-command <path>]
   ballet daemon start|stop|restart|status|logs [--lines N] [--follow]
   ballet version`;

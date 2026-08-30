@@ -7,12 +7,15 @@ import { z } from "zod";
 import { sendKnownHttpError } from "../http/errors.js";
 import { parseBody } from "../http/validation/httpValidation.js";
 import { createCompositionRoot } from "../orchestration/CompositionRoot.js";
+import { LocalDatabase } from "../orchestration/persistence/LocalDatabase.js";
+import { LocalDaemonStore } from "../orchestration/persistence/LocalDaemonStore.js";
 import { resolveProjectContext, type ProjectContext } from "../project/ProjectContext.js";
 import { RotatingFileLogger } from "./RotatingFileLogger.js";
-import { createControlPlane } from "../control-plane/createControlPlane.js";
-import { runGit } from "../execution/git/gitProcess.js";
-import { DaemonOrchestrationProvider } from "../orchestration/runtime/DaemonOrchestrationProvider.js";
-import { DaemonEnvironmentWorkspace } from "../orchestration/runtime/DaemonEnvironmentWorkspace.js";
+import { LocalDaemonOrchestrationProvider } from "../orchestration/runtime/LocalDaemonOrchestrationProvider.js";
+import { EnvironmentWorkspaceManager } from "../orchestration/runtime/EnvironmentWorkspaceManager.js";
+import { DaemonConfigStore } from "../daemon/config/DaemonConfigStore.js";
+import { createLocalDaemonRouter } from "../daemon/http/LocalDaemonRouter.js";
+import { randomUUID } from "node:crypto";
 
 export interface CreateBalletServerOptions {
   root: string;
@@ -28,43 +31,23 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   const context = await resolveProjectContext({ root: options.root, stateRoot: options.stateRoot });
   const logger = new RotatingFileLogger(context.logsPath);
   const startedAt = new Date().toISOString();
-  const repositoryUrl = await resolveRepositoryUrl(context.root);
+  const daemonConfig = await new DaemonConfigStore(context.stateRoot).ensure({
+    instanceId: context.instanceId, checkoutRoot: context.root,
+    serverUrl: `http://127.0.0.1:${options.port}`,
+    daemonVersion: process.env.BALLET_VERSION ?? "0.1.0"
+  });
+  const daemonDatabase = new LocalDatabase(context.databasePath); daemonDatabase.connection();
+  const daemonStore = new LocalDaemonStore(() => daemonDatabase.connection());
   type Composition = Awaited<ReturnType<typeof createCompositionRoot>>;
   const compositionRef: { current?: Composition } = {};
   const currentComposition = (): Composition => {
     if (!compositionRef.current) throw new Error("Ballet composition is not initialized.");
     return compositionRef.current;
   };
-  const controlPlane = createControlPlane({
-    dbPath: path.join(context.stateRoot, "control-plane.sqlite"),
-    project: { id: context.instanceId, repositoryUrl, checkoutPath: context.root },
-    trustedLocalUi: true,
-    freshCheckoutBeforeRun: true,
-    listAgentIds: () => currentComposition().project.projects.load().config.agents.map(({ id }) => id),
-    resolveAgentSnapshot: (agentId) => {
-      const composition = currentComposition();
-      const loaded = composition.project.projects.load();
-      const agent = loaded.config.agents.find(({ id }) => id === agentId);
-      if (!agent) throw new Error(`Agent ${agentId} was not found.`);
-      const agentDocument = composition.project.documents.require("agent", agentId);
-      const instruction = composition.project.documents.require("instruction", agent.instructionResource);
-      return {
-        id: agent.id,
-        name: agent.name,
-        description: agent.description,
-        instructions: `${agentDocument.content.trim()}\n\n${instruction.content.trim()}`,
-        skillIds: [...agent.skillResources],
-        configHash: loaded.configHash
-      };
-    },
-    installCommand: ({ request, pairing }) => {
-      const serverUrl = `${request.protocol}://${request.get("host") ?? `127.0.0.1:${options.port}`}`;
-      return ["ballet", "daemon", "setup", "--server", serverUrl, "--device-code", pairing.deviceCode,
-        "--repo", repositoryUrl, "--project", context.instanceId].map(shellArgument).join(" ");
-    }
-  });
-  const provider = new DaemonOrchestrationProvider(controlPlane.service, context.instanceId);
-  const environmentWorkspace = new DaemonEnvironmentWorkspace(context.root, context.instanceId, controlPlane.service);
+  const provider = new LocalDaemonOrchestrationProvider(daemonStore);
+  const environmentWorkspace = new EnvironmentWorkspaceManager(
+    context.root, path.join(context.worktreesRoot, "environment"), (kind) => `${kind}:${randomUUID()}`
+  );
   const composition = await createCompositionRoot({
     context, provider,
     environmentWorkspace,
@@ -86,7 +69,8 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(202).json({ accepted: true });
     setTimeout(() => { void shutdown(); }, 25).unref();
   });
-  app.use("/api", controlPlane.router);
+  app.use("/api", createLocalDaemonRouter({ store: daemonStore, token: daemonConfig.token,
+    listAgentIds: () => currentComposition().project.projects.load().config.agents.map(({ id }) => id) }));
   app.use("/api", composition.router);
 
   const clientDist = resolveClientDist(options.webDist);
@@ -99,14 +83,13 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
     res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error." });
   });
   const server = createServer(app);
-  controlPlane.attachWebSocket(server);
 
   const shutdown = async (): Promise<void> => {
     if (shuttingDown) return closed;
     shuttingDown = true;
     logger.info("Ballet shutdown started.");
     await composition.shutdown();
-    controlPlane.close();
+    daemonDatabase.close();
     const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
     server.closeAllConnections();
     await serverClosed;
@@ -117,18 +100,17 @@ export const createBalletServer = async (options: CreateBalletServerOptions) => 
   };
 
   logger.info("Ballet server initialized.", { root: context.root, instanceId: context.instanceId, port: options.port });
-  return { app, server, context, composition, controlPlane, shutdown, logger };
+  return { app, server, context, composition, daemonStore, shutdown, logger };
 };
 
 export const loopbackSecurity = (port: number): express.RequestHandler => (req, res, next) => {
   const host = (req.get("host") ?? "").toLowerCase();
   const hostname = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
   const loopback = ["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname);
-  const remoteDaemon = req.path.startsWith("/api/daemon/") && req.secure;
-  if (!loopback && !remoteDaemon) {
+  if (!loopback) {
     res.status(403).json({ error: "Ballet accepts loopback requests only." }); return;
   }
-  if (remoteDaemon) { next(); return; }
+  if (req.path.startsWith("/api/daemon/")) { next(); return; }
   if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const origin = req.get("origin");
     const fetchSite = req.get("sec-fetch-site");
@@ -139,15 +121,6 @@ export const loopbackSecurity = (port: number): express.RequestHandler => (req, 
   }
   next();
 };
-
-const resolveRepositoryUrl = async (root: string): Promise<string> => {
-  try {
-    const result = await runGit(["remote", "get-url", "origin"], { cwd: root });
-    return result.stdout.trim() || root;
-  } catch { return root; }
-};
-
-const shellArgument = (value: string): string => `'${value.replaceAll("'", `'\\''`)}'`;
 
 const health = (context: ProjectContext, port: number, startedAt: string) => ({
   ok: true, instanceId: context.instanceId, checkoutRoot: context.root, port,

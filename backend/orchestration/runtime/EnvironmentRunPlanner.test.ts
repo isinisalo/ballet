@@ -13,7 +13,7 @@ describe("EnvironmentRunPlanner immutable closure", () => {
       inspect: async () => capability()
     }, () => "2026-08-29T10:00:00.000Z");
     const result = await planner.plan();
-    expect(result.snapshot).toMatchObject({ version: 14, projectHeadSha: "a".repeat(40) });
+    expect(result.snapshot).toMatchObject({ version: 15, projectHeadSha: "a".repeat(40) });
     expect(result.snapshot.approvedUseCases).toHaveLength(1);
     expect(result.snapshot.resources.map(({ kind }) => kind)).toEqual(["instruction", "skill"]);
     expect(result.snapshot.permissions.find(({ role }) => role === "validation")?.toolPolicy).toBe("read_only");
@@ -99,7 +99,7 @@ const definition = (): ProjectDefinition => {
 };
 const capability = (): RuntimeCapabilitySnapshot => {
   const value = {
-    agentId: "profile-1", deviceId: "device-1", runtimeBackendId: "backend-1",
+    agentId: "profile-1",
     provider: "codex" as const, model: "gpt-test", reasoningEffort: "high", networkAccess: false,
     readOnlyRoots: [], cliVersion: "1.0.0", supportedModels: ["gpt-test"],
     supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true

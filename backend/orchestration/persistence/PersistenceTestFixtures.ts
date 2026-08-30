@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV14, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV15, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -73,8 +73,8 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV14 = {
-    version: 14, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const snapshot: RootSnapshotV15 = {
+    version: 15, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
@@ -84,7 +84,7 @@ export const environmentSeed = (options: {
       instructionResource: "instruction", skillResources: [], contentSha256: HASH_A
     }],
     runtimeCapabilities: [{
-      agentId: "profile", deviceId: "device-1", runtimeBackendId: "backend-1", provider: "codex",
+      agentId: "profile", provider: "codex",
       model: "test-model", reasoningEffort: "high", networkAccess: false, readOnlyRoots: [],
       cliVersion: "1.0.0", supportedModels: ["test-model"],
       supportedReasoningEfforts: ["high"], supportsReadOnly: true, supportsWorkspaceWrite: true, capabilitySha256: HASH_A

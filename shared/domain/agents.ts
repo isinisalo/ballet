@@ -18,8 +18,6 @@ export type AgentLiveStatus = "running" | "idle" | "busy" | "attention" | "unbou
 export interface AgentExecutionState {
   agentId: string;
   status: AgentLiveStatus;
-  deviceId?: string;
-  runtimeBackendId?: string;
   provider?: RuntimeProvider;
   activeTaskId?: string;
   reason?: string;

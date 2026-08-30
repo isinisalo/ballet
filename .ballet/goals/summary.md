@@ -21,10 +21,11 @@ tags: [summary, goals, environment]
 - `goal-009`: Goals and Use Cases trace through decisions and architecture to executable evidence.
 - `goal-022`: Environment → State → Action and Validation-first execution are the active orchestration model.
 - `goal-023`: Markdown is the authoring workbench, Agents are project truth and a paired Computer/CLI binding owns execution readiness.
+- `goal-024`: one checkout-local daemon owns provider readiness and CLI processes while the server owns runtime, worktrees, finalization and evidence.
 
 ## Active contract
 
-The accepted strict target is Project Config v21, Root Snapshot v14, Task Envelope/role outcome v11, prompt composition v12, ExecutionSpec v13 and SQLite v17, with Feedback, Critic and Refinement v2 plus Agent/daemon binding/Run Evidence v1. `adr-034` retains deterministic ordering and the Validation-led loop; `adr-035` owns Markdown authoring, paired execution and the removal of Product/ExecutionProfile.
+The accepted strict target is Project Config v21, Root Snapshot v15, Task Envelope/role outcome v11, prompt composition v12, ExecutionSpec v14 and SQLite v18, with Feedback, Critic, Refinement and Agent/daemon binding v2 plus Run Evidence v1. `adr-034` retains deterministic ordering, `adr-035` Markdown authoring and Run Evidence, and `adr-037` the local-only execution boundary.
 
 The repository default demonstrates thirteen approved Use Cases, five ordered States, fourteen bounded Actions, four Markdown Agents, lean role instructions and explicitly selected reusable Skills. The compact fixture proves the same platform boundary with unrelated IDs.
 
@@ -44,4 +45,7 @@ Use Case, Critic and Refinement approvals require explicit human commands bound 
 4. [goal-022](goal-022-validation-led-environment-orchestration.md) and [ADR-034](../adr/adr-034-validation-led-environment-state-action-orchestration.md)
 5. [arc42 index](../arc42/README.md) and [traceability](../arc42/TRACEABILITY.md)
 6. [Markdown Agent daemon target contract](../arc42/initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md)
+7. [goal-024](goal-024-checkout-local-daemon.md)
+8. [ADR-037](../adr/adr-037-checkout-local-daemon.md)
+9. [Checkout-local daemon target contract](../arc42/initiatives/checkout-local-daemon/TARGET-CONTRACT.md)
 7. [Editable canonical flow](../../ballet.drawio)

@@ -1,89 +1,75 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import os from "node:os";
-import { v4 as uuid } from "uuid";
-import { DaemonConfigStore, type DaemonConfig } from "../daemon/config/DaemonConfigStore.js";
-import { GitWorkspaceManager } from "../daemon/git/GitWorkspaceManager.js";
-import { daemonKeychainAccount, MacOsKeychain } from "./Keychain.js";
-import { DaemonLaunchdService } from "./DaemonLaunchdService.js";
-
-interface PairingClaim { status: "pending" | "claimed"; deviceId?: string; daemonToken?: string }
+import type { LocalDaemonStatus } from "../../shared/domain/runtime.js";
+import { DaemonConfigStore } from "../daemon/config/DaemonConfigStore.js";
+import type { DaemonLaunchdService } from "./DaemonLaunchdService.js";
 
 export class DaemonCliService {
   constructor(
     private readonly config: DaemonConfigStore,
     private readonly launchd: DaemonLaunchdService,
-    private readonly version: string,
     private readonly output: { stdout(message: string): void },
     private readonly fetchImpl: typeof fetch = fetch
   ) {}
 
+  async ensureStarted(timeoutMs = 60_000): Promise<LocalDaemonStatus> {
+    const deadline = Date.now() + timeoutMs;
+    await this.launchd.start();
+    let launchd = await this.launchd.status();
+    while ((!launchd.running || !launchd.pid) && Date.now() < deadline) {
+      await delay(250); launchd = await this.launchd.status();
+    }
+    if (!launchd.running || !launchd.pid) throw new Error("Ballet local daemon launchd service did not start.");
+    return this.waitUntilReady(Math.max(1, deadline - Date.now()), launchd.pid);
+  }
+
   async run(args: readonly string[]): Promise<void> {
     const [command, ...rest] = args;
-    if (command === "setup") { await this.setup(rest); return; }
-    if (command === "start") { await this.launchd.start(); this.output.stdout("Ballet daemon started."); return; }
-    if (command === "stop") { await this.launchd.stop(); this.output.stdout("Ballet daemon stopped."); return; }
-    if (command === "restart") { await this.launchd.stop(); await this.launchd.start(); this.output.stdout("Ballet daemon restarted."); return; }
+    if (command === "start") { await this.ensureStarted(); this.output.stdout("Ballet local daemon started."); return; }
+    if (command === "stop") { await this.assertIdle(); await this.launchd.stop(); this.output.stdout("Ballet local daemon stopped."); return; }
+    if (command === "restart") {
+      await this.assertIdle(); await this.launchd.stop(); await this.ensureStarted();
+      this.output.stdout("Ballet local daemon restarted."); return;
+    }
     if (command === "status") {
-      const launchd = await this.launchd.status();
-      const runtime = await readFile(this.config.statusPath(), "utf8").then(JSON.parse, () => undefined);
+      const config = await this.config.load(); const launchd = await this.launchd.status();
+      const runtime = await this.runtime(config.serverUrl).catch(() => undefined);
       this.output.stdout(JSON.stringify({ launchd, runtime }, null, 2)); return;
     }
     if (command === "logs") { await this.logs(rest); return; }
-    throw new Error("Usage: ballet daemon setup|start|stop|restart|status|logs");
+    throw new Error("Usage: ballet daemon start|stop|restart|status|logs");
   }
 
-  private async setup(args: readonly string[]): Promise<void> {
-    if (process.platform !== "darwin") throw new Error("Ballet daemon currently supports macOS only.");
-    const options = parseOptions(args);
-    const serverUrl = required(options, "server");
-    const deviceCode = required(options, "device-code");
-    const repositoryUrl = required(options, "repo");
-    const projectId = required(options, "project");
-    assertSecureRemoteUrl(serverUrl);
-    const daemonId = uuid();
-    const displayName = options.get("name") ?? os.hostname();
-    const git = new GitWorkspaceManager({ root: this.config.home });
-    const checkout = await git.cloneProject(projectId, repositoryUrl);
-    const facts = {
-      deviceCode, hostname: os.hostname(), displayName, platform: "darwin" as const,
-      architecture: process.arch === "arm64" ? "arm64" as const : "x64" as const,
-      daemonVersion: this.version, daemonId
-    };
-    this.output.stdout("Waiting for this computer to be approved in Ballet…");
-    const claim = await this.poll(serverUrl, facts);
-    if (!claim.deviceId || !claim.daemonToken) throw new Error("Pairing server returned an incomplete claim.");
-    const config: DaemonConfig = {
-      version: 1, serverUrl, appUrl: serverUrl, deviceId: claim.deviceId, daemonId, displayName,
-      daemonVersion: this.version, projectId, repositoryUrl, repositoryPath: checkout.root,
-      backends: [
-        { id: uuid(), provider: "codex", command: options.get("codex-command") ?? "codex" },
-        { id: uuid(), provider: "copilot", command: options.get("copilot-command") ?? "copilot" }
-      ]
-    };
-    const account = daemonKeychainAccount(serverUrl, claim.deviceId);
-    const secrets = new MacOsKeychain();
-    await secrets.set(account, claim.daemonToken);
-    try { await this.config.save(config); }
-    catch (error) { await secrets.delete(account); throw error; }
-    await this.launchd.start();
-    this.output.stdout(`Ballet daemon paired as ${displayName} (${claim.deviceId}).`);
+  async stopIfIdle(): Promise<void> {
+    try { await this.assertIdle(); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    await this.launchd.stop();
+  }
+  async status(): Promise<{ launchd: Awaited<ReturnType<DaemonLaunchdService["status"]>>; runtime?: LocalDaemonStatus }> {
+    const config = await this.config.load();
+    return { launchd: await this.launchd.status(), runtime: await this.runtime(config.serverUrl).catch(() => undefined) };
   }
 
-  private async poll(serverUrl: string, facts: Record<string, unknown>): Promise<PairingClaim> {
-    const deadline = Date.now() + 10 * 60_000;
+  private async waitUntilReady(timeoutMs: number, expectedPid: number): Promise<LocalDaemonStatus> {
+    const config = await this.config.load(); const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const response = await this.fetchImpl(new URL("/api/daemon/pairing/poll", serverUrl), {
-        method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(facts), signal: AbortSignal.timeout(30_000)
-      });
-      if (response.status === 202) { await delay(2_000); continue; }
-      if (!response.ok) throw new Error(`Pairing failed with HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`);
-      return await response.json() as PairingClaim;
+      const status = await this.runtime(config.serverUrl).catch(() => undefined);
+      if (status?.status === "online" && status.pid === expectedPid) return status;
+      await delay(250);
     }
-    throw new Error("Pairing session expired before approval.");
+    throw new Error(`Ballet local daemon did not become ready within ${timeoutMs} ms.`);
   }
-
+  private async assertIdle(): Promise<void> {
+    const config = await this.config.load(); const status = await this.runtime(config.serverUrl).catch(() => undefined);
+    if (status && status.activeTaskCount > 0) throw new Error("Ballet local daemon has an active provider task.");
+  }
+  private async runtime(serverUrl: string): Promise<LocalDaemonStatus> {
+    const response = await this.fetchImpl(new URL("/api/runtimes/local", serverUrl), {
+      headers: { Accept: "application/json" }, signal: AbortSignal.timeout(2_000)
+    });
+    if (!response.ok) throw new Error(`Local daemon status returned HTTP ${response.status}.`);
+    return await response.json() as LocalDaemonStatus;
+  }
   private async logs(args: readonly string[]): Promise<void> {
     const follow = args.includes("--follow") || args.includes("-f");
     const linesIndex = Math.max(args.indexOf("--lines"), args.indexOf("-n"));
@@ -98,21 +84,4 @@ export class DaemonCliService {
     });
   }
 }
-
-const parseOptions = (args: readonly string[]): Map<string, string> => {
-  const result = new Map<string, string>();
-  for (let index = 0; index < args.length; index += 2) {
-    const key = args[index]; const value = args[index + 1];
-    if (!key?.startsWith("--") || !value || value.startsWith("--")) throw new Error(`Invalid daemon setup option ${key ?? "<missing>"}.`);
-    result.set(key.slice(2), value);
-  }
-  return result;
-};
-const required = (values: Map<string, string>, key: string): string => {
-  const value = values.get(key); if (!value) throw new Error(`Daemon setup requires --${key}.`); return value;
-};
-const assertSecureRemoteUrl = (value: string): void => {
-  const url = new URL(value); const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname.toLowerCase());
-  if (url.protocol !== "https:" && !loopback) throw new Error("Remote daemon control-plane URLs must use HTTPS.");
-};
 const delay = (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));

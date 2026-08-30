@@ -48,21 +48,16 @@ export const executionPromptEvidenceV12Schema = z.object({
 
 const executionRuntimeSnapshotSchema = z.object({
   agentId: idSchema,
-  deviceId: idSchema,
-  runtimeBackendId: idSchema,
   provider: z.enum(["codex", "copilot"]),
   cliVersion: nonEmptyTextSchema,
   model: nonEmptyTextSchema,
   reasoningEffort: nonEmptyTextSchema,
-  networkAccess: z.boolean(),
   capabilityHash: sha256Schema
 }).strict();
 
-export const agentExecutionBindingV1Schema = z.object({
-  version: z.literal(1),
+export const agentExecutionBindingV2Schema = z.object({
+  version: z.literal(2),
   agentId: idSchema,
-  deviceId: idSchema,
-  runtimeBackendId: idSchema,
   provider: z.enum(["codex", "copilot"]),
   model: nonEmptyTextSchema,
   reasoningEffort: nonEmptyTextSchema,
@@ -71,7 +66,7 @@ export const agentExecutionBindingV1Schema = z.object({
   updatedAt: timestampSchema
 }).strict();
 
-export const executionSpecV13Schema = z.object({
+export const executionSpecV14Schema = z.object({
   version: z.literal(EXECUTION_SPEC_VERSION),
   taskId: idSchema,
   kind: z.literal("agent_execution"),
@@ -80,6 +75,12 @@ export const executionSpecV13Schema = z.object({
   agentRunId: idSchema,
   evidence: executionPromptEvidenceV12Schema,
   runtime: executionRuntimeSnapshotSchema,
+  permissions: z.object({
+    workspaceAccess: z.enum(["read-only", "workspace-write"]),
+    networkAccess: z.boolean(),
+    readOnlyRoots: z.array(z.string().trim().min(1).regex(/^\//)).max(32),
+    approvalPolicy: z.literal("never")
+  }).strict(),
   project: z.object({
     checkoutRoot: nonEmptyTextSchema,
     headSha: gitObjectIdSchema,

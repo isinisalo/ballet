@@ -5,6 +5,9 @@ import {
   refinementOutcomeSchema, roleOutcomeV11Schema, sha256, taskEnvelopeV11Schema,
   validationDecisionSchema, workOutcomeSchema
 } from "../../../shared/orchestration/index.js";
+import { executionBindingBodySchema } from "../../../shared/api/runtime-schemas.js";
+import { DAEMON_BINDING_CONTRACT_VERSION, ROOT_SNAPSHOT_VERSION } from "../../../shared/orchestration/versions.js";
+import { DATABASE_SCHEMA_VERSION } from "../persistence/RuntimeSchema.js";
 
 const checks = [{ name: "test", status: "passed", evidenceRefs: ["evidence-1"] }];
 const outcomeBase = { version: ROLE_OUTCOME_VERSION, summary: "Summary", checks };
@@ -116,7 +119,18 @@ describe("Project Configuration v21 boundary", () => {
     expect(PROJECT_CONFIG_VERSION).toBe(21);
     expect(TASK_ENVELOPE_VERSION).toBe(11);
     expect(ROLE_OUTCOME_VERSION).toBe(11);
-    expect(EXECUTION_SPEC_VERSION).toBe(13);
+    expect(EXECUTION_SPEC_VERSION).toBe(14);
+    expect(ROOT_SNAPSHOT_VERSION).toBe(15);
+    expect(DATABASE_SCHEMA_VERSION).toBe(18);
+    expect(DAEMON_BINDING_CONTRACT_VERSION).toBe(2);
+  });
+
+  it("rejects Computer-era binding identity fields", () => {
+    const binding = { provider: "codex", model: "gpt", reasoningEffort: "medium",
+      policy: { network: false, readOnlyRoots: [] } };
+    expect(executionBindingBodySchema.safeParse(binding).success).toBe(true);
+    expect(executionBindingBodySchema.safeParse({ ...binding, deviceId: "legacy" }).success).toBe(false);
+    expect(executionBindingBodySchema.safeParse({ ...binding, runtimeBackendId: "legacy" }).success).toBe(false);
   });
 
   it("accepts a runnable bounded Environment and rejects unknown fields", () => {
