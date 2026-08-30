@@ -1,0 +1,71 @@
+.action-agent-model-card {
+  --agent-model-tone: var(--primary);
+  display: grid;
+  min-width: 0;
+  gap: .5rem;
+  padding: .5rem;
+  border: 1px solid color-mix(in srgb, var(--agent-model-tone) 44%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--agent-model-tone) 5%, var(--background));
+}
+
+.action-agent-model-card[data-model-theme="sol"] { --agent-model-tone: var(--tertiary); }
+.action-agent-model-card[data-model-theme="terra"] { --agent-model-tone: var(--secondary); }
+.action-agent-model-card[data-model-theme="luna"] { --agent-model-tone: var(--muted-foreground); }
+
+.action-agent-model-cycle {
+  display: grid;
+  width: 3rem;
+  min-height: 3rem;
+  place-items: center;
+  outline: none;
+}
+
+.action-agent-model-cycle:focus-visible,
+.action-agent-reasoning-input:focus-visible + .action-agent-reasoning-rail {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 48%, transparent);
+  outline: 1px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.action-agent-reasoning-control { position: relative; min-height: 2.5rem; }
+
+.action-agent-reasoning-input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 2.5rem;
+  cursor: pointer;
+  appearance: none;
+  background: transparent;
+}
+
+.action-agent-reasoning-input:disabled { cursor: not-allowed; }
+.action-agent-reasoning-input::-webkit-slider-runnable-track { height: 2.5rem; background: transparent; }
+.action-agent-reasoning-input::-moz-range-track { height: 2.5rem; background: transparent; }
+.action-agent-reasoning-input::-webkit-slider-thumb { width: 2rem; height: 2rem; appearance: none; opacity: 0; }
+.action-agent-reasoning-input::-moz-range-thumb { width: 2rem; height: 2rem; border: 0; opacity: 0; }
+
+.action-agent-reasoning-rail {
+  position: absolute;
+  top: 1.0625rem;
+  right: 1rem;
+  left: 1rem;
+  height: .375rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--agent-model-tone) 44%, var(--border));
+  border-radius: 9999px;
+  background: var(--muted);
+}
+
+.action-agent-reasoning-fill { display: block; width: var(--reasoning-progress); height: 100%; background: var(--agent-model-tone); }
+.action-agent-reasoning-planet { position: absolute; z-index: 1; top: .25rem; left: var(--reasoning-left); pointer-events: none; }
+
+@media (min-width: 768px) {
+  .action-agent-model-card { grid-template-columns: minmax(11rem, .38fr) minmax(0, 1fr); align-items: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-agent-model-card *, .action-agent-model-card *::before, .action-agent-model-card *::after { transition: none !important; }
+}

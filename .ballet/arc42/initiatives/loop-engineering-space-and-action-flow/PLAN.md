@@ -4,7 +4,7 @@ title: Loop Engineering space and Action flow plan
 status: accepted
 createdAt: '2026-08-29'
 updatedAt: '2026-08-30'
-version: 2
+version: 4
 tags: [arc42, initiative, plan, loop-engineering]
 ---
 
@@ -17,6 +17,8 @@ tags: [arc42, initiative, plan, loop-engineering]
 | LESAF-step-003 | goal-023/REQ-023 | QS-033 | adr-036/CON-016 | BB-016 | DEP-006 | token-driven styles and responsive overflow boundary | 1440x900/390x844 browser QA | LESAF-evid-003 |
 | LESAF-step-004 | goal-023/REQ-023 | QS-033 | adr-034–036/CON-016 | BB-016 | RT-029/DEP-006 | canonical docs, full repository and packaged startup | full gates, make latest, startup | LESAF-evid-004 |
 | LESAF-step-005 | goal-023/REQ-023 | QS-033 | adr-036,adr-042/CON-016 | BB-016 | RT-029/DEP-006 | compact Action authoring, centered edge anchors and State-owned Action deletion | component/geometry/keyboard tests, desktop/narrow QA and full gates | LESAF-evid-005 |
+| LESAF-step-006 | goal-023/REQ-023 | QS-033 | adr-036,adr-042/CON-016 | BB-016 | RT-029/DEP-006 | Sol/Terra/Luna-only agent authoring, combined Action model/reasoning card and status-header removal with SSE retained | pure/component/keyboard/SSE tests, desktop/narrow QA and full gates | LESAF-evid-006 |
+| LESAF-step-007 | goal-023/REQ-023 | QS-033 | adr-036,adr-042/CON-016 | BB-016 | DEP-006 | compact dot-free Action reasoning rail and single-border planet presentation | component test, desktop/narrow visual QA and frontend gates | LESAF-evid-007 |
 
 Työjärjestys on projection -> renderer/shell -> responsive QA -> canonical documentation/full gates. Data migrationia tai legacy-polkuja ei ole, koska domain-sopimukset eivät muutu. Palautus on scoped frontend/docs-diffin revert; se ei vaadi config- tai SQLite-rollbackia.
 

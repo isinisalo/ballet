@@ -8,6 +8,7 @@ import type { LocalDaemonStatus } from "@shared/domain/runtime";
 import type { GovernanceAgentsResponse, GovernanceAgentSlot, ResourceDocument } from "../types";
 import { orchestrationApi } from "../orchestrationApi";
 import { ConfigureToolbar } from "./ConfigureToolbar";
+import { authoringModels, isAuthoringModelId, unsupportedAuthoringModelMessage } from "./agentModelPolicy";
 
 type SaveInput = { developerInstructions: string; model: string; reasoningEffort: string; skillResources: string[];
   expectedConfigHash: string; expectedDocumentHash: string };
@@ -34,29 +35,30 @@ function AgentEditor({ slot, skills, configHash, locked, onSave }: {
   const [runtime, setRuntime] = useState<LocalDaemonStatus>();
   const [pending, setPending] = useState(false); const [error, setError] = useState("");
   useEffect(() => { void orchestrationApi.localRuntime().then(setRuntime).catch(() => undefined); }, []);
-  const models = useMemo(() => {
-    const values = runtime?.providers[0]?.capabilities.models ?? [];
-    return model && !values.some(({ id }) => id === model)
-      ? [{ id: model, label: model, reasoningOptions: [reasoningEffort] }, ...values] : values;
-  }, [model, reasoningEffort, runtime]);
-  const reasoning = models.find(({ id }) => id === model)?.reasoningOptions ?? (reasoningEffort ? [reasoningEffort] : []);
+  const models = useMemo(() => authoringModels(runtime?.providers[0]?.capabilities.models ?? []), [runtime]);
+  const selectedModel = models.find(({ id }) => id === model);
+  const reasoning = selectedModel?.reasoningOptions ?? [];
   const dirty = Boolean(slot.agent) && (instructions !== slot.agent!.developerInstructions || model !== slot.agent!.model
     || reasoningEffort !== slot.agent!.reasoningEffort || JSON.stringify(skillResources) !== JSON.stringify(slot.skillResources));
   const ready = slot.status === "ready" && Boolean(slot.agent && slot.contentHash);
-  const status = locked ? "Locked by active Run" : ready ? (dirty ? "Unsaved" : "Ready") : `Invalid · ${slot.status}`;
+  const modelIssue = runtime && !isAuthoringModelId(model) ? unsupportedAuthoringModelMessage(model)
+    : runtime && !selectedModel ? `Model ${model || "is missing"} is unavailable.`
+      : runtime && selectedModel && !reasoning.includes(reasoningEffort) ? `Reasoning ${reasoningEffort || "is missing"} is unavailable for ${model}.` : "";
+  const valid = ready && Boolean(runtime && selectedModel && reasoning.includes(reasoningEffort));
+  const status = locked ? "Locked by active Run" : !ready ? `Invalid · ${slot.status}` : modelIssue ? "Invalid" : dirty ? "Unsaved" : "Ready";
   const save = async () => {
-    if (!ready || !dirty || locked || pending) return;
+    if (!valid || !dirty || locked || pending) return;
     setPending(true); setError("");
     try { await onSave(slot.id, { developerInstructions: instructions, model, reasoningEffort,
       skillResources: [...skillResources].sort(), expectedConfigHash: configHash, expectedDocumentHash: slot.contentHash! }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Agent save failed."); }
     finally { setPending(false); }
   };
-  return <div className="min-w-0 overflow-x-hidden"><ConfigureToolbar status={status} label={slot.id}><Button size="sm" disabled={!ready || !dirty || locked || pending} onClick={() => void save()}><Save />{pending ? "Saving…" : "Save Agent"}</Button></ConfigureToolbar>
+  return <div className="min-w-0 overflow-x-hidden"><ConfigureToolbar status={status} label={slot.id}><Button size="sm" disabled={!valid || !dirty || locked || pending} onClick={() => void save()}><Save />{pending ? "Saving…" : "Save Agent"}</Button></ConfigureToolbar>
     {!ready ? <AgentFileError slot={slot} /> : <form className="grid min-w-0 border-b border-divider-strong bg-card xl:min-h-[calc(100vh-8rem)] xl:grid-cols-[18rem_minmax(0,1fr)_20rem]" onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <aside aria-label="Agent profile" className="min-w-0 space-y-4 border-b border-divider-strong p-4 xl:border-b-0 xl:border-r"><section><p className="font-mono text-[0.68rem] uppercase tracking-wider text-muted-foreground">Identity</p><h1 className="mt-1 break-words text-lg font-semibold">{title(slot.id)}</h1><p className="mt-1 text-sm text-muted-foreground">{slot.agent!.description}</p></section><dl className="grid gap-2 text-xs"><div><dt className="text-muted-foreground">Provider</dt><dd className="font-mono">Codex CLI · fixed</dd></div><div><dt className="text-muted-foreground">Sandbox</dt><dd className="font-mono">read-only · fixed</dd></div></dl>
-        <SelectField label="Model" density="compact" value={model} options={models.map(({ id, label }) => ({ value: id, label }))} onChange={(value) => { setModel(value); const selected = models.find(({ id }) => id === value); setReasoningEffort(selected?.defaultReasoning ?? selected?.reasoningOptions[0] ?? ""); }} />
-        <SelectField label="Reasoning" density="compact" value={reasoningEffort} options={reasoning.map((value) => ({ value, label: value }))} onChange={setReasoningEffort} />
+        <SelectField label="Model" density="compact" value={model} options={models.map(({ id, label }) => ({ value: id, label }))} disabled={locked || pending} error={modelIssue || undefined} onChange={(value) => { setModel(value); const selected = models.find(({ id }) => id === value); setReasoningEffort(selected?.defaultReasoning ?? selected?.reasoningOptions[0] ?? ""); }} />
+        <SelectField label="Reasoning" density="compact" value={reasoningEffort} options={reasoning.map((value) => ({ value, label: value }))} disabled={locked || pending || !selectedModel} onChange={setReasoningEffort} />
         <label className="grid gap-1 text-xs"><span className="text-muted-foreground">Skills</span><MultiSelect ariaLabel="Agent Skills" values={skillResources} options={skills.map(({ id }) => ({ value: id, label: id }))} onValuesChange={(values) => setSkillResources([...values].sort())} /></label>
       </aside>
       <main aria-label="Developer instructions editor" className="flex min-h-[32rem] min-w-0 flex-col border-b border-divider-strong p-4 xl:border-b-0 xl:border-r"><label htmlFor={`instructions-${slot.id}`} className="mb-2 font-semibold">Developer instructions</label><p className="mb-3 text-xs text-muted-foreground">Markdown stored in <code>{slot.relativePath}</code>.</p><textarea id={`instructions-${slot.id}`} aria-label="Developer instructions" value={instructions} onChange={(event) => setInstructions(event.target.value)} className="min-h-[28rem] min-w-0 flex-1 resize-y rounded-sm border border-divider-strong bg-background p-4 font-mono text-sm leading-6 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" spellCheck={false} />{error ? <p role="alert" className="mt-2 text-sm text-destructive">{error}</p> : null}</main>

@@ -6,6 +6,7 @@ import type { ActionAgentDefinition, ActionDefinition } from "@shared/orchestrat
 import type { ResourceDocument } from "../types";
 import { ConfigureHeader, IssueList } from "./ConfigureHeader";
 import { ActionAgentEditor, type EditableActionAgent } from "./ActionAgentEditor";
+import { isAuthoringModelId, unsupportedAuthoringModelMessage } from "./agentModelPolicy";
 import { useActionAgents } from "./useActionAgents";
 
 type AgentDraft = EditableActionAgent;
@@ -70,9 +71,11 @@ const validateAgents = (agents: AgentPair | undefined, models: Array<{ id: strin
     const agent = agents[role]; const model = models.find(({ id }) => id === agent.model);
     if (!agent.description.trim()) issues.push(`${role}: description is required.`);
     if (!agent.developerInstructions.trim()) issues.push(`${role}: developer instructions are required.`);
-    if (!model) issues.push(`${role}: model ${agent.model || "is missing"} is unavailable.`);
+    if (!isAuthoringModelId(agent.model)) issues.push(`${role}: ${lowercaseFirst(unsupportedAuthoringModelMessage(agent.model))}`);
+    else if (!model) issues.push(`${role}: model ${agent.model} is unavailable.`);
     else if (!model.reasoningOptions.includes(agent.reasoningEffort)) issues.push(`${role}: reasoning ${agent.reasoningEffort || "is missing"} is unavailable.`);
   }
   if (agents.validation.developerInstructions === agents.work.developerInstructions) issues.push("Validation and Work developer instructions must be unique.");
   return issues;
 };
+const lowercaseFirst = (value: string): string => value.replace(/^./, (letter) => letter.toLowerCase());

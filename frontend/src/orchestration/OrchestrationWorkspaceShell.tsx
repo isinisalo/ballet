@@ -16,7 +16,7 @@ export function OrchestrationWorkspaceShell({ route, navigate, setNavigationBloc
   const configure = useOrchestrationConfigureData();
   const governance = useOrchestrationGovernanceData(route);
   const refresh = useCallback(async () => { await Promise.all([configure.refresh(), governance.refresh()]); }, [configure.refresh, governance.refresh]);
-  const streamStatus = useOrchestrationInvalidations(refresh);
+  useOrchestrationInvalidations(refresh);
   const clearDirty = useCallback(() => setDirty(false), []);
   const mutation = useOrchestrationMutation(refresh, clearDirty);
   useEffect(() => { if (window.location.pathname === "/") navigate("/automation/loops", { bypassBlocker: true, replace: true }); }, [navigate]);
@@ -26,5 +26,5 @@ export function OrchestrationWorkspaceShell({ route, navigate, setNavigationBloc
   if (error) content = <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>;
   else if (!configure.loading && configure.data && isGovernanceView(route.workspaceView) && !governance.loading && governance.data) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)} onClickCapture={(event) => { if ((event.target as HTMLElement).closest("form")) setDirty(true); }}><OrchestrationGovernanceOutlet route={route} configure={configure.data} governance={governance.data} navigate={navigate} mutation={mutation} /></div>;
   else if (!configure.loading && configure.data && !isGovernanceView(route.workspaceView)) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)} onClickCapture={(event) => { if ((event.target as HTMLElement).closest("form")) setDirty(true); }}><OrchestrationConfigureOutlet route={route} data={configure.data} navigate={navigate} mutation={mutation} /></div>;
-  return <OrchestrationFrame sidebar={<OrchestrationSidebar route={route} data={configure.data} navigate={navigate} />} streamStatus={streamStatus}>{content}</OrchestrationFrame>;
+  return <OrchestrationFrame sidebar={<OrchestrationSidebar route={route} data={configure.data} navigate={navigate} />}>{content}</OrchestrationFrame>;
 }
