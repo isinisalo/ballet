@@ -4,13 +4,13 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 30
+version: 31
 tags: [architecture, arc42, environment]
 ---
 
 # Ballet architecture
 
-Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). [ADR-041](.ballet/adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) removes State-owned Use Case closure, makes project-document reading instruction/Skill-directed and makes sortable ID lists the only ordering editor. [ADR-042](.ballet/adr/adr-042-action-specific-codex-agents.md) makes every Action's Validation and Work TOML the canonical instruction/model/reasoning truth. [ADR-040](.ballet/adr/adr-040-codex-only-fixed-governance-agents.md) retains two read-only governance Agents and the Codex-only runtime. [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) retains Feedback/Refinement and Run Evidence, while [ADR-037](.ballet/adr/adr-037-checkout-local-daemon.md) owns the checkout-local CLI worker. [ADR-036](.ballet/adr/adr-036-loop-engineering-space-and-action-flow-projections.md) owns the shared State/Action canvas.
+Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). [ADR-041](.ballet/adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) removes State-owned Use Case closure, makes project-document reading instruction/Skill-directed and makes sortable ID lists the only ordering editor. [ADR-042](.ballet/adr/adr-042-action-specific-codex-agents.md) makes every Action's Validation and Work TOML the canonical instruction/model/reasoning truth. [ADR-040](.ballet/adr/adr-040-codex-only-fixed-governance-agents.md) retains two read-only governance Agents and the Codex-only runtime. [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) retains Feedback/Refinement and Run Evidence, while [ADR-037](.ballet/adr/adr-037-checkout-local-daemon.md) owns the checkout-local CLI worker. [ADR-043](.ballet/adr/adr-043-compact-horizontal-state-canvas.md) owns the compact horizontal-State and vertical-Action canvas plus the retained Validation-led Action flow.
 
 The active implementation is the atomic v25/v23 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized.
 

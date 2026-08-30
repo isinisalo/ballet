@@ -21,22 +21,41 @@ describe("Loop Engineering space canvas", () => {
       ["action-1", 1], ["action-2", 2], ["action-3", 3], ["action-4", 4],
     ]);
     expect(first.actions.map(({ artwork, size }) => [artwork, size])).toEqual([
-      ["sol", 72], ["terra", 56], ["terra", 56], ["luna", 44],
+      ["sol", 32], ["terra", 28], ["terra", 28], ["luna", 24],
     ]);
+    expect(first.states.map(({ x }) => x)).toEqual([...first.states.map(({ x }) => x)].sort((a, b) => a - b));
+    expect(new Set(first.states.map(({ y }) => y)).size).toBe(1);
+    expect(new Set(first.actions.map(({ x }) => x))).toEqual(new Set([first.states[0]!.x]));
+    expect(first.actions.map(({ y }) => y)).toEqual([...first.actions.map(({ y }) => y)].sort((a, b) => a - b));
     expect(first.actions.find(({ id }) => id === "action-3")?.selected).toBe(true);
     expect(first.edges.find(({ id }) => id === "action:action-1:to:action-2")).toMatchObject({
-      path: `M${first.actions[0]!.x} ${first.actions[0]!.y} L${first.actions[1]!.x} ${first.actions[1]!.y}`,
-      points: [{ x: first.actions[0]!.x, y: first.actions[0]!.y }, { x: first.actions[1]!.x, y: first.actions[1]!.y }],
+      path: `M${first.actions[0]!.x} ${first.actions[0]!.y + first.actions[0]!.size / 2 + 4} L${first.actions[1]!.x} ${first.actions[1]!.y - first.actions[1]!.size / 2 - 4}`,
+      points: [
+        { x: first.actions[0]!.x, y: first.actions[0]!.y + first.actions[0]!.size / 2 + 4 },
+        { x: first.actions[1]!.x, y: first.actions[1]!.y - first.actions[1]!.size / 2 - 4 },
+      ],
+    });
+    expect(first.edges.find(({ tone }) => tone === "state")?.points).toEqual([
+      { x: first.states[0]!.x + first.states[0]!.width / 2 + 4, y: first.states[0]!.y },
+      { x: first.states[1]!.x - first.states[1]!.width / 2 - 4, y: first.states[1]!.y },
+    ]);
+  });
+
+  it("keeps large Action sets separated inside a taller internal stage", () => {
+    const projection = projectLoopEngineering(environmentWithActions(14), "state-1");
+    expect(projection.height).toBeGreaterThan(800);
+    projection.actions.slice(1).forEach((action, index) => {
+      const previous = projection.actions[index]!;
+      expect(action.x).toBe(previous.x);
+      expect(action.y - previous.y).toBeGreaterThanOrEqual(44);
     });
   });
 
-  it("keeps large Action sets separated inside a wider internal stage", () => {
-    const projection = projectLoopEngineering(environmentWithActions(14), "state-1");
-    expect(projection.width).toBeGreaterThan(2500);
-    projection.actions.slice(1).forEach((action, index) => {
-      const previous = projection.actions[index]!;
-      expect(action.x - previous.x).toBeGreaterThan((action.size + previous.size) / 2);
-    });
+  it("fits the canonical five-State and twelve-Action desktop surface without internal scroll", () => {
+    const projection = projectLoopEngineering(environmentWithStatesAndActions(5, 12), "state-1", undefined, { width: 590, height: 811 });
+    expect(projection).toMatchObject({ width: 590, height: 811 });
+    expect(projection.states).toHaveLength(5);
+    expect(projection.actions).toHaveLength(12);
   });
 
   it("fills a measured surface while keeping every projected node in bounds", () => {
@@ -48,19 +67,19 @@ describe("Loop Engineering space canvas", () => {
       expect(x).toBeLessThanOrEqual(projection.width - 22);
       expect(y).toBeLessThanOrEqual(projection.height - 22);
     });
-    projection.actions.forEach(({ x, y, size }) => {
-      expect(x - size / 2).toBeGreaterThanOrEqual(0);
-      expect(y - size / 2).toBeGreaterThanOrEqual(0);
-      expect(x + size / 2).toBeLessThanOrEqual(projection.width);
-      expect(y + size / 2).toBeLessThanOrEqual(projection.height);
+    projection.actions.forEach(({ x, y }) => {
+      expect(x - 22).toBeGreaterThanOrEqual(0);
+      expect(y - 22).toBeGreaterThanOrEqual(0);
+      expect(x + 22).toBeLessThanOrEqual(projection.width);
+      expect(y + 22).toBeLessThanOrEqual(projection.height);
     });
   });
 
-  it("keeps State rows compact instead of stretching them into available height", () => {
+  it("keeps the State row compact instead of stretching it across available width", () => {
     const environment = environmentWithActions(2);
     const compact = projectLoopEngineering(environment, "state-1", undefined, { width: 900, height: 760 });
-    const baseline = projectLoopEngineering(environment, "state-1");
-    expect(compact.states.map(({ y }) => y)).toEqual(baseline.states.map(({ y }) => y));
+    expect(compact.states[1]!.x - compact.states[0]!.x).toBe(112);
+    expect(new Set(compact.states.map(({ y }) => y).values()).size).toBe(1);
     expect(compact.height).toBe(760);
   });
 
@@ -73,6 +92,9 @@ describe("Loop Engineering space canvas", () => {
     const state = screen.getByRole("button", { name: "Open State state-2: Verify" });
     const action = screen.getByRole("button", { name: "Open Action action-2: Action 2" });
     expect(action).toHaveAttribute("aria-pressed", "true");
+    expect(state).toHaveTextContent(/^state-2$/);
+    expect(state).not.toHaveTextContent("STATE 2");
+    expect(state).not.toHaveTextContent("Verify");
     state.focus();
     await user.keyboard("{Enter}");
     action.focus();
@@ -80,6 +102,7 @@ describe("Loop Engineering space canvas", () => {
     expect(navigate).toHaveBeenNthCalledWith(1, "/automation/loops/states/state-2");
     expect(navigate).toHaveBeenNthCalledWith(2, "/automation/loops/states/state-1/actions/action-2");
     expect(action).toHaveTextContent("action-2");
+    expect(action.querySelector("code")).toHaveAttribute("data-placement", "right");
     expect(action).not.toHaveTextContent("PRIORITY");
     expect(action).not.toHaveTextContent("Action 2");
     await user.dblClick(action);
@@ -92,11 +115,11 @@ describe("Loop Engineering space canvas", () => {
     render(<LoopEngineeringCanvas environment={environment} selectedStateId="state-1" navigate={vi.fn()} />);
     projection.actions.forEach((node) => {
       expect(screen.getByRole("button", { name: `Open Action ${node.id}: ${node.name}` })).toHaveStyle({
-        left: `${node.x}px`, top: `${node.y}px`, width: `${node.size}px`, height: `${node.size}px`,
+        left: `${node.x}px`, top: `${node.y}px`, width: "44px", height: "44px",
       });
     });
     const first = projection.actions[0]!;
-    expect(projection.edges.find(({ id }) => id === "state:state-1:actions")?.points.at(-1)).toEqual({ x: first.x, y: first.y });
+    expect(projection.edges.find(({ id }) => id === "state:state-1:actions")?.points.at(-1)).toEqual({ x: first.x, y: first.y - first.size / 2 - 4 });
   });
 });
 
@@ -142,6 +165,18 @@ function environmentWithActions(count: number) {
     id: `action-${index + 1}`,
     name: `Action ${index + 1}`,
     priority: index + 1,
+  }));
+  return environment;
+}
+
+function environmentWithStatesAndActions(stateCount: number, actionCount: number) {
+  const environment = environmentWithActions(actionCount);
+  const template = environment.states[0]!;
+  environment.states = Array.from({ length: stateCount }, (_, index) => ({
+    ...structuredClone(template),
+    id: `state-${index + 1}`,
+    name: `State ${index + 1}`,
+    order: index + 1,
   }));
   return environment;
 }

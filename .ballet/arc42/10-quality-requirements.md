@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 34
+version: 35
 tags: [arc42, quality, scenarios]
 arc42Section: 10
 ---
@@ -19,7 +19,7 @@ arc42Section: 10
 | QS-030 | goal-022 / REQ-022 | Ihminen hyväksyy exact Refinement proposalin | muuttumaton tai stale Git base | refinement apply and continuation | sallitut muutokset tuottavat yhden worktree-commitin ja continuation-runin; stale input kirjoittaa nolla tiedostoa | path/symlink/preimage/hash/impact/race-testit ja parent snapshotin byte equality | 1 | EVID-030 | passed locally; real-provider continuation is future evidence |
 | QS-031 | goal-022 / REQ-022 | Operaattori käyttää authoring-, run- ja review-workspaceja | 1440x900 ja 390x844, keyboard ja reduced motion | canonical UI | factual status, exact approval evidence ja kaikki ydintoiminnot ovat saavutettavia ilman page overflowta | component plus browser QA, zero console errors, keyboard deep-link/back-forward evidence | 1 | EVID-031 | passed canonical |
 | QS-032 | goal-022 / REQ-022 | strict cutover buildataan ja käynnistetään | clean checkout and fresh machine state | whole product | vain target-versiot, canonical routet ja target domain jäävät aktiivisiksi | removal gate, full test/lint/build/docs/design, release smoke, make latest, startup and clean tree | 1 | EVID-032 | passed locally |
-| QS-033 | goal-023 / REQ-023 | ihminen authoroi projektidokumenttia, Statea tai Actionia | desktop/narrow, keyboard ja dirty draft | Markdown workbench and Loop Engineering | canonical Markdown säilyy; URL palauttaa valitun entityn; State ja sen Actionit näkyvät samassa ordered authoring canvasissa | round-trip/unknown-frontmatter/dirty-guard/routing/a11y/projection/browser testit; 0 page overflowta; essential route controls >=40 px | 1 | EVID-033 | passed canonical |
+| QS-033 | goal-023 / REQ-023 | ihminen authoroi projektidokumenttia, Statea tai Actionia | desktop/narrow, keyboard ja dirty draft | Markdown workbench and Loop Engineering | canonical Markdown säilyy; URL palauttaa valitun entityn; State-rivi ja valitun Staten Action-sarake näkyvät samassa ordered authoring canvasissa | round-trip/unknown-frontmatter/dirty-guard/routing/a11y/projection/browser testit; 0 page overflowta; route controls >=44 px; canonical 5 State / 12 Action canvas-scroll 0 px @ 1440×900 | 1 | EVID-033 | passed canonical |
 | QS-034 | goal-023 / REQ-023 | daemon paritetaan, claimataan tai restartataan | online/offline/replay/stale lease | paired daemon control plane | vain aito online-laite saa fenced taskin ja terminal outcome/finalization tapahtuu kerran | pairing/auth/HTTPS-loopback/heartbeat/lease/fencing/replay/restart negative tests | 1 | EVID-034 | pending |
 | QS-035 | goal-023 / REQ-023 | Environment Run preflightaa governance-agentit | missing/invalid/symlink TOML, dirty checkout tai unsupported model/reasoning | fixed Codex Agent repository and CLI adapter | molemmat exact Agentit ovat read-only ja ready tai dispatch on 0 | TOML schema/path/hash sekä Codex capability/dispatch tests | 1 | EVID-035 | pending |
 | QS-036 | goal-023 / REQ-023 | ihminen antaa Feedbackin ja aloittaa Refinementin | valid/invalid body sekä allowed/forbidden path | Feedback and Refinement v2 | vain category+comment hyväksytään ja proposal pysyy resource-allowlistissa | strict HTTP, provenance, path/symlink/preimage/hash/approval tests; forbidden write 0 | 1 | EVID-036 | pending |

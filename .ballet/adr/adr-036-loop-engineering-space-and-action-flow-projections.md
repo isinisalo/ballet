@@ -1,14 +1,16 @@
 ---
 id: adr-036
 title: Loop Engineering yhdistää State- ja Action-projektiot avaruuscanvasiin
-status: accepted
+status: superseded
 createdAt: '2026-08-29'
-updatedAt: '2026-08-29'
-version: 1
+updatedAt: '2026-08-30'
+version: 2
 tags: [arkkitehtuuripaatos, loop-engineering, canvas, accessibility]
 ---
 
 # Loop Engineering yhdistää State- ja Action-projektiot avaruuscanvasiin
+
+> Superseded by [ADR-043](adr-043-compact-horizontal-state-canvas.md), joka säilyttää Action-flow- ja runtime-rajat mutta korvaa canvas-geometrian.
 
 ## Konteksti
 

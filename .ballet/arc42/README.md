@@ -3,14 +3,14 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-29'
-version: 26
+updatedAt: '2026-08-30'
+version: 27
 tags: [arc42, architecture, index]
 ---
 
 # Balletin arc42-arkkitehtuuri-indeksi
 
-Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -> Action ja Validation-led execution. `goal-023` / `adr-035` säilyttävät Markdown Agents-, Feedback/Refinement v2- ja Run Evidence -mallin. Aktiivisen execution placementin omistaa `goal-024` / `adr-037`: yksi checkout-local daemon ilman Computeria tai pairingia. `adr-036` määrittää Loop Engineeringin canvas-projektiot.
+Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -> Action ja Validation-led execution. `goal-023` / `adr-035` säilyttävät Markdown Agents-, Feedback/Refinement v2- ja Run Evidence -mallin. Aktiivisen execution placementin omistaa `goal-024` / `adr-037`: yksi checkout-local daemon ilman Computeria tai pairingia. `adr-043` määrittää Loop Engineeringin canvas-projektiot ja säilyttää Action-flow-rajat.
 
 1. [Johdanto ja tavoitteet](01-introduction-and-goals.md)
 2. [Rajoitteet](02-constraints.md)

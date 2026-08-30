@@ -4,13 +4,13 @@ title: Balletin arkkitehtuuristatus ja handoff
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-08-30'
-version: 49
+version: 50
 tags: [arc42, status, handoff]
 ---
 
 # Balletin arkkitehtuuristatus ja handoff
 
-`goal-022` / `adr-034` omistavat Environment -> State -> Action- ja Validation-led-runtime-semanttiikan. `adr-041` poistaa State-owned Use Case -closuren, tekee project-kontekstista instruction/Skill-ohjatun ja antaa ID-only sortable-listoille ainoan ordering-editorivastuun. `adr-042` tekee jokaisen Actionin Validation- ja Work-TOMLista instruction/model/reasoning-totuuden ja poistaa machine-local Action bindingin. `adr-040` säilyttää kaksi kiinteää read-only governance-agenttia ja Codex-only daemonin. `goal-023` / `adr-035` säilyttävät minimal Feedback-, Refinement- ja Run Evidence -mallit. `goal-024` / `adr-037` omistavat checkout-local CLI-workerin. `adr-036` omistaa Loop Engineeringin authoring-projektiot.
+`goal-022` / `adr-034` omistavat Environment -> State -> Action- ja Validation-led-runtime-semanttiikan. `adr-041` poistaa State-owned Use Case -closuren, tekee project-kontekstista instruction/Skill-ohjatun ja antaa ID-only sortable-listoille ainoan ordering-editorivastuun. `adr-042` tekee jokaisen Actionin Validation- ja Work-TOMLista instruction/model/reasoning-totuuden ja poistaa machine-local Action bindingin. `adr-040` säilyttää kaksi kiinteää read-only governance-agenttia ja Codex-only daemonin. `goal-023` / `adr-035` säilyttävät minimal Feedback-, Refinement- ja Run Evidence -mallit. `goal-024` / `adr-037` omistavat checkout-local CLI-workerin. `adr-043` omistaa Loop Engineeringin tiiviin authoring-projektion ja säilyttää Action-flow-rajat.
 
 Versiomatriisi on Project Config v25, Root Snapshot v20, Task Envelope / role outcome v11, prompt composition v16, ExecutionSpec v18 ja SQLite v23; Feedback/Critic/Refinement ovat v2, Codex Agent v3 ja Run Evidence v1. Action execution bindingia ei ole. API ja UI käyttävät vain canonical routeja. Strict removal -gate estää korvatun aktiivikoodin, transitional namespacejen ja compatibility-polkujen palautumisen.
 

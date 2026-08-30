@@ -36,13 +36,10 @@ export function ActionAgentControls({ role, model, reasoningEffort, models, disa
   } as CSSProperties;
 
   return <section aria-label={`${role} model and reasoning`} data-model-theme={selectedMeta?.artwork ?? "legacy"} className="action-agent-model-card">
-    <div className="flex min-w-0 items-center gap-3">
-      <button type="button" className="action-agent-model-cycle shrink-0 border-0 bg-transparent disabled:cursor-not-allowed disabled:opacity-50" aria-label={cycleLabel}
-        disabled={disabled || !next} onClick={() => next && onChange({ model: next.id, reasoningEffort: next.defaultReasoning ?? next.reasoningOptions[0] ?? "" })}>
-        {selectedMeta ? <ActionPlanetArtwork artwork={selectedMeta.artwork} size={40} /> : <span aria-hidden="true" className="font-mono text-lg text-muted-foreground">?</span>}
-      </button>
+    <button type="button" className="action-agent-model-cycle border-0 bg-transparent disabled:cursor-not-allowed disabled:opacity-50" aria-label={cycleLabel}
+      disabled={disabled || !next} onClick={() => next && onChange({ model: next.id, reasoningEffort: next.defaultReasoning ?? next.reasoningOptions[0] ?? "" })}>
       <code className="block whitespace-nowrap text-sm font-semibold text-[var(--agent-model-tone)]">{model || "No model"}</code>
-    </div>
+    </button>
     <ReasoningControl role={role} value={reasoningEffort} options={options} index={index} style={style} artwork={selectedMeta?.artwork} disabled={disabled} onChange={(value) => onChange({ model, reasoningEffort: value })} />
   </section>;
 }
@@ -52,16 +49,16 @@ function ReasoningControl({ role, value, options, index, style, artwork, disable
   artwork?: "sol" | "terra" | "luna"; disabled: boolean; onChange(value: string): void;
 }) {
   const id = useId();
-  return <div className="min-w-0" style={style}>
-    <div className="flex justify-end"><output htmlFor={id} className="text-xs font-semibold text-[var(--agent-model-tone)]">{formatReasoning(value || "Unavailable")}</output></div>
-    <div className="action-agent-reasoning-control mt-1">
+  return <>
+    <div className="action-agent-reasoning-control min-w-0" style={style}>
       <input id={id} aria-label={`${role} Reasoning`} aria-valuetext={formatReasoning(value)} type="range" min={0} max={Math.max(0, options.length - 1)} step={1} value={index}
         disabled={disabled || options.length <= 1} onKeyDown={(event) => changeWithKeyboard(event, index, options, onChange)}
         onChange={(event) => onChange(options[Number(event.target.value)] ?? value)} className="action-agent-reasoning-input disabled:opacity-50" />
       <span aria-hidden="true" className="action-agent-reasoning-rail"><span className="action-agent-reasoning-fill" /></span>
       {artwork ? <span data-testid={`${role}-reasoning-planet`} data-step={index} className="action-agent-reasoning-planet"><ActionPlanetArtwork artwork={artwork} size={32} /></span> : null}
     </div>
-  </div>;
+    <output htmlFor={id} className="action-agent-reasoning-value text-xs font-semibold text-[var(--agent-model-tone)]">{formatReasoning(value || "Unavailable")}</output>
+  </>;
 }
 
 const formatReasoning = (value: string): string => value.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
