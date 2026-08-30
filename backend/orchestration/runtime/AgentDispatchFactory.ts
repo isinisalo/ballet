@@ -1,5 +1,5 @@
 import type { ActionDefinition, ActionRoleComposition, StateDefinition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
 import type { CreateAgentRunInput, ExecutionTaskSeed } from "../../../shared/orchestration/persistence.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
@@ -72,8 +72,8 @@ export class AgentDispatchFactory {
     const parsedEnvelope = taskEnvelopeV11Schema.parse(envelope);
     const subject = { kind: "action_role" as const, actionId: action.id, role: input.role };
     const evidence = composeOrchestrationPrompt({ snapshot: input.run.executionSnapshot, envelope: parsedEnvelope, composition, subject });
-    const spec: ExecutionSpecV16 = {
-      version: 16, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
+    const spec: ExecutionSpecV17 = {
+      version: 17, taskId, kind: "agent_execution", environmentRunId: input.run.environmentRunId,
       actionExecutionId: input.action.actionExecutionId, agentRunId, evidence,
       runtime: {
         subject, provider: capability.provider, cliVersion: capability.cliVersion, model: roleCapability.model,

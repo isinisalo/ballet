@@ -81,7 +81,7 @@ export interface LocalDaemonTaskClaim {
   leaseUntil: string;
   leaseDurationMs: number;
   renewAfterMs: number;
-  spec: import("../orchestration/execution.js").ExecutionSpecV16;
+  spec: import("../orchestration/execution.js").ExecutionSpecV17;
   permissions: { workspaceAccess: WorkspaceAccess };
 }
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV18, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV19, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -65,7 +65,7 @@ export const environmentSeed = (options: {
     const action = actionDefinition(`action-${number}`, number, options.maxRetries ?? 1);
     const definition: StateDefinition = {
       id: `state-${number}`, name: `State ${number}`, description: `State ${number} description`,
-      order: number, useCaseIds: ["UC-1"], actions: [action]
+      order: number, actions: [action]
     };
     return {
       stateExecutionId: `state-execution-${number}${executionSuffix}`,
@@ -74,12 +74,12 @@ export const environmentSeed = (options: {
       actions: [{ actionExecutionId: `action-execution-${number}${executionSuffix}`, definition: action, definitionHash: hash(action) }]
     };
   });
-  const snapshot: RootSnapshotV18 = {
-    version: 18, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+  const snapshot: RootSnapshotV19 = {
+    version: 19, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
     directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
-    approvedUseCases: [], direction: { goals: [], adrs: [], constraints: [] },
+    direction: { goals: [], adrs: [], constraints: [] },
     agents: (["ballet-critic-agent", "ballet-refinement-agent"] as const).map((id) => ({
       id, name: id, description: "Test Agent", developerInstructions: VALID_INSTRUCTION,
       model: "gpt-5.6-sol", reasoningEffort: "high", sandboxMode: "read-only" as const, contentSha256: HASH_A

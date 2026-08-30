@@ -1,6 +1,6 @@
 import type { JsonValue } from "./primitives.js";
 import type { AgentComposition, EnvironmentDefinition, GovernanceAgentDefinition, RuntimeProvider } from "./environment.js";
-import type { Constraint, DirectionReference, UseCase } from "./direction.js";
+import type { Constraint, DirectionReference } from "./direction.js";
 import { ROOT_SNAPSHOT_VERSION } from "./versions.js";
 
 export type EnvironmentRunStatus = "pending" | "running" | "blocked" | "completed" | "cancelled" | "interrupted";
@@ -14,7 +14,7 @@ export type RuntimeBindingSubject =
   | { kind: "action_role"; actionId: string; role: "validation" | "work" }
   | { kind: "agent"; agentId: string };
 
-export interface RootSnapshotV18 {
+export interface RootSnapshotV19 {
   version: typeof ROOT_SNAPSHOT_VERSION;
   projectHeadSha: string;
   projectConfigSha256: string;
@@ -22,7 +22,6 @@ export interface RootSnapshotV18 {
   environmentSha256: string;
   resourceSha256: string;
   environment: EnvironmentDefinition;
-  approvedUseCases: Array<{ useCase: UseCase; contentSha256: string }>;
   direction: {
     goals: Array<DirectionReference & { contentSha256: string }>;
     adrs: Array<DirectionReference & { contentSha256: string }>;
@@ -94,7 +93,7 @@ export interface EnvironmentRun {
   id: string;
   environmentId: string;
   status: EnvironmentRunStatus;
-  snapshot: RootSnapshotV18;
+  snapshot: RootSnapshotV19;
   continuationOfRunId?: string;
   createdAt: string;
   updatedAt: string;

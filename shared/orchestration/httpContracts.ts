@@ -3,7 +3,7 @@ import { CONTRACT_LIMITS } from "./limits.js";
 import { idSchema, nonEmptyTextSchema, sha256Schema } from "./schemas/common.js";
 import { constraintSchema, directionReferenceSchema, useCaseAuthoringSchema } from "./schemas/directionSchemas.js";
 import {
-  actionDefinitionSchema, environmentDefinitionSchema, projectConfigurationV23Schema, stateDefinitionSchema
+  actionDefinitionSchema, environmentDefinitionSchema, projectConfigurationV24Schema, stateDefinitionSchema
 } from "./schemas/environmentSchemas.js";
 
 const markdownSourceSchema = z.string().max(CONTRACT_LIMITS.text)
@@ -19,7 +19,7 @@ export const stateParamsSchema = z.object({ stateId: idSchema }).strict();
 export const actionParamsSchema = z.object({ stateId: idSchema, actionId: idSchema }).strict();
 export const emptySchema = z.object({}).strict();
 export const putProjectSchema = z.object({
-  expectedHash: z.union([sha256Schema, z.literal("absent")]), config: projectConfigurationV23Schema
+  expectedHash: z.union([sha256Schema, z.literal("absent")]), config: projectConfigurationV24Schema
 }).strict();
 export const putResourceSchema = z.object({
   expectedHash: z.union([sha256Schema, z.literal("absent")]), content: markdownSourceSchema

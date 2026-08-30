@@ -4,7 +4,7 @@ Ballet is a checkout-local command center for human-directed AI work. A human ow
 
 ## Core concepts
 
-- **Direction** links accepted Goals, ADRs and Constraints to exact approved Use Cases.
+- **Direction** keeps Goals, ADRs, Constraints and human-approved Use Cases as project-local evidence.
 - **Environment** contains States with unique positive `order` values.
 - **State** contains bounded Actions with unique positive `priority` values.
 - **Validation** prechecks before Work and postchecks its result.
@@ -36,7 +36,7 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 
 | Path | Ownership |
 | --- | --- |
-| `.ballet/project.json` | strict Project Config v23: Direction, Environment Action compositions and fixed governance composition |
+| `.ballet/project.json` | strict Project Config v24: project direction, Environment Action compositions and fixed governance composition |
 | `.codex/agents/*.toml` | The two fixed read-only Codex Agent definitions for Critic and Refinement governance |
 | `.ballet/goals/**` | human WHAT/WHY |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
@@ -45,7 +45,7 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 | `.ballet/instructions/**` | selected role instructions |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v21, Action role selections, checkout-daemon state, logs and server-owned worktrees |
+| `.git/ballet/**` | machine-local SQLite v22, Action role selections, checkout-daemon state, logs and server-owned worktrees |
 
 Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
 
@@ -91,7 +91,6 @@ This abbreviated example shows the ownership boundary; the repository default co
       "name": "Verification",
       "description": "Verify the evidence",
       "order": 1,
-      "useCaseIds": ["UC-07"],
       "actions": [{
         "id": "check",
         "name": "Check evidence",
@@ -110,11 +109,11 @@ The complete strict shape also requires Markdown-backed governance Agents, disab
 
 ## Use Case approval
 
-Saving a draft is not approval. The human approval command binds the canonical semantic content to a SHA-256 and revision. Only valid approved Use Cases referenced by a State are runnable; every Action in that State inherits the full approved closure. A semantic edit invalidates the approval and returns the Use Case to draft; an agent task cannot call the approval boundary.
+Saving a draft is not approval. The human approval command binds the canonical semantic content to a SHA-256 and revision. Use Cases remain project-local evidence and do not gate an Environment Run or enter its snapshot/task context. A semantic edit invalidates the approval and returns the Use Case to draft; an agent task cannot call the approval boundary.
 
 ## Environment authoring
 
-Author one Environment as dependency-ordered States. Bind approved Use Cases to the State, keep each Action small enough for independent Validation, set a bounded `maxRetries`, and select one Validation and one Work composition. Instructions must contain Task, Role, Goals, Priorities, Method, Output contract, Tool policy and Acceptance evidence sections in that order.
+Author one Environment as dependency-ordered States, keep each Action small enough for independent Validation, set a bounded `maxRetries`, and select one Validation and one Work composition. State order and Action priority are persisted through their sortable ID lists. Instructions must contain Task, Role, Goals, Priorities, Method, Output contract, Tool policy and Acceptance evidence sections in that order, and must explicitly tell the agent when relevant `.ballet/**` project documents need to be read.
 
 The default project demonstrates:
 
@@ -155,7 +154,7 @@ JSON commands and projections live under canonical `/api/*` routes and SSE uses 
 
 ## Strict local state
 
-The active matrix is Project Config v23, Root Snapshot v18, Task Envelope and role outcome v11, prompt composition v14, ExecutionSpec v16 and SQLite v21. Feedback, Critic, Refinement and Codex Agent are v2; Action execution binding is v3 and Run Evidence is v1. Validation and its subordinate Work agent have role-specific model/reasoning selections on the single fixed Codex runtime; network is denied and external read-only roots are not configurable. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
+The active matrix is Project Config v24, Root Snapshot v19, Task Envelope and role outcome v11, prompt composition v15, ExecutionSpec v17 and SQLite v22. Feedback, Critic, Refinement and Codex Agent are v2; Action execution binding is v3 and Run Evidence is v1. Validation and its subordinate Work agent have role-specific model/reasoning selections on the single fixed Codex runtime; network is denied and external read-only roots are not configurable. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
 
 ## Verification
 

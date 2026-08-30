@@ -3,7 +3,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { Constraint, DirectionReference, UseCase } from "../../../shared/orchestration/direction.js";
 import { approveUseCase, invalidateUseCaseApproval, useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
-import type { GovernanceAgentId, ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentId, ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDefinition, ProjectDefinitionPort } from "../runtime/EnvironmentRunPlanner.js";
@@ -147,10 +147,10 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
 }
 
 const replaceDirectionValue = (
-  config: ProjectConfigurationV23,
+  config: ProjectConfigurationV24,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   input: DirectionValue
-): ProjectConfigurationV23 => {
+): ProjectConfigurationV24 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = replace(direction.goals, input as DirectionReference);
   else if (kind === "adr") direction.adrs = replace(direction.adrs, input as DirectionReference);
@@ -172,10 +172,10 @@ const replaceDirectionValue = (
   return { ...config, direction };
 };
 const removeDirectionValue = (
-  config: ProjectConfigurationV23,
+  config: ProjectConfigurationV24,
   kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
   id: string
-): ProjectConfigurationV23 => {
+): ProjectConfigurationV24 => {
   const direction = structuredClone(config.direction);
   if (kind === "goal") direction.goals = direction.goals.filter((value) => value.id !== id);
   else if (kind === "adr") direction.adrs = direction.adrs.filter((value) => value.id !== id);
@@ -185,6 +185,6 @@ const removeDirectionValue = (
 };
 const replace = <T extends { id: string }>(values: T[], value: T): T[] =>
   [...values.filter((candidate) => candidate.id !== value.id), value].sort((left, right) => left.id.localeCompare(right.id));
-const replaceUseCase = (config: ProjectConfigurationV23, useCase: UseCase): ProjectConfigurationV23 => ({
+const replaceUseCase = (config: ProjectConfigurationV24, useCase: UseCase): ProjectConfigurationV24 => ({
   ...config, direction: { ...config.direction, useCases: replace(config.direction.useCases, useCase) }
 });

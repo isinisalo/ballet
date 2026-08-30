@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LocalDaemonTaskClaim } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
 import { FakeCliRuntimeAdapter } from "../providers/FakeCliRuntimeAdapter.js";
 import type { LocalDaemonTransport } from "../transport/LocalDaemonTransport.js";
 import { LeaseAwareJobRunner } from "./LeaseAwareJobRunner.js";
@@ -34,10 +34,10 @@ const taskClaim = (): LocalDaemonTaskClaim => ({
   leaseDurationMs: 60_000, renewAfterMs: 20_000, spec: spec(),
   permissions: { workspaceAccess: "read-only" }
 });
-const spec = (): ExecutionSpecV16 => ({
-  version: 16, taskId: "task-1", kind: "agent_execution", environmentRunId: "run-1", agentRunId: "agent-run-1",
+const spec = (): ExecutionSpecV17 => ({
+  version: 17, taskId: "task-1", kind: "agent_execution", environmentRunId: "run-1", agentRunId: "agent-run-1",
   evidence: {
-    compositionVersion: 14, role: "validation", phase: "precheck",
+    compositionVersion: 15, role: "validation", phase: "precheck",
     subject: { kind: "action_role", actionId: "action-1", role: "validation" },
     resources: [], prompt: "Inspect.", promptSha256: "a".repeat(64),
     taskEnvelopeVersion: 11, taskEnvelopeSha256: "b".repeat(64), outputSchemaVersion: 11,

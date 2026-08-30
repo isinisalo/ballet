@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
-import type { GovernanceAgentId, ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { GovernanceAgentId, ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
 import type { FeedbackCategory, FeedbackTargetType } from "../../../shared/orchestration/reviews.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -66,7 +66,7 @@ export class ApiController {
   }
 
   project(): unknown { return this.dependencies.project.projects.load(); }
-  putProject(config: ProjectConfigurationV23, expectedHash: string | "absent"): unknown {
+  putProject(config: ProjectConfigurationV24, expectedHash: string | "absent"): unknown {
     const current = this.dependencies.project.projects.loadOptional();
     if (current && canonical(current.config.direction) !== canonical(config.direction)) {
       throw new ConflictError("Direction and Use Case mutations require their dedicated document commands.");
@@ -177,7 +177,7 @@ export class ApiController {
     const loaded = this.dependencies.project.projects.load();
     const activeRunIds = (this.referenceIndex() as { activeRunIds: string[] }).activeRunIds;
     return { environment: loaded.config.environment, configHash: loaded.configHash,
-      readinessIssues: validateRunnableEnvironment(loaded.config.environment, loaded.config.direction),
+      readinessIssues: validateRunnableEnvironment(loaded.config.environment),
       activeRunIds, locked: activeRunIds.length > 0 };
   }
   putEnvironment(environment: EnvironmentDefinition, expectedConfigHash: string): unknown {
@@ -529,7 +529,7 @@ const assertExactOrder = (received: string[], current: string[], label: string):
   }
 };
 const directionValues = (
-  config: ProjectConfigurationV23, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
+  config: ProjectConfigurationV24, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
 ) => kind === "goal" ? config.direction.goals : kind === "adr" ? config.direction.adrs
   : kind === "constraint" ? config.direction.constraints : config.direction.useCases;
 

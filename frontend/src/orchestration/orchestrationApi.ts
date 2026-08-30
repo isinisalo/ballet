@@ -1,6 +1,6 @@
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
-import type { ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV23, StateDefinition } from "@shared/orchestration/environment";
+import type { ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV24, StateDefinition } from "@shared/orchestration/environment";
 import type { GovernanceAgentsResponse, GovernanceAgentSlot, ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
 import type { ActionExecutionBinding, ActionRoleModelSelection, LocalDaemonLogEntry, LocalDaemonStatus } from "@shared/domain/runtime";
@@ -17,7 +17,7 @@ export const orchestrationApi = {
   agents: () => request<GovernanceAgentsResponse>(`${base}/agents`),
   agent: (id: GovernanceAgentId) => request<GovernanceAgentSlot & { configHash: string }>(`${base}/agents/${encodeURIComponent(id)}`),
   schedules: () => request<Array<Record<string, unknown>>>(`${base}/critic/schedules`),
-  putProject: (config: ProjectConfigurationV23, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
+  putProject: (config: ProjectConfigurationV24, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
   saveDirection: (collection: "goals" | "adrs" | "constraints" | "use-cases", value: DirectionReference | Constraint | UseCase,
     markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
     request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {

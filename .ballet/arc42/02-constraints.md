@@ -12,7 +12,7 @@ arc42Section: 2
 # 2. Rajoitteet
 
 - Yksi tarkka Git-checkout ja loopback-only paikallinen palvelu muodostavat järjestelmärajan.
-- Project Config v23 ja SQLite v21 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
+- Project Config v24 ja SQLite v22 ovat strict sopimuksia; vanhaa dataa ei migroida eikä lueta.
 - Environment on ainoa root run. Standalone State- tai Action-ajoa ei ole.
 - State `order` ja Action `priority` ovat positiivisia ja yksikäsitteisiä.
 - Provider approval mode on aina `never`; Validation ja Work jakavat Actionin machine-local provider/network/read-only-roots-bindingin, governance käyttää Agent-bindingiä ja kirjoitusoikeus johdetaan roolista.
@@ -21,5 +21,5 @@ arc42Section: 2
 - UI todentuu 1440x900- ja 390x844-viewporteissa sekä keyboardilla ja reduced motionilla.
 - CON-016 targetissa Project Config v21 ja SQLite v17 ovat strict, Agent binding on machine-local, yhden Runin kaikki Agentit käyttävät samaa paritettua Computeria ja remote daemon liikennöi vain HTTPS:llä (HTTP vain loopbackissa).
 - CON-017 supersedoi CON-016:n execution placementin: daemon on checkout-kohtainen loopback-worker, bindingissä ei ole device/runtime backend -identiteettiä ja serveri omistaa SQLite/worktree/finalization/evidence-rajat.
-- ADR-038 supersedoi CON-016:n Validation/Work Agent -sidonnan: State omistaa Use Case -closuren, Action omistaa rooliresurssit ja konepaikallinen `(actionId, role)`-binding omistaa suorituksen provider/model/reasoning/policyn.
+- ADR-041 supersedoi State-owned Use Case -closuren: project-dokumentit pysyvät erillisenä evidenssinä, Action omistaa rooliresurssit ja valittu instruction tai Skill ohjaa tarvittavan `.ballet/**`-kontekstin lukemista.
 - ADR-039 supersedoi ADR-038:n roolikohtaisen provider/policy-omistuksen: yksi Action-binding omistaa yhteisen providerin ja policyn, mutta model/reasoning säilyvät roolikohtaisina.

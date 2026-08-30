@@ -1,9 +1,9 @@
 import { approveUseCase } from "../../../shared/orchestration/direction.js";
-import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
 
 export const TEST_AT = "2026-08-29T10:00:00.000Z";
 
-export const validProjectConfig = (): ProjectConfigurationV23 => {
+export const validProjectConfig = (): ProjectConfigurationV24 => {
   const useCase = approveUseCase({
     id: "UC-1", name: "Use Case", status: "draft", examples: [{ given: "Context", when: "Action", then: "Outcome" }],
     successGoals: ["Succeeds"], failureGoals: ["Never skips"], expectedOutcomes: ["Completed"],
@@ -13,7 +13,7 @@ export const validProjectConfig = (): ProjectConfigurationV23 => {
   const critic = { agentId: "ballet-critic-agent" as const, skillResources: [] };
   const refinement = { agentId: "ballet-refinement-agent" as const, skillResources: [] };
   return {
-    version: 23,
+    version: 24,
     direction: {
       goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
       adrs: [{ id: "adr-1", name: "ADR", status: "accepted" }],
@@ -21,7 +21,7 @@ export const validProjectConfig = (): ProjectConfigurationV23 => {
       useCases: [useCase]
     },
     environment: { id: "environment-1", name: "Environment", description: "Ordered work", states: [{
-      id: "state-1", name: "State", description: "First", order: 1, useCaseIds: ["UC-1"], actions: [{
+      id: "state-1", name: "State", description: "First", order: 1, actions: [{
         id: "action-1", name: "Action", description: "Perform", priority: 1, maxRetries: 1,
         validation: actionRole, work: { ...actionRole }
       }]

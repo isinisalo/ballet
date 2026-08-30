@@ -31,7 +31,6 @@ const prohibited = [
   "/automation/" + "graph",
   "rootKind: \"" + "graph\"",
   "rootKind: \"" + "graph_node\"",
-  "version" + ": 19",
   "schemaVersion" + " = 15"
 ];
 const transitionMarker = "v" + "next";
@@ -84,6 +83,14 @@ const localOnlyProhibited = [
   "agent_execution_" + "bindings",
   ".ballet/" + "agents",
   "readOnly" + "Roots"
+  ,"ProjectConfigurationV" + "23"
+  ,"projectConfigurationV" + "23Schema"
+  ,"RootSnapshotV" + "18"
+  ,"rootSnapshotV" + "18Schema"
+  ,"ExecutionPromptEvidenceV" + "14"
+  ,"executionPromptEvidenceV" + "14Schema"
+  ,"ExecutionSpecV" + "16"
+  ,"executionSpecV" + "16Schema"
 ];
 const self = path.resolve(import.meta.filename);
 
@@ -95,7 +102,7 @@ for (const filename of files) {
   if (source === undefined) continue;
   const relative = path.relative(repositoryRoot, filename);
   for (const term of prohibited) {
-    if (source.includes(term) && !allowedHistoricalMatch(relative, source, term)) {
+    if (source.includes(term) && !allowedHistoricalMatch(relative, source)) {
       failures.push(`${relative}: prohibited term ${JSON.stringify(term)}`);
     }
   }
@@ -118,7 +125,7 @@ for (const filename of files) {
     failures.push(`${relative}: removed Copilot capability remains`);
   }
   if (source.toLocaleLowerCase().includes(transitionMarker)
-    && !allowedHistoricalMatch(relative, source, transitionMarker)) {
+    && !allowedHistoricalMatch(relative, source)) {
     failures.push(`${relative}: transition namespace marker remains`);
   }
   if (relative.toLocaleLowerCase().includes(transitionMarker)) {
@@ -171,7 +178,7 @@ async function collect(target) {
   return nested.flat();
 }
 
-function allowedHistoricalMatch(relative, source, term) {
+function allowedHistoricalMatch(relative, source) {
   if (/^\.ballet\/(?:goals|adr)\/.+\.md$/.test(relative) && /^status:\s*superseded\s*$/m.test(source)) return true;
   if (relative.startsWith(".ballet/arc42/initiatives/")
     && !relative.startsWith(".ballet/arc42/initiatives/environment-state-action-orchestration/")) return true;
@@ -184,10 +191,6 @@ function allowedHistoricalMatch(relative, source, term) {
   if ([
     ".ballet/tests/defaultProjectResources.test.ts",
     ".ballet/tools/validate-arc42.mjs"
-  ].includes(relative)) return true;
-  if (term === "version: 19" && [
-    "backend/orchestration/http/Api.integration.test.ts",
-    "backend/orchestration/project/ProjectPersistence.test.ts"
   ].includes(relative)) return true;
   return false;
 }

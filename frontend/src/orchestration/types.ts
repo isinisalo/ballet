@@ -1,9 +1,9 @@
 import type { ContractIssue } from "@shared/orchestration/primitives";
-import type { GovernanceAgentDefinition, GovernanceAgentId, ProjectConfigurationV23 } from "@shared/orchestration/environment";
+import type { GovernanceAgentDefinition, GovernanceAgentId, ProjectConfigurationV24 } from "@shared/orchestration/environment";
 
 export interface ProjectRecord {
   path: string;
-  config: ProjectConfigurationV23;
+  config: ProjectConfigurationV24;
   configHash: string;
 }
 
@@ -39,7 +39,7 @@ export interface ReferenceIndexResponse {
 }
 
 export interface EnvironmentResponse {
-  environment: ProjectConfigurationV23["environment"];
+  environment: ProjectConfigurationV24["environment"];
   configHash: string;
   readinessIssues: ContractIssue[];
   activeRunIds: string[];

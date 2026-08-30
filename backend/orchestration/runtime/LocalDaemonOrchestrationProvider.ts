@@ -1,6 +1,6 @@
 import type { GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
 import type { LocalProviderStatus } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
 import type { LocalDaemonStore } from "../persistence/LocalDaemonStore.js";
@@ -58,7 +58,7 @@ export class LocalDaemonOrchestrationProvider implements OrchestrationRuntimePro
     return provider;
   }
 
-  async execute(spec: ExecutionSpecV16, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
+  async execute(spec: ExecutionSpecV17, permissions: ProviderPermissionSpec): Promise<ProviderTerminal> {
     if (permissions.provider !== spec.runtime.provider || permissions.approvalPolicy !== spec.permissions.approvalPolicy) {
       throw new Error("Local daemon permission snapshot differs from the ExecutionSpec.");
     }

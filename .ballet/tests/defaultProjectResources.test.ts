@@ -7,7 +7,7 @@ import { describe, expect, test } from "vitest";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.js";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.js";
-import { projectConfigurationV23Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV24Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
@@ -25,17 +25,17 @@ const walk = (directory: string): string[] => readdirSync(directory).flatMap((en
 
 describe("canonical default project resources", () => {
   test("loads a runnable five-State Environment with 13 exact approved Use Cases", () => {
-    const project = projectConfigurationV23Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
     expect(project.direction.useCases.map(({ id }) => id)).toEqual(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
     expect(project.direction.useCases.every(({ status }) => status === "approved")).toBe(true);
     expect(project.direction.useCases.every((useCase) => useCase.approval?.contentHash === useCaseApprovalHash(useCase))).toBe(true);
     expect(project.environment.states.map(({ order }) => order)).toEqual([1, 2, 3, 4, 5]);
     expect(project.environment.states.reduce((total, state) => total + state.actions.length, 0)).toBe(14);
-    expect(validateRunnableEnvironment(project.environment, project.direction)).toEqual([]);
+    expect(validateRunnableEnvironment(project.environment)).toEqual([]);
   });
 
   test("keeps Use Case documents identical to the approved semantic values and hashes", () => {
-    const project = projectConfigurationV23Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
     for (const useCase of project.direction.useCases) {
       const document = markdownFrontmatter(`.ballet/use-cases/${useCase.id}.md`);
       expect(document.frontmatter).toMatchObject({ id: useCase.id, title: useCase.name, status: useCase.status, approval: useCase.approval });
@@ -47,7 +47,7 @@ describe("canonical default project resources", () => {
   });
 
   test("resolves every selected instruction and Skill with no orphan runtime resource", () => {
-    const project = projectConfigurationV23Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
     const actionRoles = project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]));
     const instructionIds = new Set(actionRoles.map(({ instructionResource }) => instructionResource));
     const skillIds = new Set([project.critic.agent, project.refinement.agent, ...actionRoles].flatMap(({ skillResources }) => skillResources));
@@ -64,7 +64,7 @@ describe("canonical default project resources", () => {
   });
 
   test("uses exactly two Codex TOML Agents and a disabled valid Critic schedule", () => {
-    const project = projectConfigurationV23Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV24Schema.parse(load(".ballet/project.json"));
     for (const [id, effort] of [["ballet-critic-agent", "low"], ["ballet-refinement-agent", "high"]] as const) {
       const agent = parseToml(readFileSync(path.join(root, ".codex", "agents", `${id}.toml`), "utf8"));
       expect(agent).toMatchObject({ name: id, model: "gpt-5.6-sol", model_reasoning_effort: effort, sandbox_mode: "read-only" });
@@ -75,11 +75,11 @@ describe("canonical default project resources", () => {
   });
 
   test("loads the compact fixture as a runnable two-State multi-Action project", () => {
-    const fixture = projectConfigurationV23Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
+    const fixture = projectConfigurationV24Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
     expect(fixture.environment.states).toHaveLength(2);
     expect(fixture.environment.states.flatMap(({ actions }) => actions)).toHaveLength(3);
     expect(fixture.direction.useCases).toHaveLength(2);
-    expect(validateRunnableEnvironment(fixture.environment, fixture.direction)).toEqual([]);
+    expect(validateRunnableEnvironment(fixture.environment)).toEqual([]);
     expect(fixture.critic.enabled).toBe(false);
     expect(fixture.critic.schedules).toHaveLength(1);
   });

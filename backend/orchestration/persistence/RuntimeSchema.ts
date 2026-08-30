@@ -2,7 +2,7 @@ import { coreSchema } from "./schema/CoreSchema.js";
 import { executionSchema } from "./schema/ExecutionSchema.js";
 import { reviewSchema } from "./schema/ReviewSchema.js";
 
-export const DATABASE_SCHEMA_VERSION = 21 as const;
+export const DATABASE_SCHEMA_VERSION = 22 as const;
 
 export const RuntimeTableNames = [
   "metadata", "environment_runs", "state_executions", "action_executions", "agent_runs",

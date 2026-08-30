@@ -5,14 +5,14 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
-import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
-import { projectConfigurationV23Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV24Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 
 export interface LoadedProjectConfiguration {
   path: string;
-  config: ProjectConfigurationV23;
+  config: ProjectConfigurationV24;
   configHash: string;
 }
 
@@ -32,7 +32,7 @@ export class ProjectConfigurationRepository {
       descriptor = openSync(this.configPath, constants.O_RDONLY | constants.O_NOFOLLOW);
       if (!fstatSync(descriptor).isFile()) throw new ConflictError("Project Config must be an ordinary file.");
       const value = JSON.parse(readFileSync(descriptor, "utf8")) as unknown;
-      const config = projectConfigurationV23Schema.parse(value);
+      const config = projectConfigurationV24Schema.parse(value);
       return { path: this.configPath, config, configHash: configHash(config) };
     } catch (error) {
       if (error instanceof ConflictError) throw error;
@@ -46,8 +46,8 @@ export class ProjectConfigurationRepository {
     return safeStatus(this.configPath) ? this.load() : undefined;
   }
 
-  save(config: ProjectConfigurationV23, expectedHash: string | "absent"): LoadedProjectConfiguration {
-    const result = projectConfigurationV23Schema.safeParse(config);
+  save(config: ProjectConfigurationV24, expectedHash: string | "absent"): LoadedProjectConfiguration {
+    const result = projectConfigurationV24Schema.safeParse(config);
     if (!result.success) {
       throw new ConflictError(`Project Config v23 is invalid: ${result.error.issues.map(({ path: issuePath, message }) => `${issuePath.join(".")}: ${message}`).join("; ")}`);
     }
@@ -77,10 +77,10 @@ export class ProjectConfigurationRepository {
   }
 }
 
-export const configHash = (config: ProjectConfigurationV23): string =>
+export const configHash = (config: ProjectConfigurationV24): string =>
   sha256(canonicalProject(config));
 
-const canonicalProject = (config: ProjectConfigurationV23): string =>
+const canonicalProject = (config: ProjectConfigurationV24): string =>
   canonicalJson(JSON.parse(JSON.stringify(config)) as JsonValue);
 
 const safeStatus = (filename: string): ReturnType<typeof lstatSync> | undefined => {

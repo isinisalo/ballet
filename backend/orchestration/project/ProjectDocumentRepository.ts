@@ -116,13 +116,12 @@ export class ProjectDocumentRepository {
 const snapshotContains = (snapshot: unknown, kind: ProjectDocumentKind, id: string): boolean => {
   const value = snapshot as {
     direction?: { goals?: Array<{ id: string }>; adrs?: Array<{ id: string }>; constraints?: Array<{ id: string }> };
-    approvedUseCases?: Array<{ useCase: { id: string } }>;
     resources?: Array<{ kind: string; id: string }>;
   };
   if (kind === "goal") return value.direction?.goals?.some((item) => item.id === id) ?? false;
   if (kind === "adr") return value.direction?.adrs?.some((item) => item.id === id) ?? false;
   if (kind === "constraint") return value.direction?.constraints?.some((item) => item.id === id) ?? false;
-  if (kind === "use-case") return value.approvedUseCases?.some((item) => item.useCase.id === id) ?? false;
+  if (kind === "use-case") return false;
   return value.resources?.some((item) => item.kind === kind && item.id === id) ?? false;
 };
 

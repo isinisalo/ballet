@@ -26,5 +26,5 @@ arc42Section: 12
 | Continuation run | Uusi immutable Environment Run hyväksytyn refinement-commitin päältä. |
 | Run Evidence | Terminal Runin immutable commit-, artifact-, validation- ja lineage-projektio, joka näkyy omistavan Runin sisällä. |
 | Project truth | Versionhallittu direction/config/resource-data. |
-| Runtime truth | SQLite v21:n statukset, eventit, päätökset, Action role -valinnat, daemon-faktat ja lineage. |
+| Runtime truth | SQLite v22:n statukset, eventit, päätökset, Action role -valinnat, daemon-faktat ja lineage. |
 | Checkout-local daemon | Saman checkoutin launchd-worker, joka pollaa loopback-serveriä ja omistaa vain provider-readinessin sekä CLI-prosessit. |

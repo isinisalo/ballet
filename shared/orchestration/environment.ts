@@ -42,7 +42,6 @@ export interface StateDefinition {
   name: string;
   description: string;
   order: number;
-  useCaseIds: string[];
   actions: ActionDefinition[];
 }
 
@@ -76,7 +75,7 @@ export interface RefinementConfiguration {
   allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"];
 }
 
-export interface ProjectConfigurationV23 {
+export interface ProjectConfigurationV24 {
   version: typeof PROJECT_CONFIG_VERSION;
   direction: Direction;
   environment: EnvironmentDefinition;

@@ -20,7 +20,7 @@ export type ExecutionPromptSubject =
   | { kind: "action_role"; actionId: string; role: "validation" | "work" }
   | { kind: "agent"; agent: GovernanceAgentDefinition };
 
-export interface ExecutionPromptEvidenceV14 {
+export interface ExecutionPromptEvidenceV15 {
   compositionVersion: typeof PROMPT_COMPOSITION_VERSION;
   role: AgentRunRole;
   phase: AgentRunPhase;
@@ -44,14 +44,14 @@ export interface ExecutionRuntimeSnapshot {
   capabilityHash: string;
 }
 
-export interface ExecutionSpecV16 {
+export interface ExecutionSpecV17 {
   version: typeof EXECUTION_SPEC_VERSION;
   taskId: string;
   kind: "agent_execution";
   environmentRunId: string;
   actionExecutionId?: string;
   agentRunId: string;
-  evidence: ExecutionPromptEvidenceV14;
+  evidence: ExecutionPromptEvidenceV15;
   runtime: ExecutionRuntimeSnapshot;
   permissions: {
     workspaceAccess: "read-only" | "workspace-write";

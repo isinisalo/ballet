@@ -14,7 +14,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 ## Ihmisen päätösvalta ja immutable evidenssi
 
-- Vain hyväksytyt Use Caset kuuluvat ajon closureen; Goals, ADR:t ja Constraints ovat niiden jäljitettävä päätöskonteksti.
+- Use Caset ja niiden hyväksynnät ovat project-local evidenssiä. Run ei portita, snapshottaa eikä injektoi niitä; valitun Actionin instruction tai Skill ohjaa agentin lukemaan tarvittavat `.ballet/**`-dokumentit.
 - Critic proposal ei ole Feedbackiä ennen eksplisiittistä human approval -komentoa.
 - Refinement proposal on read-only ja sidotaan exact change-, impact- ja preimage-hasheihin. Vasta human approval saa käynnistää sallituille instruction- ja Skill-poluille rajatun applyn.
 - Hyväksytty refinement tuottaa yhden managed-worktree-commitin ja uuden immutable continuation-runin. Parent runia ei muuteta.
@@ -22,7 +22,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 ## Strict cut
 
-- Aktiiviset versiot ovat Project Config v23, Root Snapshot v18, Task Envelope ja role outcome v11, prompt composition v14, ExecutionSpec v16, SQLite v21 sekä Feedback/Critic/Refinement v2. Action execution binding on v3, Codex Agent v2 ja Run Evidence v1.
+- Aktiiviset versiot ovat Project Config v24, Root Snapshot v19, Task Envelope ja role outcome v11, prompt composition v15, ExecutionSpec v17, SQLite v22 sekä Feedback/Critic/Refinement v2. Action execution binding on v3, Codex Agent v2 ja Run Evidence v1.
 - Vanhasta datasta ei tehdä migraatiota, readeria, route-aliasta tai dual-write-polkuja. Epäyhteensopiva machine-local SQLite arkistoidaan tai poistetaan ennen käynnistystä.
 - Canonical URLit ovat `/automation/loops`, `/agents`, `/skills`, `/runtimes`, `/project/goals`, `/project/adrs`, `/project/constraints`, `/project/use-cases`, `/project/instructions`, `/run`, `/feedback`, `/reviews/critic` ja `/reviews/refinement`; Run Evidence näkyy omistavan Runin sisällä. API on `/api/*`.
 

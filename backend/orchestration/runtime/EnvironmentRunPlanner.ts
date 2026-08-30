@@ -1,11 +1,10 @@
-import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
 import type { GovernanceAgentDefinition } from "../../../shared/orchestration/environment.js";
-import { projectConfigurationV23Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV24Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import { useCaseApprovalHash } from "../../../shared/orchestration/direction.js";
 import { validateRunnableEnvironment } from "../../../shared/orchestration/gates.js";
 import type {
-  RootSnapshotV18, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
+  RootSnapshotV19, RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot,
   RuntimeCapabilitySnapshot, RuntimePermissionSnapshot
 } from "../../../shared/orchestration/runtime.js";
 import type { CreateEnvironmentRunInput } from "../../../shared/orchestration/persistence.js";
@@ -13,7 +12,7 @@ import { resolveOrchestrationResources, type ProjectResourceInput } from "./Reso
 import { ConflictError } from "../persistence/PersistenceErrors.js";
 
 export interface ProjectDefinition {
-  config: ProjectConfigurationV23;
+  config: ProjectConfigurationV24;
   configSha256: string;
   baseCommit: string;
   checkoutRoot: string;
@@ -43,7 +42,7 @@ export interface OrchestrationProviderPreflightPort {
 }
 
 export interface PlannedEnvironmentRun {
-  snapshot: RootSnapshotV18;
+  snapshot: RootSnapshotV19;
   snapshotSha256: string;
   createInput(input: {
     environmentRunId: string; worktreePath: string; branch: string; createdAt: string; input?: string;
@@ -59,8 +58,8 @@ export class EnvironmentRunPlanner {
 
   async plan(): Promise<PlannedEnvironmentRun> {
     const loaded = await this.projects.load();
-    const config = projectConfigurationV23Schema.parse(loaded.config);
-    const readinessIssues = validateRunnableEnvironment(config.environment, config.direction);
+    const config = projectConfigurationV24Schema.parse(loaded.config);
+    const readinessIssues = validateRunnableEnvironment(config.environment);
     if (readinessIssues.length > 0) {
       throw new ConflictError(`Environment is not runnable: ${readinessIssues.map(({ code, path }) => `${code}@${path}`).join(", ")}.`);
     }
@@ -82,10 +81,6 @@ export class EnvironmentRunPlanner {
       capabilities.push(capability);
     }
     const permissions = permissionSnapshot(config, capabilities);
-    const referencedUseCaseIds = new Set(config.environment.states.flatMap((state) => state.useCaseIds));
-    const approvedUseCases = config.direction.useCases.filter(({ id }) => referencedUseCaseIds.has(id)).map((useCase) => ({
-      useCase, contentSha256: useCaseApprovalHash(useCase)
-    })).sort((left, right) => left.useCase.id.localeCompare(right.useCase.id));
     const direction = {
       goals: config.direction.goals.map((value) => ({
         ...value, contentSha256: requireDirectionHash("Goal", value.id, loaded.directionDocumentHashes.goals)
@@ -97,15 +92,14 @@ export class EnvironmentRunPlanner {
         ...value, contentSha256: requireDirectionHash("Constraint", value.id, loaded.directionDocumentHashes.constraints)
       }))
     };
-    const snapshot: RootSnapshotV18 = {
-      version: 18,
+    const snapshot: RootSnapshotV19 = {
+      version: 19,
       projectHeadSha: loaded.baseCommit,
       projectConfigSha256: loaded.configSha256,
       directionSha256: contentHash(config.direction),
       environmentSha256: contentHash(config.environment),
       resourceSha256: contentHash(resources),
       environment: config.environment,
-      approvedUseCases,
       direction,
       agents,
       runtimeCapabilities: capabilities,
@@ -163,7 +157,7 @@ const assertCapabilityHash = (capability: RuntimeCapabilitySnapshot): void => {
 };
 
 const permissionSnapshot = (
-  config: ProjectConfigurationV23, capabilities: RuntimeCapabilitySnapshot[]
+  config: ProjectConfigurationV24, capabilities: RuntimeCapabilitySnapshot[]
 ): RuntimePermissionSnapshot[] => {
   const rows: RuntimePermissionSnapshot[] = [];
   for (const state of config.environment.states) for (const action of state.actions) {
@@ -189,6 +183,6 @@ const requireDirectionHash = (label: string, id: string, hashes: Record<string, 
   if (!value || !/^[0-9a-f]{64}$/.test(value)) throw new Error(`${label} ${id} has no source content hash.`);
   return value;
 };
-const transitionLimit = (config: ProjectConfigurationV23): number => 16 + config.environment.states.reduce(
+const transitionLimit = (config: ProjectConfigurationV24): number => 16 + config.environment.states.reduce(
   (total, state) => total + state.actions.reduce((count, action) => count + 4 + action.maxRetries * 3, 0), 0
 );

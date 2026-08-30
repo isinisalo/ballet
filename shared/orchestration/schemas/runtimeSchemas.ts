@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
-import { constraintSchema, directionReferenceSchema, useCaseSchema } from "./directionSchemas.js";
+import { constraintSchema, directionReferenceSchema } from "./directionSchemas.js";
 import { agentCompositionSchema, governanceAgentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
 const runtimeCapabilityBase = {
@@ -17,7 +17,7 @@ const roleModelCapabilitySchema = z.object({
   supportedReasoningEfforts: z.array(z.string().trim().min(1))
 }).strict();
 
-export const rootSnapshotV18Schema = z.object({
+export const rootSnapshotV19Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
@@ -25,7 +25,6 @@ export const rootSnapshotV18Schema = z.object({
   environmentSha256: sha256Schema,
   resourceSha256: sha256Schema,
   environment: environmentDefinitionSchema,
-  approvedUseCases: z.array(z.object({ useCase: useCaseSchema, contentSha256: sha256Schema }).strict()),
   direction: z.object({
     goals: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
     adrs: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
@@ -67,7 +66,7 @@ export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV18Schema,
+  snapshot: rootSnapshotV19Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

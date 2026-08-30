@@ -73,12 +73,7 @@ const relevantExecutionContextHash = (
     action.validation.instructionResource, ...action.validation.skillResources,
     action.work.instructionResource, ...action.work.skillResources
   ]);
-  const state = source.executionSnapshot.environment.states.find(({ actions }) => actions.some(({ id }) => id === actionId));
-  const useCaseIds = new Set(state?.useCaseIds ?? []);
   return contentHash({
-    directionSha256: source.executionSnapshot.directionSha256,
-    useCases: source.executionSnapshot.approvedUseCases.filter(({ useCase }) => useCaseIds.has(useCase.id))
-      .map(({ useCase, contentSha256 }) => ({ id: useCase.id, contentSha256 })),
     capabilities: source.executionSnapshot.runtimeCapabilities.filter(({ subject }) => subject.kind === "action" && subject.actionId === actionId),
     permissions: source.executionSnapshot.permissions.filter(({ actionId: scopedActionId }) => !scopedActionId || scopedActionId === actionId),
     resources: source.executionSnapshot.resources.filter(({ id }) => ids.has(id)).map(

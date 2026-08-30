@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Governance dispatch, durable outcomes and proposal validation share one transactional service. */
 import type Database from "better-sqlite3";
 import type { AgentComposition } from "../../../shared/orchestration/environment.js";
-import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
 import type { CriticOutcome, RefinementOutcome } from "../../../shared/orchestration/outcomes.js";
 import { canonicalJson, sha256, type JsonValue } from "../../../shared/orchestration/primitives.js";
 import type { StoredEnvironmentRun } from "../../../shared/orchestration/persistenceRecords.js";
@@ -17,7 +17,7 @@ import type { OrchestrationRuntimeProvider } from "../runtime/RuntimeProvider.js
 import { mapProviderPermissions } from "../runtime/ProviderPermissions.js";
 import { buildCriticEnvelope, buildRefinementEnvelope } from "./GovernanceEnvelopeBuilder.js";
 import { isAllowedCanonicalRefinementPath } from "../../../shared/orchestration/refinement.js";
-import type { RootSnapshotV18 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV19 } from "../../../shared/orchestration/runtime.js";
 import { parse as parseToml } from "smol-toml";
 
 export class GovernanceExecutionService {
@@ -204,8 +204,8 @@ export class GovernanceExecutionService {
     const promptAgent = { ...agentDefinition }; delete (promptAgent as Partial<typeof promptAgent>).contentSha256;
     const subject = { kind: "agent" as const, agent: promptAgent };
     const evidence = composeOrchestrationPrompt({ snapshot: run.executionSnapshot, envelope, composition, subject });
-    const spec: ExecutionSpecV16 = {
-      version: 16, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
+    const spec: ExecutionSpecV17 = {
+      version: 17, taskId: envelope.taskId, kind: "agent_execution", environmentRunId: run.environmentRunId,
       agentRunId, evidence,
       runtime: { subject: { kind: "agent", agentId: agentDefinition.id }, provider: capability.provider,
         cliVersion: capability.cliVersion, model: capability.model,
@@ -258,7 +258,7 @@ export class GovernanceExecutionService {
       JOIN environment_runs er ON er.environment_run_id = rr.source_environment_run_id
       WHERE rr.refinement_run_id = ?
     `).get(refinementRunId) as { base_commit: string; result_commit: string | null; execution_snapshot_json: string };
-    const snapshot = JSON.parse(source.execution_snapshot_json) as RootSnapshotV18;
+    const snapshot = JSON.parse(source.execution_snapshot_json) as RootSnapshotV19;
     if (outcome.files.some((file) => !validAgentTomlRefinement(file, snapshot))) {
       this.failGovernanceRun(undefined, refinementRunId, at);
       throw new Error("Refinement may change only developer_instructions in a fixed governance Agent TOML.");
@@ -307,7 +307,7 @@ const passthroughGovernanceWorkspace: GovernanceWorkspaceBoundary = {
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;
 const hash = (value: unknown): string => sha256(canonicalJson(json(value)));
 
-export const validAgentTomlRefinement = (file: RefinementOutcome["files"][number], snapshot: RootSnapshotV18): boolean => {
+export const validAgentTomlRefinement = (file: RefinementOutcome["files"][number], snapshot: RootSnapshotV19): boolean => {
   const match = /^\.codex\/agents\/(ballet-(?:critic|refinement)-agent)\.toml$/.exec(file.relativePath);
   if (!match) return true;
   if (file.operation !== "replace" || file.proposedContent === undefined) return false;

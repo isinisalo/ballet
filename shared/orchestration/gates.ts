@@ -1,5 +1,3 @@
-import type { Direction, UseCase } from "./direction.js";
-import { hasValidUseCaseApproval } from "./direction.js";
 import type { ActionDefinition, EnvironmentDefinition, StateDefinition } from "./environment.js";
 import { CONTRACT_LIMITS } from "./limits.js";
 import type { ContractIssue } from "./primitives.js";
@@ -93,33 +91,7 @@ const duplicateNumberIssues = (values: number[], path: string, code: string): Co
   });
 };
 
-const validateReferences = (useCaseIds: string[], direction: Direction, path: string): ContractIssue[] => {
-  const byId = new Map<string, UseCase>(direction.useCases.map((useCase) => [useCase.id, useCase]));
-  if (useCaseIds.length === 0) return [{ code: "empty_use_case_binding", path, message: "At least one Use Case is required" }];
-  return useCaseIds.flatMap((id, index) => {
-    const useCase = byId.get(id);
-    if (!useCase) return [{ code: "unknown_use_case", path: `${path}.${index}`, message: `Unknown Use Case ${id}` }];
-    if (!hasValidUseCaseApproval(useCase)) {
-      return [{ code: "unapproved_use_case", path: `${path}.${index}`, message: `Use Case ${id} is not approved` }];
-    }
-    const issues: ContractIssue[] = [];
-    const targets = [
-      ["goal", useCase.goalIds, new Map(direction.goals.map((item) => [item.id, item]))],
-      ["adr", useCase.adrIds, new Map(direction.adrs.map((item) => [item.id, item]))],
-      ["constraint", useCase.constraintIds, new Map(direction.constraints.map((item) => [item.id, item]))]
-    ] as const;
-    for (const [kind, references, available] of targets) {
-      for (const reference of references) {
-        const target = available.get(reference);
-        if (!target) issues.push({ code: `missing_${kind}_reference`, path: `${path}.${index}`, message: `${id} references missing ${kind} ${reference}` });
-        else if (target.status !== "accepted") issues.push({ code: `inactive_${kind}_reference`, path: `${path}.${index}`, message: `${id} references non-accepted ${kind} ${reference}` });
-      }
-    }
-    return issues;
-  });
-};
-
-export const validateRunnableEnvironment = (environment: EnvironmentDefinition, direction: Direction): ContractIssue[] => {
+export const validateRunnableEnvironment = (environment: EnvironmentDefinition): ContractIssue[] => {
   const issues: ContractIssue[] = [];
   if (environment.states.length === 0) issues.push({ code: "empty_environment", path: "environment.states", message: "Environment needs a State" });
   issues.push(...duplicateNumberIssues(environment.states.map(({ order }) => order), "environment.states", "duplicate_state_order"));
@@ -128,7 +100,6 @@ export const validateRunnableEnvironment = (environment: EnvironmentDefinition, 
   for (const [stateIndex, state] of environment.states.entries()) {
     const statePath = `environment.states.${stateIndex}`;
     if (state.actions.length === 0) issues.push({ code: "empty_state", path: `${statePath}.actions`, message: "State needs an Action" });
-    issues.push(...validateReferences(state.useCaseIds, direction, `${statePath}.useCaseIds`));
     issues.push(...duplicateNumberIssues(state.actions.map(({ priority }) => priority), `${statePath}.actions`, "duplicate_action_priority"));
   }
   return issues;

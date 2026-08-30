@@ -17,7 +17,7 @@ const resourceEvidenceSchema = z.object({
   sourceSha256: sha256Schema
 }).strict();
 
-export const executionPromptEvidenceV14Schema = z.object({
+export const executionPromptEvidenceV15Schema = z.object({
   compositionVersion: z.literal(PROMPT_COMPOSITION_VERSION),
   role: z.enum(["validation", "work", "critic", "refinement"]),
   phase: z.enum(["precheck", "work", "postwork", "proposal"]),
@@ -63,14 +63,14 @@ const executionRuntimeSnapshotSchema = z.object({
   capabilityHash: sha256Schema
 }).strict();
 
-export const executionSpecV16Schema = z.object({
+export const executionSpecV17Schema = z.object({
   version: z.literal(EXECUTION_SPEC_VERSION),
   taskId: idSchema,
   kind: z.literal("agent_execution"),
   environmentRunId: idSchema,
   actionExecutionId: idSchema.optional(),
   agentRunId: idSchema,
-  evidence: executionPromptEvidenceV14Schema,
+  evidence: executionPromptEvidenceV15Schema,
   runtime: executionRuntimeSnapshotSchema,
   permissions: z.object({
     workspaceAccess: z.enum(["read-only", "workspace-write"]),

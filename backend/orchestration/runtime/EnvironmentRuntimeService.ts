@@ -324,9 +324,6 @@ export class EnvironmentRuntimeService {
       validationSummary: json({
         orderedExecution: states,
         feedback,
-        approvedUseCases: run.executionSnapshot.approvedUseCases.map(({ useCase, contentSha256 }) => ({
-          id: useCase.id, contentSha256, approval: useCase.approval ?? null
-        })),
         lineage: run.executionSnapshot.lineage ?? null,
         snapshotSha256: run.executionSnapshotHash
       })

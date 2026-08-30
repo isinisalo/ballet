@@ -1,4 +1,4 @@
-import type { ProjectConfigurationV23 } from "../../../shared/orchestration/environment.js";
+import type { ProjectConfigurationV24 } from "../../../shared/orchestration/environment.js";
 
 export type ProjectDocumentKind = "goal" | "adr" | "constraint" | "use-case" | "instruction" | "skill";
 export type ProjectReferenceKind = ProjectDocumentKind;
@@ -12,26 +12,13 @@ export interface ProjectReference {
 export class ProjectReferenceIndex {
   private readonly references = new Map<string, ProjectReference[]>();
 
-  constructor(config: ProjectConfigurationV23) {
+  constructor(config: ProjectConfigurationV24) {
     for (const useCase of config.direction.useCases) {
       this.addMany("goal", useCase.goalIds, "use-case", useCase.id, "goalIds");
       this.addMany("adr", useCase.adrIds, "use-case", useCase.id, "adrIds");
       this.addMany("constraint", useCase.constraintIds, "use-case", useCase.id, "constraintIds");
     }
-    const addDirectionClosure = (ids: string[], ownerType: string, ownerId: string): void => {
-      for (const id of ids) {
-        const useCase = config.direction.useCases.find((candidate) => candidate.id === id);
-        this.add("use-case", id, ownerType, ownerId, "directionClosure");
-        if (!useCase) continue;
-        this.addMany("goal", useCase.goalIds, ownerType, ownerId, "directionClosure");
-        this.addMany("adr", useCase.adrIds, ownerType, ownerId, "directionClosure");
-        this.addMany("constraint", useCase.constraintIds, ownerType, ownerId, "directionClosure");
-      }
-    };
-    const environmentUseCaseIds = new Set(config.environment.states.flatMap((state) => state.useCaseIds));
-    addDirectionClosure([...environmentUseCaseIds], "environment", config.environment.id);
     for (const state of config.environment.states) {
-      addDirectionClosure(state.useCaseIds, "state", state.id);
       for (const action of state.actions) {
         for (const [role, composition] of [["validation", action.validation], ["work", action.work]] as const) {
           this.add("instruction", composition.instructionResource, "action", action.id, `${role}.instructionResource`);

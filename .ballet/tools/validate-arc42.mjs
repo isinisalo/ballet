@@ -7,7 +7,7 @@ import YAML from "yaml";
 import { parse as parseToml } from "smol-toml";
 import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
-import { governanceAgentDefinitionSchema, projectConfigurationV23Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
+import { governanceAgentDefinitionSchema, projectConfigurationV24Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 import { validateActionInstruction } from "../../shared/orchestration/instructionContract.ts";
 
 const root = process.cwd();
@@ -154,7 +154,7 @@ for (const line of traceLines.slice(2)) for (const id of line.match(
 ) ?? []) if (!stableDefinitions.has(id)) addIssue(`TRACEABILITY references undefined ID ${id}.`);
 
 const rawConfig = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8"));
-const parsed = projectConfigurationV23Schema.safeParse(rawConfig);
+const parsed = projectConfigurationV24Schema.safeParse(rawConfig);
 let config;
 if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
@@ -188,7 +188,7 @@ if (!parsed.success) {
     if (!(await exists(filename))) addIssue(`Missing Skill resource ${id}.`);
   }
 
-  for (const issue of validateRunnableEnvironment(config.environment, config.direction)) {
+  for (const issue of validateRunnableEnvironment(config.environment)) {
     addIssue(`Default project is not runnable: ${issue.path}: ${issue.message}`);
   }
   if (config.direction.useCases.length !== 13) addIssue(`Default project must contain 13 Use Cases; found ${config.direction.useCases.length}.`);
@@ -265,7 +265,7 @@ if (issues.length) {
 } else {
   const states = config?.environment.states.length ?? 0;
   const actions = config?.environment.states.reduce((total, state) => total + state.actions.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v23, ${states} States and ${actions} Actions.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v24, ${states} States and ${actions} Actions.\n`);
 }
 
 async function indexedMarkdown(directory) {
@@ -287,11 +287,11 @@ async function indexedMarkdownDocuments(directory) {
 async function validateFixtureProject() {
   const fixtureRoot = path.join(root, ".fixture-ballet-project");
   const raw = JSON.parse(await readFile(path.join(fixtureRoot, ".ballet/project.json"), "utf8"));
-  const parsedFixture = projectConfigurationV23Schema.safeParse(raw);
+  const parsedFixture = projectConfigurationV24Schema.safeParse(raw);
   if (!parsedFixture.success) { parsedFixture.error.issues.forEach((issue) => addIssue(
     `Fixture Project Config:${issue.path.join(".")}: ${issue.message}`)); return; }
   const fixture = parsedFixture.data;
-  for (const issue of validateRunnableEnvironment(fixture.environment, fixture.direction)) addIssue(`Fixture is not runnable: ${issue.path}: ${issue.message}`);
+  for (const issue of validateRunnableEnvironment(fixture.environment)) addIssue(`Fixture is not runnable: ${issue.path}: ${issue.message}`);
   if (fixture.environment.states.length < 2) addIssue("Fixture needs at least two States.");
   if (fixture.environment.states.reduce((count, state) => count + state.actions.length, 0) < 3) addIssue("Fixture needs multiple Actions across two States.");
   if (fixture.critic.enabled || fixture.critic.schedules.length === 0) addIssue("Fixture Critic must be disabled with a valid example schedule.");

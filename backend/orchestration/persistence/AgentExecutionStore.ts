@@ -1,9 +1,9 @@
 import type Database from "better-sqlite3";
 import type {
-  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV16, ExecutionTaskSeed, JsonValue, StoredAgentRun
+  CreateAgentRunInput, ExecutionEventSeed, ExecutionSpecV17, ExecutionTaskSeed, JsonValue, StoredAgentRun
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import { executionSpecV16Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
+import { executionSpecV17Schema } from "../../../shared/orchestration/schemas/executionSchemas.js";
 import { roleOutcomeV11Schema } from "../../../shared/orchestration/schemas/outcomeSchemas.js";
 import { taskEnvelopeV11Schema } from "../../../shared/orchestration/schemas/taskEnvelopeSchemas.js";
 import { toAgentRun } from "./RowMappers.js";
@@ -22,7 +22,7 @@ export interface StoredExecutionTask {
   outcome?: unknown;
   errorCode?: string;
   errorMessage?: string;
-  spec: ExecutionSpecV16;
+  spec: ExecutionSpecV17;
 }
 
 export class AgentExecutionStore {
@@ -94,7 +94,7 @@ export class AgentExecutionStore {
   }
 
   createTask(input: ExecutionTaskSeed): void {
-    const spec = executionSpecV16Schema.parse(input.spec);
+    const spec = executionSpecV17Schema.parse(input.spec);
     assertHash(spec, input.specHash, "ExecutionSpec");
     const agent = this.requireAgent(spec.agentRunId);
     if (agent.environmentRunId !== spec.environmentRunId || agent.role !== spec.evidence.role) {
@@ -130,7 +130,7 @@ export class AgentExecutionStore {
       outcome: row.outcome_json === null ? undefined : roleOutcomeV11Schema.parse(JSON.parse(String(row.outcome_json))),
       errorCode: row.error_code === null ? undefined : String(row.error_code),
       errorMessage: row.error_message === null ? undefined : String(row.error_message),
-      spec: executionSpecV16Schema.parse(JSON.parse(String(row.spec_json)))
+      spec: executionSpecV17Schema.parse(JSON.parse(String(row.spec_json)))
     };
   }
 

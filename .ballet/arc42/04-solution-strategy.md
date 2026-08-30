@@ -11,8 +11,8 @@ arc42Section: 4
 
 # 4. Ratkaisustrategia
 
-1. Parse strict v23 project truth and close approved Use Cases only from each owning State with accepted Goals, ADRs and Constraints.
-2. Freeze Action role model/reasoning selections and the two fixed read-only Codex governance Agents into Root Snapshot v18 before dispatch.
+1. Parse strict v24 project truth; keep Use Cases and approvals project-local and resolve only the instruction/Skill resources selected by each Action.
+2. Freeze Action resources, role model/reasoning selections and the two fixed read-only Codex governance Agents into Root Snapshot v19 before dispatch, without project-document closure.
 3. Select the lowest eligible State order and Action priority transactionally.
 4. Let Validation precheck, delegate dynamic Work and postcheck every Work result.
 5. Persist state changes and causal Feedback atomically; recover work from durable queue/event facts.

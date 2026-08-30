@@ -13,13 +13,13 @@ arc42Section: 6
 
 | ID | Skenaario | Atominen/immutable raja |
 | --- | --- | --- |
-| RT-026 | Environment Run | v23 State-owned closure preflight -> v18 snapshot -> local Codex daemon lease -> lowest order/priority -> Validation precheck -> optional Work -> Validation postwork -> done/retry/blocked -> gated next State -> Run Evidence |
+| RT-026 | Environment Run | v24 ordering/resource preflight -> v19 snapshot without Use Case closure -> local Codex daemon lease -> lowest order/priority -> Validation precheck -> optional Work -> Validation postwork -> done/retry/blocked -> gated next State -> Run Evidence |
 | RT-027 | Feedback and Critic | schedule claim -> immutable read set -> pending proposal -> human decision; hyväksytty Critic proposal ja Feedback syntyvät samassa transaktiossa |
 | RT-028 | Refinement and continuation | read-only exact proposal -> human hash/revision approval -> allowlisted managed-worktree apply -> one commit -> immutable continuation link/run |
 | RT-029 | Markdown and Loop authoring | load canonical Markdown/config -> edit/preview -> strict server validation -> save revision/hash -> invalidate affected approval |
 | RT-030 | Role daemon execution | resolve Action role selections or fixed Codex Agent -> checkout/config/capability preflight -> fenced lease -> Codex dispatch -> idempotent terminal callback -> root transition |
 | RT-031 | Feedback refinement and Run Evidence | `{category, comment}` -> trusted provenance -> resource-only exact proposal -> human approval/apply -> continuation; terminal success -> immutable Run Evidence |
-| RT-032 | Checkout-local daemon task | ready Codex capability -> atomic claim/fencing -> ExecutionSpec v16 in server-owned worktree -> lease renew/events -> raw terminal callback -> server v11 validation/finalization; expiry -> one runtime_lost failure |
+| RT-032 | Checkout-local daemon task | ready Codex capability -> atomic claim/fencing -> ExecutionSpec v17 in server-owned worktree -> lease renew/events -> raw terminal callback -> server v11 validation/finalization; expiry -> one runtime_lost failure |
 | RT-033 | Codex-only Action execution | load one ActionExecutionBindingV3 -> validate both role model/reasoning selections -> freeze one Codex Action capability -> emit Validation/Work `action_role` specs; any mismatch -> zero dispatch, network denied and no external read roots |
 
 ## RT-026 rules

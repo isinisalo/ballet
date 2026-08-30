@@ -25,7 +25,7 @@ tags: [summary, goals, environment]
 
 ## Active contract
 
-The accepted strict target is Project Config v21, Root Snapshot v15, Task Envelope/role outcome v11, prompt composition v12, ExecutionSpec v14 and SQLite v18, with Feedback, Critic, Refinement and Agent/daemon binding v2 plus Run Evidence v1. `adr-034` retains deterministic ordering, `adr-035` Markdown authoring and Run Evidence, and `adr-037` the local-only execution boundary.
+The accepted strict target is Project Config v24, Root Snapshot v19, Task Envelope/role outcome v11, prompt composition v15, ExecutionSpec v17 and SQLite v22, with Feedback, Critic and Refinement v2, Action execution binding v3, Codex Agent v2 and Run Evidence v1. `adr-041` owns instruction-directed project context and sortable ordering, `adr-035` retains Markdown authoring and Run Evidence, and `adr-037` retains the local-only execution boundary.
 
 The repository default demonstrates thirteen approved Use Cases, five ordered States, fourteen bounded Actions, four Markdown Agents, lean role instructions and explicitly selected reusable Skills. The compact fixture proves the same platform boundary with unrelated IDs.
 

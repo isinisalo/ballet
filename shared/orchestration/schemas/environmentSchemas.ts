@@ -43,7 +43,6 @@ export const stateDefinitionSchema = z.object({
   name: nonEmptyTextSchema,
   description: nonEmptyTextSchema,
   order: z.number().int().safe().positive(),
-  useCaseIds: idListSchema.min(1),
   actions: z.array(actionDefinitionSchema).min(1).max(CONTRACT_LIMITS.actionsPerState)
 }).strict();
 
@@ -102,7 +101,7 @@ const refinementConfigurationSchema = z.object({
   ])
 }).strict();
 
-export const projectConfigurationV23Schema = z.object({
+export const projectConfigurationV24Schema = z.object({
   version: z.literal(PROJECT_CONFIG_VERSION),
   direction: directionSchema,
   environment: environmentDefinitionSchema,
@@ -112,13 +111,9 @@ export const projectConfigurationV23Schema = z.object({
   for (const issue of validateUniqueStateOrder(config.environment.states)) {
     context.addIssue({ code: "custom", path: issue.path.split("."), message: issue.message });
   }
-  const useCaseIds = new Set(config.direction.useCases.map(({ id }) => id));
   for (const [stateIndex, state] of config.environment.states.entries()) {
     for (const issue of validateUniqueActionPriority(state.actions)) {
       context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, ...issue.path.split(".")], message: issue.message });
-    }
-    for (const id of state.useCaseIds) if (!useCaseIds.has(id)) {
-      context.addIssue({ code: "custom", path: ["environment", "states", stateIndex, "useCaseIds"], message: `Unknown Use Case ${id}` });
     }
   }
   if (config.critic.agent.agentId !== "ballet-critic-agent") context.addIssue({

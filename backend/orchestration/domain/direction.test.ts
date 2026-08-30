@@ -4,7 +4,7 @@ import {
   hasValidUseCaseApproval, invalidateUseCaseApproval,
   nextRunnableAction, nextRunnableState, orderedActions, orderedStates, retryBudget, stateFlags,
   useCaseApprovalHash, validateActionInstruction, validateRunnableEnvironment,
-  type ActionExecution, type Direction, type EnvironmentDefinition, type StateExecution, type UseCase
+  type ActionExecution, type EnvironmentDefinition, type StateExecution, type UseCase
 } from "../../../shared/orchestration/index.js";
 
 const draftUseCase = (): UseCase => ({
@@ -24,22 +24,12 @@ const approvedUseCase = (): UseCase => approveUseCase(draftUseCase(), {
   approvedBy: "human-1", approvedAt: "2026-08-29T10:00:00.000Z", revision: 1
 });
 
-const direction = (useCase: UseCase = approvedUseCase()): Direction => ({
-  goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
-  adrs: [{ id: "adr-1", name: "Decision", status: "accepted" }],
-  constraints: [{
-    id: "constraint-1", name: "No early advance", status: "accepted", kind: "prohibited",
-    description: "Do not advance early", rationale: "Preserve ordering"
-  }],
-  useCases: [useCase]
-});
-
 const environment = (): EnvironmentDefinition => ({
   id: "env-1",
   name: "Environment",
   description: "Ordered delivery",
   states: [{
-    id: "state-1", name: "State", description: "First state", order: 1, useCaseIds: ["UC-1"],
+    id: "state-1", name: "State", description: "First state", order: 1,
     actions: [{
       id: "action-1", name: "Action", description: "First action", priority: 1,
       maxRetries: 1,
@@ -83,25 +73,14 @@ describe("ordered Environment gates", () => {
     expect(states[0].id).toBe("second");
   });
 
-  it("accumulates duplicate, empty, draft, and missing direction issues", () => {
+  it("accumulates duplicate ordering and empty State issues", () => {
     const candidate = environment();
     candidate.states.push({ ...candidate.states[0], id: "state-2", actions: [] });
     candidate.states[0].actions.push({ ...candidate.states[0].actions[0], id: "action-2" });
-    const brokenDirection = direction(approveUseCase({
-      ...draftUseCase(), goalIds: ["missing"], adrIds: ["missing"], constraintIds: ["missing"]
-    }, { approvedBy: "human-1", approvedAt: "2026-08-29T10:00:00.000Z", revision: 1 }));
-    const codes = validateRunnableEnvironment(candidate, brokenDirection).map(({ code }) => code);
+    const codes = validateRunnableEnvironment(candidate).map(({ code }) => code);
     expect(codes).toEqual(expect.arrayContaining([
-      "duplicate_state_order", "duplicate_action_priority", "empty_state",
-      "missing_goal_reference", "missing_adr_reference", "missing_constraint_reference"
+      "duplicate_state_order", "duplicate_action_priority", "empty_state"
     ]));
-    expect(validateRunnableEnvironment(environment(), direction(draftUseCase())).map(({ code }) => code)).toContain("unapproved_use_case");
-  });
-
-  it("rejects a reference to a non-accepted direction item", () => {
-    const candidate = direction();
-    candidate.goals[0].status = "draft";
-    expect(validateRunnableEnvironment(environment(), candidate).map(({ code }) => code)).toContain("inactive_goal_reference");
   });
 
   it("never dispatches beyond the first unfinished or blocked item", () => {

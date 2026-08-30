@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { LocalDaemonHeartbeat, LocalProviderStatus } from "../../../shared/domain/runtime.js";
-import type { ExecutionSpecV16 } from "../../../shared/orchestration/execution.js";
+import type { ExecutionSpecV17 } from "../../../shared/orchestration/execution.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { ActionOutcomeCoordinator } from "./ActionOutcomeCoordinator.js";
 import { AgentExecutionStore } from "./AgentExecutionStore.js";
@@ -108,12 +108,12 @@ const setup = (now = () => new Date(TEST_AT)) => {
   return { database, execution, daemon: new LocalDaemonStore(() => database.connection, now) };
 };
 
-const spec = (envelopeHash: string): ExecutionSpecV16 => {
+const spec = (envelopeHash: string): ExecutionSpecV17 => {
   const prompt = "Validate the Action";
   return {
-    version: 16, taskId: "execution-task-1", kind: "agent_execution", environmentRunId: "run-1",
+    version: 17, taskId: "execution-task-1", kind: "agent_execution", environmentRunId: "run-1",
     actionExecutionId: "action-execution-1", agentRunId: "precheck-1",
-    evidence: { compositionVersion: 14, role: "validation", phase: "precheck",
+    evidence: { compositionVersion: 15, role: "validation", phase: "precheck",
       subject: { kind: "action_role", actionId: "action-1", role: "validation" }, resources: [], prompt, promptSha256: sha256(prompt),
       taskEnvelopeVersion: 11, taskEnvelopeSha256: envelopeHash, outputSchemaVersion: 11,
       outputSchemaId: "validation-outcome-v11", outputSchemaSha256: HASH_A },

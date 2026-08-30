@@ -107,7 +107,7 @@ Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact met
 - **Use Cases** keeps its compact sidebar list and makes approval status, semantic hash and Given/When/Then evidence explicit without a parallel form-owned truth.
 - **Loop Engineering** keeps one ordered space canvas visible across Environment, State and Action routes. States run top-to-bottom by `order`; selecting a State reveals only its Actions left-to-right by `priority` on the same canvas.
 - **State** selection is URL-owned and presents Actions as derived sun/planet/station artwork with stable text IDs. Artwork is order language, never runtime status.
-- **Action flow** is a dark industrial workflow: START -> Validation -> done?, with delegate/retry through subordinate Work, evidence returning to Validation, and explicit done/blocked-Feedback terminals plus `1 + maxRetries` text. Its editor has no Action-level Use Case or Agent fields: Use Cases come from the State, the Action owns one machine-local provider/policy, and each role selects its project resources plus model/reasoning.
+- **Action flow** is a dark industrial workflow: START -> Validation -> done?, with delegate/retry through subordinate Work, evidence returning to Validation, and explicit done/blocked-Feedback terminals plus `1 + maxRetries` text. State and Action editors have no Use Case fields. Project direction is read only when the selected instruction or Skill explicitly requires the relevant canonical `.ballet/**` documents.
 - **Run Gate** explains why a State or Action can or cannot advance without inventing client-owned control state.
 - **Feedback Box** asks a human only for Category and comment; trusted runtime provenance stays visible but is not editable.
 - **Critic review** separates a read-only proposal from the human decision that may create Feedback.
@@ -135,6 +135,8 @@ At 1440x900, a persistent compact sidebar and multi-column workbench may coexist
 
 Controls are at least 40 px high on narrow screens. Focus is visible, tab order follows reading order, headings are hierarchical and live updates do not steal focus. Drag interaction always has keyboard controls. `prefers-reduced-motion` removes non-essential transitions.
 
+Dense information use is a product requirement. Short IDs, bounded numbers, enums and their helper text use intrinsic or narrow maximum widths instead of stretching across the workbench. Related label, control and explanation stay on one compact row when the viewport permits. Panels, forms and lists use the smallest tokenized padding and gap that preserve legibility; large empty control surfaces that push primary work below the viewport are defects.
+
 Configure workspaces have exactly one sticky toolbar directly below the workspace heading. Status and the current entity are on the leading side; navigation, creation, ordering, projection, save, approval and deletion commands form one trailing action row. At narrow widths the toolbar scrolls internally instead of wrapping commands onto unrelated vertical levels.
 
 ## Component rules
@@ -146,7 +148,7 @@ Configure workspaces have exactly one sticky toolbar directly below the workspac
 - Runtimes is a singleton checkout-local diagnostic: daemon status/PID/uptime/last seen/error, active tasks, Codex readiness and keyboard-operable Refresh, Restart and Logs. Restart is visibly disabled during active work.
 - Status badges use factual DTO values and a label, never inferred prose.
 - Cards have one primary purpose and expose stable entity IDs in Geist.
-- Reordering previews the resulting integer order/priority before mutation.
+- State order and Action priority are edited only through compact ID-only sortable lists. Pointer drag or keyboard movement persists immediately through the canonical reorder endpoint; no checkbox, integer editor or Earlier/Later command duplicates ordering authority.
 - Disabled approval includes the exact blocking reason. Confirmation repeats hashes and current revision.
 - Diff panes keep additions, deletions and unchanged context distinguishable without color alone.
 - Empty, loading, stale and error states preserve the workspace hierarchy.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EXECUTION_SPEC_VERSION, PROJECT_CONFIG_VERSION, ROLE_OUTCOME_VERSION,
-  TASK_ENVELOPE_VERSION, agentRunSchema, approveUseCase, projectConfigurationV23Schema,
+  TASK_ENVELOPE_VERSION, agentRunSchema, approveUseCase, projectConfigurationV24Schema,
   refinementOutcomeSchema, roleOutcomeV11Schema, sha256, taskEnvelopeV11Schema,
   validationDecisionSchema, workOutcomeSchema
 } from "../../../shared/orchestration/index.js";
@@ -116,12 +116,12 @@ describe("task and runtime boundary schemas", () => {
 
 describe("Project Configuration v23 boundary", () => {
   it("publishes the canonical strict versions", () => {
-    expect(PROJECT_CONFIG_VERSION).toBe(23);
+    expect(PROJECT_CONFIG_VERSION).toBe(24);
     expect(TASK_ENVELOPE_VERSION).toBe(11);
     expect(ROLE_OUTCOME_VERSION).toBe(11);
-    expect(EXECUTION_SPEC_VERSION).toBe(16);
-    expect(ROOT_SNAPSHOT_VERSION).toBe(18);
-    expect(DATABASE_SCHEMA_VERSION).toBe(21);
+    expect(EXECUTION_SPEC_VERSION).toBe(17);
+    expect(ROOT_SNAPSHOT_VERSION).toBe(19);
+    expect(DATABASE_SCHEMA_VERSION).toBe(22);
     expect(DAEMON_BINDING_CONTRACT_VERSION).toBe(3);
   });
 
@@ -145,7 +145,7 @@ describe("Project Configuration v23 boundary", () => {
     const criticAgent = { agentId: "ballet-critic-agent", skillResources: [] };
     const refinementAgent = { agentId: "ballet-refinement-agent", skillResources: [] };
     const config = {
-      version: 23,
+      version: 24,
       direction: {
         goals: [{ id: "goal", name: "Goal", status: "accepted" }],
         adrs: [{ id: "adr", name: "ADR", status: "accepted" }],
@@ -158,7 +158,7 @@ describe("Project Configuration v23 boundary", () => {
       environment: {
         id: "environment", name: "Environment", description: "Description",
         states: [{
-          id: "state", name: "State", description: "Description", order: 1, useCaseIds: ["UC-1"],
+          id: "state", name: "State", description: "Description", order: 1,
           actions: [{ id: "action", name: "Action", description: "Description", priority: 1, maxRetries: 1, validation: actionRole, work: { ...actionRole } }]
         }]
       },
@@ -166,15 +166,15 @@ describe("Project Configuration v23 boundary", () => {
       refinement: { version: 2, enabled: true, agent: refinementAgent,
         allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"] }
     };
-    expect(projectConfigurationV23Schema.safeParse(config).success).toBe(true);
-    expect(projectConfigurationV23Schema.safeParse({ ...config, version: 21 }).success).toBe(false);
-    expect(projectConfigurationV23Schema.safeParse({ ...config, environment: { ...config.environment,
-      states: [{ ...config.environment.states[0], actions: [{ ...config.environment.states[0]!.actions[0], useCaseIds: ["UC-1"] }] }] } }).success).toBe(false);
-    expect(projectConfigurationV23Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
+    expect(projectConfigurationV24Schema.safeParse(config).success).toBe(true);
+    expect(projectConfigurationV24Schema.safeParse({ ...config, version: 23 }).success).toBe(false);
+    expect(projectConfigurationV24Schema.safeParse({ ...config, environment: { ...config.environment,
+      states: [{ ...config.environment.states[0], useCaseIds: ["UC-1"] }] } }).success).toBe(false);
+    expect(projectConfigurationV24Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
     const duplicateAction = structuredClone(config);
     duplicateAction.environment.states.push({ ...duplicateAction.environment.states[0]!, id: "state-2", order: 2 });
-    expect(projectConfigurationV23Schema.safeParse(duplicateAction).success).toBe(false);
-    expect(projectConfigurationV23Schema.safeParse({
+    expect(projectConfigurationV24Schema.safeParse(duplicateAction).success).toBe(false);
+    expect(projectConfigurationV24Schema.safeParse({
       ...config,
       critic: { ...config.critic, schedules: [{ ...config.critic.schedules[0], timeZone: "Mars/Olympus" }] }
     }).success).toBe(false);
