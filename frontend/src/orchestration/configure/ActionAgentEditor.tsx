@@ -1,4 +1,6 @@
 import type { ActionAgentDefinition, ActionDefinition } from "@shared/orchestration/environment";
+import { Input } from "@/components/ui/input";
+import { TextField } from "@/components/shared/workspace-ui";
 import type { ResourceDocument } from "../types";
 import { ActionAgentControls, type ActionModelOption } from "./ActionAgentControls";
 import { SkillBadgePicker } from "./SkillBadgePicker";
@@ -18,6 +20,12 @@ export function ActionAgentEditor({ role, agent, composition, models, skills, di
   const title = role === "validation" ? "Validation Agent" : "Work Agent";
   return <fieldset className="space-y-3 rounded-sm border p-3" disabled={disabled}>
     <legend className="font-semibold">{title}</legend>
+    <label className="grid gap-1 text-xs sm:grid-cols-[5.5rem_minmax(0,1fr)] sm:items-center">
+      <span className="font-mono text-[0.68rem] text-muted-foreground">Name</span>
+      <Input aria-label={`${role} Agent ID`} value={composition.agentId} readOnly className="h-10 font-mono text-xs md:h-7" />
+    </label>
+    <TextField label="Description" layout="row" density="compact" value={agent.description} disabled={disabled}
+      onChange={(description) => onAgentChange({ ...agent, description })} />
     <ActionAgentControls role={role} model={agent.model} reasoningEffort={agent.reasoningEffort} models={models} disabled={disabled}
       onChange={({ model, reasoningEffort }) => onAgentChange({ ...agent, model, reasoningEffort })} />
     <label className="grid gap-1 text-xs">

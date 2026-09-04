@@ -1,14 +1,16 @@
 ---
 id: lesaf-review-001
 title: Loop Engineering space and Action flow review
-status: accepted
+status: superseded
 createdAt: '2026-08-29'
-updatedAt: '2026-08-30'
-version: 3
+updatedAt: '2026-09-04'
+version: 4
 tags: [arc42, initiative, review, loop-engineering]
 ---
 
 # Loop Engineering space and Action flow REVIEW
+
+> Superseded by [Loop Engineering three-level Dagre](../loop-engineering-three-level-dagre/REVIEW.md). Historical findings below remain immutable audit context.
 
 ## Status
 

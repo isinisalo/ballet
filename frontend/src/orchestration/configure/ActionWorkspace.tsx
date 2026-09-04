@@ -16,8 +16,9 @@ type SaveAgents = {
   workAgent: AgentDraft & { expectedDocumentHash: string };
 };
 
-export function ActionWorkspace({ stateId, action, skills, locked, onSave }: {
+export function ActionWorkspace({ stateId, action, selectedAgentRole, skills, locked, onSave }: {
   stateId?: string; action?: ActionDefinition; skills: ResourceDocument[]; locked: boolean;
+  selectedAgentRole?: "validation" | "work" | "invalid";
   onSave(action: ActionDefinition, agents: SaveAgents): Promise<void>;
 }) {
   const [draft, setDraft] = useState(action); const [agents, setAgents] = useState<AgentPair>();
@@ -26,7 +27,7 @@ export function ActionWorkspace({ stateId, action, skills, locked, onSave }: {
     const details = loaded.details; if (!details) return;
     setAgents({ validation: editable(details.validationAgent.agent), work: editable(details.workAgent.agent) });
   }, [loaded.details]);
-  if (!stateId || !action || !draft) return <><ConfigureHeader title="Action not found" description="The State or Action ID in this deep link is invalid." status="Invalid ID" /><div className="p-6"><Button render={<a href="/automation/loops" />}>Return to Environment</Button></div></>;
+  if (!stateId || !action || !draft) return <><ConfigureHeader title="Action not found" description="The State or Action ID in this deep link is invalid." status="Invalid ID" /><div className="p-6"><Button nativeButton={false} render={<a href="/automation/loops" />}>Return to Environment</Button></div></>;
   const agentIssues = validateAgents(agents, loaded.models);
   const readinessIssues = [...loaded.readinessIssues, ...agentIssues];
   const formId = `action-${action.id}`;
@@ -40,16 +41,27 @@ export function ActionWorkspace({ stateId, action, skills, locked, onSave }: {
     });
   };
   const valid = Boolean(agents && loaded.details) && readinessIssues.length === 0;
+  if (selectedAgentRole === "invalid") return <div className="min-w-0 p-3 md:p-4">
+    <section role="alert" className="rounded-sm border border-destructive bg-card p-4">
+      <h1 className="font-semibold">Agent selection is invalid</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Choose the Validation Agent or Work Agent from the canvas.</p>
+      <Button className="mt-3" nativeButton={false} render={<a href={`/automation/loops/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(action.id)}`} />}>Return to Action</Button>
+    </section>
+  </div>;
+  const selectedAgent = selectedAgentRole === "validation" || selectedAgentRole === "work" ? selectedAgentRole : undefined;
   return <div className="min-w-0 p-3 md:p-4">
-    <h1 className="sr-only">{action.name}</h1>
+    <h1 className="sr-only">{selectedAgent === "validation" ? "Validation Agent" : selectedAgent === "work" ? "Work Agent" : action.name}</h1>
     <form id={formId} className="min-w-0 space-y-3 border bg-card p-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <TextField label="Name" layout="row" density="compact" value={draft.name} disabled={locked} onChange={(name) => setDraft({ ...draft, name })} />
-      <TextField label="Description" layout="row" density="compact" value={draft.description} disabled={locked} onChange={(description) => setDraft({ ...draft, description })} />
-      <RetryBudgetField actionId={action.id} value={draft.maxRetries} disabled={locked} onChange={(maxRetries) => setDraft({ ...draft, maxRetries })} />
-      {agents && loaded.details ? <>
-        <ActionAgentEditor role="validation" agent={agents.validation} composition={draft.validation} models={loaded.models} skills={skills} disabled={locked} onAgentChange={(validation) => setAgents({ ...agents, validation })} onCompositionChange={(validation) => setDraft({ ...draft, validation })} />
-        <ActionAgentEditor role="work" agent={agents.work} composition={draft.work} models={loaded.models} skills={skills} disabled={locked} onAgentChange={(work) => setAgents({ ...agents, work })} onCompositionChange={(work) => setDraft({ ...draft, work })} />
-      </> : <p className="p-3 text-sm text-muted-foreground">Loading Action Agent TOMLs…</p>}
+      {!selectedAgent ? <>
+        <TextField label="Name" layout="row" density="compact" value={draft.name} disabled={locked} onChange={(name) => setDraft({ ...draft, name })} />
+        <TextField label="Description" layout="row" density="compact" value={draft.description} disabled={locked} onChange={(description) => setDraft({ ...draft, description })} />
+        <RetryBudgetField actionId={action.id} value={draft.maxRetries} disabled={locked} onChange={(maxRetries) => setDraft({ ...draft, maxRetries })} />
+      </> : null}
+      {selectedAgent && agents && loaded.details ? <ActionAgentEditor role={selectedAgent} agent={agents[selectedAgent]}
+        composition={draft[selectedAgent]} models={loaded.models} skills={skills} disabled={locked}
+        onAgentChange={(next) => setAgents({ ...agents, [selectedAgent]: next })}
+        onCompositionChange={(next) => setDraft({ ...draft, [selectedAgent]: next })} /> : null}
+      {!agents || !loaded.details ? <p className="p-3 text-sm text-muted-foreground">Loading Action Agent TOMLs…</p> : null}
       {readinessIssues.length ? <IssueList issues={readinessIssues.map((message) => ({ path: "agent", message }))} /> : null}
       <div className="border-t pt-3"><EditorActions saveLabel="Save Action" formId={formId} dirty={dirty} valid={valid} locked={locked} /></div>
     </form>

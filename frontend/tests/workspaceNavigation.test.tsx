@@ -51,13 +51,13 @@ describe("canonical workspace navigation blocker", () => {
     expect(result.current.route).toMatchObject({ workspaceView: "state", stateId: "build" });
   });
 
-  it("restores the Action canvas mode through browser history", async () => {
+  it("restores the Action Agent subview through browser history", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { result } = renderHook(() => useWorkspaceNavigation());
     act(() => result.current.navigate("/automation/loops/states/build/actions/test"));
-    act(() => result.current.navigate("/automation/loops/states/build/actions/test?canvas=flow"));
+    act(() => result.current.navigate("/automation/loops/states/build/actions/test?agent=validation"));
     act(() => result.current.setNavigationBlocker({ isDirty: true }));
-    expect(result.current.route).toMatchObject({ workspaceView: "action", canvasMode: "flow" });
+    expect(result.current.route).toMatchObject({ workspaceView: "action", agentRole: "validation" });
 
     await act(async () => {
       const traversed = waitForPopStates(1);
@@ -65,7 +65,7 @@ describe("canonical workspace navigation blocker", () => {
       await traversed;
     });
     expect(result.current.route).toMatchObject({ workspaceView: "action", actionId: "test" });
-    expect(result.current.route.canvasMode).toBeUndefined();
+    expect(result.current.route.agentRole).toBeUndefined();
     expect(confirm).not.toHaveBeenCalled();
   });
 

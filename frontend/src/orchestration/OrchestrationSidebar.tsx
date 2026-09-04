@@ -6,6 +6,7 @@ import { orchestrationActionPath, orchestrationEntityPath, orchestrationStatePat
 import { orderedActions, orderedStates } from "@shared/orchestration/gates";
 import type { EnvironmentDefinition } from "@shared/orchestration/environment";
 import type { OrchestrationConfigureData } from "./types";
+import { actionDisplayName } from "./actionDisplayName";
 
 const groups = [
   ["Automation", [["Loop Engineering", "/automation/loops", Network]]],
@@ -66,7 +67,7 @@ function LoopEngineeringMenu({ environment, route, navigate, closeMobile }: { en
         </div>
         {expanded ? <SidebarMenuSub aria-label={`Actions for State ${state.name}`} className="mx-0 ml-3 mr-0 overflow-hidden">
           {orderedActions(state.actions).map((action) => <SidebarMenuSubItem key={action.id} className="min-w-0"><SidebarMenuSubButton render={<button type="button" />} size="sm" className="min-h-10 w-full md:min-h-7" isActive={route.workspaceView === "action" && selected && route.actionId === action.id} aria-label={`Open Action ${action.id}: ${action.name}`} aria-current={route.workspaceView === "action" && selected && route.actionId === action.id ? "page" : undefined} onClick={() => { navigate(orchestrationActionPath(state.id, action.id)); closeMobile(); }}>
-            <code className="text-primary">A{action.priority}</code><span>{action.name}</span>
+            <code className="text-primary">A{action.priority}</code><span>{actionDisplayName(action.name, state.name)}</span>
           </SidebarMenuSubButton></SidebarMenuSubItem>)}
         </SidebarMenuSub> : null}
       </SidebarMenuSubItem>;

@@ -23,7 +23,9 @@ export const routeFromPath = (path: string): RouteState => {
     "/reviews/refinement": "refinement-reviews"
   };
   if (exact[url.pathname]) {
-    return { view: "orchestration", workspaceView: exact[url.pathname], entityId: url.searchParams.get("id") ?? undefined };
+    const workspaceView = exact[url.pathname];
+    return { view: "orchestration", workspaceView, entityId: url.searchParams.get("id") ?? undefined,
+      createMode: workspaceView === "environment" && url.searchParams.get("create") === "state" ? "state" : undefined };
   }
 
   const patterns: Array<[RegExp, WorkspaceView]> = [
@@ -42,8 +44,10 @@ export const routeFromPath = (path: string): RouteState => {
     if (!match) continue;
     if (workspaceView === "action") {
       const stateId = decode(match, 1); const actionId = decode(match, 2);
+      const agent = url.searchParams.get("agent");
       return stateId && actionId
-        ? { view: "orchestration", workspaceView, stateId, actionId, canvasMode: url.searchParams.get("canvas") === "flow" ? "flow" : undefined }
+        ? { view: "orchestration", workspaceView, stateId, actionId,
+          agentRole: agent === "validation" || agent === "work" ? agent : agent ? "invalid" : undefined }
         : { view: "orchestration", workspaceView: "invalid" };
     }
     if (workspaceView === "run-action") { const entityId = decode(match, 1); const stateId = decode(match, 2); const actionId = decode(match, 3); return entityId && stateId && actionId ? { view: "orchestration", workspaceView, entityId, stateId, actionId } : { view: "orchestration", workspaceView: "invalid" }; }
@@ -51,7 +55,8 @@ export const routeFromPath = (path: string): RouteState => {
     const id = decode(match, 1);
     if (!id) return { view: "orchestration", workspaceView: "invalid" };
     return workspaceView === "state"
-      ? { view: "orchestration", workspaceView, stateId: id }
+      ? { view: "orchestration", workspaceView, stateId: id,
+        createMode: url.searchParams.get("create") === "action" ? "action" : undefined }
       : { view: "orchestration", workspaceView, entityId: id };
   }
   return { view: "orchestration", workspaceView: "invalid" };
@@ -62,5 +67,7 @@ export const orchestrationEntityPath = (base: string, id?: string) => id && base
   : `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
 export const orchestrationStatePath = (stateId: string) => `/automation/loops/states/${encodeURIComponent(stateId)}`;
 export const orchestrationActionPath = (stateId: string, actionId: string) => `${orchestrationStatePath(stateId)}/actions/${encodeURIComponent(actionId)}`;
-export const orchestrationActionFlowPath = (stateId: string, actionId: string) => `${orchestrationActionPath(stateId, actionId)}?canvas=flow`;
+export const orchestrationActionAgentPath = (stateId: string, actionId: string, role: "validation" | "work") => `${orchestrationActionPath(stateId, actionId)}?agent=${role}`;
+export const orchestrationCreateStatePath = () => "/automation/loops?create=state";
+export const orchestrationCreateActionPath = (stateId: string) => `${orchestrationStatePath(stateId)}?create=action`;
 export const orchestrationRunPath = (runId?: string) => runId ? `/run/${encodeURIComponent(runId)}` : "/run";

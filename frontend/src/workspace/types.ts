@@ -28,5 +28,6 @@ export interface RouteState {
   entityId?: string;
   stateId?: string;
   actionId?: string;
-  canvasMode?: "flow";
+  createMode?: "state" | "action";
+  agentRole?: "validation" | "work" | "invalid";
 }

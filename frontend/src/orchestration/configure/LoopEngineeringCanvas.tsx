@@ -1,36 +1,95 @@
+import { useCallback, useMemo } from "react";
+import { Background, Controls, ReactFlow, ReactFlowProvider, type Edge, type EdgeTypes, type NodeTypes } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import type { EnvironmentDefinition } from "@shared/orchestration/environment";
-import { orchestrationActionPath, orchestrationStatePath } from "@/workspace/routing";
-import { ActionPlanetArtwork } from "./LoopEngineeringArtwork";
-import { projectLoopEngineering } from "./loopEngineeringProjection";
+import {
+  orchestrationActionAgentPath, orchestrationActionPath, orchestrationCreateActionPath,
+  orchestrationCreateStatePath, orchestrationStatePath,
+} from "@/workspace/routing";
+import { LoopEngineeringNodeView, type LoopFlowNode } from "./LoopEngineeringNodes";
+import { FloatingSmoothEdge } from "./FloatingSmoothEdge";
+import { projectLoopEngineering, type LoopEngineeringNode } from "./loopEngineeringProjection";
 import { useCanvasSurfaceSize } from "./useCanvasSurfaceSize";
 import "./LoopEngineeringCanvas.css";
 
-export function LoopEngineeringCanvas({ environment, selectedStateId, selectedActionId, navigate, onActionFlowOpen }: {
+const nodeTypes = { loopNode: LoopEngineeringNodeView } satisfies NodeTypes;
+const edgeTypes = { "floating-smooth": FloatingSmoothEdge } satisfies EdgeTypes;
+
+export function LoopEngineeringCanvas({ environment, selectedStateId, selectedActionId, selectedAgentRole, locked, navigate }: {
   environment: EnvironmentDefinition;
   selectedStateId?: string;
   selectedActionId?: string;
+  selectedAgentRole?: "validation" | "work";
+  locked?: boolean;
   navigate(path: string): void;
-  onActionFlowOpen?(stateId: string, actionId: string): void;
 }) {
   const [surfaceRef, surface] = useCanvasSurfaceSize();
-  const projection = projectLoopEngineering(environment, selectedStateId, selectedActionId, surface);
+  const projection = useMemo(() => projectLoopEngineering(
+    environment, selectedStateId, selectedActionId, surface, { locked, selectedAgentRole },
+  ), [environment, locked, selectedActionId, selectedAgentRole, selectedStateId, surface]);
+  const activate = useCallback((item: LoopEngineeringNode) => {
+    if (item.kind === "state" && item.entityId) navigate(orchestrationStatePath(item.entityId));
+    else if (item.kind === "create-state") navigate(orchestrationCreateStatePath());
+    else if (item.kind === "action" && selectedStateId && item.entityId) navigate(orchestrationActionPath(selectedStateId, item.entityId));
+    else if (item.kind === "create-action" && selectedStateId) navigate(orchestrationCreateActionPath(selectedStateId));
+    else if (item.kind === "validation-agent" && selectedStateId && selectedActionId) navigate(orchestrationActionAgentPath(selectedStateId, selectedActionId, "validation"));
+    else if (item.kind === "work-agent" && selectedStateId && selectedActionId) navigate(orchestrationActionAgentPath(selectedStateId, selectedActionId, "work"));
+  }, [navigate, selectedActionId, selectedStateId]);
+  const nodes = useMemo<LoopFlowNode[]>(() => projection.nodes.map((item) => ({
+    id: item.id,
+    type: "loopNode",
+    position: { x: item.x, y: item.y },
+    width: item.width,
+    height: item.height,
+    initialWidth: item.width,
+    initialHeight: item.height,
+    measured: { width: item.width, height: item.height },
+    draggable: false,
+    selectable: false,
+    focusable: false,
+    data: { item, onActivate: activate },
+    style: { width: item.width, height: item.height, pointerEvents: "all" },
+  })), [activate, projection.nodes]);
+  const edges = useMemo<Edge[]>(() => projection.edges.map((edge) => ({
+    ...edge,
+    type: edge.routing,
+    focusable: false,
+    selectable: false,
+    className: `loop-engineering-flow-edge loop-engineering-flow-edge--${edge.tone}`,
+  })), [projection.edges]);
+  const layoutKey = nodes.map(({ id }) => id).join("|");
   return <section className="loop-engineering-canvas" aria-label={`Loop Engineering canvas for Environment ${environment.id}`}>
-    <div className="loop-engineering-legend">ENVIRONMENT <span>{environment.id} · ordered State / Action projection</span></div>
-    <div ref={surfaceRef} className="loop-engineering-scroll">
-      <div className="loop-engineering-stage" style={{ width: projection.width, height: projection.height }}>
-        <svg className="loop-engineering-edges" width={projection.width} height={projection.height} aria-hidden="true">
-          {projection.edges.map((edge) => <g key={edge.id}>
-            <path d={edge.path} className={`loop-engineering-edge loop-engineering-edge--${edge.tone}`} />
-            {edge.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="2.5" className="loop-engineering-connection" />)}
-          </g>)}
-        </svg>
-        {projection.states.map((state) => <button key={state.id} type="button" className="loop-engineering-state" data-selected={state.selected ? "true" : "false"} aria-pressed={state.selected} aria-label={`Open State ${state.id}: ${state.name}`} style={{ left: state.x - state.width / 2, top: state.y - state.height / 2, width: state.width, height: state.height }} onClick={() => navigate(orchestrationStatePath(state.id))}>
-          <code className="loop-engineering-state-label">{state.id}</code>
-        </button>)}
-        {projection.actions.map((action) => <button key={action.id} type="button" className="loop-engineering-action" data-selected={action.selected ? "true" : "false"} aria-pressed={action.selected} aria-label={`Open Action ${action.id}: ${action.name}`} style={{ left: action.x, top: action.y, width: action.hitSize, height: action.hitSize }} onClick={() => selectedStateId && navigate(orchestrationActionPath(selectedStateId, action.id))} onDoubleClick={() => selectedStateId && onActionFlowOpen?.(selectedStateId, action.id)}>
-          <ActionPlanetArtwork artwork={action.artwork} size={action.size} />
-          <code className="loop-engineering-action-label" data-placement="right">{action.id}</code>
-        </button>)}
+    <div className="loop-engineering-legend">ENVIRONMENT <span>{environment.id} · ordered authoring projection</span></div>
+    <div className="loop-engineering-levels" aria-hidden="true"><span>STATE</span><span>ACTION</span><span>AGENTS</span></div>
+    <div ref={surfaceRef} className="loop-engineering-surface">
+      <div className="loop-engineering-flow-frame">
+        <ReactFlowProvider>
+          {surface.width > 0 && surface.height > 0 ? <ReactFlow<LoopFlowNode, Edge>
+          key={layoutKey}
+          aria-label="STATE to ACTION to AGENTS authoring tree"
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.12, minZoom: 0.8, maxZoom: 1 }}
+          minZoom={0.8}
+          maxZoom={1.5}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          nodesFocusable={false}
+          edgesFocusable={false}
+          elementsSelectable={false}
+          panOnScroll
+          zoomOnScroll={false}
+          zoomOnDoubleClick={false}
+          deleteKeyCode={null}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={24} size={1} color="var(--border)" />
+          <Controls showInteractive={false} position="bottom-left" aria-label="Loop canvas controls" />
+          </ReactFlow> : null}
+        </ReactFlowProvider>
       </div>
     </div>
     <p className="loop-engineering-caption">Authoring order only · runtime status remains in Run.</p>

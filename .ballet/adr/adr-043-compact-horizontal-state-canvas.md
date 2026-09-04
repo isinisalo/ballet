@@ -1,14 +1,16 @@
 ---
 id: adr-043
 title: Loop Engineering käyttää tiivistä vaakasuuntaista State-projektiota
-status: accepted
+status: superseded
 createdAt: '2026-08-30'
-updatedAt: '2026-08-30'
-version: 1
+updatedAt: '2026-09-04'
+version: 2
 tags: [arkkitehtuuripaatos, loop-engineering, canvas, accessibility]
 ---
 
 # Loop Engineering käyttää tiivistä vaakasuuntaista State-projektiota
+
+> Superseded by [ADR-044](adr-044-three-level-dagre-loop-canvas.md), joka korvaa canvas-geometrian, planeetta-artworkin ja erillisen Action-flow-näkymän kolmitasoisella Dagre-puulla.
 
 ## Konteksti
 

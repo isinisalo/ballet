@@ -23,14 +23,14 @@ const ensureHistoryIndex = () => {
   return 0;
 };
 
-const changesOnlyActionCanvasMode = (currentPath: string, nextPath: string) => {
+const changesOnlyActionSubview = (currentPath: string, nextPath: string) => {
   const currentUrl = new URL(currentPath, window.location.origin);
   const nextUrl = new URL(nextPath, window.location.origin);
   const currentRoute = routeFromPath(currentPath);
   const nextRoute = routeFromPath(nextPath);
   if (currentRoute.workspaceView !== "action" || nextRoute.workspaceView !== "action" || currentUrl.pathname !== nextUrl.pathname) return false;
-  currentUrl.searchParams.delete("canvas");
-  nextUrl.searchParams.delete("canvas");
+  currentUrl.searchParams.delete("agent");
+  nextUrl.searchParams.delete("agent");
   return currentUrl.search === nextUrl.search;
 };
 
@@ -65,7 +65,7 @@ export const useWorkspaceNavigation = (): WorkspaceNavigation => {
   const navigate = useCallback((path: string, options?: { bypassBlocker?: boolean; replace?: boolean }) => {
     const url = new URL(path, window.location.origin);
     const nextPath = `${url.pathname}${url.search}`;
-    if (nextPath === currentPathRef.current || (!options?.bypassBlocker && !changesOnlyActionCanvasMode(currentPathRef.current, nextPath) && !confirmNavigation())) return;
+    if (nextPath === currentPathRef.current || (!options?.bypassBlocker && !changesOnlyActionSubview(currentPathRef.current, nextPath) && !confirmNavigation())) return;
 
     const nextHistoryIndex = options?.replace ? currentHistoryIndexRef.current : currentHistoryIndexRef.current + 1;
     window.history[options?.replace ? "replaceState" : "pushState"](indexedHistoryState(nextHistoryIndex), "", path);
@@ -82,7 +82,7 @@ export const useWorkspaceNavigation = (): WorkspaceNavigation => {
       }
       const nextPath = currentRoutePath();
       if (nextPath === currentPathRef.current) return;
-      if (!changesOnlyActionCanvasMode(currentPathRef.current, nextPath) && !confirmNavigation()) {
+      if (!changesOnlyActionSubview(currentPathRef.current, nextPath) && !confirmNavigation()) {
         const nextHistoryIndex = historyIndex();
         if (nextHistoryIndex !== undefined && nextHistoryIndex !== currentHistoryIndexRef.current) {
           restoringHistoryRef.current = true;
