@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { atomicWrite } from "./atomicWrite.js";
 import {
-  closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync,
-  openSync, readFileSync, readdirSync, renameSync, rmdirSync, unlinkSync, writeFileSync
+  closeSync, constants, fstatSync, lstatSync, mkdirSync,
+  openSync, readFileSync, readdirSync, rmdirSync, unlinkSync
 } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
@@ -178,20 +178,4 @@ const ensureDirectory = (directory: string): void => {
   const metadata = status(directory);
   if (!metadata) mkdirSync(directory, { mode: 0o700 });
   assertOrdinaryDirectory(status(directory)!, directory);
-};
-const atomicWrite = (filename: string, content: string): void => {
-  const directory = path.dirname(filename);
-  const temporary = path.join(directory, `.${path.basename(filename)}.${randomUUID()}.tmp`);
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(temporary, "wx", 0o600);
-    writeFileSync(descriptor, content, "utf8"); fsyncSync(descriptor); closeSync(descriptor); descriptor = undefined;
-    renameSync(temporary, filename);
-    const directoryDescriptor = openSync(directory, "r");
-    try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); }
-  } catch (error) {
-    if (descriptor !== undefined) closeSync(descriptor);
-    try { unlinkSync(temporary); } catch { /* Best effort only. */ }
-    throw error;
-  }
 };

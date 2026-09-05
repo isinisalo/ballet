@@ -6,11 +6,11 @@ import type { ApiController } from "./ApiController.js";
 
 export function registerEventStormingRoutes(router: express.Router, controller: ApiController): void {
   router.get("/event-storming", (req, res) => {
-    parseUnknown(emptySchema, req.query); res.json(controller.eventStorming());
+    parseUnknown(emptySchema, req.query); res.json(controller.authoring.eventStorming());
   });
   router.put("/event-storming", (req, res) => {
     parseUnknown(emptySchema, req.query);
     const { value, expectedHash } = parseBody(putEventStormingSchema, req);
-    res.json(controller.saveEventStorming(value, expectedHash));
+    res.json(controller.authoring.saveEventStorming(value, expectedHash));
   });
 }

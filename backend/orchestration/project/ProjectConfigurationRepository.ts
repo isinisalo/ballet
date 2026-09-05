@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { atomicWrite } from "./atomicWrite.js";
 import {
-  closeSync, constants, fstatSync, fsyncSync, lstatSync, mkdirSync,
-  openSync, readFileSync, renameSync, unlinkSync, writeFileSync
+  closeSync, constants, fstatSync, lstatSync, mkdirSync,
+  openSync, readFileSync
 } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
@@ -60,7 +60,7 @@ export class ProjectConfigurationRepository {
       throw new ConflictError("Project Config is locked while an Environment Run is active.");
     }
     ensureOrdinaryDirectory(path.dirname(this.configPath));
-    writeAtomic(this.configPath, `${canonicalProject(parsed)}\n`);
+    atomicWrite(this.configPath, `${canonicalProject(parsed)}\n`);
     return this.load();
   }
 
@@ -102,25 +102,5 @@ const ensureOrdinaryDirectory = (directory: string): void => {
   const created = safeStatus(directory);
   if (!created?.isDirectory() || created.isSymbolicLink()) {
     throw new ConflictError("Project Config directory must not be a symlink.");
-  }
-};
-
-const writeAtomic = (filename: string, source: string): void => {
-  const directory = path.dirname(filename);
-  const temporary = path.join(directory, `.${path.basename(filename)}.${process.pid}.${randomUUID()}.tmp`);
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(temporary, "wx", 0o600);
-    writeFileSync(descriptor, source, "utf8");
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = undefined;
-    renameSync(temporary, filename);
-    const directoryDescriptor = openSync(directory, "r");
-    try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); }
-  } catch (error) {
-    if (descriptor !== undefined) closeSync(descriptor);
-    try { unlinkSync(temporary); } catch { /* Rename may already have completed. */ }
-    throw error;
   }
 };

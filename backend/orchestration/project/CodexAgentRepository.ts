@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { atomicWrite } from "./atomicWrite.js";
 import {
-  closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, readdirSync,
-  renameSync, unlinkSync, writeFileSync
+  closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync,
+  unlinkSync
 } from "node:fs";
 import path from "node:path";
 import { parse, stringify } from "smol-toml";
@@ -116,14 +116,6 @@ const readOrdinaryFile = (filename: string, label: string): { content: string; c
 };
 const status = (filename: string): ReturnType<typeof lstatSync> | undefined => {
   try { return lstatSync(filename); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
-};
-const atomicWrite = (filename: string, content: string): void => {
-  const directory = path.dirname(filename); const metadata = status(directory);
-  if (!metadata?.isDirectory() || metadata.isSymbolicLink()) throw new ConflictError(`${directory} must be an ordinary directory.`);
-  const temporary = path.join(directory, `.${path.basename(filename)}.${randomUUID()}.tmp`); let descriptor: number | undefined;
-  try { descriptor = openSync(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600); writeFileSync(descriptor, content, "utf8"); fsyncSync(descriptor); closeSync(descriptor); descriptor = undefined;
-    renameSync(temporary, filename); const directoryDescriptor = openSync(directory, constants.O_RDONLY); try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); } }
-  finally { if (descriptor !== undefined) closeSync(descriptor); if (status(temporary)) unlinkSync(temporary); }
 };
 const firstUnsafeParent = (projectRoot: string): string | undefined => {
   for (const directory of [path.join(projectRoot, ".codex"), path.join(projectRoot, ".codex", "agents")]) {
