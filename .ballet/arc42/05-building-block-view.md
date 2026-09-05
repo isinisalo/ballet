@@ -3,8 +3,8 @@ id: arc42-section-05
 title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-04'
-version: 34
+updatedAt: '2026-09-05'
+version: 35
 tags: [arc42, building-blocks]
 arc42Section: 5
 ---
@@ -22,6 +22,7 @@ BB-015 jakautuu seuraaviin selkeisiin rajoihin:
 
 - Shared contracts: schema, versiot, route inventory ja pure status/order -säännöt.
 - Project services: config, project-local Markdown documents and Action Agent/Skill composition.
+- Fact: `UserStoryService` owns repository-first User Story v1 CRUD over `ProjectDocumentRepository`. `shared/orchestration/userStories.ts` owns the strict Role/Goal/Benefit and ordered Given/When/Then contract; Markdown frontmatter is the only persisted content. `/api/user-stories` exposes the collection and document commands, and the URL-owned card workspace renders them. User Stories are independent of Project Config and SQLite and never participate in Root Snapshots or Run gates. Atomic file replacement, optimistic hashes and the existing active-Run authoring lock bound mutations; Markdown notes survive edits.
 - Runtime: planner, prompt composition, queue, provider dispatch ja continuation seed.
 - Persistence: SQLite v23 schema/stores ja transaction coordinatorit; no Action execution binding table.
 - Governance: Feedback, Critic schedule/proposals, human decisions ja Refinement apply.

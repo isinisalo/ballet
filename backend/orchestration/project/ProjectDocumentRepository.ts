@@ -8,10 +8,11 @@ import type Database from "better-sqlite3";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDocumentKind } from "./ProjectReferenceIndex.js";
+import { USER_STORY_LIMITS } from "../../../shared/orchestration/userStories.js";
 
 const COLLECTIONS: Record<ProjectDocumentKind, string> = {
   goal: "goals", adr: "adr", constraint: "constraints", "use-case": "use-cases",
-  instruction: "instructions", skill: "../.agents/skills"
+  "user-story": "user-stories", instruction: "instructions", skill: "../.agents/skills"
 };
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 const SAFE_SKILL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}(?:\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,127})*$/;
@@ -34,7 +35,8 @@ export class ProjectDocumentRepository {
       ? listSkillIds(directory)
       : readdirSync(directory, { withFileTypes: true })
         .filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".md"))
-        .map((entry) => documentId(path.join(directory, entry.name), entry.name.slice(0, -3)));
+        .map((entry) => kind === "user-story" ? entry.name.slice(0, -3) : documentId(path.join(directory, entry.name), entry.name.slice(0, -3)));
+    if (kind === "user-story" && ids.length > USER_STORY_LIMITS.stories) throw new ConflictError(`User Story collection exceeds ${USER_STORY_LIMITS.stories} files.`);
     return ids
       .map((id) => this.require(kind, id))
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -49,6 +51,7 @@ export class ProjectDocumentRepository {
     try {
       descriptor = openSync(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
       if (!fstatSync(descriptor).isFile()) throw new ConflictError(`${kind} ${id} is not an ordinary file.`);
+      if (kind === "user-story" && fstatSync(descriptor).size > USER_STORY_LIMITS.documentBytes) throw new ConflictError(`User Story ${id} exceeds the document size limit.`);
       const content = readFileSync(descriptor, "utf8");
       return { kind, id, content, contentHash: sha256(content) };
     } finally {
@@ -81,6 +84,7 @@ export class ProjectDocumentRepository {
   }
 
   runReferences(kind: ProjectDocumentKind, id: string, activeOnly = false): string[] {
+    if (kind === "user-story") return [];
     if (!this.connection) return [];
     const rows = this.connection().prepare(`
       SELECT environment_run_id, execution_snapshot_json FROM environment_runs
@@ -97,6 +101,7 @@ export class ProjectDocumentRepository {
   private filename(kind: ProjectDocumentKind, id: string): string {
     if (!(kind === "skill" ? SAFE_SKILL_ID : SAFE_ID).test(id)) throw new ConflictError("Document id contains unsafe path characters.");
     const directory = this.collectionPath(kind);
+    if (kind === "user-story") return path.join(directory, `${id}.md`);
     if (kind === "skill") return path.join(directory, ...id.split("/"), "SKILL.md");
     const matching = status(directory)?.isDirectory() ? readdirSync(directory, { withFileTypes: true })
       .find((entry) => entry.isFile() && entry.name.endsWith(".md")
@@ -105,7 +110,14 @@ export class ProjectDocumentRepository {
   }
 
   private collectionPath(kind: ProjectDocumentKind): string {
-    return path.join(this.dataRoot, COLLECTIONS[kind]);
+    const directory = path.join(this.dataRoot, COLLECTIONS[kind]);
+    if (kind === "user-story") {
+      for (const ancestor of [path.dirname(this.dataRoot), this.dataRoot, directory]) {
+        const metadata = status(ancestor);
+        if (metadata) assertOrdinaryDirectory(metadata, ancestor);
+      }
+    }
+    return directory;
   }
 
   private isLocked(kind: ProjectDocumentKind, id: string): boolean {

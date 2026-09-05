@@ -9,6 +9,7 @@ export const OrchestrationRouteInventory = [
   ...documentRoutes("goals"), ...documentRoutes("adrs"), ...documentRoutes("constraints"),
   ...documentRoutes("use-cases"), "GET /api/agents", "GET /api/agents/:id", "PUT /api/agents/:id",
   ...documentRoutes("instructions"), ...documentRoutes("skills"),
+  ...documentRoutes("user-stories"),
   "POST /api/use-cases/:id/approve", "POST /api/use-cases/:id/return-to-draft",
   "GET /api/reference-index", "GET /api/environment", "PUT /api/environment",
   "POST /api/environment/states", "GET /api/environment/states/:stateId",

@@ -9,7 +9,7 @@ import {
 const markdownSourceSchema = z.string().max(CONTRACT_LIMITS.text)
   .refine((value) => value.trim().length > 0, "Markdown must not be empty");
 
-export const documentKindSchema = z.enum(["goal", "adr", "constraint", "use-case", "instruction", "skill"]);
+export const documentKindSchema = z.enum(["goal", "adr", "constraint", "use-case", "user-story", "instruction", "skill"]);
 export const idParamsSchema = z.object({ id: idSchema }).strict();
 export const governanceAgentParamsSchema = z.object({
   id: z.enum(["ballet-critic-agent", "ballet-refinement-agent"])

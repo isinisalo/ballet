@@ -24,6 +24,12 @@
   --ballet-secondary: #4edea3;
   --ballet-tertiary: #ffb95f;
   --ballet-error: #ffb4ab;
+  --story-role: var(--ballet-primary);
+  --story-role-foreground: var(--primary-foreground);
+  --story-goal: var(--ballet-tertiary);
+  --story-goal-foreground: var(--tertiary-foreground);
+  --story-benefit: #c4b5fd;
+  --story-benefit-foreground: #2e1f54;
   --background: var(--ballet-surface-lowest);
   --foreground: var(--ballet-on-surface);
   --card: var(--ballet-surface);

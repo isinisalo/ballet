@@ -1,4 +1,5 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
 import { useCaseApprovalHash } from "@shared/orchestration/direction";
 import { actionAgentId, type ActionDefinition, type StateDefinition } from "@shared/orchestration/environment";
@@ -40,9 +41,13 @@ export function OrchestrationConfigureOutlet({ route, data, navigate, mutation }
     case "skills": content = <ResourceWorkspace kind="skills" resources={data.skills} references={data.references.entries} locked={locked} selectedId={route.entityId} navigate={navigate} onSave={async (id, source, hash, creating) => { await mutation.run(() => orchestrationApi.saveResource("skills", id, source, hash, creating)); }} />; break;
     case "agents": content = <AgentDefinitionsWorkspace response={data.agents} skills={data.skills} selectedId={route.entityId} locked={locked} onSave={(id, input) => mutation.run(() => orchestrationApi.saveAgent(id, input))} />; break;
     case "runtimes": content = <RuntimesWorkspace selectedId={route.entityId} navigate={navigate} />; break;
-    default: content = <div className="p-6"><h1 className="text-xl font-semibold">Workspace unavailable</h1><p className="text-muted-foreground">This route is not part of the Configure workspace.</p></div>;
+    default: content = <UnavailableWorkspace route={route} navigate={navigate} />;
   }
   return <>{error}{content}</>;
 }
 
 const directionDataKey = (kind: DirectionKind): "goals" | "adrs" | "constraints" | "useCases" => kind === "use-cases" ? "useCases" : kind;
+
+function UnavailableWorkspace({ route, navigate }: { route: RouteState; navigate(path: string): void }) {
+  return <div className="p-6"><h1 className="text-xl font-semibold">Workspace unavailable</h1><p className="text-muted-foreground">This route or selection is invalid.</p><Button className="mt-4" variant="outline" onClick={() => navigate(route.recoveryPath ?? "/automation/loops")}>Return to workspace</Button></div>;
+}

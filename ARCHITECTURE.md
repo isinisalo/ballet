@@ -3,8 +3,8 @@ id: architecture-root
 title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-04'
-version: 33
+updatedAt: '2026-09-05'
+version: 34
 tags: [architecture, arc42, environment]
 ---
 
@@ -78,7 +78,7 @@ flowchart TB
 
 | Truth | Canonical owner | Forbidden substitute |
 | --- | --- | --- |
-| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases, generic instructions, Skills, Action/governance `.codex/agents/*.toml` files and Project Config v25 | automatic run closure, provider prompt or client state |
+| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases, User Stories, generic instructions, Skills, Action/governance `.codex/agents/*.toml` files and Project Config v25 | automatic run closure, provider prompt or client state |
 | Environment authoring | Git: Config, Action Agent TOMLs and Skills | SQLite completion flags |
 | Runtime status, attempts, gates, schedules and decisions | SQLite v23 plus immutable Root Snapshot v20 | config `done`/`blocked` fields or provider prose |
 | Repository effect | local commit SHA plus exact artifact hashes | approval flag without applied bytes |
@@ -174,7 +174,9 @@ Successful work must remain Critic-readable through immutable commit/artifact ev
 
 ## Project/platform boundary
 
-Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
+Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, User Story, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
+
+User Story v1 is repository-owned YAML frontmatter in `.ballet/user-stories/<uuid>.md`: Role, Goal, Benefit and ordered Given/When/Then criteria. The card editor and `/api/user-stories` CRUD share this single source through the existing atomic document repository, with optimistic content hashes and the project authoring lock. Markdown notes are preserved. User Story content is never copied into Project Config, SQLite, browser storage, Root Snapshots or Run gates. The collection is read from files on every request; API invalidations are transient notifications only. See the [building-block view](.ballet/arc42/05-building-block-view.md) and [design contract](DESIGN.md#user-story-visual-contract).
 
 ## Failure modes
 

@@ -3,6 +3,7 @@ import type { TrustedHumanActor } from "../../../shared/orchestration/persistenc
 import { HttpValidationError, parseBody, parseParams, parseUnknown } from "../../http/validation/httpValidation.js";
 import type { ProjectDocumentKind } from "../project/ProjectReferenceIndex.js";
 import type { ApiController } from "./ApiController.js";
+import { registerUserStoryRoutes } from "./userStoryRoutes.js";
 import {
   actionParamsSchema, createFeedbackSchema, criticDecisionSchema,
   directionDecisionSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
@@ -25,6 +26,7 @@ export const createOrchestrationRouter = ({ controller, actor }: OrchestrationRo
     const input = parseBody(putProjectSchema, req); res.json(controller.putProject(input.config, input.expectedHash));
   }));
   registerDocumentRoutes(router, controller, actor);
+  registerUserStoryRoutes(router, controller);
   registerEnvironmentRoutes(router, controller);
   registerRunRoutes(router, controller, actor);
   registerFeedbackRoutes(router, controller, actor);
@@ -228,5 +230,6 @@ const route = (handler: (req: express.Request, res: express.Response) => Promise
 
 export const orchestrationDocumentCollections: Readonly<Record<string, ProjectDocumentKind>> = Object.freeze({
   goals: "goal", adrs: "adr", constraints: "constraint", "use-cases": "use-case",
+  "user-stories": "user-story",
   instructions: "instruction", skills: "skill"
 });

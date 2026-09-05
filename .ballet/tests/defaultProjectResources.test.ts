@@ -28,11 +28,13 @@ describe("canonical default project resources", () => {
     expect(project.direction.useCases.map(({ id }) => id)).toEqual(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
     expect(project.direction.useCases.every(({ status }) => status === "approved")).toBe(true);
     expect(project.direction.useCases.every((useCase) => useCase.approval?.contentHash === useCaseApprovalHash(useCase))).toBe(true);
-    expect(project.environment.states.map(({ order }) => order)).toEqual([1, 2, 3, 4, 5]);
-    expect(project.environment.states.map(({ id, name }) => [id, name])).toEqual([
+    expect(project.environment.states.map(({ order }) => order).sort((left, right) => left - right)).toEqual([1, 2, 3, 4, 5]);
+    // Authoring may reorder States; verify the resource inventory independently of serialized order.
+    const states = ["event-storming", "arc42", "design", "build", "deploy"].map((id) => project.environment.states.find((state) => state.id === id)!);
+    expect(states.map(({ id, name }) => [id, name])).toEqual([
       ["event-storming", "Event Storming"], ["arc42", "Arc42"], ["design", "Design"], ["build", "Build"], ["deploy", "Deploy"]
     ]);
-    expect(project.environment.states.map(({ actions }) => actions.map(({ id }) => id))).toEqual([
+    expect(states.map(({ actions }) => actions.map(({ id }) => id))).toEqual([
       ["event-storming-big-picture-exploration", "event-storming-process-modeling", "event-storming-software-design"],
       ["arc42-introduction-goals", "arc42-constraints", "arc42-context-scope", "arc42-solution-strategy",
         "arc42-building-block-view", "arc42-runtime-view", "arc42-deployment-view", "arc42-crosscutting-concepts",

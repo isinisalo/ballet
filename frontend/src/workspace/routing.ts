@@ -1,4 +1,5 @@
 import type { RouteState, WorkspaceView } from "./types";
+import { userStoryIdSchema } from "@shared/orchestration/userStories";
 
 const decode = (match: RegExpMatchArray, index: number): string | undefined => {
   try { return decodeURIComponent(match[index]); } catch { return undefined; }
@@ -16,6 +17,7 @@ export const routeFromPath = (path: string): RouteState => {
     "/project/adrs": "adrs",
     "/project/constraints": "constraints",
     "/project/use-cases": "use-cases",
+    "/project/user-stories": "user-stories",
     "/project/instructions": "instructions",
     "/run": "run-list",
     "/feedback": "feedback-list",
@@ -23,9 +25,7 @@ export const routeFromPath = (path: string): RouteState => {
     "/reviews/refinement": "refinement-reviews"
   };
   if (exact[url.pathname]) {
-    const workspaceView = exact[url.pathname];
-    return { view: "orchestration", workspaceView, entityId: url.searchParams.get("id") ?? undefined,
-      createMode: workspaceView === "environment" && url.searchParams.get("create") === "state" ? "state" : undefined };
+    return exactRoute(exact[url.pathname], url);
   }
 
   const patterns: Array<[RegExp, WorkspaceView]> = [
@@ -65,6 +65,21 @@ export const routeFromPath = (path: string): RouteState => {
 export const orchestrationEntityPath = (base: string, id?: string) => id && base === "/agents"
   ? `/agents/${encodeURIComponent(id)}`
   : `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
+
+function exactRoute(workspaceView: WorkspaceView, url: URL): RouteState {
+  if (workspaceView === "user-stories") return userStoryRoute(url);
+  return { view: "orchestration", workspaceView, entityId: url.searchParams.get("id") ?? undefined,
+    createMode: workspaceView === "environment" && url.searchParams.get("create") === "state" ? "state" : undefined };
+}
+
+function userStoryRoute(url: URL): RouteState {
+  const id = url.searchParams.get("id"); const create = url.searchParams.get("create");
+  const invalid = (id !== null && !userStoryIdSchema.safeParse(id).success)
+    || (create !== null && create !== "story") || (id !== null && create !== null)
+    || url.searchParams.getAll("id").length > 1 || url.searchParams.getAll("create").length > 1;
+  if (invalid) return { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/user-stories" };
+  return { view: "orchestration", workspaceView: "user-stories", entityId: id ?? undefined, createMode: create === "story" ? "story" : undefined };
+}
 export const orchestrationStatePath = (stateId: string) => `/automation/loops/states/${encodeURIComponent(stateId)}`;
 export const orchestrationActionPath = (stateId: string, actionId: string) => `${orchestrationStatePath(stateId)}/actions/${encodeURIComponent(actionId)}`;
 export const orchestrationActionAgentPath = (stateId: string, actionId: string, role: "validation" | "work") => `${orchestrationActionPath(stateId, actionId)}?agent=${role}`;

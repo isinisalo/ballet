@@ -29,6 +29,15 @@ describe("orchestration URL-owned routing", () => {
     expect(routeFromPath(path)).toMatchObject({ workspaceView: "agents", entityId: "ballet-critic-agent" });
   });
   it("projects unknown orchestration paths as invalid", () => expect(routeFromPath("/not-real")).toMatchObject({ view: "orchestration", workspaceView: "invalid" }));
+  it("owns User Story list, creation and selection and rejects malformed or ambiguous IDs", () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    expect(routeFromPath("/project/user-stories")).toMatchObject({ workspaceView: "user-stories" });
+    expect(routeFromPath("/project/user-stories?create=story")).toMatchObject({ workspaceView: "user-stories", createMode: "story" });
+    expect(routeFromPath(orchestrationEntityPath("/project/user-stories", id))).toMatchObject({ entityId: id });
+    for (const query of ["id=", "id=not-a-uuid", "create=unknown", `id=${id}&create=story`, `id=${id}&id=${id}`]) {
+      expect(routeFromPath(`/project/user-stories?${query}`)).toMatchObject({ workspaceView: "invalid", recoveryPath: "/project/user-stories" });
+    }
+  });
   it.each([
     ["/run", "run-list"], ["/run/run%201", "run-detail"],
     ["/run/run-1/states/state%201", "run-state"], ["/run/run-1/states/state-1/actions/action%2F1", "run-action"],

@@ -3,6 +3,7 @@ export type WorkspaceView =
   | "adrs"
   | "constraints"
   | "use-cases"
+  | "user-stories"
   | "environment"
   | "state"
   | "action"
@@ -28,6 +29,7 @@ export interface RouteState {
   entityId?: string;
   stateId?: string;
   actionId?: string;
-  createMode?: "state" | "action";
+  createMode?: "state" | "action" | "story";
   agentRole?: "validation" | "work" | "invalid";
+  recoveryPath?: string;
 }

@@ -19,7 +19,8 @@ import type { FeedbackBoxService } from "../governance/FeedbackBoxService.js";
 import type { GovernanceExecutionService } from "../governance/GovernanceExecutionService.js";
 import type { RefinementApplyService } from "../governance/RefinementApplyService.js";
 import type { ProjectDefinitionService, DirectionValue } from "../project/ProjectDefinitionService.js";
-import type { ProjectDocumentKind } from "../project/ProjectReferenceIndex.js";
+import type { DirectionDocumentKind, ProjectDocumentKind } from "../project/ProjectReferenceIndex.js";
+import type { UserStoryInput } from "../../../shared/orchestration/userStories.js";
 import { ProjectReferenceIndex } from "../project/ProjectReferenceIndex.js";
 import { RunEvidenceStore } from "../persistence/RunEvidenceStore.js";
 import type {
@@ -82,7 +83,21 @@ export class ApiController {
     return saved;
   }
   documents(kind: ProjectDocumentKind): unknown { return this.dependencies.project.documents.list(kind); }
+  userStories() { return this.dependencies.project.userStories.list(); }
+  userStory(id: string) { return this.dependencies.project.userStories.require(id); }
+  createUserStory(input: UserStoryInput) {
+    const saved = this.dependencies.project.userStories.create(input);
+    this.changed("project_changed", saved.value.id); return saved;
+  }
+  updateUserStory(id: string, input: UserStoryInput, expectedHash: string) {
+    const saved = this.dependencies.project.userStories.update(id, input, expectedHash);
+    this.changed("project_changed", id); return saved;
+  }
+  removeUserStory(id: string, expectedHash: string): void {
+    this.dependencies.project.userStories.remove(id, expectedHash); this.changed("project_changed", id);
+  }
   document(kind: ProjectDocumentKind, id: string): unknown {
+    if (kind === "user-story") return this.userStory(id);
     const document = this.dependencies.project.documents.require(kind, id);
     if (kind === "instruction" || kind === "skill") return document;
     const config = this.dependencies.project.projects.load().config;
@@ -523,7 +538,7 @@ const assertExactOrder = (received: string[], current: string[], label: string):
   }
 };
 const directionValues = (
-  config: ProjectConfigurationV25, kind: Exclude<ProjectDocumentKind, "instruction" | "skill">
+  config: ProjectConfigurationV25, kind: DirectionDocumentKind
 ) => kind === "goal" ? config.direction.goals : kind === "adr" ? config.direction.adrs
   : kind === "constraint" ? config.direction.constraints : config.direction.useCases;
 

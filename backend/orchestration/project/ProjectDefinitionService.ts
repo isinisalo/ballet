@@ -9,7 +9,8 @@ import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.j
 import type { ProjectDefinition, ProjectDefinitionPort } from "../runtime/EnvironmentRunPlanner.js";
 import { ProjectDocumentRepository } from "./ProjectDocumentRepository.js";
 import { ProjectConfigurationRepository } from "./ProjectConfigurationRepository.js";
-import { ProjectReferenceIndex, type ProjectDocumentKind } from "./ProjectReferenceIndex.js";
+import { ProjectReferenceIndex, type DirectionDocumentKind } from "./ProjectReferenceIndex.js";
+import { UserStoryService } from "./UserStoryService.js";
 import { CodexAgentRepository } from "./CodexAgentRepository.js";
 import { ActionAgentMutationService } from "./ActionAgentMutationService.js";
 
@@ -19,6 +20,7 @@ export type DirectionValue = DirectionReference | Constraint | UseCase;
 export class ProjectDefinitionService implements ProjectDefinitionPort {
   readonly agents: CodexAgentRepository;
   readonly actions: ActionAgentMutationService;
+  readonly userStories: UserStoryService;
 
   constructor(
     readonly root: string,
@@ -27,10 +29,11 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
   ) {
     this.agents = new CodexAgentRepository(root);
     this.actions = new ActionAgentMutationService(projects, this.agents);
+    this.userStories = new UserStoryService(documents, () => projects.assertUnlocked());
   }
 
   putDirection(input: {
-    kind: Exclude<ProjectDocumentKind, "instruction" | "skill">;
+    kind: DirectionDocumentKind;
     id: string;
     value: DirectionValue;
     markdown: string;
@@ -80,7 +83,7 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
   }
 
   removeDirection(input: {
-    kind: Exclude<ProjectDocumentKind, "instruction" | "skill">;
+    kind: DirectionDocumentKind;
     id: string; expectedConfigHash: string; expectedDocumentHash: string;
   }): string {
     const loaded = this.projects.load();
@@ -159,7 +162,7 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
 
 const replaceDirectionValue = (
   config: ProjectConfigurationV25,
-  kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
+  kind: DirectionDocumentKind,
   input: DirectionValue
 ): ProjectConfigurationV25 => {
   const direction = structuredClone(config.direction);
@@ -184,7 +187,7 @@ const replaceDirectionValue = (
 };
 const removeDirectionValue = (
   config: ProjectConfigurationV25,
-  kind: Exclude<ProjectDocumentKind, "instruction" | "skill">,
+  kind: DirectionDocumentKind,
   id: string
 ): ProjectConfigurationV25 => {
   const direction = structuredClone(config.direction);
