@@ -1,19 +1,30 @@
+import { ApiRequestError } from "@/apiClient";
+import type { InvalidationEvent } from "@shared/orchestration/httpContracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RouteState } from "@/workspace/types";
 import { toErrorMessage } from "@/lib/errors";
 import type { GovernanceData } from "./runTypes";
 import { orchestrationApi } from "./orchestrationApi";
 
-const optional = async <T,>(operation: () => Promise<T>): Promise<T | undefined> => { try { return await operation(); } catch { return undefined; } };
+const optional = async <T,>(operation: () => Promise<T>): Promise<T | undefined> => { try { return await operation(); } catch (error) { if (error instanceof ApiRequestError && error.status === 404) return undefined; throw error; } };
 
 export function useOrchestrationGovernanceData(route: RouteState) {
   const [data, setData] = useState<GovernanceData>(); const [error, setError] = useState<string>(); const [loading, setLoading] = useState(true);
   const sequence = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (events?: InvalidationEvent[]) => {
+    const view = route.workspaceView ?? "";
+    const runView = view.startsWith("run-"); const feedbackView = view.startsWith("feedback-");
+    const criticView = view.startsWith("critic-"); const refinementView = view.startsWith("refinement-");
+    if (events && !events.some(({ kind }) => kind === "project_changed" || kind === "run_changed"
+      || (feedbackView && kind === "feedback_changed") || (criticView && kind === "critic_changed")
+      || (refinementView && ["refinement_changed", "feedback_changed"].includes(kind)))) return;
     const current = ++sequence.current;
     try {
       const [runs, feedback, criticRuns, criticProposals, refinementRuns, refinementProposals] = await Promise.all([
-        orchestrationApi.runs(), orchestrationApi.feedback(), orchestrationApi.criticRuns(), orchestrationApi.criticProposals(), orchestrationApi.refinementRuns(), orchestrationApi.refinementProposals()
+        view === "run-list" ? orchestrationApi.runs() : [],
+        runView || feedbackView || refinementView ? orchestrationApi.feedback() : [],
+        [], criticView ? orchestrationApi.criticProposals() : [], [],
+        refinementView ? orchestrationApi.refinementProposals() : []
       ]);
       const id = route.entityId;
       const [selectedRun, selectedFeedback, selectedCritic, selectedRefinement] = await Promise.all([
@@ -29,6 +40,6 @@ export function useOrchestrationGovernanceData(route: RouteState) {
     } catch (reason) { if (current === sequence.current) setError(toErrorMessage(reason, "Unable to load Run and governance data.")); }
     finally { if (current === sequence.current) setLoading(false); }
   }, [route.entityId, route.workspaceView]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { setLoading(true); void refresh(); return () => { sequence.current++; }; }, [refresh]);
   return { data, error, loading, refresh };
 }

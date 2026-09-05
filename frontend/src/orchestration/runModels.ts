@@ -72,3 +72,8 @@ export const continuationLineage = (run: RunSummary, all: RunSummary[]) => {
 
 export const parseJson = (value: unknown): JsonRow => { try { return typeof value === "string" ? JSON.parse(value) as JsonRow : (value ?? {}) as JsonRow; } catch { return {}; } };
 export const strings = (value: unknown): string[] => Array.isArray(value) ? value.map(String) : [];
+
+export const validRunSelection = (run: RunDetail, stateId?: string, actionId?: string): boolean => {
+  const states = stateId ? run.states.filter((state) => state.stateDefinitionId === stateId || state.stateExecutionId === stateId) : run.states;
+  return (!stateId || states.length > 0) && (!actionId || states.some((state) => state.actions.some((action) => action.actionDefinitionId === actionId || action.actionExecutionId === actionId)));
+};

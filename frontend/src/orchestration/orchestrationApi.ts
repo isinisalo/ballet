@@ -2,7 +2,7 @@ import type { CriticProposalSummary } from "@shared/orchestration/httpResponses"
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
 import type { ActionAgentDefinition, ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV25, StateDefinition } from "@shared/orchestration/environment";
-import type { ActionResponse, GovernanceAgentsResponse, GovernanceAgentSlot, ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
+import type { EnvironmentResponse, ActionResponse, GovernanceAgentsResponse, GovernanceAgentSlot, ProjectRecord, ReferenceIndexResponse, ResourceDocument } from "./types";
 import type { JsonRow, RunDetail, RunSummary } from "./runTypes";
 import type { LocalDaemonLogEntry, LocalDaemonStatus } from "@shared/domain/runtime";
 
@@ -13,6 +13,7 @@ const remove = (value: unknown): RequestInit => ({ method: "DELETE", body: JSON.
 
 export const orchestrationApi = {
   project: () => request<ProjectRecord>(`${base}/project`),
+  environment: () => request<EnvironmentResponse>(`${base}/environment`),
   references: () => request<ReferenceIndexResponse>(`${base}/reference-index`),
   resources: (collection: "goals" | "adrs" | "constraints" | "use-cases" | "instructions" | "skills") => request<ResourceDocument[]>(`${base}/${collection}`),
   agents: () => request<GovernanceAgentsResponse>(`${base}/agents`),

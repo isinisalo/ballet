@@ -1,25 +1,6 @@
-import { useEffect, useRef } from "react";
-import type { InvalidationEvent } from "@shared/orchestration/httpContracts";
+import { useEffect } from "react";
+import { subscribeInvalidations, type InvalidationListener } from "./invalidationStream";
 
-export function useOrchestrationInvalidations(refresh: () => Promise<unknown>) {
-  const after = useRef(0);
-  useEffect(() => {
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let activeStream: EventSource | undefined;
-    const connect = () => {
-      if (stopped) return;
-      const stream = new EventSource(`/api/events?after=${after.current}`);
-      activeStream = stream;
-      stream.addEventListener("invalidation", (message) => {
-        const event = JSON.parse((message as MessageEvent<string>).data) as InvalidationEvent;
-        if (event.sequence <= after.current) return;
-        after.current = event.sequence;
-        void refresh();
-      });
-      stream.onerror = () => { stream.close(); if (!stopped) timer = setTimeout(connect, 1_000); };
-    };
-    connect();
-    return () => { stopped = true; if (timer) clearTimeout(timer); activeStream?.close(); };
-  }, [refresh]);
+export function useOrchestrationInvalidations(refresh: InvalidationListener) {
+  useEffect(() => subscribeInvalidations(refresh), [refresh]);
 }

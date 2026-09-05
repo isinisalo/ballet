@@ -1,4 +1,5 @@
-import { EventStormingWorkspace } from "./event-storming/EventStormingWorkspace";
+import { RuntimesWorkspace } from "./configure/RuntimesWorkspace";
+import type { InvalidationEvent } from "@shared/orchestration/httpContracts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { RouteState } from "@/workspace/types";
 import type { WorkspaceNavigation } from "@/workspace/useWorkspaceNavigation";
@@ -8,16 +9,18 @@ import { OrchestrationSidebar } from "./OrchestrationSidebar";
 import { useOrchestrationConfigureData } from "./useOrchestrationConfigureData";
 import { useOrchestrationInvalidations } from "./useOrchestrationInvalidations";
 import { useOrchestrationMutation } from "./useOrchestrationMutation";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useOrchestrationGovernanceData } from "./useOrchestrationGovernanceData";
 import { isGovernanceView, OrchestrationGovernanceOutlet } from "./run/OrchestrationGovernanceOutlet";
 import { UserStoriesWorkspace } from "./user-stories/UserStoriesWorkspace";
 
+const EventStormingWorkspace = lazy(() => import("./event-storming/EventStormingWorkspace").then((module) => ({ default: module.EventStormingWorkspace })));
+
 export function OrchestrationWorkspaceShell({ route, navigate, setNavigationBlocker }: { route: RouteState; navigate: WorkspaceNavigation["navigate"]; setNavigationBlocker: WorkspaceNavigation["setNavigationBlocker"] }) {
   const [dirty, setDirty] = useState(false);
-  const configure = useOrchestrationConfigureData();
+  const configure = useOrchestrationConfigureData(route);
   const governance = useOrchestrationGovernanceData(route);
-  const refresh = useCallback(async () => { await Promise.all([configure.refresh(), governance.refresh()]); }, [configure.refresh, governance.refresh]);
+  const refresh = useCallback(async (events?: InvalidationEvent[]) => { await Promise.all([configure.refresh(events), governance.refresh(events)]); }, [configure.refresh, governance.refresh]);
   useOrchestrationInvalidations(refresh);
   const clearDirty = useCallback(() => setDirty(false), []);
   const mutation = useOrchestrationMutation(refresh, clearDirty);
@@ -25,10 +28,11 @@ export function OrchestrationWorkspaceShell({ route, navigate, setNavigationBloc
   useEffect(() => { setNavigationBlocker({ isDirty: dirty, message: "Discard unsaved orchestration changes?" }); return () => setNavigationBlocker(null); }, [dirty, setNavigationBlocker]);
   let content = <Alert className="m-4"><AlertDescription>Loading canonical Ballet workspace…</AlertDescription></Alert>;
   const error = configure.error ?? (isGovernanceView(route.workspaceView) ? governance.error : undefined);
-  if (error) content = <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>;
+  if (route.workspaceView === "runtimes") content = <RuntimesWorkspace selectedId={route.entityId} navigate={navigate} />;
+  else if (error) content = <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>;
   else if (!configure.loading && configure.data && isGovernanceView(route.workspaceView) && !governance.loading && governance.data) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)} onClickCapture={(event) => { if ((event.target as HTMLElement).closest("form")) setDirty(true); }}><OrchestrationGovernanceOutlet route={route} configure={configure.data} governance={governance.data} navigate={navigate} mutation={mutation} /></div>;
   else if (!configure.loading && configure.data && route.workspaceView === "event-storming") content = <EventStormingWorkspace route={route} locked={configure.data.references.activeRunIds.length > 0} navigate={navigate} onDirty={setDirty} />;
   else if (!configure.loading && configure.data && route.workspaceView === "user-stories") content = <UserStoriesWorkspace route={route} locked={configure.data.references.activeRunIds.length > 0} navigate={navigate} onDirty={setDirty} />;
   else if (!configure.loading && configure.data && !isGovernanceView(route.workspaceView)) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)} onClickCapture={(event) => { if ((event.target as HTMLElement).closest("form")) setDirty(true); }}><OrchestrationConfigureOutlet route={route} data={configure.data} navigate={navigate} mutation={mutation} /></div>;
-  return <OrchestrationFrame sidebar={<OrchestrationSidebar route={route} data={configure.data} navigate={navigate} />}>{content}</OrchestrationFrame>;
+  return <OrchestrationFrame sidebar={<OrchestrationSidebar route={route} data={configure.data} navigate={navigate} />}><Suspense fallback={<p role="status" className="p-4">Loading workspace…</p>}>{content}</Suspense></OrchestrationFrame>;
 }

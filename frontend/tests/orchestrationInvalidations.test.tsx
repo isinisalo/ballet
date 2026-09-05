@@ -34,3 +34,31 @@ function Harness({ refresh }: { refresh(): Promise<unknown> }) {
   const value = useOrchestrationInvalidations(refresh);
   return <output>{String(value)}</output>;
 }
+
+it("shares one stream and resynchronizes after a restart with lower sequence numbers", async () => {
+  vi.useFakeTimers();
+  const sources: Source[] = [];
+  class Source {
+    onerror?: () => void; onopen?: () => void; listener?: EventListener;
+    constructor(readonly url: string) { sources.push(this); }
+    addEventListener(_type: string, listener: EventListener) { this.listener = listener; }
+    close() {}
+  }
+  const original = window.EventSource;
+  window.EventSource = Source as unknown as typeof EventSource;
+  const refresh = vi.fn(async () => {}); const second = vi.fn(async () => {});
+  const view = render(<><Harness refresh={refresh} /><Harness refresh={second} /></>);
+  try {
+    expect(sources).toHaveLength(1);
+    sources[0].onopen?.();
+    sources[0].listener!(new MessageEvent("invalidation", { data: JSON.stringify({ sequence: 20, kind: "run_changed" }) }));
+    await vi.advanceTimersByTimeAsync(50);
+    sources[0].onerror!(); await vi.advanceTimersByTimeAsync(1000);
+    expect(sources[1].url).toBe("/api/events?after=0");
+    sources[1].onopen?.();
+    sources[1].listener!(new MessageEvent("invalidation", { data: JSON.stringify({ sequence: 1, kind: "project_changed" }) }));
+    await vi.advanceTimersByTimeAsync(50);
+    expect(refresh).toHaveBeenCalledTimes(4);
+    expect(second).toHaveBeenCalledTimes(4);
+  } finally { view.unmount(); window.EventSource = original; vi.useRealTimers(); }
+});

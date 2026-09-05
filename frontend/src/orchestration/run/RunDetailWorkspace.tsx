@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import type { JsonRow, RunDetail } from "../runTypes";
-import { currentGate, orderedRunProjection } from "../runModels";
+import { currentGate, orderedRunProjection, validRunSelection } from "../runModels";
 import { ConfigureHeader } from "../configure/ConfigureHeader";
 import { ActionTimeline } from "./ActionTimeline";
 import { StatusLabel } from "./StatusLabel";
@@ -10,6 +10,11 @@ import { StatusLabel } from "./StatusLabel";
 export function RunDetailWorkspace({ run, feedback, stateId, actionId, navigate, onCancel, onWorkInput = async () => undefined }: { run?: RunDetail; feedback: JsonRow[]; stateId?: string; actionId?: string; navigate(path: string): void; onCancel(id: string): Promise<void>; onWorkInput?(id: string, agentId: string, revision: number, answer: string): Promise<void> }) {
   const [answer, setAnswer] = useState("");
   if (!run) return <><ConfigureHeader eyebrow="Run" title="Run not found" description="This deep link does not match a current Environment Run." status="Invalid ID" /><div className="p-6"><Button onClick={() => navigate("/run")}>Return to Runs</Button></div></>;
+  if (!validRunSelection(run, stateId, actionId)) return <div className="space-y-3 p-4" role="alert">
+    <h1 className="text-xl font-semibold">Run selection was not found</h1>
+    <p>The State or Action in this URL does not belong to this Run.</p>
+    <Button className="min-h-10" onClick={() => navigate(`/run/${encodeURIComponent(run.environmentRunId)}`)}>Return to Run</Button>
+  </div>;
   const states = orderedRunProjection(run.states); const gate = currentGate(run); const visibleStates = stateId ? states.filter((state) => state.stateDefinitionId === stateId || state.stateExecutionId === stateId) : states;
   return <><ConfigureHeader eyebrow="Run Gate" title={run.environmentDefinitionId} description={`Current gate: ${gate.label}`} status={run.status} actions={<><Button variant="outline" onClick={() => navigate("/run")}>All Runs</Button>{["pending", "running"].includes(run.status) ? <Button variant="destructive" onClick={() => void onCancel(run.environmentRunId)}>Cancel Run</Button> : null}</>} />
     <div className="space-y-4 p-4 md:p-6"><section className="grid gap-2 rounded-md border bg-card p-4 text-sm sm:grid-cols-2"><span>Run ID <code className="break-all">{run.environmentRunId}</code></span><span>Immutable snapshot <code className="break-all">{run.executionSnapshotHash ?? "stored server-side"}</code></span><span>Base commit <code>{run.baseCommit}</code></span><span>Branch <code>{run.branch}</code></span><span>Source {run.source}{run.previousRunId ? <> · parent <a className="text-primary underline" href={`/run/${run.previousRunId}`}>{run.previousRunId}</a></> : null}</span><span>Finalization/Run Evidence {run.evidence ? "available" : run.status === "completed" ? "pending" : "not terminal"}</span></section>

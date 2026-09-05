@@ -201,7 +201,7 @@ export class ApiController {
   }
   environment(): unknown {
     const loaded = this.dependencies.project.projects.load();
-    const activeRunIds = (this.referenceIndex() as { activeRunIds: string[] }).activeRunIds;
+    const activeRunIds = (this.dependencies.connection().prepare("SELECT environment_run_id FROM environment_runs WHERE status IN ('pending','running')").all() as Array<{ environment_run_id: string }>).map((row) => row.environment_run_id);
     return { environment: loaded.config.environment, configHash: loaded.configHash,
       readinessIssues: validateRunnableEnvironment(loaded.config.environment),
       activeRunIds, locked: activeRunIds.length > 0 };
