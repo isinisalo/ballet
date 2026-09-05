@@ -9,7 +9,6 @@ import { useCaseApprovalHash } from "@shared/orchestration/direction";
 import { MarkdownWorkbench } from "@/workspace/documents/MarkdownWorkbench";
 import { orchestrationEntityPath } from "@/workspace/routing";
 import type { ResourceDocument } from "../types";
-import { ConfigureHeader } from "./ConfigureHeader";
 import { ConfigureToolbar } from "./ConfigureToolbar";
 import {
   createMarkdownDocument, directionValueFromMarkdown, markdownEntity,
@@ -42,8 +41,8 @@ export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId
   };
   const approvedCount = values.filter((value) => "examples" in value && value.status === "approved").length;
   const status = locked ? "Locked by active Run" : kind === "use-cases" ? `${approvedCount} approved` : `${values.length} documents`;
-  return <><ConfigureHeader title={title(kind)} description={kind === "use-cases" ? "Select a compact Use Case from the sidebar; edit its canonical YAML frontmatter and Markdown here." : `Select canonical ${title(kind)} from the sidebar and edit the version-controlled Markdown.`} />
-    {document ? <MarkdownEditor key={`${kind}:${document.id}`} kind={kind} document={document} current={selected} creating={creating} locked={locked} status={status} onCreate={() => choose(undefined)} onDirty={setDirty} onSave={onSave} onDelete={onDelete} onApprove={onApprove} onDraft={onDraft} /> : <><ConfigureToolbar status={status}><Button size="sm" disabled={locked} onClick={() => choose(undefined)}>Create</Button></ConfigureToolbar><section className="m-4 rounded-md border border-dashed p-6 text-muted-foreground md:m-6">Select a document from the sidebar. Its complete Markdown source opens here.</section></>}
+  return <><h1 className="sr-only">{title(kind)}</h1>
+    {document ? <MarkdownEditor key={`${kind}:${document.id}`} kind={kind} document={document} current={selected} creating={creating} locked={locked} status={status} onCreate={() => choose(undefined)} onDirty={setDirty} onSave={onSave} onDelete={onDelete} onApprove={onApprove} onDraft={onDraft} /> : <><ConfigureToolbar title={title(kind)} status={status}><Button size="sm" disabled={locked} onClick={() => choose(undefined)}>Create</Button></ConfigureToolbar><section className="m-4 rounded-md border border-dashed p-6 text-muted-foreground md:m-6">Select a document from the sidebar. Its complete Markdown source opens here.</section></>}
   </>;
 }
 
@@ -64,9 +63,9 @@ function MarkdownEditor({ kind, document, current, creating, locked, status, onC
   const useCase = current && "examples" in current ? current : undefined;
   const valid = !validation && !locked && !editor.stale;
   const formId = `markdown-${kind}-${document.id}`;
-  return <div className="min-w-0"><ConfigureToolbar status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? <UseCaseApprovalActions value={useCase} disabled={locked || dirty || editor.stale || pending} onApprove={onApprove} onDraft={onDraft} /> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={valid} pending={pending} locked={locked} canDelete={Boolean(current && onDelete) && !editor.stale} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
+  return <div className="min-w-0"><ConfigureToolbar title={title(kind)} status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? <UseCaseApprovalActions value={useCase} disabled={locked || dirty || editor.stale || pending} onApprove={onApprove} onDraft={onDraft} /> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={valid} pending={pending} locked={locked} canDelete={Boolean(current && onDelete) && !editor.stale} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
     <MarkdownConflict stale={editor.stale} hash={document.contentHash} onReload={editor.reload} />
-    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="p-4 md:p-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={valid} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
+    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="px-4 py-3 md:px-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={valid} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
 
   </div>;
 }
