@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  OrchestrationProhibitedRoutes, OrchestrationRouteInventory, RuntimeSchemaInventory
+  OrchestrationProhibitedRoutes, OrchestrationRouteInventory
 } from "../../../shared/orchestration/routeInventory.js";
 import type { ApiController } from "./ApiController.js";
 import { createOrchestrationRouter } from "./createOrchestrationRouter.js";
@@ -11,15 +11,6 @@ describe("orchestration API contract inventory", () => {
     expect(OrchestrationRouteInventory.some((route) => /states\/[^/]+\/runs|actions\/[^/]+\/runs/.test(route))).toBe(false);
     expect(OrchestrationRouteInventory.some((route) => /environment-runs.*source/.test(route))).toBe(false);
     expect(OrchestrationProhibitedRoutes).toHaveLength(3);
-  });
-
-  test("pins every strict contract version at the HTTP composition boundary", () => {
-    expect(RuntimeSchemaInventory).toEqual({
-      projectConfig: 23, rootSnapshot: 18, taskEnvelope: 11, roleOutcome: 11,
-      promptComposition: 14, executionSpec: 16, sqlite: 21,
-      feedback: 2, critic: 2, refinement: 2,
-      codexAgent: 2, actionBinding: 3, runEvidence: 1
-    });
   });
 
   test("matches the mounted Express router exactly and contains no duplicate contract route", () => {

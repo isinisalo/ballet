@@ -64,11 +64,9 @@ export const orchestrationApi = {
   feedbackDetail: (id: string) => request<JsonRow>(`${base}/feedback/${encodeURIComponent(id)}`),
   createFeedback: (input: JsonRow) => request<JsonRow>(`${base}/feedback`, body(input)),
   decideFeedback: (id: string, from: "open" | "in_refinement", decision: "resolved" | "dismissed") => request(`${base}/feedback/${encodeURIComponent(id)}/decision`, body({ from, decision })),
-  criticRuns: () => request<JsonRow[]>(`${base}/critic/runs`),
   criticProposals: () => request<CriticProposalSummary[]>(`${base}/critic/proposals`),
   criticProposal: (id: string) => request<JsonRow>(`${base}/critic/proposals/${encodeURIComponent(id)}`),
   decideCritic: (id: string, input: JsonRow) => request(`${base}/critic/proposals/${encodeURIComponent(id)}/decision`, body(input)),
-  refinementRuns: () => request<JsonRow[]>(`${base}/refinement/runs`),
   refinementProposals: () => request<JsonRow[]>(`${base}/refinement/proposals`),
   refinementProposal: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}`),
   createRefinement: (feedbackEntryId: string) => request(`${base}/feedback/${encodeURIComponent(feedbackEntryId)}/refinement`, body({})),
@@ -77,5 +75,3 @@ export const orchestrationApi = {
   applyStatus: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}/apply`),
   continuation: (id: string) => request<JsonRow>(`${base}/refinement/proposals/${encodeURIComponent(id)}/continuation`)
 };
-
-export const orchestrationApiBase = base;

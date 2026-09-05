@@ -40,3 +40,23 @@ it("retains the dirty resource after a failed save and adopts the returned basel
   await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.getByRole("button", { name: "Save Markdown" })).toBeDisabled());
 });
+
+import userEvent from "@testing-library/user-event";
+import { useCaseApprovalHash } from "@shared/orchestration/direction";
+import { orchestrationConfig } from "./orchestrationFixtures";
+import { frontmatterToYaml } from "../src/workspace/documents/frontmatter";
+
+it("approves the persisted Use Case hash only through explicit confirmation", async () => {
+  const user = userEvent.setup();
+  const value = { ...orchestrationConfig().direction.useCases[0]!, status: "draft" as const, approval: undefined };
+  const document = { kind: "use-case" as const, id: value.id, content: `---\n${frontmatterToYaml({ ...value, title: value.name })}\n---\n\n# Use Case\n`, contentHash: "old" };
+  const onApprove = vi.fn();
+  render(<MarkdownDirectionWorkspace kind="use-cases" values={[value]} documents={[document]} selectedId={value.id} locked={false} navigate={vi.fn()} onSave={vi.fn()} onApprove={onApprove} />);
+  await user.click(screen.getByRole("button", { name: "Approve exact content…" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent(useCaseApprovalHash(value));
+  expect(onApprove).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Approve exact content" }));
+  expect(onApprove).toHaveBeenCalledWith(value);
+  fireEvent.change(screen.getByLabelText("Markdown Body"), { target: { value: "# Changed" } });
+  expect(screen.getByRole("button", { name: "Approve exact content…" })).toBeDisabled();
+});

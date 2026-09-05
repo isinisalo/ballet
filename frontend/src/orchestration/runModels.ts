@@ -1,4 +1,4 @@
-import type { ActionProjection, JsonRow, RunDetail, RunSummary, StateProjection } from "./runTypes";
+import type { ActionProjection, JsonRow, RunDetail, StateProjection } from "./runTypes";
 
 export const orderedRunProjection = (states: StateProjection[]) => [...states].sort((a, b) => a.order - b.order).map((state) => ({ ...state, actions: [...state.actions].sort((a, b) => a.priority - b.priority) }));
 
@@ -57,17 +57,6 @@ const exactLineDiff = (before: string, after: string): ExactDiffLine[] => {
     rows.push({ key: `=${oldIndex}:${newIndex}`, oldLine: oldIndex + 1, newLine: newIndex + 1, marker: " ", text: previous[oldIndex]! });
   }
   return rows;
-};
-
-export const reconcileRows = <T extends JsonRow>(current: T[], incoming: T[], id: keyof T): T[] => {
-  const values = new Map(current.map((row) => [String(row[id]), row])); for (const row of incoming) values.set(String(row[id]), row);
-  return [...values.values()];
-};
-
-export const continuationLineage = (run: RunSummary, all: RunSummary[]) => {
-  const ancestors: string[] = []; let current = run.previousRunId;
-  while (current && !ancestors.includes(current)) { ancestors.push(current); current = all.find((item) => item.environmentRunId === current)?.previousRunId; }
-  return ancestors;
 };
 
 export const parseJson = (value: unknown): JsonRow => { try { return typeof value === "string" ? JSON.parse(value) as JsonRow : (value ?? {}) as JsonRow; } catch { return {}; } };

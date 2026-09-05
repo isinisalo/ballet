@@ -36,12 +36,6 @@ export const OrchestrationRouteInventory = [
   "GET /api/refinement/proposals/:id/apply", "GET /api/refinement/proposals/:id/continuation"
 ] as const;
 
-export const RuntimeSchemaInventory = Object.freeze({
-  projectConfig: 23, rootSnapshot: 18, taskEnvelope: 11, roleOutcome: 11,
-  promptComposition: 14, executionSpec: 16, sqlite: 21,
-  feedback: 2, critic: 2, refinement: 2, codexAgent: 2, actionBinding: 3, runEvidence: 1
-});
-
 export const OrchestrationProhibitedRoutes = [
   "/api/states/:id/runs", "/api/actions/:id/runs",
   "/api/environment-runs/:id/source"

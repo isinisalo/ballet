@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  continuationLineage,
   criticDecisionRequest,
   currentGate,
   diffPresentation,
   orderedRunProjection,
-  reconcileRows,
   refinementDecisionRequest,
   retrySummary,
   statusPresentation,
   timelineForAction
 } from "../src/orchestration/runModels";
-import type { RunDetail, RunSummary, StateProjection } from "../src/orchestration/runTypes";
+import type { RunDetail, StateProjection } from "../src/orchestration/runTypes";
 
 const states = (): StateProjection[] => [
   { stateExecutionId: "sx-2", stateDefinitionId: "state-2", order: 2, status: "pending", revision: 0, createdAt: "now", updatedAt: "now", done: false, blocked: false, actions: [{ actionExecutionId: "ax-2", actionDefinitionId: "action-2", priority: 2, status: "pending", revision: 0, workAttempt: 0, maxRetries: 1, createdAt: "now", updatedAt: "now", done: false, blocked: false }] },
@@ -45,6 +43,4 @@ describe("orchestration Run and governance models", () => {
     { key: "+1", newLine: 2, marker: "+", text: "new" },
     { key: "=2:2", oldLine: 3, newLine: 3, marker: " ", text: "tail" }
   ]));
-  it("reconciles duplicate SSE refresh rows by stable id", () => expect(reconcileRows([{ id: "one", revision: 1 }], [{ id: "one", revision: 2 }, { id: "two", revision: 1 }], "id")).toEqual([{ id: "one", revision: 2 }, { id: "two", revision: 1 }]));
-  it("projects immutable continuation ancestry without cycles", () => { const runs = [{ environmentRunId: "run-3", previousRunId: "run-2" }, { environmentRunId: "run-2", previousRunId: "run-1" }, { environmentRunId: "run-1" }] as RunSummary[]; expect(continuationLineage(runs[0]!, runs)).toEqual(["run-2", "run-1"]); });
 });

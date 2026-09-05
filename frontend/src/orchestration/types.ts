@@ -64,5 +64,4 @@ export interface OrchestrationConfigureData {
   constraints: ResourceDocument[];
   useCases: ResourceDocument[];
   agents: GovernanceAgentsResponse;
-  schedules: Array<Record<string, unknown>>;
 }

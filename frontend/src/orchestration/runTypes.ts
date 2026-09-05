@@ -21,8 +21,8 @@ export interface RunDetail extends RunSummary {
 }
 
 export interface GovernanceData {
-  runs: RunSummary[]; feedback: JsonRow[]; criticRuns: JsonRow[]; criticProposals: CriticProposalSummary[];
-  refinementRuns: JsonRow[]; refinementProposals: JsonRow[];
+  runs: RunSummary[]; feedback: JsonRow[]; criticProposals: CriticProposalSummary[];
+  refinementProposals: JsonRow[];
   selectedRun?: RunDetail; selectedFeedback?: JsonRow; selectedCritic?: JsonRow; selectedRefinement?: JsonRow;
   applyStatus?: JsonRow; continuation?: JsonRow;
 }

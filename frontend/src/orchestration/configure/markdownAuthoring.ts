@@ -35,7 +35,7 @@ export const markdownEntity = (document: ResourceDocument, draft: MarkdownDraft)
 
 export const createMarkdownDocument = (kind: MarkdownDirectionKind): ResourceDocument => {
   const singular = kind === "use-cases" ? "Use Case" : kind === "adrs" ? "ADR" : kind.slice(0, -1);
-  const frontmatter: Record<string, unknown> = { id: "", title: `New ${singular}`, status: kind === "use-cases" ? "draft" : "draft" };
+  const frontmatter: Record<string, unknown> = { id: "", title: `New ${singular}`, status: "draft" };
   if (kind === "constraints") Object.assign(frontmatter, { kind: "required", description: "", rationale: "" });
   if (kind === "use-cases") Object.assign(frontmatter, {
     examples: [{ given: "", when: "", then: "" }], successGoals: [], failureGoals: [], expectedOutcomes: [],

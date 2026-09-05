@@ -28,9 +28,8 @@ export function useOrchestrationConfigureData(route: RouteState) {
         resource("constraints", view === "constraints"), resource("use-cases", view === "use-cases"),
         view === "agents" ? orchestrationApi.agents() : { configHash: project.configHash, agents: [] }
       ]);
-      const schedules: OrchestrationConfigureData["schedules"] = [];
       if (requestSequence !== sequence.current) return;
-      setData({ project, references, instructions, skills, goals, adrs, constraints, useCases, agents, schedules }); setError(undefined);
+      setData({ project, references, instructions, skills, goals, adrs, constraints, useCases, agents }); setError(undefined);
     } catch (reason) {
       if (requestSequence === sequence.current) setError(toErrorMessage(reason, "Unable to load orchestration workspace."));
     } finally { if (requestSequence === sequence.current) setLoading(false); }

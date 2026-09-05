@@ -5,7 +5,7 @@ import { orchestrationApi } from "../src/orchestration/orchestrationApi";
 import { useOrchestrationGovernanceData } from "../src/orchestration/useOrchestrationGovernanceData";
 
 function lists() {
-  for (const key of ["runs", "feedback", "criticRuns", "criticProposals", "refinementRuns", "refinementProposals"] as const) vi.spyOn(orchestrationApi, key).mockResolvedValue([]);
+  for (const key of ["runs", "feedback", "criticProposals", "refinementProposals"] as const) vi.spyOn(orchestrationApi, key).mockResolvedValue([]);
 }
 it("does not load governance data in an authoring workspace", async () => {
   lists();
