@@ -1,3 +1,4 @@
+import type { CriticProposalSummary } from "@shared/orchestration/httpResponses";
 import { request } from "@/apiClient";
 import type { Constraint, DirectionReference, UseCase } from "@shared/orchestration/direction";
 import type { ActionAgentDefinition, ActionDefinition, EnvironmentDefinition, GovernanceAgentId, ProjectConfigurationV25, StateDefinition } from "@shared/orchestration/environment";
@@ -63,7 +64,7 @@ export const orchestrationApi = {
   createFeedback: (input: JsonRow) => request<JsonRow>(`${base}/feedback`, body(input)),
   decideFeedback: (id: string, from: "open" | "in_refinement", decision: "resolved" | "dismissed") => request(`${base}/feedback/${encodeURIComponent(id)}/decision`, body({ from, decision })),
   criticRuns: () => request<JsonRow[]>(`${base}/critic/runs`),
-  criticProposals: () => request<JsonRow[]>(`${base}/critic/proposals`),
+  criticProposals: () => request<CriticProposalSummary[]>(`${base}/critic/proposals`),
   criticProposal: (id: string) => request<JsonRow>(`${base}/critic/proposals/${encodeURIComponent(id)}`),
   decideCritic: (id: string, input: JsonRow) => request(`${base}/critic/proposals/${encodeURIComponent(id)}/decision`, body(input)),
   refinementRuns: () => request<JsonRow[]>(`${base}/refinement/runs`),

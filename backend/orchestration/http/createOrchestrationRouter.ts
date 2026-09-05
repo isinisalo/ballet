@@ -205,7 +205,7 @@ const registerReviewRoutes = (
 ): void => {
   router.get("/critic/schedules", route(async (_req, res) => res.json(controller.listCritic("schedules"))));
   router.get("/critic/runs", route(async (_req, res) => res.json(controller.listCritic("runs"))));
-  router.get("/critic/proposals", route(async (_req, res) => res.json(controller.listCritic("proposals"))));
+  router.get("/critic/proposals", route(async (_req, res) => res.json(controller.criticProposals())));
   router.get("/critic/proposals/:id", route(async (req, res) => res.json(controller.criticProposal(parseParams(idParamsSchema, req).id))));
   router.post("/critic/runs", route(async (req, res) => { parseBody(emptySchema, req); res.status(201).json(await controller.manualCritic()); }));
   router.post("/critic/reconcile", route(async (req, res) => { parseBody(emptySchema, req); res.json(await controller.reconcileCritic()); }));
@@ -214,9 +214,9 @@ const registerReviewRoutes = (
   }));
   router.get("/refinement/runs", route(async (_req, res) => res.json(controller.listRefinement("runs"))));
   router.get("/refinement/proposals", route(async (_req, res) => res.json(controller.listRefinement("proposals"))));
-  router.get("/refinement/proposals/:id", route(async (req, res) => res.json(controller.refinementProposal(parseParams(idParamsSchema, req).id))));
+  router.get("/refinement/proposals/:id", route(async (req, res) => res.json(await controller.refinementProposal(parseParams(idParamsSchema, req).id))));
   router.post("/refinement/proposals/:id/decision", route(async (req, res) => {
-    const { id } = parseParams(idParamsSchema, req); controller.decideRefinement(id, parseBody(refinementDecisionSchema, req), actor()); res.status(204).end();
+    const { id } = parseParams(idParamsSchema, req); await controller.decideRefinement(id, parseBody(refinementDecisionSchema, req), actor()); res.status(204).end();
   }));
   router.post("/refinement/proposals/:id/apply", route(async (req, res) => {
     const { id } = parseParams(idParamsSchema, req); parseBody(emptySchema, req); res.json(await controller.applyRefinement(id));

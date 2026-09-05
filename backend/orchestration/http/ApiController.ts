@@ -1,3 +1,5 @@
+import type { CriticProposalSummary } from "../../../shared/orchestration/httpResponses.js";
+import { refinementPreimages } from "./RefinementPreimages.js";
 import type { EventStormingModelV1 } from "../../../shared/orchestration/eventStorming.js";
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
@@ -382,13 +384,22 @@ export class ApiController {
     }
     this.changed("schedule_changed"); return { criticRunIds: ids };
   }
-  listCritic(kind: "schedules" | "runs" | "proposals"): unknown[] {
+  listCritic(kind: "schedules" | "runs"): unknown[] {
     const queries = {
       schedules: "SELECT critic_schedule_id, enabled, next_due_at, updated_at FROM critic_schedules ORDER BY critic_schedule_id",
-      runs: "SELECT critic_run_id, critic_schedule_id, due_at, status, skip_reason, created_at, updated_at FROM critic_runs ORDER BY created_at DESC LIMIT 200",
-      proposals: "SELECT critic_proposal_id, critic_run_id, content_hash, target_type, target_id, category, status, version, created_at, updated_at FROM critic_proposals ORDER BY created_at DESC LIMIT 200"
+      runs: "SELECT critic_run_id, critic_schedule_id, due_at, status, skip_reason, created_at, updated_at FROM critic_runs ORDER BY created_at DESC LIMIT 200"
     };
     return this.dependencies.connection().prepare(queries[kind]).all() as unknown[];
+  }
+  criticProposals(): CriticProposalSummary[] {
+    return this.dependencies.connection().prepare(`
+      SELECT critic_proposal_id, critic_run_id, content_hash, target_type, target_id,
+        category, status, version, created_at, updated_at,
+        COALESCE(json_extract(content_json, '$.title'), 'Critic finding') AS title,
+        COALESCE(json_extract(content_json, '$.finding'), '') AS finding,
+        COALESCE(json_extract(content_json, '$.severity'), 'unknown') AS severity
+      FROM critic_proposals ORDER BY created_at DESC LIMIT 200
+    `).all() as CriticProposalSummary[];
   }
   criticProposal(id: string): unknown { return this.reviewStore.requireCriticProposal(id); }
   async manualCritic(): Promise<unknown> {
@@ -450,7 +461,7 @@ export class ApiController {
       : "SELECT refinement_proposal_id, refinement_run_id, target_action_id, change_list_hash, impact_scope_json, status, version, created_at, updated_at FROM refinement_proposals ORDER BY created_at DESC LIMIT 200";
     return this.dependencies.connection().prepare(query).all() as unknown[];
   }
-  refinementProposal(id: string): unknown {
+  async refinementProposal(id: string): Promise<unknown> {
     const proposal = this.reviewStore.requireRefinementProposal(id);
     const row = this.dependencies.connection().prepare(`
       SELECT er.execution_snapshot_json FROM refinement_runs rr
@@ -461,11 +472,8 @@ export class ApiController {
     const snapshot = JSON.parse(row.execution_snapshot_json) as {
       resources?: Array<{ relativePath: string; content: string }>;
     };
-    const resources = new Map((snapshot.resources ?? []).map((resource) => [resource.relativePath, resource.content]));
-    const files = this.reviewStore.refinementFiles(id).map((file) => ({
-      ...file,
-      preimage_content: String(file.operation) === "create" ? null : resources.get(String(file.relative_path)) ?? null
-    }));
+    const files = await refinementPreimages(this.dependencies.project.root, String(proposal.expected_base_commit),
+      snapshot.resources ?? [], this.reviewStore.refinementFiles(id));
     return { ...proposal, files };
   }
   refinementApplyStatus(id: string): unknown {
@@ -483,11 +491,12 @@ export class ApiController {
     if (!row) throw new NotFoundError(`Continuation for ${id} was not found.`);
     return row;
   }
-  decideRefinement(
+  async decideRefinement(
     id: string,
     input: Omit<Parameters<ReviewCoordinator["decideRefinement"]>[1], "decidedAt">,
     actor: TrustedHumanActor
-  ): void {
+  ): Promise<void> {
+    if (input.decision === "approved") await this.refinementProposal(id);
     this.reviews.decideRefinement(id, { ...input, decidedAt: this.dependencies.now() }, actor);
     this.changed("refinement_changed", id);
   }

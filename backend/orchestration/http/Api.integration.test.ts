@@ -331,11 +331,13 @@ describe("orchestration HTTP integration", () => {
     ).get(run.environmentRunId) as { run_evidence_id: string };
     reviewStore.createCriticDue({ criticRunId: "critic-run-manual", criticScheduleId: "manual",
       dueAt: TEST_AT, dueKey: "manual:due", runEvidenceId: runEvidence.run_evidence_id, createdAt: TEST_AT });
-    const criticContent = { proposalId: "critic-proposal-manual", summary: "Improve evidence feedback" };
+    const criticContent = { proposalId: "critic-proposal-manual", title: "Evidence feedback", finding: "Improve evidence feedback", severity: "high" };
     const criticHash = hash(criticContent);
     reviewStore.createCriticProposal({ criticProposalId: "critic-proposal-manual", criticRunId: "critic-run-manual",
       content: criticContent, contentHash: criticHash, targetType: "environment_run", targetId: run.environmentRunId,
       category: "system", createdAt: TEST_AT });
+    response = await request("/critic/proposals");
+    expect((await response.json() as Array<{ title: string; finding: string; severity: string }>)[0]).toMatchObject({ title: criticContent.title, finding: criticContent.finding, severity: "high" });
     response = await request("/critic/proposals/critic-proposal-manual/decision", json("POST", {
       decision: "approved", expectedContentHash: "f".repeat(64), expectedVersion: 2
     }));
@@ -366,6 +368,22 @@ describe("orchestration HTTP integration", () => {
       createdAt: TEST_AT
     };
     reviewStore.createRefinementProposal({ ...refinementBase, changeListHash: refinementChangeListHash(refinementBase) });
+    response = await request("/refinement/proposals/refinement-proposal-manual");
+    expect(response.status).toBe(200);
+    expect((await response.json() as { files: Array<{ preimage_content: string }> }).files[0]!.preimage_content).toBe(fixture.actionAgentSource);
+    fixture.database().prepare("UPDATE refinement_proposal_files SET expected_preimage_hash = ? WHERE refinement_proposal_id = ?")
+      .run("0".repeat(64), refinementBase.refinementProposalId);
+    response = await request("/refinement/proposals/refinement-proposal-manual/decision", json("POST", {
+      decision: "approved", expectedContentHash: refinementChangeListHash(refinementBase), expectedVersion: 2,
+      expectedChangeHashes: [sha256(refinedInstruction)], expectedImpactActionIds: ["action-1"],
+      acknowledgeLocalCommitAndContinuation: true
+    }));
+    expect(response.status).toBe(409);
+    expect(reviewStore.requireRefinementProposal(refinementBase.refinementProposalId).status).toBe("pending_human_review");
+    fixture.database().prepare("UPDATE refinement_proposal_files SET expected_preimage_hash = ? WHERE refinement_proposal_id = ?")
+      .run(fixture.actionAgentHash, refinementBase.refinementProposalId);
+
+
     response = await request("/refinement/proposals/refinement-proposal-manual/decision", json("POST", {
       decision: "approved", expectedContentHash: refinementChangeListHash(refinementBase), expectedVersion: 2,
       expectedChangeHashes: ["f".repeat(64)], expectedImpactActionIds: ["action-1"],
