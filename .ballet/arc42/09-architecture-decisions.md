@@ -3,8 +3,8 @@ id: arc42-section-09
 title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-04'
-version: 36
+updatedAt: '2026-09-05'
+version: 37
 tags: [arc42, decisions]
 arc42Section: 9
 ---
@@ -25,5 +25,7 @@ arc42Section: 9
 | [adr-043](../adr/adr-043-compact-horizontal-state-canvas.md) | superseded | Historical horizontal-State/vertical-Action planet projection and retained Action flow, superseded by ADR-044 |
 | [adr-044](../adr/adr-044-three-level-dagre-loop-canvas.md) | superseded | Introduced the three-level Dagre tree; node-label, spacing and edge presentation superseded by ADR-045 |
 | [adr-045](../adr/adr-045-spacious-concise-floating-loop-tree.md) | accepted | Spacious concise State -> Action -> Agents tree with visible selected branch and lightweight right-to-left floating curves |
+
+| [adr-046](../adr/adr-046-repository-owned-event-storming-workspace.md) | accepted | Human-approved repository-owned visual Event Storming workspace with shared live notes and board-local geometry |
 
 ADR-034:n, ADR-035:n, ADR-037:n, ADR-038:n, ADR-039:n, ADR-040:n, ADR-041:n, ADR-042:n, ADR-043:n, ADR-044:n ja ADR-045:n supersession-listat määrittävät, mitkä aiemmat päätökset tai niiden osat ovat historiallisia. Tässä indeksissä ei ylläpidetä rinnakkaista päätöstekstiä.

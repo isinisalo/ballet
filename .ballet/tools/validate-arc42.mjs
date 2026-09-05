@@ -9,6 +9,9 @@ import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
 import { actionAgentDefinitionSchema, governanceAgentDefinitionSchema, projectConfigurationV25Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 
+import { EventStormingService } from "../../backend/orchestration/project/EventStormingService.ts";
+import { ProjectDocumentRepository } from "../../backend/orchestration/project/ProjectDocumentRepository.ts";
+
 const root = process.cwd();
 const arc42Root = path.join(root, ".ballet/arc42");
 const issues = [];
@@ -211,6 +214,9 @@ if (!parsed.success) {
     if (!skillIds.has(id)) addIssue(`Orphan Skill resource ${rel(file)}.`);
   }
 }
+
+try { new EventStormingService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => {}).read(); }
+catch (error) { addIssue(`Event Storming model: ${error instanceof Error ? error.message : String(error)}`); }
 
 await validateFixtureProject();
 

@@ -3,8 +3,8 @@ id: arc42-section-08
 title: Poikkileikkaavat konseptit
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-30'
-version: 26
+updatedAt: '2026-09-05'
+version: 27
 tags: [arc42, concepts]
 arc42Section: 8
 ---
@@ -19,3 +19,5 @@ arc42Section: 8
 | CON-018 | Action Agent authority | TOML omistaa Action-roolin identiteetin, instructionin, modelin ja reasoningin; Project Config omistaa Skill-listan; Snapshot jäädyttää molemmat; Validation/Work-oikeudet johdetaan roolista eikä sandboxia authoroida |
 
 Status on source of truth ja `done`/`blocked` johdetaan pure-projektiona. Kaikki numerointi, canonical JSON ja hashit ovat deterministisiä. Human approval on oma trusted domain command, ei body role eikä provider-output. Refinement tarkistaa polkuallowlistin, symlinkit, preimaget, impact closuren ja result hashit ennen committia. HTTP on loopback-only, validoi requestit ja SSE kertoo vain factual invalidation/event-dataa. Accessibility, responsive layout ja design tokenit ovat contract, eivät loppuvaiheen koristelua.
+
+| CON-019 | Shared workshop source | Shared note UUIDs and per-board placements live only in model.md; strict schema, stable serialization, atomic replacement and hash checks protect evidence; UI interaction history is ephemeral |

@@ -1,3 +1,4 @@
+import { registerEventStormingRoutes } from "./eventStormingRoutes.js";
 import express from "express";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { HttpValidationError, parseBody, parseParams, parseUnknown } from "../../http/validation/httpValidation.js";
@@ -27,6 +28,7 @@ export const createOrchestrationRouter = ({ controller, actor }: OrchestrationRo
   }));
   registerDocumentRoutes(router, controller, actor);
   registerUserStoryRoutes(router, controller);
+  registerEventStormingRoutes(router, controller);
   registerEnvironmentRoutes(router, controller);
   registerRunRoutes(router, controller, actor);
   registerFeedbackRoutes(router, controller, actor);

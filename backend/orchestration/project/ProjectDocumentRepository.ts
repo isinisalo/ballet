@@ -8,11 +8,12 @@ import type Database from "better-sqlite3";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDocumentKind } from "./ProjectReferenceIndex.js";
+import { EVENT_STORMING_LIMITS } from "../../../shared/orchestration/eventStorming.js";
 import { USER_STORY_LIMITS } from "../../../shared/orchestration/userStories.js";
 
 const COLLECTIONS: Record<ProjectDocumentKind, string> = {
   goal: "goals", adr: "adr", constraint: "constraints", "use-case": "use-cases",
-  "user-story": "user-stories", instruction: "instructions", skill: "../.agents/skills"
+  "user-story": "user-stories", "event-storming": "event-storming", instruction: "instructions", skill: "../.agents/skills"
 };
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 const SAFE_SKILL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}(?:\/[a-zA-Z0-9][a-zA-Z0-9._-]{0,127})*$/;
@@ -52,6 +53,7 @@ export class ProjectDocumentRepository {
       descriptor = openSync(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
       if (!fstatSync(descriptor).isFile()) throw new ConflictError(`${kind} ${id} is not an ordinary file.`);
       if (kind === "user-story" && fstatSync(descriptor).size > USER_STORY_LIMITS.documentBytes) throw new ConflictError(`User Story ${id} exceeds the document size limit.`);
+      if (kind === "event-storming" && fstatSync(descriptor).size > EVENT_STORMING_LIMITS.documentBytes) throw new ConflictError("Event Storming exceeds the document size limit.");
       const content = readFileSync(descriptor, "utf8");
       return { kind, id, content, contentHash: sha256(content) };
     } finally {
@@ -84,7 +86,7 @@ export class ProjectDocumentRepository {
   }
 
   runReferences(kind: ProjectDocumentKind, id: string, activeOnly = false): string[] {
-    if (kind === "user-story") return [];
+    if (kind === "user-story" || kind === "event-storming") return [];
     if (!this.connection) return [];
     const rows = this.connection().prepare(`
       SELECT environment_run_id, execution_snapshot_json FROM environment_runs
@@ -101,6 +103,10 @@ export class ProjectDocumentRepository {
   private filename(kind: ProjectDocumentKind, id: string): string {
     if (!(kind === "skill" ? SAFE_SKILL_ID : SAFE_ID).test(id)) throw new ConflictError("Document id contains unsafe path characters.");
     const directory = this.collectionPath(kind);
+    if (kind === "event-storming") {
+      if (id !== "model") throw new ConflictError("Event Storming uses the model document only.");
+      return path.join(directory, "model.md");
+    }
     if (kind === "user-story") return path.join(directory, `${id}.md`);
     if (kind === "skill") return path.join(directory, ...id.split("/"), "SKILL.md");
     const matching = status(directory)?.isDirectory() ? readdirSync(directory, { withFileTypes: true })
@@ -111,7 +117,7 @@ export class ProjectDocumentRepository {
 
   private collectionPath(kind: ProjectDocumentKind): string {
     const directory = path.join(this.dataRoot, COLLECTIONS[kind]);
-    if (kind === "user-story") {
+    if (kind === "user-story" || kind === "event-storming") {
       for (const ancestor of [path.dirname(this.dataRoot), this.dataRoot, directory]) {
         const metadata = status(ancestor);
         if (metadata) assertOrdinaryDirectory(metadata, ancestor);

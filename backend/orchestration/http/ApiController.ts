@@ -1,3 +1,4 @@
+import type { EventStormingModelV1 } from "../../../shared/orchestration/eventStorming.js";
 /* eslint-disable max-lines -- One typed application facade keeps every orchestration HTTP adapter free of persistence and domain decisions. */
 import type Database from "better-sqlite3";
 import type { GovernanceAgentId, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
@@ -83,6 +84,11 @@ export class ApiController {
     return saved;
   }
   documents(kind: ProjectDocumentKind): unknown { return this.dependencies.project.documents.list(kind); }
+  eventStorming() { return this.dependencies.project.eventStorming.read(); }
+  saveEventStorming(value: EventStormingModelV1, expectedHash: string) {
+    const saved = this.dependencies.project.eventStorming.save(value, expectedHash);
+    this.changed("project_changed"); return saved;
+  }
   userStories() { return this.dependencies.project.userStories.list(); }
   userStory(id: string) { return this.dependencies.project.userStories.require(id); }
   createUserStory(input: UserStoryInput) {
@@ -97,6 +103,7 @@ export class ApiController {
     this.dependencies.project.userStories.remove(id, expectedHash); this.changed("project_changed", id);
   }
   document(kind: ProjectDocumentKind, id: string): unknown {
+    if (kind === "event-storming") return this.eventStorming();
     if (kind === "user-story") return this.userStory(id);
     const document = this.dependencies.project.documents.require(kind, id);
     if (kind === "instruction" || kind === "skill") return document;

@@ -3,8 +3,8 @@ id: arc42-traceability
 title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-04'
-version: 46
+updatedAt: '2026-09-05'
+version: 47
 tags: [arc42, traceability, evidence]
 ---
 
@@ -29,6 +29,7 @@ tags: [arc42, traceability, evidence]
 | goal-024 / REQ-024 | QS-041 | adr-040 / CON-017 | BB-017 | RT-033 / DEP-007 | TEST-041 | EVID-041 | RISK-025 | passed canonical |
 | goal-002,goal-007,goal-022 / REQ-022 | QS-042 | adr-041 / CON-015 | BB-015,BB-016 | RT-026,RT-029 / DEP-007 | TEST-042 | EVID-042 | RISK-023 | passed locally |
 | goal-023,goal-024 / REQ-023,REQ-024 | QS-043 | adr-042 / CON-018 | BB-018 | RT-034 / DEP-008 | TEST-043 | EVID-043 | RISK-025 | passed canonical |
+| goal-002,goal-007 | QS-044 | adr-046 / CON-019 | BB-019 | RT-035 | TEST-044 | EVID-044 | document-wide conflicts | passed locally |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
@@ -88,3 +89,6 @@ tags: [arc42, traceability, evidence]
 | EVID-041 | ADR-040 refinement/continuation, full repository and responsive browser evidence |
 | EVID-042 | ADR-041 schema/planner/context/API/UI tests plus arc42, cutover, design, lint, build and full-suite command log |
 | EVID-043 | ADR-042 TOMLs, Project Config v25, Root Snapshot v20, SQLite v23, repository/API/runtime/UI tests and final validation/startup command log |
+
+| TEST-044 | EventStormingService.test.ts, EventStorming.integration.test.ts, eventStorming.test.ts, eventStormingUI.test.tsx, workspaceNavigation.test.tsx, orchestrationInvalidations.test.tsx and desktop/narrow browser QA |
+| EVID-044 | Event Storming verification record in initiatives/event-storming-workspace/EVIDENCE.md |

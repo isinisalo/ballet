@@ -14,3 +14,9 @@ Use the current Action name and input to select exactly one level. Read the prec
 5. Event Storming informs arc42; it does not replace requirements, interface contracts, deployment design or accepted architecture documentation.
 
 Reference method: https://techtrendsetters.org/p/event-storming
+
+## Repository-owned visual model
+
+The approved Project Event Storming workspace and these Actions share `.ballet/event-storming/model.md`. Read [MODEL.md](MODEL.md) before editing. The YAML frontmatter is EventStormingModelV1; the Markdown body retains supplementary workshop evidence. Preserve note IDs across levels and use independent placements to show the same note on several boards. Never regenerate or reposition unrelated boards. The requested board ID bounds the work; if more than one board fits without explicit selection, ask for bounded input rather than choosing silently.
+
+Work edits only its managed-worktree file, using atomic replacement after validating the entire model. Validation reads the same file and verifies the selected level, references and domain evidence. `npm run validate:arc42` checks the shared schema when the file exists. No narrative copy, SQLite mirror, automatic acceptance or Run gate is introduced. The previous three separate level-artifact paths are replaced.

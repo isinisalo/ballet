@@ -43,6 +43,30 @@ colors:
   on-story-goal: '#472a00'
   story-benefit: '#c4b5fd'
   on-story-benefit: '#2e1f54'
+  storm-event: '#ffb95f'
+  on-storm-event: '#472a00'
+  storm-command: '#adc6ff'
+  on-storm-command: '#002e69'
+  storm-actor: '#fff0ae'
+  on-storm-actor: '#443600'
+  storm-policy: '#c4b5fd'
+  on-storm-policy: '#2e1f54'
+  storm-system: '#efb5d5'
+  on-storm-system: '#50253e'
+  storm-read-model: '#8edcaf'
+  on-storm-read-model: '#123d28'
+  storm-aggregate: '#f2d465'
+  on-storm-aggregate: '#423500'
+  storm-hotspot: '#ffaaa0'
+  on-storm-hotspot: '#641d19'
+  storm-opportunity: '#b5dfa0'
+  on-storm-opportunity: '#243d18'
+  storm-value: '#b5dfa0'
+  on-storm-value: '#243d18'
+  storm-definition: '#e2e2e6'
+  on-storm-definition: '#2f3034'
+  storm-note: '#e2e2e6'
+  on-storm-note: '#2f3034'
 typography:
   headline-lg:
     fontFamily: Inter
@@ -104,7 +128,7 @@ spacing:
 
 Ballet is a dense, calm cyber-industrial command center. Dark tonal surfaces support long sessions; mint marks validated/safe state, amber marks attention and retry, red marks blocking failure, and blue marks selection or primary action. Every semantic color has a text label or icon-and-label equivalent.
 
-Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact metadata. The spacing rhythm is 4 px and panels use restrained radii and one-pixel boundaries. Freeform topology canvases, ad hoc palettes, ornamental planet/radial artwork and reward/policy matrices are forbidden. Loop Engineering is a deterministic navigational tree rather than a user-positioned topology editor.
+Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact metadata. The spacing rhythm is 4 px and panels use restrained radii and one-pixel boundaries. Freeform topology canvases outside the repository-owned Event Storming workshop, ad hoc palettes, ornamental planet/radial artwork and reward/policy matrices are forbidden. Loop Engineering is a deterministic navigational tree rather than a user-positioned topology editor.
 
 ## Information architecture
 
@@ -129,6 +153,7 @@ Each workspace has one canonical URL owner. `/` is a shell landing redirect to `
 | Agents / Skills / Runtimes | `/agents`, `/skills`, `/runtimes` |
 | Goals / ADRs / Constraints | `/project/goals`, `/project/adrs`, `/project/constraints`, each with `?id=` |
 | Use Cases / Instructions | `/project/use-cases`, `/project/instructions`, each with `?id=` |
+| Event Storming | `/project/event-storming`, `?id=<boardId>&item=<placementId>` |
 | User Story | `/project/user-stories`, `?create=story` or `?id=<uuid>` |
 | Run Gate | `/run`, `/run/:runId`, nested State and Action routes |
 | Feedback Box | `/feedback`, `/feedback/:id` |
@@ -195,3 +220,15 @@ Route changes move focus to the new workspace heading or announce it without ste
 ## Implementation boundary
 
 Use existing React, Vite, Tailwind and shadcn primitives plus React Flow and Dagre for Loop Engineering. Tokens in this frontmatter are the source of truth. Pure TypeScript owns deterministic ordering, Dagre input/output normalization, edges and dimensions; React renders the read-only graph and forwards canonical navigation. Intentional changes to palette, type, rhythm, radii or component language require this file and architecture evidence to change together.
+
+## Event Storming visual contract
+
+The human-approved Event Storming implementation plan authorizes a free-positioned workshop canvas inside Project. Loop Engineering retains its separate deterministic navigational tree. Event Storming uses React Flow with stored board-local placement geometry and one shared repository model; it has no execution or approval authority.
+
+The full-height dark surface has a subdued 24 px dot grid, a compact heading/level toolbar, a left tool palette and a labelled bottom color legend. Primary authoring happens directly in notes; details expand inside the note, and contextual actions sit by the selection. The overview uses small colored-note previews. All styling uses the frontmatter tokens, 4 px spacing rhythm, Inter titles and Geist labels. No ornamental gradients or handwritten fonts are introduced.
+
+The `storm-*`/`on-storm-*` pairs identify notation, never runtime status. Events are orange, commands blue, actors pale yellow, policies lilac, systems pink, read models green, aggregates yellow, hotspots coral, opportunities/values green and definitions/notes neutral. Every note has a type label and symbol; hotspot uses a question mark. Notes start at 184×168 px, actors 136×112 px and systems 224×144 px, with a 4 px radius and one-pixel boundary. Named process/context frames have a neutral translucent surface and dashed outline. Pivotal event placements add a labelled star and stronger outline.
+
+At 1440×900 the board fills the remaining viewport and the sidebar can collapse. At 390×844, the tools form an internally scrolling top strip, selection tools move to the bottom, dialogs stay within the viewport and controls are at least 40 px. The page never scrolls horizontally; the canvas itself pans and zooms. Color legend and text remain labelled. Reduced motion disables non-essential transitions and camera movements are immediate.
+
+Single-note content is shared across boards; geometry, frames, arrows and pivotal marks are board-local. Shared notes show their usage count. Delete removes a placement; Delete everywhere and Delete board use consequence dialogs. Undo/redo is session-local and persists the inverse edit through the same optimistic save queue. Saving occurs 600 ms after typing and after a completed geometric gesture. Saved, Saving and Save failed are factual persistence states. Conflicts retain the draft and require explicit discard before reload.

@@ -10,6 +10,7 @@ import type { ProjectDefinition, ProjectDefinitionPort } from "../runtime/Enviro
 import { ProjectDocumentRepository } from "./ProjectDocumentRepository.js";
 import { ProjectConfigurationRepository } from "./ProjectConfigurationRepository.js";
 import { ProjectReferenceIndex, type DirectionDocumentKind } from "./ProjectReferenceIndex.js";
+import { EventStormingService } from "./EventStormingService.js";
 import { UserStoryService } from "./UserStoryService.js";
 import { CodexAgentRepository } from "./CodexAgentRepository.js";
 import { ActionAgentMutationService } from "./ActionAgentMutationService.js";
@@ -21,6 +22,7 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
   readonly agents: CodexAgentRepository;
   readonly actions: ActionAgentMutationService;
   readonly userStories: UserStoryService;
+  readonly eventStorming: EventStormingService;
 
   constructor(
     readonly root: string,
@@ -30,6 +32,7 @@ export class ProjectDefinitionService implements ProjectDefinitionPort {
     this.agents = new CodexAgentRepository(root);
     this.actions = new ActionAgentMutationService(projects, this.agents);
     this.userStories = new UserStoryService(documents, () => projects.assertUnlocked());
+    this.eventStorming = new EventStormingService(documents, () => projects.assertUnlocked());
   }
 
   putDirection(input: {

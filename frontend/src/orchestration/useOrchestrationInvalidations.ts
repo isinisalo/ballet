@@ -6,9 +6,11 @@ export function useOrchestrationInvalidations(refresh: () => Promise<unknown>) {
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let activeStream: EventSource | undefined;
     const connect = () => {
       if (stopped) return;
       const stream = new EventSource(`/api/events?after=${after.current}`);
+      activeStream = stream;
       stream.addEventListener("invalidation", (message) => {
         const event = JSON.parse((message as MessageEvent<string>).data) as InvalidationEvent;
         if (event.sequence <= after.current) return;
@@ -18,6 +20,6 @@ export function useOrchestrationInvalidations(refresh: () => Promise<unknown>) {
       stream.onerror = () => { stream.close(); if (!stopped) timer = setTimeout(connect, 1_000); };
     };
     connect();
-    return () => { stopped = true; if (timer) clearTimeout(timer); };
+    return () => { stopped = true; if (timer) clearTimeout(timer); activeStream?.close(); };
   }, [refresh]);
 }

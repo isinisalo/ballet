@@ -1,3 +1,4 @@
+import { eventStormingId } from "@shared/orchestration/eventStorming";
 import type { RouteState, WorkspaceView } from "./types";
 import { userStoryIdSchema } from "@shared/orchestration/userStories";
 
@@ -18,6 +19,7 @@ export const routeFromPath = (path: string): RouteState => {
     "/project/constraints": "constraints",
     "/project/use-cases": "use-cases",
     "/project/user-stories": "user-stories",
+    "/project/event-storming": "event-storming",
     "/project/instructions": "instructions",
     "/run": "run-list",
     "/feedback": "feedback-list",
@@ -67,6 +69,13 @@ export const orchestrationEntityPath = (base: string, id?: string) => id && base
   : `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
 
 function exactRoute(workspaceView: WorkspaceView, url: URL): RouteState {
+  if (workspaceView === "event-storming") {
+    const id = url.searchParams.get("id"); const item = url.searchParams.get("item");
+    const invalid = (id !== null && !eventStormingId.safeParse(id).success) || (item !== null && (!id || !eventStormingId.safeParse(item).success))
+      || [...url.searchParams.keys()].some((key) => !["id", "item"].includes(key)) || url.searchParams.getAll("id").length > 1 || url.searchParams.getAll("item").length > 1;
+    return invalid ? { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/event-storming" }
+      : { view: "orchestration", workspaceView, entityId: id ?? undefined, itemId: item ?? undefined };
+  }
   if (workspaceView === "user-stories") return userStoryRoute(url);
   return { view: "orchestration", workspaceView, entityId: url.searchParams.get("id") ?? undefined,
     createMode: workspaceView === "environment" && url.searchParams.get("create") === "state" ? "state" : undefined };

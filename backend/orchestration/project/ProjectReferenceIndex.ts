@@ -1,7 +1,7 @@
 import type { ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
 
 export type DirectionDocumentKind = "goal" | "adr" | "constraint" | "use-case";
-export type ProjectDocumentKind = DirectionDocumentKind | "user-story" | "instruction" | "skill";
+export type ProjectDocumentKind = DirectionDocumentKind | "user-story" | "event-storming" | "instruction" | "skill";
 export type ProjectReferenceKind = ProjectDocumentKind;
 
 export interface ProjectReference {

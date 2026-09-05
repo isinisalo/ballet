@@ -11,7 +11,7 @@ import { actionDisplayName } from "./actionDisplayName";
 const groups = [
   ["Automation", [["Loop Engineering", "/automation/loops", Network]]],
   ["Environment", [["Agents", "/agents", Bot], ["Skills", "/skills", Sparkles], ["Runtimes", "/runtimes", ServerCog]]],
-  ["Project", [["Goals", "/project/goals", Target], ["ADRs", "/project/adrs", Scale], ["Constraints", "/project/constraints", Gauge], ["User Story", "/project/user-stories", BookOpenText], ["Use Cases", "/project/use-cases", FileCheck2], ["Instructions", "/project/instructions", ClipboardCheck]]],
+  ["Project", [["Goals", "/project/goals", Target], ["ADRs", "/project/adrs", Scale], ["Constraints", "/project/constraints", Gauge], ["Event Storming", "/project/event-storming", Network], ["User Story", "/project/user-stories", BookOpenText], ["Use Cases", "/project/use-cases", FileCheck2], ["Instructions", "/project/instructions", ClipboardCheck]]],
   ["Run", [["Runs", "/run", Play], ["Feedback", "/feedback", MessageSquareWarning], ["Critic reviews", "/reviews/critic", FileKey2], ["Refinement reviews", "/reviews/refinement", Braces]]]
 ] as const;
 

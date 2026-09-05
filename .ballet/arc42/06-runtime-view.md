@@ -3,8 +3,8 @@ id: arc42-section-06
 title: Ajonaikainen näkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-30'
-version: 27
+updatedAt: '2026-09-05'
+version: 28
 tags: [arc42, runtime]
 arc42Section: 6
 ---
@@ -22,6 +22,8 @@ arc42Section: 6
 | RT-032 | Checkout-local daemon task | ready Codex capability -> atomic claim/fencing -> ExecutionSpec v18 in server-owned worktree -> lease renew/events -> raw terminal callback -> server v11 validation/finalization; expiry -> one runtime_lost failure |
 | RT-033 | Historical Codex-only Action binding | superseded by RT-034; machine-local Action execution binding is removed |
 | RT-034 | Action Agent execution | exact Action-Agent inventory -> model/reasoning capability preflight -> freeze TOML definition/hash + Skill closure -> emit Validation/Work `action_agent` specs with TOML instructions; Validation read-only, Work managed-worktree, any mismatch -> zero dispatch |
+
+| RT-035 | Event Storming authoring | read model.md → edit note/placement → debounce or finish gesture → serial optimistic PUT → atomic file replacement → transient invalidation; conflict retains draft; Run lock blocks writes |
 
 ## RT-026 rules
 

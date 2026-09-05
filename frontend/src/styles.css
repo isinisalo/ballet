@@ -373,3 +373,30 @@
 .markdown-document-preview code {
   font-family: var(--font-mono);
 }
+
+:root {
+  --storm-event: #ffb95f;
+  --on-storm-event: #472a00;
+  --storm-command: #adc6ff;
+  --on-storm-command: #002e69;
+  --storm-actor: #fff0ae;
+  --on-storm-actor: #443600;
+  --storm-policy: #c4b5fd;
+  --on-storm-policy: #2e1f54;
+  --storm-system: #efb5d5;
+  --on-storm-system: #50253e;
+  --storm-read-model: #8edcaf;
+  --on-storm-read-model: #123d28;
+  --storm-aggregate: #f2d465;
+  --on-storm-aggregate: #423500;
+  --storm-hotspot: #ffaaa0;
+  --on-storm-hotspot: #641d19;
+  --storm-opportunity: #b5dfa0;
+  --on-storm-opportunity: #243d18;
+  --storm-value: #b5dfa0;
+  --on-storm-value: #243d18;
+  --storm-definition: #e2e2e6;
+  --on-storm-definition: #2f3034;
+  --storm-note: #e2e2e6;
+  --on-storm-note: #2f3034;
+}

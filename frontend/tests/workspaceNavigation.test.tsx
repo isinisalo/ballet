@@ -30,6 +30,17 @@ describe("canonical workspace navigation blocker", () => {
     expect(confirm).not.toHaveBeenCalled();
     expect(result.current.route).toMatchObject({ workspaceView: "feedback-list" });
   });
+  it("keeps Event Storming drafts while changing boards, but blocks leaving the editor", () => {
+    const boardId = crypto.randomUUID(), nextId = crypto.randomUUID(), item = crypto.randomUUID();
+    window.history.replaceState({}, "", `/project/event-storming?id=${boardId}`);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { result } = renderHook(() => useWorkspaceNavigation());
+    act(() => result.current.setNavigationBlocker({ isDirty: true }));
+    act(() => result.current.navigate(`/project/event-storming?id=${nextId}&item=${item}`));
+    expect(result.current.route).toMatchObject({ entityId: nextId, itemId: item }); expect(confirm).not.toHaveBeenCalled();
+    act(() => result.current.navigate("/project/goals"));
+    expect(confirm).toHaveBeenCalledOnce(); expect(result.current.route.workspaceView).toBe("event-storming");
+  });
 
   it("restores canonical deep links through browser back and forward", async () => {
     const { result } = renderHook(() => useWorkspaceNavigation());

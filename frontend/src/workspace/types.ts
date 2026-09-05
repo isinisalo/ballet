@@ -4,6 +4,7 @@ export type WorkspaceView =
   | "constraints"
   | "use-cases"
   | "user-stories"
+  | "event-storming"
   | "environment"
   | "state"
   | "action"
@@ -27,6 +28,7 @@ export interface RouteState {
   view: "orchestration";
   workspaceView: WorkspaceView;
   entityId?: string;
+  itemId?: string;
   stateId?: string;
   actionId?: string;
   createMode?: "state" | "action" | "story";

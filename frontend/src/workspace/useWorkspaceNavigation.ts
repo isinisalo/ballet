@@ -28,6 +28,7 @@ const changesOnlyActionSubview = (currentPath: string, nextPath: string) => {
   const nextUrl = new URL(nextPath, window.location.origin);
   const currentRoute = routeFromPath(currentPath);
   const nextRoute = routeFromPath(nextPath);
+  if (currentRoute.workspaceView === "event-storming" && nextRoute.workspaceView === "event-storming") return true;
   if (currentRoute.workspaceView !== "action" || nextRoute.workspaceView !== "action" || currentUrl.pathname !== nextUrl.pathname) return false;
   currentUrl.searchParams.delete("agent");
   nextUrl.searchParams.delete("agent");

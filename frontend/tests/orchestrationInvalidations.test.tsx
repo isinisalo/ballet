@@ -20,6 +20,14 @@ describe("orchestration invalidations", () => {
     await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
     window.EventSource = originalEventSource;
   });
+  it("closes the stream when changing workspaces or replacing the refresh callback", () => {
+    const closed = vi.fn();
+    class Source { onerror = null; addEventListener() {} close = closed; }
+    const original = window.EventSource; window.EventSource = Source as unknown as typeof EventSource;
+    const { rerender, unmount } = render(<Harness refresh={vi.fn(async () => {})} />);
+    rerender(<Harness refresh={vi.fn(async () => {})} />); expect(closed).toHaveBeenCalledTimes(1);
+    unmount(); expect(closed).toHaveBeenCalledTimes(2); window.EventSource = original;
+  });
 });
 
 function Harness({ refresh }: { refresh(): Promise<unknown> }) {
