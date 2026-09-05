@@ -20,7 +20,7 @@ export const orchestrationApi = {
   putProject: (config: ProjectConfigurationV25, expectedHash: string) => request<ProjectRecord>(`${base}/project`, put({ config, expectedHash })),
   saveDirection: (collection: "goals" | "adrs" | "constraints" | "use-cases", value: DirectionReference | Constraint | UseCase,
     markdown: string, expectedConfigHash: string, expectedDocumentHash: string | "absent", creating = false) =>
-    request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {
+    request<{ configHash: string; documentHash: string }>(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(value.id)}`}`, {
       ...(creating ? body({ value, markdown, expectedConfigHash, expectedDocumentHash }) : put({ value, markdown, expectedConfigHash, expectedDocumentHash }))
     }),
   deleteDirection: (collection: string, id: string, expectedConfigHash: string, expectedHash: string) =>
@@ -49,7 +49,7 @@ export const orchestrationApi = {
   deleteAction: (stateId: string, actionId: string, expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/${encodeURIComponent(actionId)}`, remove({ expectedConfigHash })),
   reprioritizeActions: (stateId: string, orderedIds: string[], expectedConfigHash: string) => request(`${base}/environment/states/${encodeURIComponent(stateId)}/actions/reprioritize`, body({ orderedIds, expectedConfigHash })),
   saveResource: (collection: "instructions" | "skills", id: string, content: string, expectedHash: string | "absent", creating = false) =>
-    request(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(id)}`}`, creating ? body({ id, content, expectedHash }) : put({ content, expectedHash })),
+    request<ResourceDocument>(`${base}/${collection}${creating ? "" : `/${encodeURIComponent(id)}`}`, creating ? body({ id, content, expectedHash }) : put({ content, expectedHash })),
   manualCritic: () => request(`${base}/critic/runs`, body({})),
   runs: () => request<RunSummary[]>(`${base}/environment-runs`),
   run: (id: string) => request<RunDetail>(`${base}/environment-runs/${encodeURIComponent(id)}`),

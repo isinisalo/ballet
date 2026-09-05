@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMarkdownDraft } from "./useMarkdownDraft";
+import { MarkdownConflict } from "./MarkdownConflict";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EditorActions } from "@/components/shared/editor-actions";
@@ -10,7 +12,7 @@ import type { ResourceDocument } from "../types";
 import { ConfigureHeader } from "./ConfigureHeader";
 import { ConfigureToolbar } from "./ConfigureToolbar";
 import {
-  createMarkdownDocument, directionValueFromMarkdown, markdownEntity, splitMarkdownSource,
+  createMarkdownDocument, directionValueFromMarkdown, markdownEntity,
   type MarkdownDirectionKind, type MarkdownDirectionValue
 } from "./markdownAuthoring";
 
@@ -20,7 +22,7 @@ const title = (kind: MarkdownDirectionKind) => kind === "use-cases" ? "Use Cases
 export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId, locked, navigate, onSave, onDelete, onApprove, onDraft }: {
   kind: MarkdownDirectionKind; values: MarkdownDirectionValue[]; documents: ResourceDocument[]; selectedId?: string; locked: boolean;
   navigate(path: string): void;
-  onSave(value: MarkdownDirectionValue, markdown: string, creating: boolean): Promise<void>;
+  onSave(value: MarkdownDirectionValue, markdown: string, creating: boolean, expectedDocumentHash: string): Promise<ResourceDocument>;
   onDelete?(value: MarkdownDirectionValue): Promise<void>;
   onApprove?(value: UseCase): Promise<void>; onDraft?(value: UseCase): Promise<void>;
 }) {
@@ -46,21 +48,23 @@ export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId
 function MarkdownEditor({ kind, document, current, creating, locked, status, onCreate, onDirty, onSave, onDelete, onApprove, onDraft }: {
   kind: MarkdownDirectionKind; document: ResourceDocument; current?: MarkdownDirectionValue; creating: boolean; locked: boolean;
   status: string; onCreate(): void;
-  onDirty(value: boolean): void; onSave(value: MarkdownDirectionValue, markdown: string, creating: boolean): Promise<void>;
+  onDirty(value: boolean): void; onSave(value: MarkdownDirectionValue, markdown: string, creating: boolean, expectedDocumentHash: string): Promise<ResourceDocument>;
   onDelete?(value: MarkdownDirectionValue): Promise<void>; onApprove?(value: UseCase): Promise<void>; onDraft?(value: UseCase): Promise<void>;
 }) {
-  const original = useMemo(() => splitMarkdownSource(document.content), [document.content]);
-  const [frontmatterText, setFrontmatterText] = useState(original.frontmatterText); const [bodyText, setBodyText] = useState(original.bodyText);
-  const [pending, setPending] = useState(false); const [serverError, setServerError] = useState(""); const [confirming, setConfirming] = useState(false);
-  const dirty = frontmatterText !== original.frontmatterText || bodyText !== original.bodyText;
+  const editor = useMarkdownDraft(document, onDirty);
+  const { frontmatterText, bodyText, setFrontmatterText, setBodyText, dirty, pending, error: serverError } = editor;
+  const [confirming, setConfirming] = useState(false);
   let validation = ""; try { directionValueFromMarkdown(kind, { frontmatterText, bodyText }, current); } catch (error) { validation = error instanceof Error ? error.message : "Invalid Markdown document."; }
-  useEffect(() => onDirty(dirty), [dirty, onDirty]);
   const entity = markdownEntity(document, { frontmatterText, bodyText });
-  const save = async () => { setPending(true); setServerError(""); try { const parsed = directionValueFromMarkdown(kind, { frontmatterText, bodyText }, current); await onSave(parsed.value, parsed.source, creating); onDirty(false); } catch (error) { setServerError(error instanceof Error ? error.message : "Unable to save Markdown."); } finally { setPending(false); } };
+  const save = () => editor.save((hash) => {
+    const parsed = directionValueFromMarkdown(kind, { frontmatterText, bodyText }, current);
+    return onSave(parsed.value, parsed.source, creating, hash);
+  });
   const useCase = current && "examples" in current ? current : undefined;
   const formId = `markdown-${kind}-${document.id}`;
-  return <div className="min-w-0"><ConfigureToolbar status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? useCase.status === "draft" ? <Button size="sm" disabled={locked || dirty} onClick={() => setConfirming(true)}>Approve exact content…</Button> : <Button size="sm" variant="outline" disabled={locked} onClick={() => void onDraft?.(useCase)}>Return to draft</Button> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={!validation && !locked} pending={pending} canDelete={Boolean(current && onDelete)} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
-    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="p-4 md:p-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={!validation && !locked} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
+  return <div className="min-w-0"><ConfigureToolbar status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? useCase.status === "draft" ? <Button size="sm" disabled={locked || dirty || editor.stale} onClick={() => setConfirming(true)}>Approve exact content…</Button> : <Button size="sm" variant="outline" disabled={locked} onClick={() => void onDraft?.(useCase)}>Return to draft</Button> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={!validation && !locked && !editor.stale} pending={pending} canDelete={Boolean(current && onDelete) && !editor.stale} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
+    <MarkdownConflict stale={editor.stale} hash={document.contentHash} onReload={editor.reload} />
+    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="p-4 md:p-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={!validation && !locked && !editor.stale} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
     <Dialog open={confirming} onOpenChange={setConfirming}><DialogContent><DialogHeader><DialogTitle>Approve {useCase?.id}?</DialogTitle><DialogDescription>This approves the exact persisted semantic content with hash <code className="break-all">{useCase ? useCaseApprovalHash(useCase) : ""}</code>. Saving Markdown never approves it.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setConfirming(false)}>Cancel</Button><Button onClick={() => { setConfirming(false); if (useCase) void onApprove?.(useCase); }}>Approve exact content</Button></DialogFooter></DialogContent></Dialog>
   </div>;
 }

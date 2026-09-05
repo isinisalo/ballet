@@ -148,6 +148,23 @@ describe("orchestration Configure UI", () => {
     await user.click(screen.getByRole("button", { name: "Save Action" })); await waitFor(() => expect(save).toHaveBeenCalledOnce());
     expect(save.mock.calls[0]![1]).toMatchObject({ validationAgent: { developerInstructions: expect.stringContaining("validation-draft") }, workAgent: { developerInstructions: expect.stringContaining("work-draft") } });
   });
+  it("uses returned Agent hashes for the next save without navigating", async () => {
+    mockActionAgents();
+    const initial = await orchestrationApi.action("state-1", "action-1");
+    const save = vi.fn(async (_action, pair) => ({ ...initial,
+      validationAgent: { ...initial.validationAgent, contentHash: "v-new" },
+      workAgent: { ...initial.workAgent, contentHash: "w-new", agent: { ...initial.workAgent.agent, ...pair.workAgent } }
+    }));
+    const user = userEvent.setup();
+    renderActionWorkspace(false, save, [], "work");
+    await user.type(await screen.findByLabelText("work developer instructions"), " first");
+    await user.click(screen.getByRole("button", { name: "Save Action" }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    await user.type(screen.getByLabelText("work developer instructions"), " second");
+    await user.click(screen.getByRole("button", { name: "Save Action" }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save.mock.calls[1]![1]).toMatchObject({ validationAgent: { expectedDocumentHash: "v-new" }, workAgent: { expectedDocumentHash: "w-new" } });
+  });
   it("recovers from an invalid Action Agent query", () => { mockActionAgents(); const config = orchestrationConfig(); render(<ActionWorkspace stateId="state-1" action={config.environment.states[0]!.actions[0]} selectedAgentRole="invalid" skills={[]} locked={false} onSave={vi.fn()} />); expect(screen.getByRole("alert")).toHaveTextContent("Agent selection is invalid"); expect(screen.getByRole("button", { name: "Return to Action" })).toHaveAttribute("href", "/automation/loops/states/state-1/actions/action-1"); });
   it("shows only blocking Action Agent readiness issues inline", async () => { mockActionAgents({ missing: true }); renderActionWorkspace(); await waitFor(() => expect(screen.getByText("Action Agent definitions are unavailable.")).toBeInTheDocument()); expect(screen.getByRole("alert")).toBeInTheDocument(); expect(screen.queryByText("Run readiness")).not.toBeInTheDocument(); expect(screen.queryByText("Ready · no validation issues.")).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "Save Action" })).toBeDisabled(); });
 });

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EditorActions, TextField } from "@/components/shared/workspace-ui";
 import type { ActionAgentDefinition, ActionDefinition } from "@shared/orchestration/environment";
-import type { ResourceDocument } from "../types";
+import type { ActionResponse, ResourceDocument } from "../types";
 import { ConfigureHeader, IssueList } from "./ConfigureHeader";
 import { ActionAgentEditor, type EditableActionAgent } from "./ActionAgentEditor";
 import { isAuthoringModelId, unsupportedAuthoringModelMessage } from "./agentModelPolicy";
@@ -19,9 +19,11 @@ type SaveAgents = {
 export function ActionWorkspace({ stateId, action, selectedAgentRole, skills, locked, onSave }: {
   stateId?: string; action?: ActionDefinition; skills: ResourceDocument[]; locked: boolean;
   selectedAgentRole?: "validation" | "work" | "invalid";
-  onSave(action: ActionDefinition, agents: SaveAgents): Promise<void>;
+  onSave(action: ActionDefinition, agents: SaveAgents): Promise<ActionResponse | void>;
 }) {
   const [draft, setDraft] = useState(action); const [agents, setAgents] = useState<AgentPair>();
+  const [pending, setPending] = useState(false); const [saveError, setSaveError] = useState("");
+  const submitting = useRef(false);
   const loaded = useActionAgents(stateId ?? "", action?.id ?? "");
   useEffect(() => {
     const details = loaded.details; if (!details) return;
@@ -31,14 +33,19 @@ export function ActionWorkspace({ stateId, action, selectedAgentRole, skills, lo
   const agentIssues = validateAgents(agents, loaded.models);
   const readinessIssues = [...loaded.readinessIssues, ...agentIssues];
   const formId = `action-${action.id}`;
-  const dirty = JSON.stringify(draft) !== JSON.stringify(action) || Boolean(agents && loaded.details
+  const dirty = JSON.stringify(draft) !== JSON.stringify(loaded.details?.action ?? action) || Boolean(agents && loaded.details
     && JSON.stringify(agents) !== JSON.stringify({ validation: editable(loaded.details.validationAgent.agent), work: editable(loaded.details.workAgent.agent) }));
   const save = async () => {
-    if (!agents || !loaded.details) return;
-    await onSave(draft, {
-      validationAgent: { ...agents.validation, expectedDocumentHash: loaded.details.validationAgent.contentHash },
-      workAgent: { ...agents.work, expectedDocumentHash: loaded.details.workAgent.contentHash }
-    });
+    if (!agents || !loaded.details || submitting.current || locked) return;
+    submitting.current = true; setPending(true); setSaveError("");
+    try {
+      const saved = await onSave(draft, {
+        validationAgent: { ...agents.validation, expectedDocumentHash: loaded.details.validationAgent.contentHash },
+        workAgent: { ...agents.work, expectedDocumentHash: loaded.details.workAgent.contentHash }
+      });
+      if (saved) { loaded.acceptSaved(saved); setDraft(saved.action); }
+    } catch (error) { setSaveError(error instanceof Error ? error.message : "Unable to save Action."); }
+    finally { submitting.current = false; setPending(false); }
   };
   const valid = Boolean(agents && loaded.details) && readinessIssues.length === 0;
   if (selectedAgentRole === "invalid") return <div className="min-w-0 p-3 md:p-4">
@@ -53,17 +60,18 @@ export function ActionWorkspace({ stateId, action, selectedAgentRole, skills, lo
     <h1 className="sr-only">{selectedAgent === "validation" ? "Validation Agent" : selectedAgent === "work" ? "Work Agent" : action.name}</h1>
     <form id={formId} className="min-w-0 space-y-3 border bg-card p-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
       {!selectedAgent ? <>
-        <TextField label="Name" layout="row" density="compact" value={draft.name} disabled={locked} onChange={(name) => setDraft({ ...draft, name })} />
-        <TextField label="Description" layout="row" density="compact" value={draft.description} disabled={locked} onChange={(description) => setDraft({ ...draft, description })} />
-        <RetryBudgetField actionId={action.id} value={draft.maxRetries} disabled={locked} onChange={(maxRetries) => setDraft({ ...draft, maxRetries })} />
+        <TextField label="Name" layout="row" density="compact" value={draft.name} disabled={locked || pending} onChange={(name) => setDraft({ ...draft, name })} />
+        <TextField label="Description" layout="row" density="compact" value={draft.description} disabled={locked || pending} onChange={(description) => setDraft({ ...draft, description })} />
+        <RetryBudgetField actionId={action.id} value={draft.maxRetries} disabled={locked || pending} onChange={(maxRetries) => setDraft({ ...draft, maxRetries })} />
       </> : null}
       {selectedAgent && agents && loaded.details ? <ActionAgentEditor role={selectedAgent} agent={agents[selectedAgent]}
-        composition={draft[selectedAgent]} models={loaded.models} skills={skills} disabled={locked}
+        composition={draft[selectedAgent]} models={loaded.models} skills={skills} disabled={locked || pending}
         onAgentChange={(next) => setAgents({ ...agents, [selectedAgent]: next })}
         onCompositionChange={(next) => setDraft({ ...draft, [selectedAgent]: next })} /> : null}
       {!agents || !loaded.details ? <p className="p-3 text-sm text-muted-foreground">Loading Action Agent TOMLs…</p> : null}
+      {saveError ? <IssueList issues={[{ path: "save", message: saveError }]} /> : null}
       {readinessIssues.length ? <IssueList issues={readinessIssues.map((message) => ({ path: "agent", message }))} /> : null}
-      <div className="border-t pt-3"><EditorActions saveLabel="Save Action" formId={formId} dirty={dirty} valid={valid} locked={locked} /></div>
+      <div className="border-t pt-3"><EditorActions saveLabel="Save Action" formId={formId} dirty={dirty} valid={valid} locked={locked} pending={pending} /></div>
     </form>
   </div>;
 }

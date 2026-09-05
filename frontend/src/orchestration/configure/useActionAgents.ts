@@ -21,5 +21,5 @@ export function useActionAgents(stateId: string, actionId: string) {
   if (loaded && runtime?.status !== "online") readinessIssues.push(`Local Codex runtime is ${runtime?.status ?? "unavailable"}.`);
   if (loaded && provider?.health !== "ready") readinessIssues.push(provider?.healthMessage ?? "A ready Codex runtime is required.");
   if (loaded && provider && !provider.capabilities.policy.workspaceWrite) readinessIssues.push("Codex cannot provide managed workspace-write for Work.");
-  return { details, runtime, models, loaded, error, readinessIssues };
+  return { details, acceptSaved: setDetails, runtime, models, loaded, error, readinessIssues };
 }
