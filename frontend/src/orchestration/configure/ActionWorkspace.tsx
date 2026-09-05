@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useActionDraft } from "./useActionDraft";
 import { validateAgents, type SaveAgents } from "./actionDraft";
 import { Button } from "@/components/ui/button";
@@ -8,12 +9,14 @@ import type { ActionResponse, ResourceDocument } from "../types";
 import { ConfigureHeader, IssueList } from "./ConfigureHeader";
 import { ActionAgentEditor } from "./ActionAgentEditor";
 
-export function ActionWorkspace({ stateId, action, selectedAgentRole, skills, locked, onSave }: {
+export function ActionWorkspace({ stateId, action, selectedAgentRole, skills, locked, onSave, onDirty }: {
+  onDirty?(dirty: boolean): void;
   stateId?: string; action?: ActionDefinition; skills: ResourceDocument[]; locked: boolean;
   selectedAgentRole?: "validation" | "work" | "invalid";
   onSave(action: ActionDefinition, agents: SaveAgents): Promise<ActionResponse | void>;
 }) {
   const { draft, setDraft, agents, setAgents, loaded, dirty, save, pending, saveError } = useActionDraft(stateId, action, locked, onSave);
+  useEffect(() => { onDirty?.(dirty); return () => onDirty?.(false); }, [dirty, onDirty]);
   const disabled = locked || pending;
   if (!stateId || !action || !draft) return <><ConfigureHeader title="Action not found" description="The State or Action ID in this deep link is invalid." status="Invalid ID" /><div className="p-6"><Button nativeButton={false} render={<a href="/automation/loops" />}>Return to Environment</Button></div></>;
   const agentIssues = validateAgents(agents, loaded.models);

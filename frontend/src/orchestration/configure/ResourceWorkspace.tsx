@@ -14,11 +14,13 @@ import { ConfigureHeader } from "./ConfigureHeader";
 import { ConfigureToolbar } from "./ConfigureToolbar";
 import { joinMarkdownSource, markdownEntity } from "./markdownAuthoring";
 
-export function ResourceWorkspace({ kind, resources, references, locked, selectedId, navigate, onSave }: {
+export function ResourceWorkspace({ kind, resources, references, locked, selectedId, navigate, onSave, onDirty }: {
   kind: "instructions" | "skills"; resources: ResourceDocument[]; references: ReferenceEntry[]; locked: boolean; selectedId?: string;
+  onDirty?(dirty: boolean): void;
   navigate(path: string): void; onSave(id: string, content: string, expectedHash: string | "absent", creating: boolean): Promise<ResourceDocument>;
 }) {
   const [creating, setCreating] = useState(false); const [dirty, setDirty] = useState(false);
+  useEffect(() => { onDirty?.(dirty); return () => onDirty?.(false); }, [dirty, onDirty]);
   const selected = resources.find((resource) => resource.id === selectedId);
   useEffect(() => { if (selectedId) setCreating(false); }, [selectedId]);
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); }; window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn); }, [dirty]);

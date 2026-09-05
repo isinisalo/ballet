@@ -13,19 +13,21 @@ import { authoringModels, isAuthoringModelId, unsupportedAuthoringModelMessage }
 type SaveInput = { developerInstructions: string; model: string; reasoningEffort: string; skillResources: string[];
   expectedConfigHash: string; expectedDocumentHash: string };
 
-export function AgentDefinitionsWorkspace({ response, skills, selectedId, locked, onSave }: {
+export function AgentDefinitionsWorkspace({ response, skills, selectedId, locked, onSave, onDirty }: {
   response: GovernanceAgentsResponse; skills: ResourceDocument[]; selectedId?: string; locked: boolean;
+  onDirty?(dirty: boolean): void;
   onSave(id: GovernanceAgentId, input: SaveInput): Promise<boolean>;
 }) {
   const selected = response.agents.find(({ id }) => id === selectedId);
   if (!selected) return <><ConfigureToolbar status="2 fixed Agents" /><section className="grid min-h-64 place-items-center border-b border-dashed p-6 text-center"><div><h1 className="font-semibold">Select a governance Agent</h1><p className="text-sm text-muted-foreground">Critic and Refinement are the only configurable Agent roles.</p></div></section></>;
   return <AgentEditor key={`${selected.id}:${selected.contentHash ?? selected.status}`} slot={selected} skills={skills}
-    configHash={response.configHash} locked={locked} onSave={onSave} />;
+    configHash={response.configHash} locked={locked} onSave={onSave} onDirty={onDirty} />;
 }
 
 // eslint-disable-next-line complexity -- One fixed-role form keeps dirty, invalid, locked and save states visibly coherent.
-function AgentEditor({ slot, skills, configHash, locked, onSave }: {
+function AgentEditor({ slot, skills, configHash, locked, onSave, onDirty }: {
   slot: GovernanceAgentSlot; skills: ResourceDocument[]; configHash: string; locked: boolean;
+  onDirty?(dirty: boolean): void;
   onSave(id: GovernanceAgentId, input: SaveInput): Promise<boolean>;
 }) {
   const [instructions, setInstructions] = useState(slot.agent?.developerInstructions ?? "");
@@ -40,6 +42,7 @@ function AgentEditor({ slot, skills, configHash, locked, onSave }: {
   const reasoning = selectedModel?.reasoningOptions ?? [];
   const dirty = Boolean(slot.agent) && (instructions !== slot.agent!.developerInstructions || model !== slot.agent!.model
     || reasoningEffort !== slot.agent!.reasoningEffort || JSON.stringify(skillResources) !== JSON.stringify(slot.skillResources));
+  useEffect(() => { onDirty?.(dirty); return () => onDirty?.(false); }, [dirty, onDirty]);
   const ready = slot.status === "ready" && Boolean(slot.agent && slot.contentHash);
   const modelIssue = runtime && !isAuthoringModelId(model) ? unsupportedAuthoringModelMessage(model)
     : runtime && !selectedModel ? `Model ${model || "is missing"} is unavailable.`

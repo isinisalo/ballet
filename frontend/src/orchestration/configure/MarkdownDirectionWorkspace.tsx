@@ -19,14 +19,16 @@ import {
 const basePath = (kind: MarkdownDirectionKind) => kind === "use-cases" ? "/project/use-cases" : `/project/${kind}`;
 const title = (kind: MarkdownDirectionKind) => kind === "use-cases" ? "Use Cases" : kind === "adrs" ? "ADRs" : `${kind[0]?.toUpperCase()}${kind.slice(1)}`;
 
-export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId, locked, navigate, onSave, onDelete, onApprove, onDraft }: {
+export function MarkdownDirectionWorkspace({ kind, values, documents, selectedId, locked, navigate, onDirty, onSave, onDelete, onApprove, onDraft }: {
   kind: MarkdownDirectionKind; values: MarkdownDirectionValue[]; documents: ResourceDocument[]; selectedId?: string; locked: boolean;
+  onDirty?(dirty: boolean): void;
   navigate(path: string): void;
   onSave(value: MarkdownDirectionValue, markdown: string, creating: boolean, expectedDocumentHash: string): Promise<ResourceDocument>;
   onDelete?(value: MarkdownDirectionValue): Promise<void>;
   onApprove?(value: UseCase): Promise<void>; onDraft?(value: UseCase): Promise<void>;
 }) {
   const [creating, setCreating] = useState(false); const [dirty, setDirty] = useState(false);
+  useEffect(() => { onDirty?.(dirty); return () => onDirty?.(false); }, [dirty, onDirty]);
   const selected = values.find(({ id }) => id === selectedId);
   const document = creating ? createMarkdownDocument(kind) : documents.find(({ id }) => id === selected?.id);
   useEffect(() => { if (selectedId) setCreating(false); }, [selectedId]);

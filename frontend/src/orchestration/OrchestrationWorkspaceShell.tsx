@@ -29,10 +29,12 @@ export function OrchestrationWorkspaceShell({ route, navigate, setNavigationBloc
   let content = <Alert className="m-4"><AlertDescription>Loading canonical Ballet workspace…</AlertDescription></Alert>;
   const error = configure.error ?? (isGovernanceView(route.workspaceView) ? governance.error : undefined);
   if (route.workspaceView === "runtimes") content = <RuntimesWorkspace selectedId={route.entityId} navigate={navigate} />;
-  else if (error) content = <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>;
-  else if (!configure.loading && configure.data && isGovernanceView(route.workspaceView) && !governance.loading && governance.data) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)} onClickCapture={(event) => { if ((event.target as HTMLElement).closest("form")) setDirty(true); }}><OrchestrationGovernanceOutlet route={route} configure={configure.data} governance={governance.data} navigate={navigate} mutation={mutation} /></div>;
-  else if (!configure.loading && configure.data && route.workspaceView === "event-storming") content = <EventStormingWorkspace route={route} locked={configure.data.references.activeRunIds.length > 0} navigate={navigate} onDirty={setDirty} />;
-  else if (!configure.loading && configure.data && route.workspaceView === "user-stories") content = <UserStoriesWorkspace route={route} locked={configure.data.references.activeRunIds.length > 0} navigate={navigate} onDirty={setDirty} />;
-  else if (!configure.loading && configure.data && !isGovernanceView(route.workspaceView)) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)} onClickCapture={(event) => { if ((event.target as HTMLElement).closest("form")) setDirty(true); }}><OrchestrationConfigureOutlet route={route} data={configure.data} navigate={navigate} mutation={mutation} /></div>;
-  return <OrchestrationFrame sidebar={<OrchestrationSidebar route={route} data={configure.data} navigate={navigate} />}><Suspense fallback={<p role="status" className="p-4">Loading workspace…</p>}>{content}</Suspense></OrchestrationFrame>;
+  else if (error && (!configure.data || governance.error)) content = <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert>;
+  else if (!configure.loading && configure.data) {
+    if (isGovernanceView(route.workspaceView) && !governance.loading && governance.data) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)}><OrchestrationGovernanceOutlet route={route} configure={configure.data} governance={governance.data} navigate={navigate} mutation={mutation} /></div>;
+    else if (route.workspaceView === "event-storming") content = <EventStormingWorkspace route={route} locked={configure.data.references.activeRunIds.length > 0} navigate={navigate} onDirty={setDirty} />;
+    else if (route.workspaceView === "user-stories") content = <UserStoriesWorkspace route={route} locked={configure.data.references.activeRunIds.length > 0} navigate={navigate} onDirty={setDirty} />;
+    else if (!isGovernanceView(route.workspaceView)) content = <div onInput={() => setDirty(true)} onChangeCapture={() => setDirty(true)}><OrchestrationConfigureOutlet route={route} data={configure.data} navigate={navigate} mutation={mutation} onDirty={setDirty} /></div>;
+  }
+  return <OrchestrationFrame sidebar={<OrchestrationSidebar route={route} data={configure.data} navigate={navigate} />}>{configure.error && configure.data ? <Alert variant="destructive" className="m-4"><AlertDescription>{configure.error}</AlertDescription></Alert> : null}<Suspense fallback={<p role="status" className="p-4">Loading workspace…</p>}>{content}</Suspense></OrchestrationFrame>;
 }
