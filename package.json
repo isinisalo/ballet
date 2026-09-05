@@ -23,8 +23,6 @@
     "@xyflow/react": "^12.11.6",
     "better-sqlite3": "^12.11.1",
     "express": "^4.19.2",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
     "smol-toml": "^1.4.2",
     "uuid": "^14.0.2",
     "yaml": "^2.9.0",

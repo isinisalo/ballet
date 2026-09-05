@@ -6,6 +6,7 @@ import { AgentDefinitionsWorkspace } from "../src/orchestration/configure/AgentD
 import { CriticWorkspace } from "../src/orchestration/configure/CriticWorkspace";
 import { DirectionWorkspace } from "../src/orchestration/configure/DirectionWorkspace";
 import { EnvironmentWorkspace } from "../src/orchestration/configure/EnvironmentWorkspace";
+import { MarkdownDirectionWorkspace } from "../src/orchestration/configure/MarkdownDirectionWorkspace";
 import { ResourceWorkspace } from "../src/orchestration/configure/ResourceWorkspace";
 import { RuntimesWorkspace } from "../src/orchestration/configure/RuntimesWorkspace";
 import { StateWorkspace } from "../src/orchestration/configure/StateWorkspace";
@@ -19,6 +20,22 @@ import { resources, orchestrationConfig } from "./orchestrationFixtures";
 const directionProps = () => { const config = orchestrationConfig(); return { direction: config.direction, documents: { goals: [{ kind: "goal" as const, id: "goal-1", content: "# Goal", contentHash: "a".repeat(64) }], adrs: [], constraints: [] }, references: [], locked: false, onSave: vi.fn(), onDelete: vi.fn() }; };
 
 describe("orchestration Configure UI", () => {
+  it.each(["goals", "adrs", "constraints", "use-cases"] as const)("renders the %s Markdown workspace as editing only", (kind) => {
+    const config = orchestrationConfig();
+    const values = kind === "use-cases" ? config.direction.useCases : config.direction[kind];
+    const value = values[0]!;
+    render(<MarkdownDirectionWorkspace kind={kind} values={values} documents={[{ kind: kind === "use-cases" ? "use-case" : kind.slice(0, -1) as "goal" | "adr" | "constraint", id: value.id, content: "---\ntitle: Editable document\n---\n# Editable document\n", contentHash: "a".repeat(64) }]} selectedId={value.id} locked={false} navigate={vi.fn()} onSave={vi.fn()} />);
+    expect(screen.queryByText("Preview")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("YAML Frontmatter")).toBeInTheDocument();
+    expect(screen.getByLabelText("Markdown Body")).toBeInTheDocument();
+  });
+  it.each(["instructions", "skills"] as const)("renders the %s Markdown workspace as editing only", (kind) => {
+    const resource = resources().find((item) => item.kind === (kind === "skills" ? "skill" : "instruction"))!;
+    render(<ResourceWorkspace kind={kind} resources={[resource]} references={[]} locked={false} selectedId={resource.id} navigate={vi.fn()} onSave={vi.fn()} />);
+    expect(screen.queryByText("Preview")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("YAML Frontmatter")).toBeInTheDocument();
+    expect(screen.getByLabelText("Markdown Body")).toBeInTheDocument();
+  });
   it("renders Direction list/detail selection", async () => { const user = userEvent.setup(); render(<DirectionWorkspace {...directionProps()} />); await user.click(screen.getByRole("button", { name: /goal-1 Goal/ })); expect(screen.getByRole("heading", { name: "Edit goal-1" })).toBeInTheDocument(); });
   it("renders Constraint kind and status as text", async () => { const user = userEvent.setup(); render(<DirectionWorkspace {...directionProps()} />); await user.click(screen.getByRole("button", { name: /constraint-1 No skip/ })); expect(screen.getByLabelText("Constraint semantics")).toHaveValue("prohibited"); expect(screen.getAllByText("accepted").length).toBeGreaterThan(0); });
   it("disables Direction delete when references exist", async () => { const user = userEvent.setup(); const props = directionProps(); props.references = [{ kind: "goal", id: "goal-1", references: [{ ownerType: "use-case", ownerId: "UC-1", field: "goalIds" }] }]; render(<DirectionWorkspace {...props} />); await user.click(screen.getByRole("button", { name: /goal-1 Goal/ })); expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled(); });

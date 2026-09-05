@@ -3,8 +3,8 @@ id: goal-023
 title: Selkeä Markdown-authoring ja agentin daemon-sidottu suoritus
 status: accepted
 createdAt: '2026-08-29'
-updatedAt: '2026-08-29'
-version: 1
+updatedAt: '2026-09-05'
+version: 2
 tags:
   - tavoite
   - markdown
@@ -20,7 +20,7 @@ Ballet palauttaa versionhallittavan Markdownin ensisijaiseksi Goals-, ADR-, Cons
 
 ## Käyttäjäarvo
 
-- Käyttäjä muokkaa dokumentin YAML-frontmatteria ja Markdown-runkoa suoraan tutussa editori/preview-työtilassa.
+- Käyttäjä muokkaa dokumentin YAML-frontmatteria ja Markdown-runkoa suoraan yhdessä editorissa ilman rinnakkaista preview-näkymää.
 - Goals ja ADRs ovat omat löydettävät näkymänsä, ja Use Case -lista säilyy kompaktina.
 - Agentilla on näkyvä Computer → Provider → Model → Reasoning -sidonta; Copilot CLI ja Codex CLI toimivat saman daemon-protokollan kautta.
 - Feedbackin ihmisrajapinta sisältää vain kategorian ja kommentin; järjestelmä lisää teknisen provenienssin.
@@ -28,7 +28,7 @@ Ballet palauttaa versionhallittavan Markdownin ensisijaiseksi Goals-, ADR-, Cons
 
 ## Mitattavat success criteria
 
-1. Kaikki viisi Markdown-authoring-näkymää säilyttävät tuntemattoman validin frontmatterin ja bodyn byte-stabiilisti, varoittavat dirty-navigationista ja tarjoavat previewn.
+1. Goals-, ADR-, Constraints-, Use Cases-, Instructions- ja Skills-authoring säilyttää tuntemattoman validin frontmatterin ja bodyn byte-stabiilisti, varoittaa dirty-navigationista ja näyttää vain editorin ilman Markdown-previewtä.
 2. Canonical reitistö sisältää erilliset `/project/goals` ja `/project/adrs` -reitit sekä 0 `/configure/*`- tai `/products/*`-reittiä.
 3. Jokainen Environment Run preflightaa kaikki sen Agentit samalle online-laitteelle, samaan checkoutiin ja hyväksyttyyn config-hashiin; mixed/offline/dirty/auth/model/policy-tilat dispatchaavat 0 taskia.
 4. Daemonin claim/lease/fencing- ja terminal callback -testit tuottavat restartissa ja replayllä täsmälleen yhden terminal outcome -faktan.
@@ -45,4 +45,4 @@ Tavoite ei muuta Environment-järjestystä, Validation-first-semanttiikkaa, retr
 
 ## Ihmispäätös
 
-Projektin omistajan 2026-08-29 palaute hyväksyi vanhan Markdown-, Agents-, Environment-menu- ja daemon-kokemuksen palauttamisen, nykyisen Environment-runtime-semanttiikan säilyttämisen, Feedbackin kaksikenttäisen rajan, resurssirajatun Refinementin ja Product-näkymän poistamisen. Valtuutus kattaa paikalliset commitit, ei pushia, mergeä, releasea tai deployta.
+Projektin omistajan 2026-08-29 palaute hyväksyi vanhan Markdown-, Agents-, Environment-menu- ja daemon-kokemuksen palauttamisen, nykyisen Environment-runtime-semanttiikan säilyttämisen, Feedbackin kaksikenttäisen rajan, resurssirajatun Refinementin ja Product-näkymän poistamisen. Projektin omistajan 2026-09-05 pyyntö hyväksyi Markdown-previewn poistamisen kaikista kuudesta jaettua workbenchiä käyttävästä näkymästä. Valtuutus kattaa paikalliset commitit, ei pushia, mergeä, releasea tai deployta.

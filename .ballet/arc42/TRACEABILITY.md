@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-05'
-version: 47
+version: 48
 tags: [arc42, traceability, evidence]
 ---
 
@@ -30,6 +30,7 @@ tags: [arc42, traceability, evidence]
 | goal-002,goal-007,goal-022 / REQ-022 | QS-042 | adr-041 / CON-015 | BB-015,BB-016 | RT-026,RT-029 / DEP-007 | TEST-042 | EVID-042 | RISK-023 | passed locally |
 | goal-023,goal-024 / REQ-023,REQ-024 | QS-043 | adr-042 / CON-018 | BB-018 | RT-034 / DEP-008 | TEST-043 | EVID-043 | RISK-025 | passed canonical |
 | goal-002,goal-007 | QS-044 | adr-046 / CON-019 | BB-019 | RT-035 | TEST-044 | EVID-044 | document-wide conflicts | passed locally |
+| goal-023 / REQ-023 | QS-045 | adr-047 / CON-016 | BB-016 | RT-029 / DEP-006 | TEST-045 | EVID-045 | RISK-024 | passed canonical |
 <!-- traceability:end -->
 
 ## Canonical Use Case coverage
@@ -70,6 +71,7 @@ tags: [arc42, traceability, evidence]
 | TEST-041 | strict ActionExecutionBindingV3 schema and atomic SQLite v22 upsert/cleanup; removed Agent POST/DELETE/execution routes; Codex-only snapshot, both role mismatches, permissions, immutable continuation and responsive UI gates |
 | TEST-042 | strict legacy `useCaseIds` rejection, draft Use Case run, snapshot/task-context absence, normalized reorder API, ID-only keyboard sortable UI and compact retry-field tests |
 | TEST-043 | exact Action Agent inventory/schema/identity/uniqueness/symlink/capability tests; atomic Action pair create/update/delete, stale/rollback/Run-lock tests; immutable prompt/snapshot/permissions and responsive Action Workspace tests |
+| TEST-045 | parameterized Goals/ADRs/Constraints/Use Cases/Instructions/Skills editor-only component tests, strict preview removal search and 1440x900/390x844 browser QA |
 
 | ID | Evidenssi |
 | --- | --- |
@@ -89,6 +91,7 @@ tags: [arc42, traceability, evidence]
 | EVID-041 | ADR-040 refinement/continuation, full repository and responsive browser evidence |
 | EVID-042 | ADR-041 schema/planner/context/API/UI tests plus arc42, cutover, design, lint, build and full-suite command log |
 | EVID-043 | ADR-042 TOMLs, Project Config v25, Root Snapshot v20, SQLite v23, repository/API/runtime/UI tests and final validation/startup command log |
+| EVID-045 | ADR-047 six-workspace red-to-green component evidence, strict removal search, responsive browser QA and final repository gates |
 
 | TEST-044 | EventStormingService.test.ts, EventStorming.integration.test.ts, eventStorming.test.ts, eventStormingUI.test.tsx, workspaceNavigation.test.tsx, orchestrationInvalidations.test.tsx and desktop/narrow browser QA |
 | EVID-044 | Event Storming verification record in initiatives/event-storming-workspace/EVIDENCE.md |

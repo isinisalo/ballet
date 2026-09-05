@@ -1,13 +1,12 @@
 import { useId, useMemo, useRef, type FormEvent } from "react";
-import { Braces, Eye, FileKey2 } from "lucide-react";
+import { Braces, FileKey2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
-import { EditorActions, EmptyState, Panel, WorkbenchLayout } from "@/components/shared/workspace-ui";
+import { EditorActions, EmptyState, Panel } from "@/components/shared/workspace-ui";
 import { countEditorWords, estimateEditorTokens, formatEditorMetric } from "./editorMetrics";
 import { parseFrontmatterYaml } from "./frontmatter";
-import { MarkdownDocumentView } from "./MarkdownDocumentView";
-import { documentTitle, markdownPreviewDocument, type MarkdownEntity } from "./markdownDocument";
+import { documentTitle, type MarkdownEntity } from "./markdownDocument";
 
 function EditorMetric({ label, value }: { label: string; value: string | number }) {
   return (
@@ -94,13 +93,19 @@ export function MarkdownWorkbench(props: MarkdownWorkbenchProps) {
     onFrontmatterChange, onBodyChange, onSubmit
   } = props;
   const submittingRef = useRef(false);
-  const previewDocument = useMemo(
-    () => document ? markdownPreviewDocument(document, frontmatterText, bodyText, parseFrontmatterYaml) : undefined,
-    [bodyText, document, frontmatterText]
+  const title = useMemo(
+    () => {
+      if (!document) return "";
+      try {
+        return documentTitle({ ...document, frontmatter: parseFrontmatterYaml(frontmatterText) });
+      } catch {
+        return documentTitle(document);
+      }
+    },
+    [document, frontmatterText]
   );
 
   if (!document) return <EmptyState title={emptyTitle} />;
-  const title = documentTitle(previewDocument ?? document);
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!dirty || !valid || pending || submittingRef.current) return;
@@ -113,64 +118,55 @@ export function MarkdownWorkbench(props: MarkdownWorkbenchProps) {
   };
 
   return (
-    <WorkbenchLayout
-      preview={(
-        <Panel title="Preview" icon={<Eye data-icon="inline-start" />} compact>
-          <MarkdownDocumentView document={previewDocument} emptyTitle={emptyTitle} compact embedded />
-        </Panel>
-      )}
-      editor={(
-        <Panel
-          title="Markdown Workbench"
-          icon={<FileKey2 data-icon="inline-start" />}
-          compact
-          contentClassName="p-0"
-          action={showActions ? (
-            <EditorActions
-              saveLabel={saveLabel}
-              formId={formId}
-              dirty={dirty}
-              valid={valid}
-              pending={pending}
-              canDelete={Boolean(onDelete)}
-              deleteLabel={deleteLabel}
-              deleteType={deleteType}
-              resourceName={resourceName}
-              onDelete={onDelete}
-            />
-          ) : undefined}
-        >
-          <form id={formId} className="flex flex-col" onSubmit={(event) => { void handleSubmit(event); }}>
-            {serverError ? (
-              <div className="px-4 py-3">
-                <Alert variant="destructive"><AlertDescription>{serverError}</AlertDescription></Alert>
-              </div>
-            ) : null}
-            <div className="flex min-h-10 flex-wrap items-center justify-end gap-3 bg-panel-header px-4 py-2">
-              <div className="flex items-center gap-3">
-                <EditorMetric label="Words" value={countEditorWords(bodyText)} />
-                <EditorMetric label="Tokens" value={formatEditorMetric(estimateEditorTokens(`${frontmatterText}\n${bodyText}`))} />
-                <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
-                  MARKDOWN_MODE
-                </span>
-              </div>
+    <Panel
+      title="Markdown Workbench"
+      icon={<FileKey2 data-icon="inline-start" />}
+      compact
+      contentClassName="p-0"
+      action={showActions ? (
+        <EditorActions
+          saveLabel={saveLabel}
+          formId={formId}
+          dirty={dirty}
+          valid={valid}
+          pending={pending}
+          canDelete={Boolean(onDelete)}
+          deleteLabel={deleteLabel}
+          deleteType={deleteType}
+          resourceName={resourceName}
+          onDelete={onDelete}
+        />
+      ) : undefined}
+    >
+      <form id={formId} className="flex flex-col" onSubmit={(event) => { void handleSubmit(event); }}>
+        {serverError ? (
+          <div className="px-4 py-3">
+            <Alert variant="destructive"><AlertDescription>{serverError}</AlertDescription></Alert>
+          </div>
+        ) : null}
+        <div className="flex min-h-10 flex-wrap items-center justify-end gap-3 bg-panel-header px-4 py-2">
+          <div className="flex items-center gap-3">
+            <EditorMetric label="Words" value={countEditorWords(bodyText)} />
+            <EditorMetric label="Tokens" value={formatEditorMetric(estimateEditorTokens(`${frontmatterText}\n${bodyText}`))} />
+            <span className="rounded bg-muted px-2 py-1 font-mono text-[0.62rem] font-semibold uppercase leading-none text-muted-foreground">
+              MARKDOWN_MODE
+            </span>
+          </div>
+        </div>
+        <div className="grid gap-3 px-4 py-3">
+          <div className="flex items-start gap-2 pb-1">
+            <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <p className="truncate font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                Editing source
+              </p>
+              <p className="truncate text-sm font-medium text-foreground">{title}</p>
             </div>
-            <div className="grid gap-3 px-4 py-3">
-              <div className="flex items-start gap-2 pb-1">
-                <Braces className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                    Editing source
-                  </p>
-                  <p className="truncate text-sm font-medium text-foreground">{title}</p>
-                </div>
-              </div>
-              <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} error={fieldErrors?.frontmatter} disabled={pending} onChange={onFrontmatterChange} />
-              <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} error={fieldErrors?.body} disabled={pending} onChange={onBodyChange} />
-            </div>
-          </form>
-        </Panel>
-      )}
-    />
+          </div>
+          <WorkbenchTextArea label="YAML Frontmatter" rows={9} value={frontmatterText} error={fieldErrors?.frontmatter} disabled={pending} onChange={onFrontmatterChange} />
+          <WorkbenchTextArea label="Markdown Body" rows={18} value={bodyText} error={fieldErrors?.body} disabled={pending} onChange={onBodyChange} />
+        </div>
+      </form>
+    </Panel>
   );
 }

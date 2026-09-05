@@ -4,7 +4,7 @@ title: Laatuvaatimukset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-05'
-version: 40
+version: 41
 tags: [arc42, quality, scenarios]
 arc42Section: 10
 ---
@@ -31,6 +31,7 @@ arc42Section: 10
 | QS-042 | goal-002, goal-007, goal-022 / REQ-022 | Ihminen järjestää Stateja tai Actioneita ja agentti tarvitsee valikoidun project-kontekstin | desktop/narrow, pointer/keyboard, draft tai approved Use Caset | Project Config v24, Root Snapshot v19 and Loop Engineering UI | ID-only sortable tallentaa välittömästi normalisoidun järjestyksen; Use Caset eivät portita Runia tai siirry snapshottiin/task contextiin; instruction/Skill ohjaa dokumenttien lukemisen | legacy `useCaseIds` hylätään; snapshot/context property absence; reorder API/UI keyboard/stale tests; order/priority-kenttiä ei ole ja compact retry mahtuu workbenchiin | 1 | EVID-042 | passed locally |
 | QS-043 | goal-023, goal-024 / REQ-023, REQ-024 | Action luodaan, muokataan, poistetaan tai preflightataan | missing/extra/invalid/symlink TOML, stale hash, active Run ja unsupported Codex capability | Project Config v25, Codex Agent v3, Root Snapshot v20, SQLite v23 and Action Workspace | jokaisella Actionilla on exact Validation/Work Agent; config+pair muutos on atominen; TOML instruction/model/reasoning ja Skill closure jäätyvät; Validation on read-only ja Work managed-worktree; virhe tuottaa 0 dispatchia | 21 Actionia, 42 unique five-field TOMLia ja 44 total; repository/API/runtime/UI rollback, stale, lock, capability, keyboard ja 1440x900/390x844 testit; Action binding table/route/editor 0 | 1 | EVID-043 | passed canonical |
 | QS-044 | goal-002, goal-007 | Human or Work agent edits a linked Event Storming board | Local workshop, stale file, restart, keyboard, desktop and narrow viewport | EventStormingModelV1 and visual Project workspace | Shared note changes propagate; layout stays local; atomic file-only saves preserve drafts on conflict | Shared-note and geometry tests, SQLite writes 0, 600 ms debounce, in-flight save fencing, 500-note browser editing, 1440×900 and 390×844 checks | 1 | EVID-044 | passed locally |
+| QS-045 | goal-023 / REQ-023 | ihminen avaa tai muokkaa jaettua project Markdown -dokumenttia | Goals, ADRs, Constraints, Use Cases, Instructions tai Skills; desktop/narrow ja keyboard | shared MarkdownWorkbench | yksi editor-only-paneeli näyttää source-kentät ja olemassa olevat komennot ilman renderöityä previewtä | kuusi parametrisoitua workspace-testiä: `Preview` 0, YAML- ja body-editorit 1/näkymä; 1440×900 ja 390×844 page overflow 0; preview-komponentit, CSS ja yksinomaiset riippuvuudet 0 | 1 | EVID-045 | passed canonical |
 <!-- quality-scenarios:end -->
 
 Compile yksin ei täytä mitään skenaariota. Verdict edellyttää scenario-kohtaista test/evidence-ketjua ja rajoitteiden raportointia.

@@ -24,17 +24,12 @@ export const joinMarkdownSource = ({ frontmatterText, bodyText }: MarkdownDraft)
 
 export const markdownEntity = (document: ResourceDocument, draft: MarkdownDraft) => {
   let frontmatter: Record<string, unknown> = {};
-  let errors: string[] = [];
   try { frontmatter = parseFrontmatterYaml(draft.frontmatterText); }
-  catch (error) { errors = [error instanceof Error ? error.message : "Invalid YAML frontmatter."]; }
+  catch { /* The owning editor renders the validation error beside the source field. */ }
   return {
     id: document.id,
-    relativePath: relativePath(document.kind, document.id),
     frontmatter,
-    body: draft.bodyText,
-    errors,
-    title: stringValue(frontmatter.title) ?? stringValue(frontmatter.name) ?? document.id,
-    status: stringValue(frontmatter.status)
+    title: stringValue(frontmatter.title) ?? stringValue(frontmatter.name) ?? document.id
   };
 };
 
@@ -91,12 +86,6 @@ export const directionValueFromMarkdown = (
 };
 /* eslint-enable complexity */
 
-const relativePath = (kind: ResourceDocument["kind"], id: string): string => {
-  if (kind === "skill") return `.agents/skills/${id}/SKILL.md`;
-  if (kind === "instruction") return `.ballet/instructions/${id}.md`;
-  const folder = kind === "adr" ? "adr" : kind === "use-case" ? "use-cases" : `${kind}s`;
-  return `.ballet/${folder}/${id}.md`;
-};
 const stringValue = (value: unknown): string | undefined => typeof value === "string" && value.trim() ? value.trim() : undefined;
 const requiredString = (value: unknown, message: string): string => { const parsed = stringValue(value); if (!parsed) throw new Error(message); return parsed; };
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim()) : [];
