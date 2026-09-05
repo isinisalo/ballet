@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-05'
-version: 36
+version: 37
 tags: [arc42, building-blocks]
 arc42Section: 5
 ---
@@ -23,13 +23,13 @@ arc42Section: 5
 BB-015 jakautuu seuraaviin selkeisiin rajoihin:
 
 - Shared contracts: schema, versiot, route inventory ja pure status/order -säännöt.
-- Project services: config, project-local Markdown documents and Action Agent/Skill composition.
+- Project services: config, project-local Markdown documents and Action Agent/Skill composition. Repositories share `atomicWrite` after their own path/hash/lock checks.
 - Fact: `UserStoryService` owns repository-first User Story v1 CRUD over `ProjectDocumentRepository`. `shared/orchestration/userStories.ts` owns the strict Role/Goal/Benefit and ordered Given/When/Then contract; Markdown frontmatter is the only persisted content. `/api/user-stories` exposes the collection and document commands, and the URL-owned card workspace renders them. User Stories are independent of Project Config and SQLite and never participate in Root Snapshots or Run gates. Atomic file replacement, optimistic hashes and the existing active-Run authoring lock bound mutations; Markdown notes survive edits.
 - Runtime: planner, prompt composition, queue, provider dispatch ja continuation seed.
 - Persistence: SQLite v23 schema/stores ja transaction coordinatorit; no Action execution binding table.
 - Governance: Feedback, Critic schedule/proposals, human decisions ja Refinement apply.
-- HTTP/SSE: loopback security, request validation, mutation commands ja invalidation eventit.
-- UI: pure projection -moduulin ja Dagren omistama Loop Engineering State/Action/Agents-rakenne, React Flow -renderer, URL-owned settings/create-pane, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback, Critic, Refinement ja Run Evidence.
+- HTTP/SSE: route adapters validate requests; `AuthoringController` owns project commands, `ApiController` runtime/governance commands and invalidations; `RunQueries` and `ReviewQueries` own read projections. `RefinementPreimages` verifies exact immutable diff bytes.
+- UI: `useMarkdownDraft` owns source and baseline hash together; `useActionDraft` owns Action/Agent saves; `invalidationStream` shares one reconnecting SSE connection and route-scoped hooks load visible data. Graph workspaces load lazily. Pure projection -moduulin ja Dagren omistama Loop Engineering State/Action/Agents-rakenne, React Flow -renderer, URL-owned settings/create-pane, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback, Critic, Refinement ja Run Evidence.
 - Generic execution infrastructure: checkout-local Codex daemon, strict Action/governance Agent repository, server-owned worktrees and lease/fencing lifecycle.
 
 Riippuvuussuunta on UI/HTTP -> application/runtime -> domain contracts; adapterit ja persistence toteuttavat sisäiset portit. Project-local workflow-data ei kuulu platform-koodiin.

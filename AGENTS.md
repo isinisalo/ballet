@@ -5,7 +5,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 ## Kanoninen domain
 
 - Balletin aktiivinen domain on `Environment -> State -> Action` päätöksen `adr-034` mukaisesti.
-- Project Config on strict v21. Environmentin Stateilla on positiivinen, yksikäsitteinen ja nouseva `order`; Staten Actioneilla vastaava `priority`.
+- Project Config noudattaa [aktiivista versiomatriisia](ARCHITECTURE.md#active-version-matrix). Environmentin Stateilla on positiivinen, yksikäsitteinen ja nouseva `order`; Staten Actioneilla vastaava `priority`.
 - Seuraavaa Statea ei dispatchata ennen kuin edellisen kaikki Actionit ovat runtime-statuksessa `done`.
 - Runtime status on totuus. `done` ja `blocked` ovat siitä johdettuja eivätkä project configiin tallennettavia lippuja.
 - Validation on controller: precheck palauttaa vain `done | delegate | blocked`, Work on alisteinen toteutusrooli ja postwork palauttaa vain `done | retry | blocked`.
@@ -22,7 +22,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 ## Strict cut
 
-- Aktiiviset versiot ovat Project Config v25, Root Snapshot v20, Task Envelope ja role outcome v11, prompt composition v16, ExecutionSpec v18, SQLite v23 sekä Feedback/Critic/Refinement v2. Codex Agent on v3 ja Run Evidence v1; Action execution bindingia ei ole.
+- Aktiiviset versiot: [ARCHITECTURE.md:n versiomatriisi](ARCHITECTURE.md#active-version-matrix). Älä ylläpidä rinnakkaista versioluetteloa. Action execution bindingia ei ole.
 - Vanhasta datasta ei tehdä migraatiota, readeria, route-aliasta tai dual-write-polkuja. Epäyhteensopiva machine-local SQLite arkistoidaan tai poistetaan ennen käynnistystä.
 - Canonical URLit ovat `/automation/loops`, `/agents`, `/skills`, `/runtimes`, `/project/goals`, `/project/adrs`, `/project/constraints`, `/project/use-cases`, `/project/instructions`, `/run`, `/feedback`, `/reviews/critic` ja `/reviews/refinement`; Run Evidence näkyy omistavan Runin sisällä. API on `/api/*`.
 

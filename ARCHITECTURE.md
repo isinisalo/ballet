@@ -4,15 +4,25 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-05'
-version: 36
+version: 37
 tags: [architecture, arc42, environment]
 ---
 
 # Ballet architecture
 
-Ballet is an orchestration command center whose Environment → State → Action and Validation-led semantics are owned by [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md). [ADR-041](.ballet/adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) removes State-owned Use Case closure, makes project-document reading instruction/Skill-directed and makes sortable ID lists the only ordering editor. [ADR-042](.ballet/adr/adr-042-action-specific-codex-agents.md) makes every Action's Validation and Work TOML the canonical instruction/model/reasoning truth. [ADR-040](.ballet/adr/adr-040-codex-only-fixed-governance-agents.md) retains two read-only governance Agents and the Codex-only runtime. [ADR-035](.ballet/adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) retains Feedback/Refinement and Run Evidence, while [ADR-037](.ballet/adr/adr-037-checkout-local-daemon.md) owns the checkout-local CLI worker. [ADR-045](.ballet/adr/adr-045-spacious-concise-floating-loop-tree.md) owns the spacious React Flow + Dagre STATE -> ACTION -> AGENTS tree, concise node labels and lightweight floating edges while retaining planet/Action-flow strict removal. [ADR-047](.ballet/adr/adr-047-editor-only-markdown-authoring.md) makes the shared project Markdown workbench editor-only.
+Ballet is a checkout-local orchestration command center. [ADR-034](.ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md) owns Environment → State → Action and Validation-led execution. This entrypoint owns the version matrix and trust boundaries; detailed views have one owner each.
 
-The active implementation is the atomic v25/v23 cut. No temporary public namespace, migration, compatibility reader, route alias or dual-write is authorized.
+## Reading guide
+
+| Task | Read next |
+| --- | --- |
+| Current work and verification | [STATUS](.ballet/arc42/STATUS.md) → its dated evidence |
+| Architecture or source ownership | [arc42 index](.ballet/arc42/README.md) → the relevant section; [accepted decisions and supersession](.ballet/arc42/09-architecture-decisions.md) |
+| Runtime behavior | [state contract](.ballet/arc42/STATE-CONTRACT.md) and [runtime scenarios](.ballet/arc42/06-runtime-view.md) |
+| UI or authoring | [DESIGN](DESIGN.md), then the relevant component and its tests |
+| Implementation checks | [AGENTS](AGENTS.md) and the target directory's AGENTS.md |
+
+Load only the task-relevant views and Skills. Initiative documents record bounded delivery history; they do not override newer accepted ADRs or the active contracts below.
 
 ## Active version matrix
 
@@ -27,7 +37,7 @@ The active implementation is the atomic v25/v23 cut. No temporary public namespa
 | Feedback / Critic / Refinement | 2 / 2 / 2 |
 | Codex Agent / Run Evidence | 3 / 1 |
 
-The version cut is strict. Incompatible config or local state is rejected unchanged; there is no migration, reader, route alias or dual write.
+Executable version owners are [shared constants](shared/orchestration/versions.ts), [schemas](shared/orchestration/schemas/environmentSchemas.ts) and [SQLite](backend/orchestration/persistence/RuntimeSchema.ts). The version cut is strict. Incompatible config or local state is rejected unchanged; there is no migration, reader, route alias or dual write.
 
 ## Context view
 
@@ -62,17 +72,7 @@ flowchart TB
 
 ## Component view
 
-| Component | Responsibility | Primary source |
-| --- | --- | --- |
-| Direction and config | strict v25 load/save, project-local documents and approvals, Action Agent TOMLs, two governance Agent TOMLs, references and Skill composition | `shared/orchestration/schemas/**`, `backend/orchestration/project/**` |
-| Run planning | immutable Snapshot v20 with Action Agent definitions/hashes and Skill closures, ordered State/Action seeds and role-derived permissions | `backend/orchestration/runtime/EnvironmentRunPlanner.ts` |
-| Action control | Validation-first transitions, retry formula and next eligible work | `backend/orchestration/persistence/ActionOutcomeCoordinator.ts`, `FlowCoordinator.ts` |
-| Runtime execution | queue, local-daemon dispatch, cancellation, recovery and server-owned finalization | `backend/orchestration/runtime/EnvironmentRuntimeService.ts`, `LocalDaemonOrchestrationProvider.ts` |
-| Local daemon | readiness, polling, leases and the Codex process; no repository/finalization ownership | `backend/daemon/**`, `backend/orchestration/persistence/LocalDaemonStore.ts` |
-| Governance | Critic scheduling, proposal decisions, exact Refinement apply and continuation | `backend/orchestration/governance/**` |
-| Persistence | SQLite v23 schema without Action execution bindings, transactions, events, daemon facts, Feedback, reviews and Run Evidence | `backend/orchestration/persistence/**` |
-| API/security | canonical routes, strict request schemas, loopback/origin/body limits and trusted actor boundary | `backend/orchestration/http/**`, `backend/server/createBalletServer.ts` |
-| UI | deterministic React Flow + Dagre Loop Engineering State/Action/Agents tree, Markdown project workspaces, Agents, Runtimes, Run Gate, Feedback and reviews | `frontend/src/orchestration/**` |
+Source responsibilities and component mappings live in the [building-block view](.ballet/arc42/05-building-block-view.md).
 
 ## Truth and ownership
 
@@ -86,74 +86,7 @@ flowchart TB
 
 ## Runtime sequences
 
-### Normal Action
-
-```mermaid
-sequenceDiagram
-  participant R as Runtime
-  participant V as Validation
-  participant W as Work
-  participant DB as SQLite
-  R->>DB: select first pending Action in first incomplete State
-  R->>V: precheck immutable context
-  V-->>R: delegate + bounded dynamic prompt
-  R->>W: execute prompt in managed worktree
-  W-->>R: completed + artifacts/checks
-  R->>V: postcheck exact Work evidence
-  V-->>R: done + acceptance evidence
-  R->>DB: commit Action done and next gate atomically
-```
-
-### Retry and block
-
-```mermaid
-sequenceDiagram
-  participant V as Validation
-  participant R as Runtime
-  participant W as Work
-  participant DB as SQLite
-  V-->>R: retry + correction
-  alt attempts used less than 1 + maxRetries
-    R->>W: next Work attempt with correction
-  else retry exhausted
-    R->>DB: one transaction: Action blocked + one Feedback entry
-    DB-->>R: later Action and State dispatch gated
-  end
-```
-
-Provider failure, cancellation and invalid structured output are operational failure boundaries. They do not silently become semantic retry decisions.
-
-### Critic approval
-
-```mermaid
-sequenceDiagram
-  participant S as Scheduler
-  participant C as Critic
-  participant H as Human
-  participant DB as SQLite
-  S->>C: one due occurrence, read-only Run Evidence
-  C-->>DB: immutable proposal only
-  Note over DB: no Feedback yet
-  H->>DB: approve exact revision and hash
-  DB->>DB: one transaction: decision + one Feedback entry
-```
-
-### Refinement continuation
-
-```mermaid
-sequenceDiagram
-  participant P as Refinement proposer
-  participant H as Human
-  participant A as Apply service
-  participant G as Managed worktree
-  participant DB as SQLite
-  P-->>DB: read-only exact paths/preimages/result hashes/impact
-  H->>DB: approve exact proposal
-  A->>DB: atomically claim approved apply
-  A->>G: verify and apply exact bytes, validate, commit once
-  A->>DB: record commit and create one continuation Snapshot v20
-  Note over DB: parent snapshot remains immutable
-```
+The [runtime view](.ballet/arc42/06-runtime-view.md) owns RT-026–RT-035: Validation/Work execution, retry exhaustion, Critic approval, exact Refinement continuation, authoring and daemon recovery. The [state contract](.ballet/arc42/STATE-CONTRACT.md) owns status projections. Provider failure and cancellation are operational boundaries, never implicit semantic retries.
 
 ## Persistence ownership
 
@@ -176,15 +109,13 @@ Successful work must remain Critic-readable through immutable commit/artifact ev
 
 Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, User Story, Event Storming model, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
 
-User Story v1 is repository-owned YAML frontmatter in `.ballet/user-stories/<uuid>.md`: Role, Goal, Benefit and ordered Given/When/Then criteria. The card editor and `/api/user-stories` CRUD share this single source through the existing atomic document repository, with optimistic content hashes and the project authoring lock. Markdown notes are preserved. User Story content is never copied into Project Config, SQLite, browser storage, Root Snapshots or Run gates. The collection is read from files on every request; API invalidations are transient notifications only. See the [building-block view](.ballet/arc42/05-building-block-view.md) and [design contract](DESIGN.md#user-story-visual-contract).
-
-Event Storming v1 uses one repository-owned `.ballet/event-storming/model.md`: shared notes with board-local placements, frames and connections. The visual React Flow workspace and existing project-local Actions read/write the same strict model; GET/PUT uses atomic document replacement and content hashes. Autosave is serial and conflicts preserve drafts. No board content is stored in SQLite, Config, Root Snapshots or Run gates. See [ADR-046](.ballet/adr/adr-046-repository-owned-event-storming-workspace.md) and the [building-block view](.ballet/arc42/05-building-block-view.md).
+User Stories and Event Storming are repository-owned Markdown; neither enters Config, SQLite or Run gates. Their exact source/HTTP mappings live in the [building-block view](.ballet/arc42/05-building-block-view.md); their UI contracts live in [DESIGN](DESIGN.md).
 
 ## Failure modes
 
 | Failure | Required behavior |
 | --- | --- |
-| Invalid config, duplicate order/priority or stale approval | readiness blocks before any provider task |
+| Invalid config or duplicate order/priority | readiness blocks before any provider task |
 | Missing/extra/invalid Action Agent, missing Skill or changed frozen hash | snapshot/dispatch fails closed |
 | Provider failure or invalid structured output | operational failure is recorded; no false semantic retry or done |
 | Retry exhaustion or Validation blocked | Action and one Feedback entry commit atomically; later work stops |

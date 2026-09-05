@@ -3,14 +3,14 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-04'
-version: 29
+updatedAt: '2026-09-05'
+version: 30
 tags: [arc42, architecture, index]
 ---
 
 # Balletin arc42-arkkitehtuuri-indeksi
 
-Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -> Action ja Validation-led execution. `goal-023` / `adr-035` säilyttävät Markdown Agents-, Feedback/Refinement v2- ja Run Evidence -mallin. Aktiivisen execution placementin omistaa `goal-024` / `adr-037`: yksi checkout-local daemon ilman Computeria tai pairingia. `adr-045` määrittää Loop Engineeringin väljän kolmitasoisen React Flow + Dagre -authoring-puun, concise labelit ja kevyet floating-edget ilman planeetta- tai Action-flow-näkymää.
+Aloita [ARCHITECTURE.md:n lukupolusta ja aktiivisesta versiomatriisista](../../ARCHITECTURE.md). Valitse sitten vain tehtävää koskeva näkymä. Päätösten nykyinen vaikutus ja supersession löytyvät osiosta 9.
 
 1. [Johdanto ja tavoitteet](01-introduction-and-goals.md)
 2. [Rajoitteet](02-constraints.md)
@@ -25,4 +25,4 @@ Kanoninen runtime-semanttiikka on `goal-022` / `adr-034`: Environment -> State -
 11. [Riskit ja tekninen velka](11-risks-and-technical-debt.md)
 12. [Sanasto](12-glossary.md)
 
-Tukilähteet: [STATUS](STATUS.md), [TRACEABILITY](TRACEABILITY.md), [METHOD-HEALTH](METHOD-HEALTH.md), [runtime state contract](STATE-CONTRACT.md), [active target contract](initiatives/markdown-agent-daemon-orchestration/TARGET-CONTRACT.md) ja [current Loop Engineering Dagre initiative](initiatives/loop-engineering-three-level-dagre/BRIEF.md). Historialliset initiativet ja superseded ADR:t ovat audit trailia, eivät aktiivinen vaihtoehtoinen arkkitehtuuri.
+Tukilähteet: [STATUS](STATUS.md), [TRACEABILITY](TRACEABILITY.md), [METHOD-HEALTH](METHOD-HEALTH.md), [runtime state contract](STATE-CONTRACT.md) ja [current Loop Engineering Dagre initiative](initiatives/loop-engineering-three-level-dagre/BRIEF.md). Historialliset initiativet ja superseded ADR:t ovat audit trailia, eivät aktiivinen vaihtoehtoinen arkkitehtuuri.

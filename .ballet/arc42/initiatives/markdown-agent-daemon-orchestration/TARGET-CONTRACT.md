@@ -1,14 +1,16 @@
 ---
 id: mado-target-contract-001
 title: Markdown Agent daemon orchestration target contract
-status: accepted
+status: superseded
 createdAt: '2026-08-29'
-updatedAt: '2026-08-29'
-version: 1
+updatedAt: '2026-09-05'
+version: 2
 tags: [arc42, initiative, contract]
 ---
 
 # TARGET CONTRACT
+
+Historical ADR-035 delivery contract. Execution placement is superseded by ADR-037 and Agent composition by ADR-041/ADR-042. Use the [active version matrix](../../../../ARCHITECTURE.md#active-version-matrix), [state contract](../../STATE-CONTRACT.md) and [decision index](../../09-architecture-decisions.md). The text below is retained as historical evidence.
 
 ## Truth ownership
 
