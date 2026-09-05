@@ -16,9 +16,10 @@ import { AgentDefinitionsWorkspace } from "./AgentDefinitionsWorkspace";
 import { MarkdownDirectionWorkspace } from "./MarkdownDirectionWorkspace";
 import { ResourceWorkspace } from "./ResourceWorkspace";
 import { StateWorkspace } from "./StateWorkspace";
-import { RuntimesWorkspace } from "./RuntimesWorkspace";
 import { validateRunnableEnvironment } from "@shared/orchestration/gates";
-import { LoopEngineeringWorkspace } from "./LoopEngineeringWorkspace";
+import { lazy } from "react";
+
+const LoopEngineeringWorkspace = lazy(() => import("./LoopEngineeringWorkspace").then((module) => ({ default: module.LoopEngineeringWorkspace })));
 
 type Mutation = ReturnType<typeof useOrchestrationMutation>;
 type DirectionKind = "goals" | "adrs" | "constraints" | "use-cases";
@@ -46,7 +47,6 @@ export function OrchestrationConfigureOutlet({ route, data, navigate, mutation }
     case "instructions": content = <ResourceWorkspace kind="instructions" resources={data.instructions} references={data.references.entries} locked={locked} selectedId={route.entityId} navigate={navigate} onSave={async (id, source, hash, creating) => { const saved = await mutation.execute(() => orchestrationApi.saveResource("instructions", id, source, hash, creating)); if (creating) navigate(`/project/instructions?id=${encodeURIComponent(id)}`, { bypassBlocker: true }); return saved; }} />; break;
     case "skills": content = <ResourceWorkspace kind="skills" resources={data.skills} references={data.references.entries} locked={locked} selectedId={route.entityId} navigate={navigate} onSave={async (id, source, hash, creating) => { const saved = await mutation.execute(() => orchestrationApi.saveResource("skills", id, source, hash, creating)); if (creating) navigate(`/skills?id=${encodeURIComponent(id)}`, { bypassBlocker: true }); return saved; }} />; break;
     case "agents": content = <AgentDefinitionsWorkspace response={data.agents} skills={data.skills} selectedId={route.entityId} locked={locked} onSave={(id, input) => mutation.run(() => orchestrationApi.saveAgent(id, input))} />; break;
-    case "runtimes": content = <RuntimesWorkspace selectedId={route.entityId} navigate={navigate} />; break;
     default: content = <UnavailableWorkspace route={route} navigate={navigate} />;
   }
   return <>{error}{content}</>;

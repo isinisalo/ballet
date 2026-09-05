@@ -120,7 +120,7 @@ export function EditorActions({
         {pending ? <LoaderCircle className="animate-spin motion-reduce:animate-none" data-icon="inline-start" /> : <Save data-icon="inline-start" />}
       </Button>
       {canDelete && onDelete ? (
-        <DeleteAction deleteLabel={deleteLabel} deleteType={deleteType} resourceName={resourceName} disabled={pending} onDelete={onDelete} />
+        <DeleteAction deleteLabel={deleteLabel} deleteType={deleteType} resourceName={resourceName} disabled={pending || locked} onDelete={onDelete} />
       ) : null}
     </div>
   );

@@ -2,7 +2,7 @@ import { useMarkdownDraft } from "./useMarkdownDraft";
 import { MarkdownConflict } from "./MarkdownConflict";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { UseCaseApprovalActions } from "./UseCaseApprovalActions";
 import { EditorActions } from "@/components/shared/editor-actions";
 import type { UseCase } from "@shared/orchestration/direction";
 import { useCaseApprovalHash } from "@shared/orchestration/direction";
@@ -53,7 +53,6 @@ function MarkdownEditor({ kind, document, current, creating, locked, status, onC
 }) {
   const editor = useMarkdownDraft(document, onDirty);
   const { frontmatterText, bodyText, setFrontmatterText, setBodyText, dirty, pending, error: serverError } = editor;
-  const [confirming, setConfirming] = useState(false);
   let validation = ""; try { directionValueFromMarkdown(kind, { frontmatterText, bodyText }, current); } catch (error) { validation = error instanceof Error ? error.message : "Invalid Markdown document."; }
   const entity = markdownEntity(document, { frontmatterText, bodyText });
   const save = () => editor.save((hash) => {
@@ -61,10 +60,11 @@ function MarkdownEditor({ kind, document, current, creating, locked, status, onC
     return onSave(parsed.value, parsed.source, creating, hash);
   });
   const useCase = current && "examples" in current ? current : undefined;
+  const valid = !validation && !locked && !editor.stale;
   const formId = `markdown-${kind}-${document.id}`;
-  return <div className="min-w-0"><ConfigureToolbar status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? useCase.status === "draft" ? <Button size="sm" disabled={locked || dirty || editor.stale} onClick={() => setConfirming(true)}>Approve exact content…</Button> : <Button size="sm" variant="outline" disabled={locked} onClick={() => void onDraft?.(useCase)}>Return to draft</Button> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={!validation && !locked && !editor.stale} pending={pending} canDelete={Boolean(current && onDelete) && !editor.stale} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
+  return <div className="min-w-0"><ConfigureToolbar status={status} label={current?.id ?? "New document"}><Button size="sm" variant="outline" disabled={locked} onClick={onCreate}>Create</Button>{useCase ? <UseCaseApprovalActions value={useCase} disabled={locked || dirty || editor.stale || pending} onApprove={onApprove} onDraft={onDraft} /> : null}<EditorActions saveLabel="Save Markdown" formId={formId} dirty={dirty} valid={valid} pending={pending} locked={locked} canDelete={Boolean(current && onDelete) && !editor.stale} deleteLabel="Delete document" deleteType="document" resourceName={current?.name} onDelete={current && onDelete ? () => onDelete(current) : undefined} /></ConfigureToolbar>
     <MarkdownConflict stale={editor.stale} hash={document.contentHash} onReload={editor.reload} />
-    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="p-4 md:p-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={!validation && !locked && !editor.stale} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
-    <Dialog open={confirming} onOpenChange={setConfirming}><DialogContent><DialogHeader><DialogTitle>Approve {useCase?.id}?</DialogTitle><DialogDescription>This approves the exact persisted semantic content with hash <code className="break-all">{useCase ? useCaseApprovalHash(useCase) : ""}</code>. Saving Markdown never approves it.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setConfirming(false)}>Cancel</Button><Button onClick={() => { setConfirming(false); if (useCase) void onApprove?.(useCase); }}>Approve exact content</Button></DialogFooter></DialogContent></Dialog>
+    {useCase ? <p className="mx-4 mt-3 break-all text-xs text-muted-foreground md:mx-6">Approval hash <code>{useCaseApprovalHash(useCase)}</code></p> : null}<div className="p-4 md:p-6"><MarkdownWorkbench document={entity} emptyTitle="Select a Markdown document" formId={formId} saveLabel="Save Markdown" frontmatterText={frontmatterText} bodyText={bodyText} dirty={dirty} valid={valid} pending={pending} fieldErrors={validation ? { frontmatter: validation } : undefined} serverError={serverError} showActions={false} onFrontmatterChange={setFrontmatterText} onBodyChange={setBodyText} onSubmit={save} /></div>
+
   </div>;
 }

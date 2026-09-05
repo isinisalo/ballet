@@ -34,20 +34,7 @@ export function RuntimesWorkspace(props: { selectedId?: string; navigate(path: s
     </ConfigureToolbar>
     {error ? <Alert variant="destructive" className="m-4"><AlertDescription>{error}</AlertDescription></Alert> : null}
     <div className="grid gap-4 p-4 md:p-6">
-      <section className="border bg-card" aria-labelledby="local-daemon-heading">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-panel-header p-3">
-          <div><h2 id="local-daemon-heading" className="font-semibold">Checkout-local daemon</h2>
-            <p className="font-mono text-xs text-muted-foreground">{runtime ? `v${runtime.daemonVersion} · last seen ${runtime.lastSeenAt}` : "Loading…"}</p></div>
-          <OperationalStatus compact label={runtime?.status ?? "loading"}
-            tone={runtime?.status === "online" ? "healthy" : runtime?.status === "error" ? "danger" : "neutral"} />
-        </div>
-        <dl className="grid gap-3 p-3 text-sm sm:grid-cols-4">
-          <Fact label="PID" value={runtime?.pid ? String(runtime.pid) : "—"} />
-          <Fact label="Uptime" value={runtime ? `${runtime.uptimeSeconds}s` : "—"} />
-          <Fact label="Active tasks" value={String(runtime?.activeTaskCount ?? 0)} />
-          <Fact label="Recent error" value={runtime?.recentError ?? "None"} />
-        </dl>
-      </section>
+      <LocalDaemonFacts runtime={runtime} />
       <section aria-labelledby="providers-heading"><h2 id="providers-heading" className="mb-2 font-semibold">Local providers</h2>
         <div className="grid gap-3 sm:grid-cols-2">{runtime?.providers.map((provider) => <article key={provider.provider} className="border bg-card p-3">
           <div className="flex items-center justify-between gap-3"><strong>Codex CLI</strong>
@@ -68,3 +55,20 @@ function Fact({ label, value }: { label: string; value: string }) {
   return <div><dt className="font-mono text-[0.65rem] uppercase tracking-wider text-muted-foreground">{label}</dt><dd className="mt-1 break-words">{value}</dd></div>;
 }
 const message = (reason: unknown): string => reason instanceof Error ? reason.message : "Runtime operation failed.";
+
+function LocalDaemonFacts({ runtime }: { runtime?: LocalDaemonStatus }) {
+  return <section className="border bg-card" aria-labelledby="local-daemon-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-panel-header p-3">
+          <div><h2 id="local-daemon-heading" className="font-semibold">Checkout-local daemon</h2>
+            <p className="font-mono text-xs text-muted-foreground">{runtime ? `v${runtime.daemonVersion} · last seen ${runtime.lastSeenAt}` : "Loading…"}</p></div>
+          <OperationalStatus compact label={runtime?.status ?? "loading"}
+            tone={runtime?.status === "online" ? "healthy" : runtime?.status === "error" ? "danger" : "neutral"} />
+        </div>
+        <dl className="grid gap-3 p-3 text-sm sm:grid-cols-4">
+          <Fact label="PID" value={runtime?.pid ? String(runtime.pid) : "—"} />
+          <Fact label="Uptime" value={runtime ? `${runtime.uptimeSeconds}s` : "—"} />
+          <Fact label="Active tasks" value={String(runtime?.activeTaskCount ?? 0)} />
+          <Fact label="Recent error" value={runtime?.recentError ?? "None"} />
+        </dl>
+      </section>;
+}
