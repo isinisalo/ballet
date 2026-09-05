@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Bot, BookOpenText, Braces, ChevronDown, ChevronRight, ClipboardCheck, FileCheck2, FileKey2, Gauge, MessageSquareWarning, Network, Play, Scale, ServerCog, Sparkles, Target } from "lucide-react";
+import { Bot, BookOpenText, Braces, ChevronDown, ChevronRight, FileCheck2, FileKey2, Gauge, MessageSquareWarning, Network, Play, Scale, ServerCog, Sparkles, Target } from "lucide-react";
 import { Sidebar, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import type { RouteState } from "@/workspace/types";
 import { orchestrationActionPath, orchestrationEntityPath, orchestrationStatePath } from "@/workspace/routing";
@@ -11,7 +11,7 @@ import { actionDisplayName } from "./actionDisplayName";
 const groups = [
   ["Automation", [["Loop Engineering", "/automation/loops", Network]]],
   ["Environment", [["Agents", "/agents", Bot], ["Skills", "/skills", Sparkles], ["Runtimes", "/runtimes", ServerCog]]],
-  ["Project", [["Goals", "/project/goals", Target], ["ADRs", "/project/adrs", Scale], ["Constraints", "/project/constraints", Gauge], ["Event Storming", "/project/event-storming", Network], ["User Story", "/project/user-stories", BookOpenText], ["Use Cases", "/project/use-cases", FileCheck2], ["Instructions", "/project/instructions", ClipboardCheck]]],
+  ["Project", [["Goals", "/project/goals", Target], ["ADRs", "/project/adrs", Scale], ["Constraints", "/project/constraints", Gauge], ["Event Storming", "/project/event-storming", Network], ["User Story", "/project/user-stories", BookOpenText], ["Use Cases", "/project/use-cases", FileCheck2]]],
   ["Run", [["Runs", "/run", Play], ["Feedback", "/feedback", MessageSquareWarning], ["Critic reviews", "/reviews/critic", FileKey2], ["Refinement reviews", "/reviews/refinement", Braces]]]
 ] as const;
 

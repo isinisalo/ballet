@@ -133,7 +133,7 @@ Inter owns prose and hierarchy; Geist owns IDs, hashes, statuses and compact met
 ## Information architecture
 
 - **Goals** and **ADRs** are separate Markdown workspaces; Constraints, Use Cases and Instructions use the same direct Markdown editor/preview contract.
-- **Authoring collections** expose Agents, Skills, Goals, ADRs, Constraints, Use Cases and Instructions as compact URL-owned nested sidebar lists; the content area is reserved for the selected editor.
+- **Authoring collections** expose Agents, Skills, Goals, ADRs, Constraints and Use Cases as compact URL-owned nested sidebar lists; Instructions remains a URL-owned Markdown workspace accessible through its canonical route, while the content area is reserved for the selected editor.
 - **Use Cases** keeps its compact sidebar list and makes approval status, semantic hash and Given/When/Then evidence explicit without a parallel form-owned truth.
 - **User Story** is a repository-first collection before Use Cases in the Project menu. Its main content is a list of complete story cards, including every acceptance criterion. Creation and editing use the same structured card editor over the canonical Markdown file; they do not use a second Markdown workbench or config-owned copy.
 - **Loop Engineering** keeps one ordered authoring tree visible across Environment, State, Action and Action Agent routes. Its three left-to-right ranks are STATE -> ACTION -> AGENTS. States run top-to-bottom by `order`; selecting a State reveals only its Actions top-to-bottom by `priority`; selecting an Action reveals its Validation and Work Agent nodes.
@@ -152,7 +152,8 @@ Each workspace has one canonical URL owner. `/` is a shell landing redirect to `
 | Loop Engineering | `/automation/loops` with URL-owned Environment/State/Action selection |
 | Agents / Skills / Runtimes | `/agents`, `/skills`, `/runtimes` |
 | Goals / ADRs / Constraints | `/project/goals`, `/project/adrs`, `/project/constraints`, each with `?id=` |
-| Use Cases / Instructions | `/project/use-cases`, `/project/instructions`, each with `?id=` |
+| Use Cases | `/project/use-cases` with `?id=` |
+| Instructions | `/project/instructions` with `?id=`; canonical deep link, not shown in the sidebar |
 | Event Storming | `/project/event-storming`, `?id=<boardId>&item=<placementId>` |
 | User Story | `/project/user-stories`, `?create=story` or `?id=<uuid>` |
 | Run Gate | `/run`, `/run/:runId`, nested State and Action routes |
