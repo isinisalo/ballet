@@ -348,6 +348,7 @@
               "agentId": "ballet-action-validation-arc42-architectural-decisions",
               "skillResources": [
                 "arc42/decision-records",
+                "ballet-adr",
                 "arc42/document-maintenance",
                 "arc42/traceability"
               ]
@@ -356,6 +357,7 @@
               "agentId": "ballet-action-work-arc42-architectural-decisions",
               "skillResources": [
                 "arc42/decision-records",
+                "ballet-adr",
                 "arc42/document-maintenance",
                 "arc42/traceability"
               ]
