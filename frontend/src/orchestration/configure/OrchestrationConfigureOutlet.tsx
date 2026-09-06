@@ -1,3 +1,4 @@
+import { AdrWorkspace } from "../adrs/AdrWorkspace";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { actionAgentId, type ActionDefinition, type StateDefinition } from "@shared/orchestration/environment";
@@ -26,19 +27,11 @@ export function OrchestrationConfigureOutlet({ route, data, navigate, mutation, 
 
   let content;
   switch (route.workspaceView) {
-    case "overview": case "adrs": {
-      const kind = route.workspaceView;
-      content = <ProjectMarkdownWorkspace key={kind} kind={kind} documents={projectDocuments(data, kind)}
-        selectedId={kind === "overview" ? "overview" : route.entityId} navigate={navigate} onDirty={onDirty}
-        onSave={async (id, source, hash, creating) => {
-          const saved = await mutation.execute(() => kind === "overview" ? orchestrationApi.saveOverview(source, hash)
-            : orchestrationApi.saveResource("adrs", id, source, hash, creating));
-          if (creating && kind === "adrs") navigate(`/project/adrs?id=${encodeURIComponent(id)}`, { bypassBlocker: true });
-          return saved;
-        }} onDelete={kind === "adrs" ? async (id, hash) => {
-          await mutation.execute(() => orchestrationApi.deleteAdr(id, hash)); navigate("/project/adrs", { bypassBlocker: true });
-        } : undefined} />; break;
-    }
+    case "adrs": content = <AdrWorkspace route={route} documents={data.adrs} navigate={navigate} onDirty={onDirty}
+      onSave={(id, source, hash, creating) => mutation.execute(() => orchestrationApi.saveResource("adrs", id, source, hash, creating))}
+      onDelete={async (id, hash) => { await mutation.execute(() => orchestrationApi.deleteAdr(id, hash)); }} />; break;
+    case "overview": content = <ProjectMarkdownWorkspace documents={data.overview ? [data.overview] : []} onDirty={onDirty}
+      onSave={(_id, source, hash) => mutation.execute(() => orchestrationApi.saveOverview(source, hash))} />; break;
     case "environment": content = <LoopEngineeringWorkspace environment={config.environment} locked={locked} navigate={navigate}><EnvironmentWorkspace environment={config.environment} issues={validateRunnableEnvironment(config.environment)} locked={locked} creating={route.createMode === "state"} navigate={navigate} onCancelCreate={() => navigate("/automation/loops", { bypassBlocker: true })} onReorder={(ids) => mutation.run(() => orchestrationApi.reorderStates(ids, configHash))} onSave={async (environment) => { await mutation.run(() => orchestrationApi.saveEnvironment(environment, configHash)); }} onCreate={async (id, name) => { const template = config.environment.states[0]!.actions[0]!; const actionId = `${id}-action-1`; const action: ActionDefinition = { ...template, id: actionId, name: `${name} first Action`, description: `Complete the first bounded Action for ${name}.`, priority: 1, validation: { ...template.validation, agentId: actionAgentId(actionId, "validation") }, work: { ...template.work, agentId: actionAgentId(actionId, "work") } }; const state: StateDefinition = { id, name, description: `${name} completion boundary`, order: config.environment.states.length + 1, actions: [action] }; if (await mutation.run(() => orchestrationApi.createState(state, configHash))) navigate(orchestrationStatePath(id), { bypassBlocker: true }); }} /></LoopEngineeringWorkspace>; break;
     case "state": { const state = config.environment.states.find((item) => item.id === route.stateId); content = <LoopEngineeringWorkspace environment={config.environment} selectedStateId={state?.id} locked={locked} navigate={navigate}><StateWorkspace state={state} locked={locked} creating={route.createMode === "action"} navigate={navigate} onCancelCreate={() => state && navigate(orchestrationStatePath(state.id), { bypassBlocker: true })} onReorderActions={(ids) => state ? mutation.run(() => orchestrationApi.reprioritizeActions(state.id, ids, configHash)) : Promise.resolve(false)} onSave={async (next: StateDefinition) => { await mutation.run(() => orchestrationApi.updateState(next, configHash)); }} onDelete={async () => { if (state && await mutation.run(() => orchestrationApi.deleteState(state.id, configHash))) navigate("/automation/loops"); }} onDeleteAction={async (actionId) => { if (state) await mutation.run(() => orchestrationApi.deleteAction(state.id, actionId, configHash)); }} onCreateAction={async (id, name) => { if (!state) return; const template = state.actions[0]!; const action: ActionDefinition = { ...template, id, name, description: `${name} bounded work`, priority: state.actions.length + 1, validation: { ...template.validation, agentId: actionAgentId(id, "validation") }, work: { ...template.work, agentId: actionAgentId(id, "work") } }; if (await mutation.run(() => orchestrationApi.createAction(state.id, action, configHash))) navigate(orchestrationActionPath(state.id, id), { bypassBlocker: true }); }} /></LoopEngineeringWorkspace>; break; }
     case "action": { const state = config.environment.states.find((item) => item.id === route.stateId); const action = state?.actions.find((item) => item.id === route.actionId); const selectedAgentRole = route.agentRole === "validation" || route.agentRole === "work" ? route.agentRole : undefined; content = <LoopEngineeringWorkspace environment={config.environment} selectedStateId={state?.id} selectedActionId={action?.id} selectedAgentRole={selectedAgentRole} locked={locked} navigate={navigate}><ActionWorkspace onDirty={onDirty} key={action?.id} stateId={state?.id} action={action} selectedAgentRole={route.agentRole} skills={data.skills} locked={locked} onSave={async (next, agents) => { if (!state) return; return mutation.execute(async () => { await orchestrationApi.updateAction(state.id, next, configHash, agents); return orchestrationApi.action(state.id, next.id); }); }} /></LoopEngineeringWorkspace>; break; }
@@ -54,6 +47,3 @@ export function OrchestrationConfigureOutlet({ route, data, navigate, mutation, 
 function UnavailableWorkspace({ route, navigate }: { route: RouteState; navigate(path: string): void }) {
   return <div className="p-6"><h1 className="text-xl font-semibold">Workspace unavailable</h1><p className="text-muted-foreground">This route or selection is invalid.</p><Button className="mt-4" variant="outline" onClick={() => navigate(route.recoveryPath ?? "/automation/loops")}>Return to workspace</Button></div>;
 }
-
-const projectDocuments = (data: OrchestrationConfigureData, kind: "overview" | "adrs") =>
-  kind === "adrs" ? data.adrs : data.overview ? [data.overview] : [];

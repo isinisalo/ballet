@@ -1,7 +1,7 @@
+import { parseAdr } from "../../shared/orchestration/adr.js";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import YAML from "yaml";
 import { parse as parseToml } from "smol-toml";
 import { describe, expect, test } from "vitest";
 import { createHash } from "node:crypto";
@@ -13,12 +13,6 @@ import { projectConfigurationV26Schema } from "../../shared/orchestration/schema
 const root = path.resolve(import.meta.dirname, "../..");
 
 const load = (relative: string) => JSON.parse(readFileSync(path.join(root, relative), "utf8"));
-const markdownFrontmatter = (relative: string) => {
-  const source = readFileSync(path.join(root, relative), "utf8");
-  const block = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
-  if (!block) throw new Error(`${relative} has no frontmatter`);
-  return { source, frontmatter: YAML.parse(block[1]!) };
-};
 const walk = (directory: string): string[] => readdirSync(directory).flatMap((entry) => {
   const target = path.join(directory, entry);
   return statSync(target).isDirectory() ? walk(target) : [target];
@@ -58,12 +52,12 @@ describe("canonical default project resources", () => {
       expect(createHash("sha256").update(bytes).digest("hex"), file.source).toBe(file.sha256);
     }
     const collection = new UserStoryService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => undefined).list();
-    expect(collection.issues).toEqual([]); expect(collection.stories).toHaveLength(8);
+    expect(collection.issues).toEqual([]); expect(collection.stories.length).toBeGreaterThanOrEqual(8);
     const trace = readFileSync(path.join(root, ".ballet/arc42/TRACEABILITY.md"), "utf8");
     for (const { value } of collection.stories) {
       expect(value.status).toBe("draft"); expect(value.approvalRevision).toBe(0); expect(value.approval).toBeUndefined();
       expect(trace).toContain(value.id); expect(value.acceptanceCriteria.length).toBeGreaterThan(0);
-      for (const id of value.adrIds) expect(readdirSync(path.join(root, ".ballet/adr")).some((file) => markdownFrontmatter(`.ballet/adr/${file}`).frontmatter.id === id), id).toBe(true);
+      for (const id of value.adrIds) expect(readdirSync(path.join(root, ".ballet/adr")).some((file) => parseAdr(readFileSync(path.join(root, `.ballet/adr/${file}`), "utf8")).id === id), id).toBe(true);
     }
     for (const source of Object.values(archive.destinations) as string[]) expect(existsSync(path.join(root, source.split("#")[0]!))).toBe(true);
     expect(Object.keys(archive.destinations)).toHaveLength(13);

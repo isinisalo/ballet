@@ -25,7 +25,7 @@ tags:
 | Working tree at start | clean |
 | Target source | Project owner's 2026-08-29 strict-cut request |
 
-The current architecture owners are [goal-021](../../../goals/goal-021-hierarchical-reward-mdp.md), [adr-033](../../../adr/adr-033-hierarchical-node-owned-reward-mdp.md), [architecture status](../../STATUS.md) and [traceability](../../TRACEABILITY.md). This audit records facts and proposed change surfaces. It does not activate the target model or alter runtime behavior.
+The current architecture owners are [goal-021](../../../goals/goal-021-hierarchical-reward-mdp.md), [adr-033](https://github.com/isinisalo/ballet/blob/29a4a0a8262d0ce66c32e7b0cdb35cd3da9d0b7e/.ballet/adr/adr-033-hierarchical-node-owned-reward-mdp.md), [architecture status](../../STATUS.md) and [traceability](../../TRACEABILITY.md). This audit records facts and proposed change surfaces. It does not activate the target model or alter runtime behavior.
 
 ## Version matrix
 

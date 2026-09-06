@@ -1,3 +1,4 @@
+import { ADR_ID } from "@shared/orchestration/adr";
 import { eventStormingId } from "@shared/orchestration/eventStorming";
 import type { RouteState, WorkspaceView } from "./types";
 import { userStoryIdSchema } from "@shared/orchestration/userStories";
@@ -75,6 +76,7 @@ function exactRoute(workspaceView: WorkspaceView, url: URL): RouteState {
     return invalid ? { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/event-storming" }
       : { view: "orchestration", workspaceView, entityId: id ?? undefined, itemId: item ?? undefined };
   }
+  if (workspaceView === "adrs") return adrRoute(url);
   if (workspaceView === "user-stories") return userStoryRoute(url);
   return { view: "orchestration", workspaceView, entityId: url.searchParams.get("id") ?? undefined,
     createMode: workspaceView === "environment" && url.searchParams.get("create") === "state" ? "state" : undefined };
@@ -94,3 +96,12 @@ export const orchestrationActionAgentPath = (stateId: string, actionId: string, 
 export const orchestrationCreateStatePath = () => "/automation/loops?create=state";
 export const orchestrationCreateActionPath = (stateId: string) => `${orchestrationStatePath(stateId)}?create=action`;
 export const orchestrationRunPath = (runId?: string) => runId ? `/run/${encodeURIComponent(runId)}` : "/run";
+
+function adrRoute(url: URL): RouteState {
+    const id = url.searchParams.get("id"); const create = url.searchParams.get("create");
+    const invalid = (id !== null && !ADR_ID.test(id)) || (create !== null && create !== "adr") || (id !== null && create !== null)
+      || [...url.searchParams.keys()].some((key) => !["id", "create"].includes(key))
+      || url.searchParams.getAll("id").length > 1 || url.searchParams.getAll("create").length > 1;
+    return invalid ? { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/adrs" }
+      : { view: "orchestration", workspaceView: "adrs", entityId: id ?? undefined, createMode: create === "adr" ? "adr" : undefined };
+  }

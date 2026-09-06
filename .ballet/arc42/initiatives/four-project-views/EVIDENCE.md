@@ -10,7 +10,7 @@ tags: [evidence, project, approval]
 
 # Four Project views verification
 
-Fact — Verified locally on 2026-09-06 in the working tree based on `caacde54ec9cf8a01375884f033fb2617f7807fe`. [ADR-048](../../../adr/adr-048-four-project-views.md) records the user's authorized contract. This evidence concerns implementation, not human agreement to the converted stories.
+Fact — Verified locally on 2026-09-06 in the working tree based on `caacde54ec9cf8a01375884f033fb2617f7807fe`. [ADR-048](https://github.com/isinisalo/ballet/blob/29a4a0a8262d0ce66c32e7b0cdb35cd3da9d0b7e/.ballet/adr/adr-048-four-project-views.md) records the user's authorized contract. This evidence concerns implementation, not human agreement to the converted stories.
 
 ## Delivered contract and source integrity
 

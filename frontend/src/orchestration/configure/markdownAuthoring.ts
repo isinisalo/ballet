@@ -31,17 +31,10 @@ export const markdownEntity = (document: ResourceDocument, draft: MarkdownDraft)
 
 const stringValue = (value: unknown): string | undefined => typeof value === "string" && value.trim() ? value.trim() : undefined;
 
-export function projectMarkdownValidation(kind: "overview" | "adrs", draft: MarkdownDraft, currentId: string, creating: boolean) {
-  let id = currentId;
+export function projectMarkdownValidation(draft: MarkdownDraft) {
   try {
-    const metadata = draft.frontmatterText.trim() ? parseFrontmatterYaml(draft.frontmatterText) : {};
-    if (kind === "adrs") {
-      if (typeof metadata.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(metadata.id)) throw new Error("A safe document ID is required.");
-      if (!creating && metadata.id !== currentId) throw new Error("The document ID cannot change.");
-      if (typeof metadata.title !== "string" || !metadata.title.trim()) throw new Error("A title is required.");
-      id = metadata.id;
-    }
+    if (draft.frontmatterText.trim()) parseFrontmatterYaml(draft.frontmatterText);
     if (!draft.bodyText.trim()) throw new Error("Markdown content is required.");
-    return { id, validation: "" };
-  } catch (reason) { return { id, validation: reason instanceof Error ? reason.message : "Invalid Markdown." }; }
+    return { validation: "" };
+  } catch (reason) { return { validation: reason instanceof Error ? reason.message : "Invalid Markdown." }; }
 }

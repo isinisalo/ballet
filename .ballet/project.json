@@ -326,7 +326,7 @@
             }
           },
           {
-            "description": "Maintain the index of important accepted, proposed and superseded architecture decisions without changing accepted semantics silently.",
+            "description": "Maintain Finnish three-line records of currently accepted architecture decisions and their index, following ballet-adr; move requirements, process evidence and design rules to their canonical owners.",
             "id": "arc42-architectural-decisions",
             "input": {
               "acceptance": [

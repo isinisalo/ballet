@@ -1,13 +1,13 @@
 ---
 name: decision-records
-description: Propose and maintain architecture decision records without changing accepted decisions silently. Use when a choice is important, risky, expensive, hard to reverse or contentious.
+description: Maintain current architecture decisions using the canonical ballet-adr record and explicit human authority.
 ---
 
 # Decision records
 
-1. Confirm that the issue is architecture-significant and not already decided by an accepted ADR.
-2. Record context, decision drivers/QS, considered options, proposed decision, consequences, evidence and review trigger.
-3. Allocate the next free ADR ID without overwriting a gap unless that gap is the next free identifier.
-4. Create proposals as `draft` or `review`; only explicit human approval may set `accepted`.
-5. Never edit the semantic decision of an accepted ADR. Create a superseding ADR and update section 9 when a decision changes.
-6. Link affected requirement/QS/CON/BB/RISK IDs and report the required human decision.
+1. Read [ballet-adr](../../ballet-adr/SKILL.md). It exclusively owns the ADR format: title, Decision and Scope, without frontmatter or extra sections. Write the title and values in Finnish; retain the literal Decision and Scope field names.
+2. Record only a currently accepted architecture decision. Keep proposals and unresolved choices in the relevant initiative or Event Storming hotspot until the human decides; an agent cannot grant acceptance.
+3. Preserve an existing decision ID when updating its currently accepted scope. Allocate a new ID after the highest current number when a distinct accepted decision needs a record.
+4. Update or delete a decision when it is superseded under the human's authorization. Keep obsolete history in Git, never in the active ADR collection.
+5. Put functional behavior and acceptance criteria in User Stories, process/domain evidence in Event Storming, and visual/interaction rules in DESIGN.md. Preserve source traceability in arc42; do not duplicate these as ADR context, rationale, alternatives, consequences, status or review sections.
+6. Update the current decision index and active references, validate exact record structure and source links, and report actual checks. Existing historical evidence retains its original revision and results.

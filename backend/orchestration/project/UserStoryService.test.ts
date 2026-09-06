@@ -158,16 +158,16 @@ describe("exact human User Story approval", () => {
 
 test("validates ADR references before saving and invalidates approval when references change", () => {
   const { service, documents } = fixture();
-  documents.put("adr", "adr-1", "---\nid: adr-1\ntitle: First\n---\nFirst decision.\n", "absent");
-  documents.put("adr", "adr-2", "---\nid: adr-2\ntitle: Second\n---\nSecond decision.\n", "absent");
-  const saved = service.create({ ...input, adrIds: ["adr-1"] });
+  documents.put("adr", "adr-001", "[ADR-001: First]\nDecision: First decision.\nScope: Project.\n", "absent");
+  documents.put("adr", "adr-002", "[ADR-002: Second]\nDecision: Second decision.\nScope: Project.\n", "absent");
+  const saved = service.create({ ...input, adrIds: ["adr-001"] });
   const approved = service.approve(saved.value.id, saved.contentHash, saved.semanticHash,
     { id: "human", source: "request_context" }, "2026-09-06T10:00:00.000Z");
   expect(() => service.update(saved.value.id, { ...input, adrIds: ["missing"] }, approved.contentHash)).toThrow("was not found");
   expect(service.require(saved.value.id)).toEqual(approved);
-  const edited = service.update(saved.value.id, { ...input, adrIds: ["adr-2"] }, approved.contentHash);
+  const edited = service.update(saved.value.id, { ...input, adrIds: ["adr-002"] }, approved.contentHash);
   expect(edited.value.status).toBe("draft"); expect(edited.value.approval).toBeUndefined();
-  documents.remove("adr", "adr-2", documents.require("adr", "adr-2").contentHash, []);
+  documents.remove("adr", "adr-002", documents.require("adr", "adr-002").contentHash, []);
   expect(() => service.approve(edited.value.id, edited.contentHash, edited.semanticHash,
     { id: "human", source: "request_context" }, "2026-09-06T10:01:00.000Z")).toThrow("was not found");
   expect(service.require(edited.value.id)).toEqual(edited);

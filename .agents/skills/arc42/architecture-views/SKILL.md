@@ -10,4 +10,4 @@ description: Maintain risk-driven arc42 context, building-block, runtime and dep
 3. Map static blocks to source directories and shared interfaces.
 4. Document only runtime/deployment scenarios that are important, risky, complex or needed by a quality scenario.
 5. Keep diagrams and text consistent; prefer a compact table or scenario over redundant views.
-6. Link every change to QS/ADR/CON IDs and record unresolved design choices as Open questions or ADR proposals.
+6. Link every change to QS/ADR/CON IDs and record unresolved design choices as Open questions or initiative proposals outside the active ADR collection until human acceptance.

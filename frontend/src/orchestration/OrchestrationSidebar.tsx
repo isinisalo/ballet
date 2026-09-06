@@ -1,4 +1,3 @@
-import { markdownEntity, splitMarkdownSource } from "./configure/markdownAuthoring";
 import { Fragment, useState } from "react";
 import { Bot, BookOpenText, Braces, ChevronDown, ChevronRight, FileKey2, MessageSquareWarning, Network, Play, Scale, ServerCog, Sparkles, FileText } from "lucide-react";
 import { Sidebar, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
@@ -85,9 +84,5 @@ function entityItems(path: string, data?: OrchestrationConfigureData): SidebarEn
     status: item.status, healthy: item.status === "ready" }));
   if (path === "/skills") return data.skills.map((item) => ({ id: item.id, label: item.id, status: "Skill", healthy: true }));
   if (path === "/project/instructions") return data.instructions.map((item) => ({ id: item.id, label: item.id, status: "Instruction", healthy: true }));
-  return path === "/project/adrs" ? data.adrs.map((item) => {
-    const metadata = markdownEntity(item, splitMarkdownSource(item.content));
-    const status = String(metadata.frontmatter.status ?? "draft");
-    return { id: item.id, label: metadata.title, status, healthy: status === "accepted" };
-  }) : [];
+  return [];
 }

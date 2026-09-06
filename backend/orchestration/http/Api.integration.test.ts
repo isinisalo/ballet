@@ -182,12 +182,17 @@ describe("orchestration HTTP integration", () => {
     expect((await request("/overview", json("PUT", { content: "overwrite", expectedHash: overview.contentHash }))).status).toBe(409);
     expect((await request("/overview", json("PUT", { content: overviewSource, expectedHash: savedOverview.contentHash, actor: "agent" }))).status).toBe(400);
     expect((await (await request("/project")).json() as { configHash: string }).configHash).toBe(fixture.configHash);
-    const adrContent = "---\nid: adr-extra\ntitle: Extra decision\nstatus: draft\n---\n\n# Context\nOne file only.\n";
-    response = await request("/adrs", json("POST", { id: "adr-extra", content: adrContent, expectedHash: "absent" })); expect(response.status).toBe(201);
+    const adrContent = "[ADR-999: Lisäpäätös]\nDecision: Yksi tiedosto.\nScope: Projekti.\n";
+    response = await request("/adrs", json("POST", { id: "adr-999", content: adrContent, expectedHash: "absent" })); expect(response.status).toBe(201);
     const adr = await response.json() as { contentHash: string };
-    expect(await (await request("/adrs/adr-extra")).json()).toMatchObject({ content: adrContent });
-    expect((await request("/adrs/adr-extra", json("DELETE", { expectedHash: "f".repeat(64) }))).status).toBe(409);
-    expect((await request("/adrs/adr-extra", json("DELETE", { expectedHash: adr.contentHash }))).status).toBe(204);
+    expect(await (await request("/adrs/adr-999")).json()).toMatchObject({ content: adrContent });
+    expect((await request("/adrs", json("POST", { id: "adr-999", content: adrContent, expectedHash: "absent" }))).status).toBe(409);
+    for (const content of ["---\nid: adr-999\n---\n" + adrContent, adrContent + "Status: accepted\n", adrContent.replace("ADR-999", "ADR-998")]) {
+      expect((await request("/adrs/adr-999", json("PUT", { content, expectedHash: adr.contentHash }))).status).toBe(409);
+    }
+    expect(await (await request("/adrs/adr-999")).json()).toMatchObject({ content: adrContent, contentHash: adr.contentHash });
+    expect((await request("/adrs/adr-999", json("DELETE", { expectedHash: "f".repeat(64) }))).status).toBe(409);
+    expect((await request("/adrs/adr-999", json("DELETE", { expectedHash: adr.contentHash }))).status).toBe(204);
 
     response = await request("/environment-runs", json("POST", {
       environmentId: "environment-1", expectedConfigHash: fixture.configHash, source: "continuation"
@@ -415,7 +420,7 @@ const startFixture = async () => {
   const projects = new ProjectConfigurationRepository(path.join(root, ".ballet", "project.json"), connection);
   const documents = new ProjectDocumentRepository(path.join(root, ".ballet"), connection);
   let configHash = projects.save(config, "absent").configHash;
-  documents.put("adr", "adr-1", "# ADR 1\n", "absent");
+  documents.put("adr", "adr-001", "[ADR-001: Ensimmäinen]\nDecision: Päätös.\nScope: Projekti.\n", "absent");
   const instructionHash = documents.put("instruction", "instruction", VALID_INSTRUCTION, "absent").contentHash;
   const project = new ProjectDefinitionService(root, projects, documents);
   const actionAgentSlot = project.agents.requireAction("ballet-action-validation-action-1");

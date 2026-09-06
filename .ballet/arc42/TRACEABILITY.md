@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-06'
-version: 50
+version: 51
 tags: [arc42, traceability, evidence]
 ---
 
@@ -100,3 +100,25 @@ Former source IDs and unchanged approvals are in the [historical conversion reco
 | EVID-044 | Event Storming verification record in initiatives/event-storming-workspace/EVIDENCE.md |
 | EVID-045 | ADR-047 six-workspace red-to-green component evidence, strict removal search, responsive browser QA and final repository gates |
 | EVID-046 | [Four project views verification](initiatives/four-project-views/EVIDENCE.md) |
+
+## ADR-recordit ja nykyisen domainin kattavuus
+
+[Siirtokartoitus](ADR-CONTENT-MAP.md) kattaa alkuperäiset ADR:t ja Event Stormingin taulut. Uudet vaatimukset ovat luonnoksia; vanha evidenssi ei automaattisesti todista niiden jokaista kriteeriä.
+
+| Tarina | Tarkistusten omistaja | Evidenssi |
+| --- | --- | --- |
+| [54625950-26fb-46fe-90e3-f4cf31084368](../user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md) — overview | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [837f8ecb-c3e7-46d5-a8a4-9521f37542e4](../user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md) — action | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [9b094976-5840-4764-8c2d-9a42559a09d6](../user-stories/9b094976-5840-4764-8c2d-9a42559a09d6.md) — approval | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [9def77e6-89c3-4ef3-b295-89323c592807](../user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md) — feedback | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [a172e384-43eb-4fb3-95ca-9d42ab52a5f7](../user-stories/a172e384-43eb-4fb3-95ca-9d42ab52a5f7.md) — evidence | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [b87320a0-3e7c-4a59-b120-4fa7e3d95b7c](../user-stories/b87320a0-3e7c-4a59-b120-4fa7e3d95b7c.md) — environment | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [cc322abc-96e2-41ef-93f8-1b5aba633995](../user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md) — refinement | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [ff255f3a-5748-42da-904c-311cc9ff9c43](../user-stories/ff255f3a-5748-42da-904c-311cc9ff9c43.md) — critic | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027201](../user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md) — execution | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027202](../user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md) — lifecycle | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027203](../user-stories/aae46173-ec52-44d0-8fa6-e80353027203.md) — distribution | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027204](../user-stories/aae46173-ec52-44d0-8fa6-e80353027204.md) — storm | ADR-parseri, API, ADR-kortit ja projektisisällön tarkistukset | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027205](../user-stories/aae46173-ec52-44d0-8fa6-e80353027205.md) — adr | ADR-parseri, API, ADR-kortit ja projektisisällön tarkistukset | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027206](../user-stories/aae46173-ec52-44d0-8fa6-e80353027206.md) — security | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+| [aae46173-ec52-44d0-8fa6-e80353027207](../user-stories/aae46173-ec52-44d0-8fa6-e80353027207.md) — method | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |

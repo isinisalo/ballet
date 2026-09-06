@@ -1,3 +1,4 @@
+import { ADR_ID } from "../../../shared/orchestration/adr.js";
 import { atomicWrite } from "./atomicWrite.js";
 import {
   closeSync, constants, fstatSync, lstatSync, mkdirSync,
@@ -37,8 +38,9 @@ export class ProjectDocumentRepository {
       ? listSkillIds(directory)
       : readdirSync(directory, { withFileTypes: true })
         .filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".md"))
-        .map((entry) => kind === "user-story" ? entry.name.slice(0, -3) : documentId(path.join(directory, entry.name), entry.name.slice(0, -3)));
+        .map((entry) => kind === "user-story" ? entry.name.slice(0, -3) : documentId(path.join(directory, entry.name), entry.name.slice(0, -3), kind));
     if (kind === "user-story" && ids.length > USER_STORY_LIMITS.stories) throw new ConflictError(`User Story collection exceeds ${USER_STORY_LIMITS.stories} files.`);
+    if (new Set(ids).size !== ids.length) throw new ConflictError(`Duplicate ${kind} document ID.`);
     return ids
       .map((id) => this.require(kind, id))
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -116,7 +118,7 @@ export class ProjectDocumentRepository {
     if (kind === "skill") return path.join(directory, ...id.split("/"), "SKILL.md");
     const matching = status(directory)?.isDirectory() ? readdirSync(directory, { withFileTypes: true })
       .find((entry) => entry.isFile() && entry.name.endsWith(".md")
-        && documentId(path.join(directory, entry.name), entry.name.slice(0, -3)) === id) : undefined;
+        && documentId(path.join(directory, entry.name), entry.name.slice(0, -3), kind) === id) : undefined;
     return path.join(directory, matching?.name ?? `${id}.md`);
   }
 
@@ -157,7 +159,12 @@ const listSkillIds = (root: string, relative = ""): string[] => {
   return ids;
 };
 
-const documentId = (filename: string, fallback: string): string => {
+const documentId = (filename: string, fallback: string, kind: ProjectDocumentKind): string => {
+  if (kind === "adr") {
+    const id = fallback.match(/^(adr-\d{3,})(?:-|$)/)?.[1];
+    if (!id || !ADR_ID.test(id)) throw new ConflictError("ADR filename requires an adr-001 prefix.");
+    return id;
+  }
   const content = readFileSync(filename, "utf8");
   const match = content.match(/^---\s*$[\s\S]*?^id:\s*['"]?([^'"\s]+)['"]?\s*$/m);
   return match?.[1] ?? fallback;

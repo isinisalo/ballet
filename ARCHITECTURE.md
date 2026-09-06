@@ -17,7 +17,7 @@ Ballet is a checkout-local orchestration command center. [ADR-034](.ballet/adr/a
 | Task | Read next |
 | --- | --- |
 | Current work and verification | [STATUS](.ballet/arc42/STATUS.md) → its dated evidence |
-| Architecture or source ownership | [arc42 index](.ballet/arc42/README.md) → the relevant section; [accepted decisions and supersession](.ballet/arc42/09-architecture-decisions.md) |
+| Architecture or source ownership | [arc42 index](.ballet/arc42/README.md) → the relevant section; [current accepted decisions](.ballet/arc42/09-architecture-decisions.md) |
 | Runtime behavior | [state contract](.ballet/arc42/STATE-CONTRACT.md) and [runtime scenarios](.ballet/arc42/06-runtime-view.md) |
 | UI or authoring | [DESIGN](DESIGN.md), then the relevant component and its tests |
 | Implementation checks | [AGENTS](AGENTS.md) and the target directory's AGENTS.md |

@@ -29,7 +29,7 @@ export interface RouteState {
   itemId?: string;
   stateId?: string;
   actionId?: string;
-  createMode?: "state" | "action" | "story";
+  createMode?: "state" | "action" | "story" | "adr";
   agentRole?: "validation" | "work" | "invalid";
   recoveryPath?: string;
 }

@@ -4,33 +4,37 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-06'
-version: 40
+version: 41
 tags: [arc42, decisions]
 arc42Section: 9
 ---
 
 # 9. Arkkitehtuuripäätökset
 
-| ADR | Status | Aktiivinen päätös |
-| --- | --- | --- |
-| [adr-034](../adr/adr-034-validation-led-environment-state-action-orchestration.md) | accepted | Environment -> State -> Action, Validation-led loop, strict versions, human-gated Critic/Refinement and immutable continuation |
-| [adr-035](../adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) | accepted | Markdown authoring, Agent project truth, paired daemon execution binding, resource-only Refinement and Run Evidence |
-| [adr-037](../adr/adr-037-checkout-local-daemon.md) | accepted | Supersedes ADR-035 Computer/pairing/remote execution with one checkout-local daemon while retaining Markdown Agents and Run Evidence |
-| [adr-038](../adr/adr-038-action-role-execution-bindings.md) | accepted | Role resource composition retained; State closure superseded by ADR-041 and machine-local execution bindings by ADR-042 |
-| [adr-039](../adr/adr-039-action-shared-provider-policy.md) | superseded | Historical shared provider/policy binding, superseded by Codex-only Action binding v3 |
-| [adr-040](../adr/adr-040-codex-only-fixed-governance-agents.md) | accepted | Two fixed read-only governance Agent TOMLs and Codex-only daemon retained; Action bindings superseded by ADR-042 |
-| [adr-041](../adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) | accepted | Project documents are instruction/Skill-directed and ordering is edited only with compact ID-only sortable lists |
-| [adr-042](../adr/adr-042-action-specific-codex-agents.md) | accepted | Every Action owns distinct Validation/Work TOMLs; removes shared role instruction and machine-local Action execution binding truths |
-| [adr-036](../adr/adr-036-loop-engineering-space-and-action-flow-projections.md) | superseded | Historical top-to-bottom State and left-to-right Action projection, superseded by ADR-043 |
-| [adr-043](../adr/adr-043-compact-horizontal-state-canvas.md) | superseded | Historical horizontal-State/vertical-Action planet projection and retained Action flow, superseded by ADR-044 |
-| [adr-044](../adr/adr-044-three-level-dagre-loop-canvas.md) | superseded | Introduced the three-level Dagre tree; node-label, spacing and edge presentation superseded by ADR-045 |
-| [adr-045](../adr/adr-045-spacious-concise-floating-loop-tree.md) | accepted | Spacious concise State -> Action -> Agents tree with visible selected branch and lightweight right-to-left floating curves |
+ADR-hakemisto sisältää vain voimassa olevat päätökset [ballet-adr-skillin](../../.agents/skills/ballet-adr/SKILL.md) kolmirivisessä muodossa. Vanhentunut sisältö säilyy Git-historiassa. Tämä indeksi linkittää päätökset kopioimatta niiden tekstiä.
 
-| [adr-046](../adr/adr-046-repository-owned-event-storming-workspace.md) | accepted | Human-approved repository-owned visual Event Storming workspace with shared live notes and board-local geometry |
-| [adr-047](../adr/adr-047-editor-only-markdown-authoring.md) | accepted | Goals, ADRs, Constraints, User Stories, Instructions and Skills use one editor-only Markdown workbench without preview |
+| ADR | Otsikko |
+| --- | --- |
+| [adr-001](../adr/adr-001-checkout-kohtainen-paikallinen-palvelu.md) | Checkout-kohtainen paikallinen palvelu |
+| [adr-002](../adr/adr-002-kannettava-projektimaaritys-ja-paikallinen-tila.md) | Projektimäärityksen ja ajonaikaisen tilan erottaminen |
+| [adr-003](../adr/adr-003-yhteinen-typescript-sovellusarkkitehtuuri.md) | Yhteinen TypeScript-sovellusarkkitehtuuri |
+| [adr-006](../adr/adr-006-root-run-git-worktree-eristys.md) | Runin eristetty Git-työtila |
+| [adr-007](../adr/adr-007-sqlite-suoritus-ja-ajastustila.md) | SQLite ajonaikaisen tilan omistajana |
+| [adr-008](../adr/adr-008-loopback-api-ja-suljettu-oikeusmalli.md) | Paikallinen HTTP-raja ja roolien oikeudet |
+| [adr-009](../adr/adr-009-varmennettu-macos-jakelu.md) | Varmennettu macOS-jakelu |
+| [adr-011](../adr/adr-011-arc42-template-ja-jatkuva-ballet-method.md) | Projektin arkkitehtuuridokumentaation omistus |
+| [adr-013](../adr/adr-013-workflow-yksityiskohdat-kuuluvat-skillsiin.md) | Uudelleenkäytettävät menettelyt Skilleissä |
+| [adr-014](../adr/adr-014-workflow-templatet-ovat-project-local-dataa.md) | Projektin oma työnkulkumääritys |
+| [adr-034](../adr/adr-034-validation-led-environment-state-action-orchestration.md) | Validationin ohjaama Environment-suoritus |
+| [adr-035](../adr/adr-035-markdown-agents-paired-daemon-and-run-evidence.md) | Run Evidence terminaalisen tuloksen projektiona |
+| [adr-037](../adr/adr-037-checkout-local-daemon.md) | Yksi paikallinen daemon checkoutia kohti |
+| [adr-040](../adr/adr-040-codex-only-fixed-governance-agents.md) | Kiinteät Codex-governance-agentit |
+| [adr-041](../adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) | Ohjeen määrittämä projektikonteksti |
+| [adr-042](../adr/adr-042-action-specific-codex-agents.md) | Actionin omat Validation- ja Work-agentit |
+| [adr-045](../adr/adr-045-spacious-concise-floating-loop-tree.md) | Kanonisen järjestyksen navigointipuu |
+| [adr-046](../adr/adr-046-repository-owned-event-storming-workspace.md) | Yhteinen Event Storming -dokumentti |
+| [adr-047](../adr/adr-047-editor-only-markdown-authoring.md) | Suora Markdown-muokkaus |
+| [adr-048](../adr/adr-048-four-project-views.md) | Projektin neljä näkymää |
+| [adr-049](../adr/adr-049-three-line-record-and-card-editor.md) | Kolmirivinen ADR-record ja rakenteinen editori |
 
-ADR-034:n, ADR-035:n, ADR-037:n, ADR-038:n, ADR-039:n, ADR-040:n, ADR-041:n, ADR-042:n, ADR-043:n, ADR-044:n, ADR-045:n ja ADR-047:n supersession-listat määrittävät, mitkä aiemmat päätökset tai niiden osat ovat historiallisia. Tässä indeksissä ei ylläpidetä rinnakkaista päätöstekstiä.
-
-| [adr-048](../adr/adr-048-four-project-views.md) | accepted by the project owner's explicit implementation request | Four Project views; replaces duplicated definition collections and Direction snapshot with Markdown-only Overview, Stories and ADRs, preserving execution and human authority. |
-
-ADR-048 supersedes only the project-definition roster, mirrored Direction and Use Case entity portions of ADR-034/035/041/047. Earlier decision bodies remain unchanged as history.
+[ADR-sisällön siirtokartoitus](ADR-CONTENT-MAP.md) osoittaa vaatimusten, prosessien ja design-sääntöjen nykyiset omistajat.

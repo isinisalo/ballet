@@ -1,3 +1,5 @@
+import { parseAdr } from "../../shared/orchestration/adr.ts";
+import { validateProjectContent } from "./validate-project-content.mjs";
 /* eslint-disable max-lines -- Canonical validation stays in one executable inventory for deterministic repository checks. */
 import { readFile, readdir, stat, lstat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -154,7 +156,8 @@ for (const filename of definitionFiles) {
 }
 for (const directory of [".ballet/adr"]) {
   for (const file of (await walk(path.join(root, directory))).filter((entry) => entry.endsWith(".md"))) {
-    const id = (await parseMarkdown(file)).frontmatter?.id;
+    let id;
+    try { id = parseAdr(await readFile(file, "utf8")).id; } catch (error) { addIssue(`${rel(file)}: ${error.message}`); }
     if (typeof id === "string") stableDefinitions.add(id);
   }
 }
@@ -207,6 +210,7 @@ for (const { value } of storyCollection.stories) {
 }
 for (const removed of ["goals", "constraints", "use-cases"]) if (await exists(path.join(root, ".ballet", removed))) addIssue(`Removed active collection ${removed}.`);
 
+for (const issue of validateProjectContent(root)) addIssue(issue);
 try { new EventStormingService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => {}).read(); }
 catch (error) { addIssue(`Event Storming model: ${error instanceof Error ? error.message : String(error)}`); }
 
@@ -229,7 +233,8 @@ else {
 const additionalLinkFiles = ["README.md", "DESIGN.md", "AGENTS.md", ".ballet/overview.md",
   ...(await walk(path.join(root, ".ballet/user-stories"))).filter((file) => file.endsWith(".md")).map(rel),
   ...(await walk(path.join(root, ".agents/skills"))).filter((file) => file.endsWith(".md")).map(rel),
-  ".ballet/adr/adr-048-four-project-views.md"];
+  ...(await walk(path.join(root, ".ballet/adr"))).filter((file) => file.endsWith(".md")).map(rel),
+  ".ballet/event-storming/model.md"];
 for (const filename of additionalLinkFiles) await validateLocalLinks(path.join(root, filename));
 
 for (const removed of [".ballet/graph-node-library", ".ballet/graph-node-modules"]) {
@@ -249,8 +254,7 @@ if (issues.length) {
 async function indexedMarkdown(directory) {
   const result = new Set();
   for (const filename of (await walk(directory)).filter((file) => file.endsWith(".md"))) {
-    const parsedDocument = await parseMarkdown(filename);
-    if (typeof parsedDocument.frontmatter?.id === "string") result.add(parsedDocument.frontmatter.id);
+    try { result.add(parseAdr(await readFile(filename, "utf8")).id); } catch (error) { addIssue(`${rel(filename)}: ${error.message}`); }
   }
   return result;
 }

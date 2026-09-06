@@ -24,6 +24,12 @@
   --ballet-secondary: #4edea3;
   --ballet-tertiary: #ffb95f;
   --ballet-error: #ffb4ab;
+  --adr-title: var(--story-role);
+  --adr-title-foreground: var(--story-role-foreground);
+  --adr-decision: var(--story-goal);
+  --adr-decision-foreground: var(--story-goal-foreground);
+  --adr-scope: var(--story-benefit);
+  --adr-scope-foreground: var(--story-benefit-foreground);
   --story-role: var(--ballet-primary);
   --story-role-foreground: var(--primary-foreground);
   --story-goal: var(--ballet-tertiary);

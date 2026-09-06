@@ -1,0 +1,23 @@
+.adr-content { padding: 24px; }
+.adr-legend { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 20px; font-size: 14px; }
+.adr-legend li { display: flex; align-items: center; gap: 8px; }
+.adr-swatch { width: 24px; height: 12px; border-radius: var(--radius-xs); }
+.adr-title { background: var(--adr-title); color: var(--adr-title-foreground); }
+.adr-decision { background: var(--adr-decision); color: var(--adr-decision-foreground); }
+.adr-scope { background: var(--adr-scope); color: var(--adr-scope-foreground); }
+.adr-field { display: grid; min-width: 0; grid-template-columns: 128px minmax(0, 1fr); gap: 16px; align-items: start; }
+.adr-field > label { padding-top: 4px; }
+.adr-field-label { font: 600 11px/16px var(--font-mono); text-transform: uppercase; letter-spacing: .05em; border-radius: var(--radius-xs); padding: 2px 8px; }
+.adr-field textarea { field-sizing: content; min-height: 64px; font-size: 18px; line-height: 24px; font-weight: 500; border-color: transparent; }
+.adr-field textarea::placeholder { color: inherit; opacity: .85; }
+.adr-prose { font-size: 18px; line-height: 32px; overflow-wrap: anywhere; }
+.adr-prose mark { border-radius: var(--radius-xs); padding: 2px 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.adr-article { outline-offset: 4px; scroll-margin-block: 72px; border-radius: var(--radius-lg); }
+.adr-article:focus-visible { outline: 2px solid var(--ring); }
+@media (max-width: 767px) {
+  .adr-content { padding: 16px; }
+  .adr-legend { gap: 16px; }
+  .adr-field { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .adr-workspace button, .adr-workspace input, .adr-dialog button { min-height: 44px; }
+  .adr-workspace [data-slot="configure-toolbar"] [data-slot="button"] { min-height: 44px; min-width: 44px; }
+}

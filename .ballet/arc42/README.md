@@ -10,7 +10,7 @@ tags: [arc42, architecture, index]
 
 # Balletin arc42-arkkitehtuuri-indeksi
 
-Aloita [ARCHITECTURE.md:n lukupolusta ja aktiivisesta versiomatriisista](../../ARCHITECTURE.md). Valitse sitten vain tehtävää koskeva näkymä. Päätösten nykyinen vaikutus ja supersession löytyvät osiosta 9.
+Aloita [ARCHITECTURE.md:n lukupolusta ja aktiivisesta versiomatriisista](../../ARCHITECTURE.md). Valitse sitten vain tehtävää koskeva näkymä. Voimassa olevien päätösten indeksi löytyy osiosta 9; korvattu sisältö säilyy Git-historiassa.
 
 1. [Johdanto ja tavoitteet](01-introduction-and-goals.md)
 2. [Rajoitteet](02-constraints.md)

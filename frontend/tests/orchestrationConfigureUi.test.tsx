@@ -16,8 +16,8 @@ import { resources, orchestrationConfig } from "./orchestrationFixtures";
 
 
 describe("orchestration Configure UI", () => {
-  it.each(["overview", "adrs"] as const)("renders the %s Markdown workspace as editing only", (kind) => {
-    render(<ProjectMarkdownWorkspace kind={kind} documents={[{ kind: kind === "adrs" ? "adr" : "overview", id: "doc", content: "---\nid: doc\ntitle: Editable document\n---\n# Editable document\n", contentHash: "a".repeat(64) }]} selectedId="doc" navigate={vi.fn()} onSave={vi.fn()} />);
+  it("renders the Overview Markdown workspace as editing only", () => {
+    render(<ProjectMarkdownWorkspace documents={[{ kind: "overview", id: "overview", content: "---\nid: overview\ntitle: Editable document\n---\n# Editable document\n", contentHash: "a".repeat(64) }]} onSave={vi.fn()} />);
     expect(screen.queryByText("Preview")).not.toBeInTheDocument();
     expect(screen.getByLabelText("YAML Frontmatter")).toBeInTheDocument();
     expect(screen.getByLabelText("Markdown Body")).toBeInTheDocument();
