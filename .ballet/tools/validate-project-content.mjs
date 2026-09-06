@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { parseAdr } from "../../shared/orchestration/adr.ts";
-import { parseEventStormingMarkdown } from "../../backend/orchestration/project/eventStormingMarkdown.ts";
+import { EventStormingService } from "../../backend/orchestration/project/EventStormingService.ts";
+import { ProjectDocumentRepository } from "../../backend/orchestration/project/ProjectDocumentRepository.ts";
+import { stormProcessStoryIds } from "../../shared/orchestration/eventStormingContext.ts";
 
 /** Ballet's own content coverage; the generic platform still permits an empty workshop. */
 export function validateProjectContent(root) {
@@ -15,30 +17,14 @@ export function validateProjectContent(root) {
       ids.add(record.id);
     } catch (error) { issues.push(`${file}: ${error.message}`); }
   }
-  const filename = path.join(root, ".ballet/event-storming/model.md");
-  if (!existsSync(filename)) return [...issues, "Ballet Event Storming model is missing."];
   try {
-    const { value } = parseEventStormingMarkdown(readFileSync(filename, "utf8"));
-    for (const [level, count] of [["big-picture", 1], ["process-modelling", 6], ["software-design", 6]]) {
-      if (value.boards.filter((board) => board.level === level).length < count) issues.push(`Ballet requires at least ${count} ${level} boards.`);
+    const service = new EventStormingService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => {});
+    const { value } = service.read(); service.readLayout();
+    for (const process of value.processes) for (const id of stormProcessStoryIds(process)) {
+      if (!existsSync(path.join(root, ".ballet/user-stories", `${id}.md`))) issues.push(`Missing Event Storming story ${id}.`);
     }
-    issues.push(...validateStormContent(root, value));
+    const sources = [...value.concepts.flatMap(c => c.sources), ...value.processes.flatMap(p => [...p.sources, ...p.steps.flatMap(s => s.sources), ...p.boundaries.flatMap(b => b.sources)])];
+    for (const source of new Set(sources.filter(s => s.startsWith(".ballet/")))) if (!existsSync(path.join(root, source.split("#")[0]))) issues.push(`Missing Event Storming source ${source}.`);
   } catch (error) { issues.push(`Event Storming: ${error.message}`); }
-  return issues;
-}
-
-function validateStormContent(root, value) {
-  const issues = [];
-    for (const board of value.boards) {
-      if (!board.placements.length || !board.connections.length) issues.push(`Empty Event Storming board ${board.title}.`);
-      if (board.level !== "big-picture" && !board.sourceBoardId) issues.push(`Missing source board for ${board.title}.`);
-    }
-    for (const note of value.notes) {
-      if (!note.title.trim() || !note.details.trim() || !note.sources.length) issues.push(`Unsourced or empty Event Storming note ${note.id}.`);
-      for (const source of note.sources.filter((source) => source.startsWith(".ballet/"))) {
-        if (!existsSync(path.join(root, source.split("#")[0]))) issues.push(`Missing Event Storming source ${source}.`);
-      }
-      if (!value.boards.some((board) => board.placements.some((placement) => placement.noteId === note.id))) issues.push(`Unplaced note ${note.id}.`);
-    }
   return issues;
 }

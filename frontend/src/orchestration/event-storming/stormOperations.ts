@@ -1,74 +1,76 @@
-import type { EventStormingModelV1, StormBoard, StormLevel } from "@shared/orchestration/eventStorming";
-
-export const createBoard = (id: string, level: StormLevel, title: string): StormBoard => ({
-  id, level, title, description: "", placements: [], frames: [], connections: []
-});
-export function availableStormPosition(board: StormBoard, origin: { x: number; y: number }, size: { width: number; height: number }) {
+import type { RouteState } from "@/workspace/types";
+import type { UserStoryCollection } from "@shared/orchestration/userStories";
+import type { EventStormingModelV2, StormNoteKind, StormProcess } from "@shared/orchestration/eventStorming";
+import type { EventStormingLayoutV1, StormPlacement, StormView } from "@shared/orchestration/eventStormingLayout";
+import type { StormDraft } from "./StormDocumentStore";
+import { noteSize } from "./stormPresentation";
+export const createProcess = (id: string): StormProcess => ({ id, title: "New process", description: "", sources: [], storyIds: [], steps: [], connections: [], boundaries: [] });
+export const createView = (process: StormProcess): StormView => ({ id: process.id, processId: process.id, kind: "process", title: process.title, description: "", placements: [], frames: [], connections: [] });
+export function availableStormPosition(placements: StormPlacement[], origin: { x: number; y: number }, size: { width: number; height: number }) {
   let point = origin;
-  for (let i = 0; i <= board.placements.length; i++) {
-    if (!board.placements.some((p) => point.x < p.x + p.width + 16 && point.x + size.width + 16 > p.x && point.y < p.y + p.height + 16 && point.y + size.height + 16 > p.y)) return point;
-    point = { x: origin.x + ((i + 1) % 8) * (size.width + 48), y: origin.y + Math.floor((i + 1) / 8) * (size.height + 48) };
+  for (let i = 0; i <= placements.length; i++) {
+    if (!placements.some((p) => point.x < p.x + p.width + 16 && point.x + size.width + 16 > p.x && point.y < p.y + p.height + 16 && point.y + size.height + 16 > p.y)) return point;
+    point = { x: origin.x + ((i + 1) % 8) * (size.width + 120), y: origin.y + Math.floor((i + 1) / 8) * (size.height + 48) };
   }
-  return { x: Math.max(...board.placements.map((p) => p.x + p.width)) + 48, y: origin.y };
+  return { x: Math.max(0, ...placements.map((p) => p.x + p.width)) + 120, y: origin.y };
 }
-export function removeStormItems(board: StormBoard, ids: string[]): void {
-  const removed = new Set(ids);
-  board.placements = board.placements.filter(({ id }) => !removed.has(id)).map((placement) => {
-    if (!placement.frameId || !removed.has(placement.frameId)) return placement;
-    const { frameId: _frameId, ...ungrouped } = placement; void _frameId; return ungrouped;
-  });
-  board.frames = board.frames.filter(({ id }) => !removed.has(id));
-  board.connections = board.connections.filter(({ id, source, target }) => !removed.has(id) && !removed.has(source) && !removed.has(target));
-}
-export function deleteStormNotes(model: EventStormingModelV1, ids: string[]): void {
-  model.notes = model.notes.filter(({ id }) => !ids.includes(id));
-  for (const board of model.boards) removeStormItems(board, board.placements.filter(({ noteId }) => ids.includes(noteId)).map(({ id }) => id));
-}
-export function removeStormBoard(model: EventStormingModelV1, id: string): void {
-  model.boards = model.boards.filter((board) => board.id !== id).map((board) => {
-    if (board.sourceBoardId !== id) return board;
-    const { sourceBoardId: _source, ...independent } = board; void _source; return independent;
-  });
-}
-export function selectedPlacements(board: StormBoard, ids: string[]) {
-  return board.placements.filter((p) => ids.includes(p.id) || (p.frameId && ids.includes(p.frameId)));
-}
-export function deriveStormBoard(source: StormBoard, id: string, ids: string[], allocate: () => string): StormBoard {
-  const selected = selectedPlacements(source, ids);
-  const result = createBoard(id, source.level === "big-picture" ? "process-modelling" : "software-design", `${source.title} · ${source.level === "big-picture" ? "Process" : "Design"}`);
-  result.sourceBoardId = source.id;
-  const mapping = new Map(selected.map((p) => [p.id, allocate()]));
-  result.placements = selected.map(({ frameId: _frameId, ...p }) => { void _frameId; return { ...p, id: mapping.get(p.id)! }; });
-  result.connections = source.connections.filter((c) => mapping.has(c.source) && mapping.has(c.target))
-    .map((c) => ({ ...c, id: allocate(), source: mapping.get(c.source)!, target: mapping.get(c.target)! }));
-  return result;
-}
-export function moveStormItems(board: StormBoard, positions: Map<string, { x: number; y: number }>): void {
-  const movements = new Map(board.frames.filter((f) => positions.has(f.id)).map((f) => {
-    const next = positions.get(f.id)!; return [f.id, { x: next.x - f.x, y: next.y - f.y }];
-  }));
-  board.placements = board.placements.map((p) => {
-    const direct = positions.get(p.id); if (direct) return { ...p, ...direct };
-    const delta = p.frameId ? movements.get(p.frameId) : undefined;
-    return delta ? { ...p, x: p.x + delta.x, y: p.y + delta.y } : p;
-  });
-  board.frames = board.frames.map((f) => ({ ...f, ...(positions.get(f.id) ?? {}) }));
-}
-export function groupStormItems(board: StormBoard, ids: string[], id: string): void {
-  const items = selectedPlacements(board, ids); if (!items.length) return;
-  const x = Math.min(...items.map((p) => p.x)) - 32; const y = Math.min(...items.map((p) => p.y)) - 64;
-  board.frames.push({ id, title: board.level === "software-design" ? "Bounded context" : "Process", kind: board.level === "software-design" ? "bounded-context" : "process", x, y,
-    width: Math.max(...items.map((p) => p.x + p.width)) - x + 32, height: Math.max(...items.map((p) => p.y + p.height)) - y + 32 });
-  const members = new Set(items.map((p) => p.id));
-  board.placements = board.placements.map((p) => members.has(p.id) ? { ...p, frameId: id } : p);
-}
-export function duplicateStormItems(model: EventStormingModelV1, board: StormBoard, ids: string[], allocate: () => string): string[] {
-  const items = selectedPlacements(board, ids); const mapping = new Map(items.map((p) => [p.id, allocate()]));
-  const notes = new Map<string, string>();
-  for (const item of items) if (!notes.has(item.noteId)) {
-    const note = model.notes.find((n) => n.id === item.noteId)!; const id = allocate(); notes.set(note.id, id); model.notes.push({ ...note, id, sources: [...note.sources] });
+/** Repair only the in-memory projection of stale layout; never rewrite an external file on read. */
+export function resolveStormView(model: EventStormingModelV2, layout: EventStormingLayoutV1, process: StormProcess, viewId?: string): StormView {
+  const saved = layout.views.find((v) => v.id === viewId && v.processId === process.id)
+    ?? layout.views.find((v) => v.processId === process.id && v.kind === "process");
+  const view = structuredClone(saved ?? createView(process));
+  if (view.kind === "process") view.title = process.title;
+  const steps = new Set(process.steps.map((s) => s.id));
+  view.placements = view.placements.filter((p) => p.stepId && steps.has(p.stepId));
+  const present = new Set(view.placements.map((p) => p.stepId));
+  for (const step of process.steps) if (!present.has(step.id)) {
+    const concept = model.concepts.find((c) => c.id === step.conceptId)!;
+    if (view.kind === "process" && concept.kind === "aggregate") continue;
+    if (view.kind === "responsibilities" && saved && layout.views.some((v) => v.placements.some((p) => p.stepId === step.id))) continue;
+    const size = noteSize(concept.kind), origin = { x: Math.max(0, ...view.placements.map((p) => p.x + p.width)) + 48, y: 100 };
+    view.placements.push({ id: step.id, stepId: step.id, ...availableStormPosition(view.placements, origin, size), ...size, pivotal: false });
   }
-  board.placements.push(...items.map(({ frameId: _frameId, ...p }) => { void _frameId; return { ...p, id: mapping.get(p.id)!, noteId: notes.get(p.noteId)!, x: p.x + 32, y: p.y + 32 }; }));
-  board.connections.push(...board.connections.filter((c) => mapping.has(c.source) && mapping.has(c.target)).map((c) => ({ ...c, id: allocate(), source: mapping.get(c.source)!, target: mapping.get(c.target)! })));
-  return [...mapping.values()];
+  const placementIds = new Set(view.placements.map((p) => p.id));
+  const edges = new Set(process.connections.map((c) => c.id));
+  view.connections = view.connections.filter((c) => edges.has(c.connectionId) && placementIds.has(c.source) && placementIds.has(c.target));
+  for (const c of process.connections) if (!view.connections.some((e) => e.connectionId === c.id)) {
+    const source = view.placements.find((p) => p.stepId === c.source), target = view.placements.find((p) => p.stepId === c.target);
+    if (source && target) view.connections.push({ id: c.id, connectionId: c.id, source: source.id, target: target.id });
+  }
+  return view;
 }
+export function ensureView(draft: StormDraft, view: StormView): StormView {
+  const value = structuredClone(view);
+  draft.layout.views = [...draft.layout.views.filter((v) => v.id !== view.id), value];
+  return value;
+}
+export function addStormStep(draft: StormDraft, processId: string, view: StormView, kind: StormNoteKind, id: string, conceptId: string, position?: { x: number; y: number }) {
+  const process = draft.model.processes.find((p) => p.id === processId)!;
+  if (!draft.model.concepts.some((c) => c.id === conceptId)) draft.model.concepts.push({ id: conceptId, kind, title: "", details: "", sources: [] });
+  process.steps.push({ id, conceptId, storyIds: [], sources: [] });
+  const layout = ensureView(draft, view), size = noteSize(kind);
+  layout.placements.push({ id, stepId: id, ...position ?? availableStormPosition(layout.placements, { x: 100, y: 100 }, size), ...size, pivotal: false });
+}
+export function removeStormSteps(draft: StormDraft, processId: string, ids: string[]) {
+  const process = draft.model.processes.find((p) => p.id === processId)!;
+  process.steps = process.steps.filter((s) => !ids.includes(s.id));
+  for (const p of draft.model.processes) {
+    p.connections = p.connections.filter((c) => !ids.includes(c.source) && !ids.includes(c.target));
+    p.boundaries = p.boundaries.map((b) => ({ ...b, stepIds: b.stepIds.filter((id) => !ids.includes(id)) }));
+  }
+  for (const v of draft.layout.views) {
+    v.placements = v.placements.filter((p) => !p.stepId || !ids.includes(p.stepId));
+    const remaining = new Set(v.placements.map((p) => p.id));
+    v.connections = v.connections.filter((c) => remaining.has(c.source) && remaining.has(c.target));
+  }
+}
+
+export function invalidStormSelection(model: EventStormingModelV2, layout: EventStormingLayoutV1, route: RouteState, stories?: UserStoryCollection): boolean {
+  const process = model.processes.find((p) => p.id === route.entityId);
+  if (route.entityId && !process) return true;
+  if (route.itemId && !process?.steps.some((s) => s.id === route.itemId)) return true;
+  if (route.stormViewId && route.stormViewId !== process?.id && !layout.views.some((v) => v.id === route.stormViewId && v.processId === process?.id)) return true;
+  return !!(route.storyId && stories && !stories.stories.some((s) => s.value.id === route.storyId) && !stories.issues.some((s) => s.id === route.storyId));
+}
+
+export const findStormSteps = (model: EventStormingModelV2, process: StormProcess | undefined, search: string) => process && search ? process.steps.filter((s) => model.concepts.find((c) => c.id === s.conceptId)?.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())) : [];

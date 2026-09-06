@@ -70,11 +70,13 @@ export const orchestrationEntityPath = (base: string, id?: string) => id && base
 function exactRoute(workspaceView: WorkspaceView, url: URL): RouteState {
   if (workspaceView === "overview" && url.search) return { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/overview" };
   if (workspaceView === "event-storming") {
-    const id = url.searchParams.get("id"); const item = url.searchParams.get("item");
-    const invalid = (id !== null && !eventStormingId.safeParse(id).success) || (item !== null && (!id || !eventStormingId.safeParse(item).success))
-      || [...url.searchParams.keys()].some((key) => !["id", "item"].includes(key)) || url.searchParams.getAll("id").length > 1 || url.searchParams.getAll("item").length > 1;
+    const keys = ["process", "step", "view", "story"];
+    const process = url.searchParams.get("process"), step = url.searchParams.get("step"), view = url.searchParams.get("view"), story = url.searchParams.get("story");
+    const invalid = [...url.searchParams.keys()].some((key) => !keys.includes(key))
+      || keys.some((key) => url.searchParams.getAll(key).length > 1 || (url.searchParams.has(key) && !eventStormingId.safeParse(url.searchParams.get(key)).success))
+      || Boolean((step || view) && !process);
     return invalid ? { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/event-storming" }
-      : { view: "orchestration", workspaceView, entityId: id ?? undefined, itemId: item ?? undefined };
+      : { view: "orchestration", workspaceView, entityId: process ?? undefined, itemId: step ?? undefined, stormViewId: view ?? undefined, storyId: story ?? undefined };
   }
   if (workspaceView === "adrs") return adrRoute(url);
   if (workspaceView === "user-stories") return userStoryRoute(url);

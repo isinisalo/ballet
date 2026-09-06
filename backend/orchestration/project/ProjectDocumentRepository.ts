@@ -9,7 +9,6 @@ import type Database from "better-sqlite3";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import { ConflictError, NotFoundError } from "../persistence/PersistenceErrors.js";
 import type { ProjectDocumentKind } from "./ProjectReferenceIndex.js";
-import { EVENT_STORMING_LIMITS } from "../../../shared/orchestration/eventStorming.js";
 import { USER_STORY_LIMITS } from "../../../shared/orchestration/userStories.js";
 
 const COLLECTIONS: Record<ProjectDocumentKind, string> = {
@@ -29,6 +28,7 @@ export class ProjectDocumentRepository {
   ) {}
 
   list(kind: ProjectDocumentKind): ProjectDocument[] {
+    if (kind === "event-storming") throw new ConflictError("Event Storming uses the dedicated JSON model and layout repository.");
     if (kind === "overview") return this.optional(kind, "overview") ? [this.require(kind, "overview")] : [];
     const directory = this.collectionPath(kind);
     const metadata = status(directory);
@@ -47,6 +47,7 @@ export class ProjectDocumentRepository {
   }
 
   require(kind: ProjectDocumentKind, id: string): ProjectDocument {
+    if (kind === "event-storming") throw new ConflictError("Event Storming uses the dedicated JSON model and layout repository.");
     const filename = this.filename(kind, id);
     const metadata = status(filename);
     if (!metadata) throw new NotFoundError(`${kind} ${id} was not found.`);
@@ -56,7 +57,6 @@ export class ProjectDocumentRepository {
       descriptor = openSync(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
       if (!fstatSync(descriptor).isFile()) throw new ConflictError(`${kind} ${id} is not an ordinary file.`);
       if (kind === "user-story" && fstatSync(descriptor).size > USER_STORY_LIMITS.documentBytes) throw new ConflictError(`User Story ${id} exceeds the document size limit.`);
-      if (kind === "event-storming" && fstatSync(descriptor).size > EVENT_STORMING_LIMITS.documentBytes) throw new ConflictError("Event Storming exceeds the document size limit.");
       const content = readFileSync(descriptor, "utf8");
       return { kind, id, content, contentHash: sha256(content) };
     } finally {
@@ -65,6 +65,7 @@ export class ProjectDocumentRepository {
   }
 
   put(kind: ProjectDocumentKind, id: string, content: string, expectedHash: string | "absent"): ProjectDocument {
+    if (kind === "event-storming") throw new ConflictError("Event Storming uses the dedicated JSON model and layout repository.");
     if (!content.trim()) throw new ConflictError("Markdown content must not be empty.");
     const current = this.optional(kind, id);
     if ((current?.contentHash ?? "absent") !== expectedHash) throw new ConflictError(`${kind} ${id} optimistic hash is stale.`);
@@ -109,10 +110,6 @@ export class ProjectDocumentRepository {
     if (kind === "overview") {
       if (id !== "overview") throw new ConflictError("Overview uses one document only.");
       return path.join(directory, "overview.md");
-    }
-    if (kind === "event-storming") {
-      if (id !== "model") throw new ConflictError("Event Storming uses the model document only.");
-      return path.join(directory, "model.md");
     }
     if (kind === "user-story") return path.join(directory, `${id}.md`);
     if (kind === "skill") return path.join(directory, ...id.split("/"), "SKILL.md");

@@ -160,7 +160,7 @@ Each workspace has one canonical URL owner. `/` is a shell landing redirect to `
 | Overview | `/project/overview` |
 | ADRs | `/project/adrs`, `?create=adr` or `?id=adr-034` |
 | Instructions | `/project/instructions` with `?id=`; canonical deep link, not shown in the sidebar |
-| Event Storming | `/project/event-storming`, `?id=<boardId>&item=<placementId>` |
+| Event Storming | `/project/event-storming`, `?process=<id>&step=<id>&view=<id>&story=<id>` |
 | User Stories | `/project/user-stories`, `?create=story` or `?id=<uuid>` |
 | Run Gate | `/run`, `/run/:runId`, nested State and Action routes |
 | Feedback Box | `/feedback`, `/feedback/:id` |
@@ -230,15 +230,17 @@ Use existing React, Vite, Tailwind and shadcn primitives plus React Flow and Dag
 
 ## Event Storming visual contract
 
-The human-approved Event Storming implementation plan authorizes a free-positioned workshop canvas inside Project. Loop Engineering retains its separate deterministic navigational tree. Event Storming uses React Flow with stored board-local placement geometry and one shared repository model; it has no execution or approval authority.
+Event Storming is an optional process map. The overview shows named process groups with concise event previews; a selected process opens its map and optional responsibility presentation. Both use one semantic JSON model. Layout is separate and missing geometry receives a temporary deterministic placement without moving existing cards.
 
-The full-height dark surface has a subdued 24 px dot grid, a compact heading/level toolbar, a left tool palette and a labelled bottom color legend. Primary authoring happens directly in notes; details expand inside the note, and contextual actions sit by the selection. The overview uses small colored-note previews. All styling uses the frontmatter tokens, 4 px spacing rhythm, Inter titles and Geist labels. No ornamental gradients or handwritten fonts are introduced.
+Reuse React Flow pan, zoom, multi-selection and keyboard operations. The primary palette contains Event, Command, Actor, Read Model, Policy, External System and Open question; Aggregate, Opportunity, Value, Definition and Note are optional additional types. Use existing storm tokens, type labels and symbols. Cards show a name, type and story count. Descriptions, conditions, sources and complete canonical User Stories open in the side pane; narrow screens use a bottom sheet. The palette and toolbar scroll internally when necessary.
 
-The `storm-*`/`on-storm-*` pairs identify notation, never runtime status. Events are orange, commands blue, actors pale yellow, policies lilac, systems pink, read models green, aggregates yellow, hotspots coral, opportunities/values green and definitions/notes neutral. Every note has a type label and symbol; hotspot uses a question mark. Notes start at 184×168 px, actors 136×112 px and systems 224×144 px, with a 4 px radius and one-pixel boundary. Named process/context frames have a neutral translucent surface and dashed outline. Pivotal event placements add a labelled star and stronger outline.
+A solid labelled arrow is event flow, a dashed arrow is supporting information and a dotted arrow is responsibility. Conditions are readable text; disconnected events, branches, cycles and incomplete processes are valid. Visual frames do not establish process membership or responsibility. Repeating a step reuses a concept with a new step ID. Semantic edits to shared concepts explicitly show the affected usage count.
 
-At 1440×900 the board fills the remaining viewport and the sidebar can collapse. At 390×844, the tools form an internally scrolling top strip, selection tools move to the bottom, dialogs stay within the viewport and controls are at least 40 px. The page never scrolls horizontally; the canvas itself pans and zooms. Color legend and text remain labelled. Reduced motion disables non-essential transitions and camera movements are immediate.
+URL-owned process, step, presentation and story selection supports back/forward, search and story highlighting. Whole-story references are edited only in the map; story content and Draft/Approved state come from the existing Markdown source. The existing story editor owns approval. Backlinks are derived from the same map references and a linked story must be unlinked before deletion.
 
-Single-note content is shared across boards; geometry, frames, arrows and pivotal marks are board-local. Shared notes show their usage count. Delete removes a placement; Delete everywhere and Delete board use consequence dialogs. Undo/redo is session-local and persists the inverse edit through the same optimistic save queue. Saving occurs 600 ms after typing and after a completed geometric gesture. Saved, Saving and Save failed are factual persistence states. Conflicts retain the draft and require explicit discard before reload.
+Model and layout expose separate Saved, Saving, Unsaved and Save failed states. Typing saves after 600 ms and completed gestures save immediately. Undo/redo records semantic and layout edits through their independent optimistic queues. Conflict drafts remain until explicit discard. Invalid model JSON never becomes an empty writable map. A broken layout leaves semantic use available and names the file requiring repair.
+
+At 1440×900, the map and scrollable details pane share the available width. At 390×844, the canvas stays viewport-wide and details use the existing sheet with at least 40 px controls. Focus is visible; node movement and connections have keyboard-accessible controls. Reduced motion disables transitions and camera movement is immediate. The existing storm palette, 4 px spacing rhythm, Inter prose and Geist metadata remain the design authority.
 
 ## ADR-korttien ja lomakkeen sopimus
 

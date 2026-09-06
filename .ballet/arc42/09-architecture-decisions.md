@@ -4,7 +4,7 @@ title: Arkkitehtuuripäätökset
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-06'
-version: 41
+version: 42
 tags: [arc42, decisions]
 arc42Section: 9
 ---
@@ -32,7 +32,7 @@ ADR-hakemisto sisältää vain voimassa olevat päätökset [ballet-adr-skillin]
 | [adr-041](../adr/adr-041-instruction-directed-project-context-and-sortable-ordering.md) | Ohjeen määrittämä projektikonteksti |
 | [adr-042](../adr/adr-042-action-specific-codex-agents.md) | Actionin omat Validation- ja Work-agentit |
 | [adr-045](../adr/adr-045-spacious-concise-floating-loop-tree.md) | Kanonisen järjestyksen navigointipuu |
-| [adr-046](../adr/adr-046-repository-owned-event-storming-workspace.md) | Yhteinen Event Storming -dokumentti |
+| [adr-046](../adr/adr-046-repository-owned-event-storming-workspace.md) | Semanttinen Event Storming -prosessikartta |
 | [adr-047](../adr/adr-047-editor-only-markdown-authoring.md) | Suora Markdown-muokkaus |
 | [adr-048](../adr/adr-048-four-project-views.md) | Projektin neljä näkymää |
 | [adr-049](../adr/adr-049-three-line-record-and-card-editor.md) | Kolmirivinen ADR-record ja rakenteinen editori |

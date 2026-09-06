@@ -4,7 +4,7 @@ title: Rakennusosanäkymä
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-06'
-version: 38
+version: 39
 tags: [arc42, building-blocks]
 arc42Section: 5
 ---
@@ -17,7 +17,7 @@ arc42Section: 5
 | BB-016 | Project composition and governance Agents | Action-owned Agent/Skill composition, two fixed governance TOMLs, deterministic React Flow + Dagre Loop Engineering projection and Run Evidence | canonical layers after strict v26/v24 cut |
 | BB-017 | Checkout-local Codex execution | server-owned SQLite/worktrees/finalization/evidence, Action role model/reasoning selections, singleton Codex readiness, polling and fenced CLI execution | `LocalDaemonStore`, `LocalDaemonOrchestrationProvider`, `backend/daemon/**`, `/api/runtimes/local` |
 | BB-018 | Action Agent composition | strict Action-ID/role TOML inventory, atomic Project Config + pair lifecycle, immutable Agent/hash/Skill snapshot and Action-owned editor | `CodexAgentRepository`, `ActionAgentMutationService`, `EnvironmentRunPlanner`, `ActionWorkspace` |
-| BB-019 | Event Storming workshop | Shared v1 notes, board-local geometry, file-only optimistic model repository, serial autosave and visual authoring | `shared/orchestration/eventStorming.ts`, `EventStormingService`, `frontend/src/orchestration/event-storming/**` |
+| BB-019 | Event Storming process map | Shared semantic v2 concepts/processes, independent layout v1, whole-story links, offline bounded context and separate optimistic queues | `shared/orchestration/eventStorming.ts`, `EventStormingService`, `EventStormingContextService`, `frontend/src/orchestration/event-storming/**` |
 | BB-020 | Project definition | Overview, Story v2 approval, ADR Markdown and existing Event Storming; no duplicate config content | `UserStoryService`, `ProjectDocumentRepository`, `ProjectMarkdownWorkspace`, `UserStoryApproval` |
 
 BB-015 jakautuu seuraaviin selkeisiin rajoihin:

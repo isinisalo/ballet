@@ -1,3 +1,3 @@
-[ADR-046: Yhteinen Event Storming -dokumentti]
-Decision: Event Stormingin jaetut kortit sekä taulukohtaiset sijoittelut, kehykset ja yhteydet tallennetaan yhteen .ballet/event-storming/model.md-dokumenttiin, jota ihminen ja agentit käyttävät samana lähteenä.
-Scope: Koskee Big Picture-, Process Modelling- ja Software Design -tauluja sekä atomista optimistista tallennusta. Malli ei kuulu SQLiteen, Project Configiin, Root Snapshoteihin tai Run-portteihin.
+[ADR-046: Semanttinen Event Storming -prosessikartta]
+Decision: Event Stormingin käsitteet, prosessiaskeleet, merkitykselliset yhteydet ja Story-viitteet tallennetaan .ballet/event-storming/model.json-tiedostoon ja esitystieto erilliseen layout.json-tiedostoon. Ihminen ja agentit käyttävät samaa semantiikkaa; offline-CLI palauttaa tehtävään rajatun lähdehashillisen kontekstin.
+Scope: Koskee vapaaehtoista prosessikarttaa, kokonaiskuvaa ja prosessin lisäesityksiä sekä erillisiä atomisia optimistisia tallennuksia. User Storyt ja hyväksynnät säilyvät omissa Markdown-lähteissään. Kartta ei kuulu SQLiteen, Project Configiin, Root Snapshoteihin tai Run-portteihin eikä edellytä kolmea mallinnustasoa.

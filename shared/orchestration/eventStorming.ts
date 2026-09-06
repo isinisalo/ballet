@@ -1,66 +1,69 @@
 import { z } from "zod";
 import { sha256Schema } from "./schemas/common.js";
+import { canonicalJson, sha256, type JsonValue } from "./primitives.js";
 
-export const EVENT_STORMING_LIMITS = { documentBytes: 786_432, notes: 2000, boards: 64, placements: 2000, connections: 4000, frames: 100 } as const;
+export const EVENT_STORMING_LIMITS = { documentBytes: 786_432, notes: 2000, processes: 64, placements: 2000, connections: 4000, frames: 100 } as const;
 export const eventStormingId = z.string().uuid();
-export const stormLevelSchema = z.enum(["big-picture", "process-modelling", "software-design"]);
 export const stormNoteKindSchema = z.enum(["event", "command", "actor", "policy", "system", "read-model", "aggregate", "hotspot", "opportunity", "value", "definition", "note"]);
 const text = z.string().max(20_000);
 const title = z.string().max(500);
-const coordinate = z.number().finite().min(-100_000).max(100_000);
-const dimension = z.number().finite().min(40).max(20_000);
-const source = z.string().max(2048).refine((value) => /^(https?:\/\/|\.ballet\/)/.test(value)
+const ids = z.array(eventStormingId).max(2000).refine((v) => new Set(v).size === v.length, "Duplicate reference.");
+export const stormSourceSchema = z.string().max(2048).refine((value) => /^(https?:\/\/|\.ballet\/)/.test(value)
   && !value.split(/[\\/#?]/).includes("..") && ![...value].some((char) => char.charCodeAt(0) <= 32 || char === "\\"), "Use an https/http URL or a .ballet/ relative document path.");
-export const stormNoteSchema = z.object({
-  id: eventStormingId, kind: stormNoteKindSchema, title, details: text, sources: z.array(source).max(50)
+const sources = z.array(stormSourceSchema).max(50);
+export const stormConceptSchema = z.object({ id: eventStormingId, kind: stormNoteKindSchema, title, details: text, sources }).strict();
+export const stormStepSchema = z.object({ id: eventStormingId, conceptId: eventStormingId, storyIds: ids, sources }).strict();
+export const stormConnectionSchema = z.object({
+  id: eventStormingId, source: eventStormingId, target: eventStormingId,
+  kind: z.enum(["flow", "support", "responsibility"]), label: title, condition: text
 }).strict();
-export const stormPlacementSchema = z.object({
-  id: eventStormingId, noteId: eventStormingId, x: coordinate, y: coordinate, width: dimension, height: dimension,
-  frameId: eventStormingId.optional(), pivotal: z.boolean()
+export const stormBoundarySchema = z.object({
+  id: eventStormingId, title, details: text, kind: z.enum(["responsibility", "bounded-context"]), stepIds: ids, sources
 }).strict();
-export const stormConnectionSchema = z.object({ id: eventStormingId, source: eventStormingId, target: eventStormingId, label: title }).strict();
-export const stormFrameSchema = z.object({
-  id: eventStormingId, title, kind: z.enum(["process", "bounded-context"]), x: coordinate, y: coordinate, width: dimension, height: dimension
-}).strict();
-export const stormBoardSchema = z.object({
-  id: eventStormingId, title, level: stormLevelSchema, description: text, sourceBoardId: eventStormingId.optional(),
-  placements: z.array(stormPlacementSchema).max(EVENT_STORMING_LIMITS.placements),
-  connections: z.array(stormConnectionSchema).max(EVENT_STORMING_LIMITS.connections),
-  frames: z.array(stormFrameSchema).max(EVENT_STORMING_LIMITS.frames)
+export const stormProcessSchema = z.object({
+  id: eventStormingId, title, description: text, storyIds: ids, sources,
+  steps: z.array(stormStepSchema).max(2000), connections: z.array(stormConnectionSchema).max(4000),
+  boundaries: z.array(stormBoundarySchema).max(100)
 }).strict();
 export const eventStormingModelSchema = z.object({
-  version: z.literal(1), notes: z.array(stormNoteSchema).max(EVENT_STORMING_LIMITS.notes), boards: z.array(stormBoardSchema).max(EVENT_STORMING_LIMITS.boards)
+  version: z.literal(2), description: text, documentation: z.string().max(200_000),
+  concepts: z.array(stormConceptSchema).max(2000), processes: z.array(stormProcessSchema).max(64), sharedConceptIds: ids
 }).strict().superRefine((model, ctx) => {
   const issue = (message: string) => ctx.addIssue({ code: "custom", message });
-  const unique = (items: Array<{ id: string }>, label: string) => {
-    if (new Set(items.map(({ id }) => id)).size !== items.length) issue(`Duplicate ${label} ID.`);
-  };
-  unique(model.notes, "note"); unique(model.boards, "board");
-  const notes = new Set(model.notes.map(({ id }) => id));
-  for (const board of model.boards) {
-    unique([...board.placements, ...board.frames, ...board.connections], "board item");
-    const placements = new Set(board.placements.map(({ id }) => id));
-    const frames = new Set(board.frames.map(({ id }) => id));
-    if (board.sourceBoardId) {
-      const parent = model.boards.find(({ id }) => id === board.sourceBoardId);
-      if (!parent || stormLevelSchema.options.indexOf(parent.level) >= stormLevelSchema.options.indexOf(board.level)) issue("Source board must exist at an earlier level.");
+  const allIds = [...model.concepts, ...model.processes, ...model.processes.flatMap((p) => [...p.steps, ...p.connections, ...p.boundaries])].map((v) => v.id);
+  if (new Set(allIds).size !== allIds.length) issue("Duplicate semantic ID.");
+  const concepts = new Set(model.concepts.map((v) => v.id));
+  for (const id of model.sharedConceptIds) if (!concepts.has(id)) issue("Shared context refers to a missing concept.");
+  const steps = new Set(model.processes.flatMap((p) => p.steps.map((s) => s.id)));
+  for (const process of model.processes) {
+    for (const step of process.steps) if (!concepts.has(step.conceptId)) issue("Step refers to a missing concept.");
+    const owned = new Set(process.steps.map((s) => s.id));
+    for (const edge of process.connections) {
+      if (!steps.has(edge.source) || !steps.has(edge.target)) issue("Connection refers to a missing step.");
+      if (!owned.has(edge.source)) issue("Connection must belong to its source process.");
     }
-    for (const placement of board.placements) {
-      if (!notes.has(placement.noteId)) issue("Placement refers to a missing note.");
-      if (placement.frameId && !frames.has(placement.frameId)) issue("Placement refers to a missing frame.");
-    }
-    for (const connection of board.connections) {
-      if (!placements.has(connection.source) || !placements.has(connection.target)) issue("Connection refers to a missing placement.");
-    }
+    for (const boundary of process.boundaries) if (boundary.stepIds.some((id) => !owned.has(id))) issue("Boundary refers to a missing process step.");
   }
 });
-export type StormLevel = z.infer<typeof stormLevelSchema>;
 export type StormNoteKind = z.infer<typeof stormNoteKindSchema>;
-export type StormNote = z.infer<typeof stormNoteSchema>;
-export type StormBoard = z.infer<typeof stormBoardSchema>;
-export type StormPlacement = z.infer<typeof stormPlacementSchema>;
-export type StormFrame = z.infer<typeof stormFrameSchema>;
-export type EventStormingModelV1 = z.infer<typeof eventStormingModelSchema>;
-export interface EventStormingDocument { value: EventStormingModelV1; contentHash: string | "absent"; body: string }
-export const putEventStormingSchema = z.object({ value: eventStormingModelSchema, expectedHash: z.union([sha256Schema, z.literal("absent")]) }).strict();
-export const emptyEventStormingModel = (): EventStormingModelV1 => ({ version: 1, notes: [], boards: [] });
+export type StormConcept = z.infer<typeof stormConceptSchema>;
+export type StormStep = z.infer<typeof stormStepSchema>;
+export type StormConnection = z.infer<typeof stormConnectionSchema>;
+export type StormProcess = z.infer<typeof stormProcessSchema>;
+export type EventStormingModelV2 = z.infer<typeof eventStormingModelSchema>;
+export interface EventStormingDocument { value: EventStormingModelV2; contentHash: string | "absent"; semanticHash: string }
+export const expectedStormHash = z.union([sha256Schema, z.literal("absent")]);
+export const putEventStormingSchema = z.object({ value: eventStormingModelSchema, expectedHash: expectedStormHash }).strict();
+export const emptyEventStormingModel = (): EventStormingModelV2 => ({ version: 2, description: "", documentation: "", concepts: [], processes: [], sharedConceptIds: [] });
+
+/** Model arrays are sets; story criteria are never stored here. */
+export function normalizeStormJson(value: unknown): JsonValue {
+  if (Array.isArray(value)) return value.map(normalizeStormJson).sort((a, b) => {
+    const key = (v: JsonValue) => v && typeof v === "object" && !Array.isArray(v) && typeof v.id === "string" ? v.id : canonicalJson(v);
+    return key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0;
+  });
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => [k, normalizeStormJson(v)]));
+  return value as JsonValue;
+}
+export const serializeStormJson = (value: unknown): string => `${JSON.stringify(normalizeStormJson(value), null, 2)}\n`;
+export const eventStormingSemanticHash = (model: EventStormingModelV2): string => sha256(canonicalJson(normalizeStormJson(eventStormingModelSchema.parse(model))));

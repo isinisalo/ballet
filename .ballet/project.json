@@ -27,7 +27,7 @@
     "version": 2
   },
   "environment": {
-    "description": "Deliver a bounded change through Event Storming, arc42 architecture, Penpot-assisted design, test-driven implementation and the deployment plan defined by arc42.",
+    "description": "Deliver a bounded change through arc42 architecture, Penpot-assisted design, test-driven implementation and the deployment plan defined by arc42.",
     "id": "ballet-development",
     "name": "Ballet development lifecycle",
     "states": [
@@ -44,7 +44,7 @@
                 ".ballet/arc42/01-introduction-and-goals.md"
               ],
               "sourceRefs": [
-                ".ballet/event-storming/model.md",
+                ".ballet/event-storming/model.json",
                 "https://arc42.org/overview/"
               ]
             },
@@ -56,7 +56,8 @@
               "skillResources": [
                 "arc42/document-maintenance",
                 "arc42/quality-scenarios",
-                "arc42/traceability"
+                "arc42/traceability",
+                "event-storming"
               ]
             },
             "work": {
@@ -64,7 +65,8 @@
               "skillResources": [
                 "arc42/document-maintenance",
                 "arc42/quality-scenarios",
-                "arc42/traceability"
+                "arc42/traceability",
+                "event-storming"
               ]
             }
           },
@@ -112,7 +114,7 @@
                 ".ballet/arc42/03-context-and-scope.md"
               ],
               "sourceRefs": [
-                ".ballet/event-storming/model.md",
+                ".ballet/event-storming/model.json",
                 "https://arc42.org/overview/"
               ]
             },
@@ -124,7 +126,8 @@
               "skillResources": [
                 "arc42/architecture-views",
                 "arc42/document-maintenance",
-                "arc42/traceability"
+                "arc42/traceability",
+                "event-storming"
               ]
             },
             "work": {
@@ -132,7 +135,8 @@
               "skillResources": [
                 "arc42/architecture-views",
                 "arc42/document-maintenance",
-                "arc42/traceability"
+                "arc42/traceability",
+                "event-storming"
               ]
             }
           },
@@ -460,7 +464,8 @@
               "skillResources": [
                 "arc42/document-maintenance",
                 "typescript-domain-design",
-                "arc42/traceability"
+                "arc42/traceability",
+                "event-storming"
               ]
             },
             "work": {
@@ -468,7 +473,8 @@
               "skillResources": [
                 "arc42/document-maintenance",
                 "typescript-domain-design",
-                "arc42/traceability"
+                "arc42/traceability",
+                "event-storming"
               ]
             }
           }
@@ -476,7 +482,7 @@
         "description": "Maintain all twelve arc42 sections as a coherent, traceable architecture whose deployment plan is derived from the documented environment.",
         "id": "arc42",
         "name": "Arc42",
-        "order": 2
+        "order": 1
       },
       {
         "actions": [
@@ -509,7 +515,8 @@
                 "penpot-design",
                 "react-workspace-accessibility",
                 "arc42/quality-scenarios",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             },
             "work": {
@@ -518,7 +525,8 @@
                 "penpot-design",
                 "react-workspace-accessibility",
                 "arc42/quality-scenarios",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             }
           },
@@ -551,7 +559,8 @@
                 "react-workspace-accessibility",
                 "typescript-domain-design",
                 "test-evidence-verification",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             },
             "work": {
@@ -561,7 +570,8 @@
                 "react-workspace-accessibility",
                 "typescript-domain-design",
                 "test-evidence-verification",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             }
           }
@@ -569,7 +579,7 @@
         "description": "Use Penpot to turn approved architecture and Ballet's design contract into implementable wireframes and reusable components.",
         "id": "design",
         "name": "Design",
-        "order": 3
+        "order": 2
       },
       {
         "actions": [
@@ -601,7 +611,8 @@
                 "test-driven-development",
                 "test-evidence-verification",
                 "arc42/quality-scenarios",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             },
             "work": {
@@ -610,7 +621,8 @@
                 "test-driven-development",
                 "test-evidence-verification",
                 "arc42/quality-scenarios",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             }
           },
@@ -646,7 +658,8 @@
                 "http-api-validation-security",
                 "react-workspace-accessibility",
                 "test-evidence-verification",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             },
             "work": {
@@ -658,7 +671,8 @@
                 "http-api-validation-security",
                 "react-workspace-accessibility",
                 "test-evidence-verification",
-                "arc42/conformance-review"
+                "arc42/conformance-review",
+                "event-storming"
               ]
             }
           }
@@ -666,7 +680,7 @@
         "description": "Use an explicit red-to-green TDD handoff to implement only the behavior authorized by the accepted architecture and design.",
         "id": "build",
         "name": "Build",
-        "order": 4
+        "order": 3
       },
       {
         "actions": [
@@ -738,7 +752,8 @@
                 "arc42/evaluation",
                 "test-evidence-verification",
                 "arc42/traceability",
-                "arc42/initiative-handoff"
+                "arc42/initiative-handoff",
+                "event-storming"
               ]
             },
             "work": {
@@ -749,7 +764,8 @@
                 "arc42/evaluation",
                 "test-evidence-verification",
                 "arc42/traceability",
-                "arc42/initiative-handoff"
+                "arc42/initiative-handoff",
+                "event-storming"
               ]
             }
           }
@@ -757,124 +773,7 @@
         "description": "Follow the environment-specific arc42 deployment plan and prove the deployed dev build with acceptance evidence.",
         "id": "deploy",
         "name": "Deploy",
-        "order": 5
-      },
-      {
-        "actions": [
-          {
-            "description": "Explore the bounded domain as a chronological Big Picture and expose shared language, pivotal events, hotspots, actors, systems, values and open questions without inventing stakeholder knowledge.",
-            "id": "event-storming-big-picture-exploration",
-            "input": {
-              "acceptance": [
-                "The timeline is chronological and names unresolved hotspots explicitly",
-                "The artifact links discoveries to existing project direction where evidence exists"
-              ],
-              "deliverables": [
-                ".ballet/event-storming/model.md"
-              ],
-              "sourceRefs": [
-                "https://techtrendsetters.org/p/event-storming"
-              ]
-            },
-            "maxRetries": 1,
-            "name": "Event Storming - Big Picture Exploration",
-            "priority": 1,
-            "validation": {
-              "agentId": "ballet-action-validation-event-storming-big-picture-exploration",
-              "skillResources": [
-                "event-storming",
-                "arc42/traceability"
-              ]
-            },
-            "work": {
-              "agentId": "ballet-action-work-event-storming-big-picture-exploration",
-              "skillResources": [
-                "event-storming",
-                "arc42/traceability"
-              ]
-            }
-          },
-          {
-            "description": "Refine the Big Picture into bounded process flows with commands, actors, policies, read models, events, failure paths and measurable bottlenecks.",
-            "id": "event-storming-process-modeling",
-            "input": {
-              "acceptance": [
-                "Each modeled process traces commands through events and decision information",
-                "Failure paths, policies and unresolved domain questions remain visible"
-              ],
-              "deliverables": [
-                ".ballet/event-storming/model.md"
-              ],
-              "sourceRefs": [
-                ".ballet/event-storming/model.md",
-                "https://techtrendsetters.org/p/event-storming"
-              ]
-            },
-            "maxRetries": 1,
-            "name": "Event Storming - Process Modeling",
-            "priority": 2,
-            "validation": {
-              "agentId": "ballet-action-validation-event-storming-process-modeling",
-              "skillResources": [
-                "event-storming",
-                "arc42/quality-scenarios",
-                "arc42/traceability"
-              ]
-            },
-            "work": {
-              "agentId": "ballet-action-work-event-storming-process-modeling",
-              "skillResources": [
-                "event-storming",
-                "arc42/quality-scenarios",
-                "arc42/traceability"
-              ]
-            }
-          },
-          {
-            "description": "Translate the approved process model into candidate aggregates, invariants, bounded contexts and technical boundaries while leaving architecture decisions for arc42 and human approval.",
-            "id": "event-storming-software-design",
-            "input": {
-              "acceptance": [
-                "Candidate boundaries trace to process evidence and name their invariants",
-                "Architecture-significant alternatives remain proposals rather than silently accepted decisions"
-              ],
-              "deliverables": [
-                ".ballet/event-storming/model.md"
-              ],
-              "sourceRefs": [
-                ".ballet/event-storming/model.md",
-                "https://techtrendsetters.org/p/event-storming"
-              ]
-            },
-            "maxRetries": 1,
-            "name": "Event Storming - Software Design",
-            "priority": 3,
-            "validation": {
-              "agentId": "ballet-action-validation-event-storming-software-design",
-              "skillResources": [
-                "event-storming",
-                "arc42/architecture-views",
-                "arc42/decision-records",
-                "typescript-domain-design",
-                "arc42/traceability"
-              ]
-            },
-            "work": {
-              "agentId": "ballet-action-work-event-storming-software-design",
-              "skillResources": [
-                "event-storming",
-                "arc42/architecture-views",
-                "arc42/decision-records",
-                "typescript-domain-design",
-                "arc42/traceability"
-              ]
-            }
-          }
-        ],
-        "description": "Discover the problem space, model important processes and derive evidence-backed software design candidates before architecture documentation.",
-        "id": "event-storming",
-        "name": "Event Storming",
-        "order": 1
+        "order": 4
       }
     ]
   },

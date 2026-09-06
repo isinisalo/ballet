@@ -10,6 +10,7 @@ export const OrchestrationRouteInventory = [
   ...documentRoutes("instructions"), ...documentRoutes("skills"),
   ...documentRoutes("user-stories"),
   "GET /api/event-storming", "PUT /api/event-storming",
+  "GET /api/event-storming/layout", "PUT /api/event-storming/layout", "GET /api/event-storming/context",
   "POST /api/user-stories/:id/approve", "POST /api/user-stories/:id/return-to-draft",
   "GET /api/reference-index", "GET /api/environment", "PUT /api/environment",
   "POST /api/environment/states", "GET /api/environment/states/:stateId",

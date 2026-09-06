@@ -1,6 +1,9 @@
+import type { EventStormingLayoutV1 } from "../../../shared/orchestration/eventStormingLayout.js";
+import type { StormContextQuery } from "../../../shared/orchestration/eventStormingContext.js";
+import { EventStormingContextService } from "../project/EventStormingContextService.js";
 import { validateAdrMarkdown } from "../project/adrMarkdown.js";
 import type Database from "better-sqlite3";
-import type { EventStormingModelV1 } from "../../../shared/orchestration/eventStorming.js";
+import type { EventStormingModelV2 } from "../../../shared/orchestration/eventStorming.js";
 import type { GovernanceAgentId, ProjectConfigurationV26, ActionDefinition, EnvironmentDefinition, StateDefinition } from "../../../shared/orchestration/environment.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { canonicalJson, type JsonValue } from "../../../shared/orchestration/primitives.js";
@@ -31,10 +34,16 @@ export class AuthoringController {
   }
   documents(kind: ProjectDocumentKind): unknown { return this.dependencies.project.documents.list(kind); }
   eventStorming() { return this.dependencies.project.eventStorming.read(); }
-  saveEventStorming(value: EventStormingModelV1, expectedHash: string) {
+  saveEventStorming(value: EventStormingModelV2, expectedHash: string) {
     const saved = this.dependencies.project.eventStorming.save(value, expectedHash);
     this.changed("project_changed"); return saved;
   }
+  eventStormingLayout() { return this.dependencies.project.eventStorming.readLayout(); }
+  saveEventStormingLayout(value: EventStormingLayoutV1, expectedHash: string) {
+    const saved = this.dependencies.project.eventStorming.saveLayout(value, expectedHash);
+    this.changed("project_changed"); return saved;
+  }
+  eventStormingContext(query: StormContextQuery) { return new EventStormingContextService(this.dependencies.project.root).read(query); }
   userStories() { return this.dependencies.project.userStories.list(); }
   userStory(id: string) { return this.dependencies.project.userStories.require(id); }
   createUserStory(input: UserStoryInput) {
@@ -96,7 +105,7 @@ export class AuthoringController {
         const runIds = this.dependencies.project.documents.runReferences(kind, id);
         return runIds.length > 0 ? [{ kind, id, runIds }] : [];
       }));
-    return { entries: new ProjectReferenceIndex(config).entries(), runReferences, activeRunIds };
+    return { entries: new ProjectReferenceIndex(config, [], this.dependencies.project.eventStorming.read().value).entries(), runReferences, activeRunIds };
   }
   createResource(kind: "adr" | "instruction" | "skill", id: string, content: string, expectedHash: string | "absent"): unknown {
     if (expectedHash !== "absent" || this.dependencies.project.documents.list(kind).some((item) => item.id === id)) {

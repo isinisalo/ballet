@@ -4,7 +4,7 @@ Ballet is a checkout-local command center for human-directed AI work. A human ow
 
 ## Core concepts
 
-- **Project** contains Overview, Event Storming, User Stories and ADRs, each backed by one canonical Markdown source.
+- **Project** contains Overview, Event Storming, User Stories and ADRs, with canonical Markdown sources for documents and separate semantic/layout JSON for Event Storming.
 - **Environment** contains States with unique positive `order` values.
 - **State** contains bounded Actions with unique positive `priority` values.
 - **Validation** prechecks before Work and postchecks its result.
@@ -41,7 +41,7 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 | `.ballet/overview.md` | Purpose, Outcomes, Scope and Shared requirements |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
 | `.ballet/user-stories/<uuid>.md` | Role/Goal/Benefit, acceptance criteria, Markdown details, ADR references and exact human approval |
-| `.ballet/event-storming/model.md` | shared notes and board-local process views |
+| `.ballet/event-storming/model.json` and `layout.json` | semantic processes, story references and independent presentation |
 | `.ballet/instructions/**` | optional generic project instructions; Action execution instructions live in Agent TOMLs |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
@@ -51,7 +51,7 @@ Project truth is version-controlled. Runtime status, attempts, leases and govern
 
 ## Configuration example
 
-This abbreviated example shows the ownership boundary; the repository default contains five States, twenty-one Actions and eight Draft User Stories awaiting explicit human approval.
+This abbreviated example shows the ownership boundary; the repository default contains four States, eighteen Actions and fifteen Draft User Stories awaiting explicit human approval.
 
 ```json
 {
@@ -93,11 +93,10 @@ Author one Environment as dependency-ordered States, keep each Action small enou
 
 The default project demonstrates:
 
-1. Event Storming
-2. Arc42
-3. Design
-4. Build
-5. Deploy
+1. Arc42
+2. Design
+3. Build
+4. Deploy
 
 ## Validation-first execution
 
@@ -146,3 +145,17 @@ git diff --check
 ```
 
 Release/install/startup acceptance additionally runs `make latest` and browser QA at 1440×900 and 390×844. External writes, merge, push, release publication and deploy always require separate human authorization.
+
+### Event Storming context
+
+The optional process map opens at `/project/event-storming`. Start with a few events, link whole User Stories, and open their current criteria in the detail pane. Responsibility presentations are optional. A linked story must be unlinked before deletion. Model and layout save independently; conflicts retain local drafts.
+
+Read bounded context offline from any directory in your checkout or worktree:
+
+```sh
+ballet context event-storming --json
+ballet context event-storming --process <process-uuid> --json
+ballet context event-storming --story <story-uuid> --json
+```
+
+The first command returns a small index. Targeted output retains branches, questions, dependencies, story approval status and local source hashes; it excludes geometry. No server or runtime initialization is required. Unknown targets fail explicitly. Agent Actions can carry an optional `input.eventStormingTarget` containing one `processId` or `storyId`; the selected Skill directs the actual read.

@@ -27,6 +27,8 @@ export interface RouteState {
   workspaceView: WorkspaceView;
   entityId?: string;
   itemId?: string;
+  stormViewId?: string;
+  storyId?: string;
   stateId?: string;
   actionId?: string;
   createMode?: "state" | "action" | "story" | "adr";

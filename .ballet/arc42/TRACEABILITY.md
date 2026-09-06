@@ -4,7 +4,7 @@ title: Balletin arkkitehtuurin jäljitettävyys
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-06'
-version: 51
+version: 52
 tags: [arc42, traceability, evidence]
 ---
 
@@ -122,3 +122,7 @@ Former source IDs and unchanged approvals are in the [historical conversion reco
 | [aae46173-ec52-44d0-8fa6-e80353027205](../user-stories/aae46173-ec52-44d0-8fa6-e80353027205.md) — adr | ADR-parseri, API, ADR-kortit ja projektisisällön tarkistukset | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
 | [aae46173-ec52-44d0-8fa6-e80353027206](../user-stories/aae46173-ec52-44d0-8fa6-e80353027206.md) — security | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
 | [aae46173-ec52-44d0-8fa6-e80353027207](../user-stories/aae46173-ec52-44d0-8fa6-e80353027207.md) — method | Nykyiset runtime-, project-, security- ja lifecycle-testit; kriteerikohtaiset aukot pidetään avoimina | [Tämän muutoksen tarkistukset](initiatives/adr-records-event-storming/EVIDENCE.md); ei tarinan hyväksyntää |
+
+## Event Stormingin vapaaehtoinen prosessikartta
+
+ADR-046 → BB-019 → semanttinen V2-malli / erillinen layout V1 → yhteinen HTTP-/offline-konteksti ja nykyiset Story-viitteet → [yksinkertaistamisen tarkistukset](initiatives/event-storming-simplification/EVIDENCE.md). Skeema-, atomisuus-, konfliktieristys-, kertamuunnos-, Story-, worktree-CLI-, agenttikoostumus- ja UI-testit omistavat tämän muutoksen evidenssin. Aiempi TEST-044/EVID-044 kuvaa edeltävää toteutusta. Tarinoiden hyväksyntää tai runtime-porttia ei johdeta tästä evidenssistä.

@@ -1,111 +1,81 @@
-import { describe, expect, test, vi, afterEach } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { ApiRequestError } from "../src/apiClient";
-import { emptyEventStormingModel, eventStormingModelSchema, type EventStormingDocument } from "@shared/orchestration/eventStorming";
 import { StormDocumentStore } from "../src/orchestration/event-storming/StormDocumentStore";
-import { createBoard, deleteStormNotes, deriveStormBoard, duplicateStormItems, groupStormItems, moveStormItems, removeStormBoard, removeStormItems } from "../src/orchestration/event-storming/stormOperations";
+import { stormFixture, stormId } from "@shared/orchestration/testing/eventStormingFixture";
+import { eventStormingSemanticHash, type EventStormingDocument } from "@shared/orchestration/eventStorming";
+import { type EventStormingLayoutDocument } from "@shared/orchestration/eventStormingLayout";
+import { addStormStep, removeStormSteps, resolveStormView } from "../src/orchestration/event-storming/stormOperations";
 import { routeFromPath } from "../src/workspace/routing";
-import { projectStormBoard } from "../src/orchestration/event-storming/stormProjection";
-
-const id = () => crypto.randomUUID();
-const empty = (): EventStormingDocument => ({ value: emptyEventStormingModel(), contentHash: "absent", body: "\nEvidence\n" });
-afterEach(() => { vi.useRealTimers(); });
-function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((r) => { resolve = r; }); return { promise, resolve }; }
-
-describe("Event Storming save queue", () => {
-  test("debounces typing by 600 ms and saves geometry immediately", async () => {
-    vi.useFakeTimers(); const base = empty(); const api = { read: vi.fn(async () => base), save: vi.fn(async (value, _hash) => { void _hash; return { ...base, value, contentHash: "a".repeat(64) }; }) };
-    const store = new StormDocumentStore(api); await store.refresh();
-    store.edit((v) => v.boards.push(createBoard(id(), "big-picture", "A")));
-    await vi.advanceTimersByTimeAsync(599); expect(api.save).not.toHaveBeenCalled();
-    store.edit((v) => { v.boards[0].title = "AB"; });
-    await vi.advanceTimersByTimeAsync(600); expect(api.save).toHaveBeenCalledTimes(1); expect(store.getSnapshot().dirty).toBe(false);
-    store.edit((v) => { v.boards[0].title = "Geometry gesture"; }, true);
-    await vi.advanceTimersByTimeAsync(0); expect(api.save).toHaveBeenCalledTimes(2); store.dispose();
-  });
-  test("serializes writes and never overwrites edits made during an in-flight save", async () => {
-    const base = empty(); const first = deferred<EventStormingDocument>(); const second = deferred<EventStormingDocument>();
-    const api = { read: vi.fn(async () => base), save: vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise) };
-    const store = new StormDocumentStore(api); await store.refresh(); store.edit((v) => v.boards.push(createBoard(id(), "big-picture", "First")));
-    const saving = store.save(); const sent = structuredClone(store.getSnapshot().value);
-    store.edit((v) => { v.boards[0].title = "Newer draft"; }); await store.save(); expect(api.save).toHaveBeenCalledTimes(1);
-    first.resolve({ ...base, value: sent, contentHash: "a".repeat(64) }); await saving;
-    expect(store.getSnapshot().value.boards[0].title).toBe("Newer draft"); expect(store.getSnapshot().dirty).toBe(true);
-    const next = store.save(); expect(api.save.mock.calls[1][1]).toBe("a".repeat(64));
-    second.resolve({ ...base, value: store.getSnapshot().value, contentHash: "b".repeat(64) }); await next;
-    expect(store.getSnapshot().dirty).toBe(false); store.dispose();
-  });
-  test("preserves a conflicting draft and clears history only after explicit reload", async () => {
-    const base = empty(); const api = { read: vi.fn().mockResolvedValueOnce(base).mockResolvedValue({ ...base, contentHash: "a".repeat(64) }), save: vi.fn(async () => { throw new ApiRequestError("stale", 409); }) };
-    const store = new StormDocumentStore(api); await store.refresh(); store.edit((v) => v.boards.push(createBoard(id(), "big-picture", "Keep me")));
-    await store.save(); expect(store.getSnapshot()).toMatchObject({ conflict: true, dirty: true });
-    store.undo(); expect(store.getSnapshot().value.boards[0].title).toBe("Keep me");
-    await store.refresh(); expect(store.getSnapshot().value.boards).toHaveLength(1);
-    await store.refresh(true); expect(store.getSnapshot()).toMatchObject({ conflict: false, dirty: false, canUndo: false }); store.dispose();
-  });
-  test("a temporary lock rejection keeps the draft editable when its file hash still matches", async () => {
-    const base = empty(); const api = { read: vi.fn(async () => base), save: vi.fn().mockRejectedValueOnce(new ApiRequestError("Locked by active Run", 409)).mockImplementation(async (value) => ({ ...base, value, contentHash: "a".repeat(64) })) };
-    const store = new StormDocumentStore(api); await store.refresh(); store.edit((v) => v.boards.push(createBoard(id(), "big-picture", "Pending")));
-    await store.save(); expect(store.getSnapshot()).toMatchObject({ dirty: true, conflict: false });
-    await store.save(); expect(store.getSnapshot().dirty).toBe(false); expect(store.getSnapshot().value.boards[0].title).toBe("Pending"); store.dispose();
-  });
-  test("undo/redo persists inverse edits and external refresh cannot replace a newer draft", async () => {
-    const base = empty(); const api = { read: vi.fn(async () => base), save: vi.fn(async (value, _hash) => { void _hash; return { ...base, value, contentHash: "a".repeat(64) }; }) };
-    const store = new StormDocumentStore(api); await store.refresh(); store.edit((v) => v.boards.push(createBoard(id(), "big-picture", "Original"))); await store.save();
-    store.undo(); await store.save(); expect(store.getSnapshot().value.boards).toHaveLength(0);
-    store.redo(); await store.save(); expect(store.getSnapshot().value.boards).toHaveLength(1);
-    const pending = deferred<EventStormingDocument>(); api.read.mockReturnValueOnce(pending.promise); const refresh = store.refresh();
-    store.edit((v) => { v.boards[0].title = "Local text"; }); pending.resolve({ ...base, contentHash: "b".repeat(64) }); await refresh;
-    expect(store.getSnapshot().value.boards[0].title).toBe("Local text"); expect(store.getSnapshot().conflict).toBe(true); store.dispose();
-  });
-  test("locks mutations during a Run and invalid sources do not become empty writable models", async () => {
-    const api = { read: vi.fn(async () => { throw new Error("Invalid YAML"); }), save: vi.fn() };
-    const store = new StormDocumentStore(api); await store.refresh(); store.edit((v) => v.boards.push(createBoard(id(), "big-picture", "No")));
-    expect(store.getSnapshot().baseline).toBeUndefined(); expect(store.getSnapshot().value.boards).toHaveLength(0); expect(api.save).not.toHaveBeenCalled(); store.dispose();
-  });
-  test("keeps unfinished source references as guarded drafts and saves only after correction", async () => {
-    const base = { ...empty(), value: example() };
-    const api = { read: vi.fn(async () => base), save: vi.fn(async (value, _hash) => { void _hash; return { ...base, value, contentHash: "a".repeat(64) }; }) };
-    const store = new StormDocumentStore(api); await store.refresh();
-    store.edit((v) => { v.notes[0].sources = [".bal"]; }); await store.save();
-    expect(store.getSnapshot()).toMatchObject({ dirty: true, conflict: false });
-    expect(store.getSnapshot().value.notes[0].sources).toEqual([".bal"]); expect(api.save).not.toHaveBeenCalled();
-    store.edit((v) => { v.notes[0].sources = [".ballet/adr/adr-046.md"]; }); await store.save();
-    expect(store.getSnapshot()).toMatchObject({ dirty: false, error: undefined }); expect(api.save).toHaveBeenCalledOnce();
-    store.locked = true; store.edit((v) => { v.notes[0].title = "Forbidden"; }); store.undo(); await store.save();
-    expect(store.getSnapshot().value.notes[0].title).toBe("Event 0"); expect(api.save).toHaveBeenCalledOnce(); store.dispose();
-  });
-});
-
-describe("Event Storming shared notes and board geometry", () => {
-  test("derivation preserves shared note identities, but placements and connections are independent", () => {
-    const value = example(); const source = value.boards[0]; const derived = deriveStormBoard(source, id(), source.placements.map((p) => p.id), id); value.boards.push(derived);
-    expect(derived.placements[0].noteId).toBe(source.placements[0].noteId); expect(derived.placements[0].id).not.toBe(source.placements[0].id);
-    value.notes[0].title = "Changed everywhere"; derived.placements[0].x = 999;
-    expect(projectStormBoard(value, derived, []).nodes.find((n) => n.type === "sticky")?.data).toMatchObject({ note: { title: "Changed everywhere" }, uses: 2 });
-    expect(source.placements[0].x).toBe(0); expect(eventStormingModelSchema.safeParse(value).success).toBe(true);
-  });
-  test("frame movement includes its members once; removing a frame retains notes and removing a placement removes its edges", () => {
-    const value = example(); const board = value.boards[0]; const frameId = id(); groupStormItems(board, board.placements.map((p) => p.id), frameId);
-    const f = board.frames[0]; moveStormItems(board, new Map([[frameId, { x: f.x + 100, y: f.y + 200 }]]));
-    expect(board.placements[0]).toMatchObject({ x: 100, y: 200 });
-    removeStormItems(board, [frameId]); expect(board.placements).toHaveLength(2); expect(board.placements[0].frameId).toBeUndefined();
-    removeStormItems(board, [board.placements[0].id]); expect(board.connections).toHaveLength(0); expect(value.notes).toHaveLength(2);
-  });
-  test("duplicate creates independent notes; global delete removes all occurrences while board deletion preserves notes", () => {
-    const value = example(); const board = value.boards[0]; duplicateStormItems(value, board, board.placements.map((p) => p.id), id);
-    expect(value.notes).toHaveLength(4); expect(board.connections).toHaveLength(2);
-    const derived = deriveStormBoard(board, id(), board.placements.map((p) => p.id), id); value.boards.push(derived);
-    const deleted = value.notes[0].id; deleteStormNotes(value, [deleted]); expect(value.boards.every((b) => b.placements.every((p) => p.noteId !== deleted))).toBe(true);
-    removeStormBoard(value, board.id); expect(value.notes).toHaveLength(3); expect(value.boards[0].sourceBoardId).toBeUndefined(); expect(eventStormingModelSchema.safeParse(value).success).toBe(true);
-  });
-  test("routing owns board and placement identity and rejects malformed or duplicate IDs", () => {
-    const boardId = id(), itemId = id();
-    expect(routeFromPath(`/project/event-storming?id=${boardId}&item=${itemId}`)).toMatchObject({ workspaceView: "event-storming", entityId: boardId, itemId });
-    for (const query of ["id=bad", `item=${itemId}`, `id=${boardId}&id=${boardId}`, `id=${boardId}&extra=x`]) expect(routeFromPath(`/project/event-storming?${query}`).workspaceView).toBe("invalid");
-  });
-});
-function example() {
-  const value = emptyEventStormingModel(); const board = createBoard(id(), "big-picture", "Workshop"); value.boards.push(board);
-  for (let i = 0; i < 2; i++) { const noteId = id(); value.notes.push({ id: noteId, kind: "event", title: `Event ${i}`, details: "", sources: [] }); board.placements.push({ id: id(), noteId, x: i * 240, y: 0, width: 184, height: 168, pivotal: false }); }
-  board.connections.push({ id: id(), source: board.placements[0].id, target: board.placements[1].id, label: "then" }); return value;
+const stores: StormDocumentStore[] = [];
+afterEach(() => { stores.splice(0).forEach((s) => s.dispose()); vi.useRealTimers(); });
+async function fixture() {
+  const { model, layout } = stormFixture();
+  let serverModel: EventStormingDocument = { value: model, contentHash: "a".repeat(64), semanticHash: eventStormingSemanticHash(model) };
+  let serverLayout: EventStormingLayoutDocument = { value: layout, contentHash: "b".repeat(64) };
+  const api = {
+    read: vi.fn(async () => structuredClone(serverModel)), readLayout: vi.fn(async () => structuredClone(serverLayout)),
+    save: vi.fn(async (value: typeof model, hash: string) => { if (hash !== serverModel.contentHash) throw new ApiRequestError("stale model", 409);
+      serverModel = { value: structuredClone(value), contentHash: eventStormingSemanticHash(value), semanticHash: eventStormingSemanticHash(value) }; return structuredClone(serverModel); }),
+    saveLayout: vi.fn(async (value: typeof layout, hash: string) => { if (hash !== serverLayout.contentHash) throw new ApiRequestError("stale layout", 409);
+      serverLayout = { value: structuredClone(value), contentHash: String(serverLayout.contentHash.length) }; return structuredClone(serverLayout); }), context: vi.fn()
+  };
+  const store = new StormDocumentStore(api); stores.push(store); await store.refresh();
+  return { store, api, externalModel: (doc: EventStormingDocument) => { serverModel = doc; }, externalLayout: (doc: EventStormingLayoutDocument) => { serverLayout = doc; } };
 }
+describe("separate semantic/layout save queues", () => {
+  test("typing debounces; geometry saves independently and never changes the semantic hash", async () => {
+    vi.useFakeTimers(); const { store, api } = await fixture(); const hash = eventStormingSemanticHash(store.model.state.value);
+    store.edit((d) => { d.layout.views[0].placements[0].x++; }, true); await vi.advanceTimersByTimeAsync(0);
+    expect(api.saveLayout).toHaveBeenCalledTimes(1); expect(api.save).not.toHaveBeenCalled(); expect(eventStormingSemanticHash(store.model.state.value)).toBe(hash);
+    store.edit((d) => { d.model.concepts[0].title = "Typed"; }); await vi.advanceTimersByTimeAsync(599); expect(api.save).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1); expect(api.save).toHaveBeenCalledTimes(1);
+  });
+  test("semantic changes persist before their layout and late responses preserve newer edits", async () => {
+    const { store, api } = await fixture(); let finish!: (value: EventStormingDocument) => void;
+    api.save.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    store.edit((d) => { d.model.description = "first"; d.layout.views[0].placements[0].x++; }); const saving = store.save();
+    store.edit((d) => { d.model.description = "newer"; }); expect(api.saveLayout).not.toHaveBeenCalled();
+    finish({ value: { ...store.model.state.value, description: "first" }, contentHash: "a".repeat(64), semanticHash: "c".repeat(64) }); await saving;
+    expect(store.model.state.value.description).toBe("newer"); expect(store.model.state.dirty).toBe(true);
+    await store.save(); expect(store.model.state.dirty).toBe(false); expect(api.saveLayout).toHaveBeenCalledTimes(1);
+  });
+  test("layout conflicts preserve drafts while model edits still save, with explicit reload", async () => {
+    const { store, api, externalLayout } = await fixture();
+    store.edit((d) => { d.layout.views[0].placements[0].x = 900; });
+    externalLayout({ value: stormFixture().layout, contentHash: "c".repeat(64) }); await store.layout.refresh();
+    expect(store.layout.state.conflict).toBe(true); expect(store.layout.state.value.views[0].placements[0].x).toBe(900);
+    store.edit((d) => { d.model.description = "Independent edit"; }); await store.save(); expect(api.save).toHaveBeenCalledTimes(1); expect(api.saveLayout).not.toHaveBeenCalled();
+    await store.layout.refresh(true); expect(store.layout.state.conflict).toBe(false); expect(store.layout.state.value.views[0].placements[0].x).toBe(100);
+  });
+  test("an unrelated layout edit saves while a semantic draft has a validation error", async () => {
+    const { store, api } = await fixture();
+    store.edit((d) => { d.model.concepts[0].sources = ["invalid source"]; });
+    store.edit((d) => { d.layout.views[0].placements[0].x = 321; });
+    await store.save();
+    expect(api.save).not.toHaveBeenCalled(); expect(api.saveLayout).toHaveBeenCalledTimes(1);
+    expect(store.model.state.dirty).toBe(true); expect(store.layout.state.dirty).toBe(false);
+  });
+  test("undo/redo touches only edited files and preserves independent external layout", async () => {
+    const { store, api, externalLayout } = await fixture(); store.edit((d) => { d.model.description = "changed"; }); await store.save();
+    const layout = stormFixture().layout; layout.views[0].placements[0].x = 888; externalLayout({ value: layout, contentHash: "c".repeat(64) }); await store.layout.refresh();
+    store.undo(); await store.save(); expect(store.model.state.value.description).toBe(""); expect(store.layout.state.value.views[0].placements[0].x).toBe(888);
+    store.redo(); await store.save(); expect(store.model.state.value.description).toBe("changed"); expect(api.saveLayout).not.toHaveBeenCalled();
+  });
+  test("invalid models, unavailable layouts and active locks cannot overwrite source files", async () => {
+    const { store, api } = await fixture(); store.locked = true; store.edit((d) => { d.model.description = "ignored"; }); expect(store.model.state.dirty).toBe(false);
+    store.locked = false; api.readLayout.mockRejectedValue(new Error("Invalid layout JSON")); await store.layout.refresh(); expect(store.layout.state.error).toContain("Invalid layout");
+    store.edit((d) => { d.model.concepts[0].sources = ["invalid source"]; }); await store.save(); expect(api.save).not.toHaveBeenCalled(); expect(store.model.state.error).toBeTruthy();
+  });
+});
+test("missing geometry is deterministic; repeating a concept and removing an occurrence preserve other steps", () => {
+  const draft = stormFixture(), process = draft.model.processes[0]; const missing = { version: 1 as const, views: [] };
+  expect(resolveStormView(draft.model, missing, process)).toEqual(resolveStormView(draft.model, missing, process));
+  const before = structuredClone(draft.layout.views[0].placements);
+  addStormStep(draft, process.id, draft.layout.views[0], "event", stormId(20), stormId(1));
+  expect(draft.model.concepts).toHaveLength(2); expect(draft.model.processes[0].steps).toHaveLength(3); expect(draft.layout.views[0].placements.slice(0, 2)).toEqual(before);
+  removeStormSteps(draft, process.id, [stormId(20)]); expect(draft.model.processes[0].steps).toHaveLength(2); expect(draft.model.concepts).toHaveLength(2);
+});
+test("URL owns process, step, presentation and story; removed level routes and malformed selection fail", () => {
+  expect(routeFromPath(`/project/event-storming?process=${stormId(3)}&step=${stormId(4)}&view=${stormId(3)}&story=${stormId(8)}`)).toMatchObject({ entityId: stormId(3), itemId: stormId(4), stormViewId: stormId(3), storyId: stormId(8) });
+  for (const suffix of [`?id=${stormId(3)}`, `?step=${stormId(4)}`, "?process=bad", `?process=${stormId(3)}&process=${stormId(3)}`]) expect(routeFromPath(`/project/event-storming${suffix}`).workspaceView).toBe("invalid");
+});

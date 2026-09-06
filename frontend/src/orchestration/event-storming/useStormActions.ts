@@ -1,77 +1,65 @@
 import { useRef, useState } from "react";
-import type { EventStormingModelV1, StormBoard, StormLevel, StormNote, StormNoteKind } from "@shared/orchestration/eventStorming";
+import type { StormConcept, StormNoteKind, StormProcess } from "@shared/orchestration/eventStorming";
+import type { StormView } from "@shared/orchestration/eventStormingLayout";
 import type { WorkspaceNavigation } from "@/workspace/useWorkspaceNavigation";
 import type { StormEdit } from "./StormDocumentStore";
-import { availableStormPosition, createBoard, deleteStormNotes, deriveStormBoard, duplicateStormItems, groupStormItems, moveStormItems, removeStormBoard, removeStormItems, selectedPlacements } from "./stormOperations";
-import { LEVELS, noteSize, stormPath } from "./stormPresentation";
-
-export function useStormActions(board: StormBoard | undefined, edit: (fn: StormEdit, immediate?: boolean) => void, navigate: WorkspaceNavigation["navigate"]) {
+import { addStormStep, createProcess, createView, ensureView, removeStormSteps } from "./stormOperations";
+import { stormPath } from "./stormPresentation";
+export function useStormActions(process: StormProcess | undefined, view: StormView | undefined, edit: (fn: StormEdit, immediate?: boolean) => void,
+  navigate: WorkspaceNavigation["navigate"], storyId?: string) {
   const [selected, setSelected] = useState<string[]>([]);
-  const [editingId, setEditingId] = useState<string>();
-  const [confirmation, setConfirmation] = useState<"notes" | "board">();
   const [tool, setTool] = useState("select");
-  const [connectFrom, setConnectFrom] = useState<string>();
-  const center = useRef(() => ({ x: 160, y: 160 }));
-  const mutate = (change: (board: StormBoard, model: EventStormingModelV1) => void, immediate = false) => {
-    if (board) edit((draft) => { const target = draft.boards.find((b) => b.id === board.id); if (target) change(target, draft); }, immediate);
+  const center = useRef(() => ({ x: 100, y: 100 }));
+  const addProcess = () => {
+    const id = crypto.randomUUID(); edit((d) => { const p = createProcess(id); d.model.processes.push(p); d.layout.views.push(createView(p)); }, true);
+    navigate(stormPath(id), { bypassBlocker: true });
   };
-  const addBoard = (level: StormLevel) => {
-    const id = crypto.randomUUID(); edit((draft) => { draft.boards.push(createBoard(id, level, LEVELS[level].label)); }, true);
-    navigate(stormPath(id), { bypassBlocker: true }); setSelected([]);
+  const addNote = (kind: StormNoteKind, position?: { x: number; y: number }, existing?: string) => {
+    if (!process || !view) return;
+    const id = crypto.randomUUID(); edit((d) => addStormStep(d, process.id, view, kind, id, existing ?? crypto.randomUUID(), position), true);
+    setSelected([id]); setTool("select"); navigate(stormPath(process.id, id, view.id, storyId), { bypassBlocker: true });
   };
-  const addNote = (kind: StormNoteKind, position?: { x: number; y: number }, existingId?: string) => {
-    const previous = board?.placements.find((p) => selected.includes(p.id));
-    const origin = previous ? { x: previous.x + previous.width + 48, y: previous.y } : center.current();
-    const point = position ?? (board ? availableStormPosition(board, origin, noteSize(kind)) : origin);
-    const id = crypto.randomUUID(); const noteId = existingId ?? crypto.randomUUID();
-    mutate((b, draft) => { if (!existingId) draft.notes.push({ id: noteId, kind, title: "", details: "", sources: [] });
-      b.placements.push({ id, noteId, ...point, ...noteSize(kind), pivotal: false }); }, true);
-    setSelected([id]); setEditingId(existingId ? undefined : id); setTool("select"); navigate(stormPath(board?.id, id), { bypassBlocker: true });
-  };
-  const patchNote = (id: string, patch: Partial<StormNote>) => edit((draft) => { const note = draft.notes.find((n) => n.id === id); if (note) Object.assign(note, patch); });
-  const action = (name: string) => {
-    if (!board) return;
-    if (name === "delete-everywhere") { setConfirmation("notes"); return; }
-    if (name === "delete-board") { setConfirmation("board"); return; }
-    if (name === "derive") {
-      const id = crypto.randomUUID(); edit((draft) => { draft.boards.push(deriveStormBoard(board, id, selected, () => crypto.randomUUID())); }, true);
-      navigate(stormPath(id), { bypassBlocker: true }); setSelected([]); return;
-    }
-    mutate((b, draft) => {
-      if (name === "remove") removeStormItems(b, selected);
-      if (name === "duplicate") setSelected(duplicateStormItems(draft, b, selected, () => crypto.randomUUID()));
-      if (name === "group") groupStormItems(b, selected, crypto.randomUUID());
-      if (name === "align") { const items = selectedPlacements(b, selected); const y = Math.min(...items.map((p) => p.y)); for (const p of items) p.y = y; }
-      if (name === "pivotal") for (const p of b.placements) if (selected.includes(p.id) && draft.notes.find((n) => n.id === p.noteId)?.kind === "event") p.pivotal = !p.pivotal;
-      if (name === "grow" || name === "shrink") for (const p of [...b.placements, ...b.frames]) if (selected.includes(p.id)) {
-        const step = name === "grow" ? 24 : -24; p.width = Math.max(136, Math.min(20_000, p.width + step)); p.height = Math.max(112, Math.min(20_000, p.height + step));
-      }
-    }, true);
-    if (name === "remove") { setSelected([]); navigate(stormPath(board.id), { bypassBlocker: true }); }
-  };
-  const connect = (source: string, target: string) => mutate((b) => { b.connections.push({ id: crypto.randomUUID(), source, target, label: "" }); }, true);
+  const patchNote = (id: string, patch: Partial<StormConcept>) => edit((d) => { const c = d.model.concepts.find((n) => n.id === id); if (c) Object.assign(c, patch); });
+  const patchProcess = (patch: Partial<StormProcess>) => { if (process) edit((d) => Object.assign(d.model.processes.find((p) => p.id === process.id)!, patch)); };
   const selectItem = (id: string, multi = false) => {
-    if (tool === "connect" && board?.placements.some((p) => p.id === id)) {
-      if (connectFrom) { connect(connectFrom, id); setConnectFrom(undefined); setTool("select"); } else setConnectFrom(id);
-      return;
+    if (multi) return;
+    setSelected([id]); const step = view?.placements.find((p) => p.id === id)?.stepId;
+    if (step) navigate(stormPath(process?.id, step, view?.id, storyId), { bypassBlocker: true });
+  };
+  const connect = (source: string, target: string) => {
+    const from = view?.placements.find((p) => p.id === source)?.stepId, to = view?.placements.find((p) => p.id === target)?.stepId;
+    if (!process || !view || !from || !to) return;
+    edit((d) => { const id = crypto.randomUUID(); d.model.processes.find((p) => p.id === process.id)!.connections.push({ id, source: from, target: to, kind: "flow", label: "Next", condition: "" });
+      ensureView(d, view).connections.push({ id, connectionId: id, source, target }); }, true);
+  };
+  const remove = () => {
+    if (!process || !view) return;
+    const ids = view.placements.filter((p) => selected.includes(p.id)).flatMap((p) => p.stepId ?? []);
+    edit((d) => {
+      removeStormSteps(d, process.id, ids);
+      const edgeIds = view.connections.filter((c) => selected.includes(c.id)).map((c) => c.connectionId);
+      d.model.processes.find((p) => p.id === process.id)!.connections = d.model.processes.find((p) => p.id === process.id)!.connections.filter((c) => !edgeIds.includes(c.id));
+      for (const v of d.layout.views) v.connections = v.connections.filter((c) => !edgeIds.includes(c.connectionId));
+    }, true);
+    setSelected([]); navigate(stormPath(process.id, undefined, view.id, storyId), { bypassBlocker: true });
+  };
+  const move = (positions: Map<string, { x: number; y: number }>) => { if (view) edit((d) => {
+    const v = ensureView(d, view);
+    for (const frame of v.frames) { const next = positions.get(frame.id); if (!next) continue;
+      for (const p of v.placements) if (p.frameId === frame.id && !positions.has(p.id)) { p.x += next.x - frame.x; p.y += next.y - frame.y; }
+      Object.assign(frame, next);
     }
-    if (multi) return; // React Flow owns additive/toggle selection; preserve the URL anchor.
-    setSelected([id]);
-    if (board?.placements.some((p) => p.id === id)) navigate(stormPath(board.id, id), { bypassBlocker: true });
+    for (const p of v.placements) if (positions.has(p.id)) Object.assign(p, positions.get(p.id));
+  }, true); };
+  const duplicate = () => {
+    if (!process || !view) return;
+    const placements = view.placements.filter((p) => selected.includes(p.id));
+    edit((d) => { const p = d.model.processes.find((p) => p.id === process.id)!; const v = ensureView(d, view);
+      for (const placement of placements) { const step = p.steps.find((s) => s.id === placement.stepId); if (!step) continue;
+        const id = crypto.randomUUID(); p.steps.push({ ...step, id, storyIds: [...step.storyIds], sources: [...step.sources] });
+        v.placements.push({ ...placement, id, stepId: id, x: placement.x + 40, y: placement.y + 40 }); }
+    }, true);
   };
-  const confirmDelete = () => {
-    if (!board) return;
-    if (confirmation === "board") { edit((draft) => removeStormBoard(draft, board.id), true); navigate(stormPath(), { bypassBlocker: true }); }
-    else { const ids = selectedPlacements(board, selected).map((p) => p.noteId); edit((draft) => deleteStormNotes(draft, ids), true); navigate(stormPath(board.id), { bypassBlocker: true }); }
-    setConfirmation(undefined); setSelected([]);
-  };
-  return { selected, setSelected, editingId, setEditingId, tool, setTool, connectFrom, center, confirmation, setConfirmation, confirmDelete,
-    addBoard, addNote, patchNote, action, selectItem, connect,
-    mutate, move: (positions: Map<string, { x: number; y: number }>) => mutate((b) => moveStormItems(b, positions), true),
-    resize: (id: string, size: { x: number; y: number; width: number; height: number }) => mutate((b) => {
-      const item = [...b.placements, ...b.frames].find((p) => p.id === id); if (item) Object.assign(item, size);
-    }, true),
-    patchFrame: (id: string, title: string) => mutate((b) => { const f = b.frames.find((f) => f.id === id); if (f) f.title = title; })
-  };
+  return { selected, setSelected, tool, setTool, center, addProcess, addNote, patchNote, patchProcess, selectItem, connect, remove, move, duplicate };
 }
 export type StormActions = ReturnType<typeof useStormActions>;

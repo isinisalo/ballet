@@ -1,86 +1,64 @@
-import { ApiRequestError } from "@/apiClient";
-import { emptyEventStormingModel, eventStormingModelSchema, type EventStormingDocument, type EventStormingModelV1 } from "@shared/orchestration/eventStorming";
+import { emptyEventStormingModel, eventStormingModelSchema, type EventStormingModelV2 } from "@shared/orchestration/eventStorming";
+import { emptyEventStormingLayout, eventStormingLayoutSchema, type EventStormingLayoutV1 } from "@shared/orchestration/eventStormingLayout";
+import { StormFileStore } from "./StormFileStore";
 import { stormApi } from "./stormApi";
-
-export type StormEdit = (draft: EventStormingModelV1) => void;
-interface StoreState {
-  value: EventStormingModelV1; baseline?: EventStormingDocument; latest?: EventStormingDocument;
-  loading: boolean; saving: boolean; dirty: boolean; error?: string; conflict: boolean; canUndo: boolean; canRedo: boolean;
-}
-/** Serial single-writer queue. Revisions fence saves/refreshes from newer in-memory edits. */
+export interface StormDraft { model: EventStormingModelV2; layout: EventStormingLayoutV1 }
+export type StormEdit = (draft: StormDraft) => void;
+type Entry = { before: Partial<StormDraft>; after: Partial<StormDraft> };
 export class StormDocumentStore {
-  private state: StoreState = { value: emptyEventStormingModel(), loading: true, saving: false, dirty: false, conflict: false, canUndo: false, canRedo: false };
+  readonly model: StormFileStore<EventStormingModelV2>;
+  readonly layout: StormFileStore<EventStormingLayoutV1>;
+  private layoutDependsOnModel = false;
+  private past: Entry[] = [];
+  private future: Entry[] = [];
   private listeners = new Set<() => void>();
-  private past: EventStormingModelV1[] = [];
-  private future: EventStormingModelV1[] = [];
-  private revision = 0;
-  private requestSequence = 0;
-  private timer?: ReturnType<typeof setTimeout>;
-  private active = true;
-  locked = false;
-  constructor(private readonly api = stormApi) {}
-  getSnapshot = () => this.state;
-  subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  private publish(patch: Partial<StoreState>) {
-    this.state = { ...this.state, ...patch, canUndo: this.past.length > 0, canRedo: this.future.length > 0 };
-    this.listeners.forEach((listener) => listener());
+  private snapshot!: ReturnType<StormDocumentStore["snapshotValue"]>;
+  constructor(api = stormApi) {
+    const validate = <T>(schema: { safeParse(v: T): { success: boolean; error?: { issues: Array<{ message: string }> } } }) => (v: T) => schema.safeParse(v).error?.issues[0]?.message;
+    this.model = new StormFileStore(emptyEventStormingModel(), api, validate(eventStormingModelSchema), () => { this.publish(); if (this.layout && !this.model.state.dirty && !this.model.state.saving && this.layout.state.dirty && !this.layout.state.error) queueMicrotask(() => { void this.layout.save(); }); }, () => this.clearHistory("model"));
+    this.layout = new StormFileStore(emptyEventStormingLayout(), { read: api.readLayout, save: api.saveLayout }, validate(eventStormingLayoutSchema), () => this.publish(), () => this.clearHistory("layout"), () => this.layoutDependsOnModel && (this.model.state.dirty || this.model.state.saving));
+    this.publish();
   }
-  activate() { this.active = true; }
-  dispose() { this.active = false; clearTimeout(this.timer); this.requestSequence++; }
-  async refresh(discard = false) {
-    if (this.state.saving) return;
-    const sequence = ++this.requestSequence; const revision = this.revision;
-    try {
-      const latest = await this.api.read();
-      if (!this.active || sequence !== this.requestSequence || this.state.saving) return;
-      const changed = latest.contentHash !== this.state.baseline?.contentHash;
-      if ((this.state.dirty || revision !== this.revision) && !discard) {
-        if (changed) { clearTimeout(this.timer); this.publish({ latest, conflict: true, error: "The repository file changed. Your local draft is preserved." }); }
-        else if (this.state.conflict) this.publish({ latest, conflict: false }); // A lock/size rejection is not a changed-file conflict.
-        return;
-      }
-      if (changed || discard || !this.state.baseline) {
-        this.past = []; this.future = []; this.revision++;
-        this.publish({ value: latest.value, baseline: latest, latest: undefined, dirty: false, error: undefined, conflict: false });
-      }
-      this.publish({ loading: false, error: undefined });
-    } catch (error) { if (this.active && sequence === this.requestSequence) this.publish({ loading: false, error: String(error instanceof Error ? error.message : error) }); }
+  private snapshotValue() { return { model: this.model.state, layout: this.layout.state, canUndo: this.past.length > 0, canRedo: this.future.length > 0 }; }
+  private publish() {
+    if (!this.model || !this.layout) return;
+    this.snapshot = this.snapshotValue(); this.listeners.forEach((f) => f());
   }
+  private clearHistory(file: keyof StormDraft) {
+    this.past = this.past.filter((entry) => !entry.before[file]); this.future = this.future.filter((entry) => !entry.before[file]);
+  }
+  set locked(value: boolean) { this.model.locked = value; this.layout.locked = value; }
+  getSnapshot = () => this.snapshot;
+  subscribe = (f: () => void) => { this.listeners.add(f); return () => { this.listeners.delete(f); }; };
+  activate() { this.model.active = true; this.layout.active = true; }
+  dispose() { this.model.dispose(); this.layout.dispose(); }
+  refresh = async () => { await Promise.all([this.model.refresh(), this.layout.refresh()]); };
+  save = async () => { await this.model.save(); await this.layout.save(); };
   edit = (change: StormEdit, immediate = false) => {
-    if (this.locked || !this.state.baseline || this.state.conflict) return;
-    const value = structuredClone(this.state.value); change(value);
-    if (JSON.stringify(value) === JSON.stringify(this.state.value)) return;
-    const valid = eventStormingModelSchema.safeParse(value);
-    this.past = [...this.past.slice(-99), this.state.value]; this.future = [];
-    this.revision++; this.publish({ value, dirty: true, error: valid.success ? undefined : valid.error.issues[0].message });
-    clearTimeout(this.timer);
-    if (valid.success) this.schedule(immediate);
+    const before: StormDraft = { model: this.model.state.value, layout: this.layout.state.value };
+    const after = structuredClone(before); change(after);
+    const entry: Entry = { before: {}, after: {} };
+    for (const key of ["model", "layout"] as const) {
+      const file = this[key];
+      if (JSON.stringify(before[key]) === JSON.stringify(after[key]) || file.locked || file.state.conflict || !file.state.baseline) continue;
+      Object.assign(entry.before, { [key]: before[key] }); Object.assign(entry.after, { [key]: after[key] });
+    }
+    if (!Object.keys(entry.before).length) return;
+    this.past = [...this.past.slice(-99), entry]; this.future = [];
+    this.apply(entry.after, immediate); this.publish();
   };
+  private apply(value: Partial<StormDraft>, immediate: boolean) {
+    if (value.model && value.layout) this.layoutDependsOnModel = true;
+    else if (!this.model.state.dirty && !this.model.state.saving) this.layoutDependsOnModel = false;
+    if (value.model) this.model.set(value.model, immediate);
+    if (value.layout) this.layout.set(value.layout, immediate);
+  }
   undo = () => this.travel(false);
   redo = () => this.travel(true);
   private travel(forward: boolean) {
-    if (this.locked || this.state.conflict) return;
-    const source = forward ? this.future : this.past; const value = source.pop(); if (!value) return;
-    (forward ? this.past : this.future).push(this.state.value);
-    this.revision++; this.publish({ value, dirty: true, error: undefined }); this.schedule(true);
+    const source = forward ? this.future : this.past; const entry = source.at(-1); if (!entry) return;
+    if ((["model", "layout"] as const).some((key) => entry.before[key] && (this[key].locked || this[key].state.conflict))) return;
+    source.pop(); (forward ? this.past : this.future).push(entry);
+    this.apply(forward ? entry.after : entry.before, true); this.publish();
   }
-  private schedule(immediate: boolean) { clearTimeout(this.timer); this.timer = setTimeout(() => { void this.save(); }, immediate ? 0 : 600); }
-  save = async () => {
-    clearTimeout(this.timer);
-    if (!this.active || this.locked || this.state.saving || this.state.conflict || !this.state.dirty || !this.state.baseline) return;
-    const valid = eventStormingModelSchema.safeParse(this.state.value);
-    if (!valid.success) { this.publish({ error: valid.error.issues[0].message }); return; }
-    const revision = this.revision; const value = this.state.value; const expectedHash = this.state.baseline.contentHash;
-    this.requestSequence++; this.publish({ saving: true, error: undefined });
-    try {
-      const baseline = await this.api.save(value, expectedHash);
-      if (!this.active) return;
-      this.publish({ baseline, saving: false, dirty: this.revision !== revision });
-      if (this.state.dirty) this.schedule(true);
-    } catch (error) {
-      if (!this.active) return;
-      this.publish({ saving: false, error: error instanceof Error ? error.message : String(error), conflict: error instanceof ApiRequestError && error.status === 409 });
-      if (this.state.conflict) await this.refresh();
-    }
-  };
 }

@@ -1,3 +1,4 @@
+import { EventStormingService } from "./EventStormingService.js";
 import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import { userStoryApprovalHash, invalidateStoryApproval } from "./userStoryApproval.js";
 import { randomUUID } from "node:crypto";
@@ -78,6 +79,6 @@ export class UserStoryService {
 
   remove(id: string, expectedHash: string): void {
     this.assertUnlocked();
-    this.documents.remove("user-story", id, expectedHash, []);
+    this.documents.remove("user-story", id, expectedHash, new EventStormingService(this.documents, () => {}).storyReferences(id));
   }
 }

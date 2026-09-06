@@ -1,3 +1,4 @@
+import { runContextCommand } from "./ContextCli.js";
 import { execFile, spawn } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -29,10 +30,13 @@ export interface BalletCliServices {
 }
 
 export const runBalletCli = async (argv: readonly string[], services: BalletCliServices): Promise<number> => {
-  const command = argv[0]?.startsWith("-") ? undefined : argv[0];
+  const command = cliCommand(argv);
   const args = command ? argv.slice(1) : argv;
   try {
     switch (command) {
+      case "context":
+        services.output.stdout(await runContextCommand(args, contextWorkingDirectory(services)));
+        return 0;
       case "stop":
         requireNoArguments(args, "ballet stop");
         await stop(services);
@@ -83,6 +87,9 @@ export const runBalletCli = async (argv: readonly string[], services: BalletCliS
     return 1;
   }
 };
+
+const cliCommand = (argv: readonly string[]) => argv[0]?.startsWith("-") ? undefined : argv[0];
+const contextWorkingDirectory = (services: BalletCliServices) => services.cwd?.() ?? process.cwd();
 
 const start = async (args: readonly string[], services: BalletCliServices): Promise<void> => {
   const options = parseStartOptions(args);
@@ -207,4 +214,5 @@ Usage:
   ballet logs [--lines N] [--follow]
   ballet update
   ballet daemon start|stop|restart|status|logs [--lines N] [--follow]
+  ballet context event-storming [--process <id> | --story <id>] [--json]
   ballet version`;

@@ -1,0 +1,66 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, expect, test, vi } from "vitest";
+import { runContextCommand } from "../ContextCli.js";
+import { runBalletCli } from "../BalletCli.js";
+import { stormFixture, stormId } from "../../../shared/orchestration/testing/eventStormingFixture.js";
+import { serializeStormJson } from "../../../shared/orchestration/eventStorming.js";
+import { ProjectDocumentRepository } from "../../orchestration/project/ProjectDocumentRepository.js";
+import { UserStoryService } from "../../orchestration/project/UserStoryService.js";
+import { EventStormingContextService } from "../../orchestration/project/EventStormingContextService.js";
+import { EventStormingService } from "../../orchestration/project/EventStormingService.js";
+const roots: string[] = [];
+afterEach(() => { vi.restoreAllMocks(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+const git = (root: string, ...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" }).toString().trim();
+function fixture() {
+  const root = mkdtempSync(path.join(tmpdir(), "ballet-context-")); roots.push(root);
+  git(root, "init"); mkdirSync(path.join(root, ".ballet/event-storming"), { recursive: true });
+  const { model, layout } = stormFixture();
+  writeFileSync(path.join(root, ".ballet/event-storming/model.json"), serializeStormJson(model));
+  writeFileSync(path.join(root, ".ballet/event-storming/layout.json"), serializeStormJson(layout));
+  git(root, "add", "."); git(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "-m", "test fixture");
+  return { root, model, layout };
+}
+test("offline CLI reads its own worktree from a subdirectory and never initializes runtime or networking", async () => {
+  const { root, model } = fixture(); const worktree = path.join(root, "child"); git(root, "worktree", "add", "--detach", worktree);
+  model.processes[0].title = "Own worktree"; writeFileSync(path.join(worktree, ".ballet/event-storming/model.json"), serializeStormJson(model));
+  mkdirSync(path.join(worktree, "src")); const network = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+  const output = JSON.parse(await runContextCommand(["event-storming", "--process", stormId(3), "--json"], path.join(worktree, "src")));
+  expect(output.processes[0].title).toBe("Own worktree"); expect(output.processes[0].connections.map((c: { label: string }) => c.label)).toContain("Retry");
+  expect(JSON.stringify(output)).not.toContain('"placements"'); expect(JSON.stringify(output)).not.toContain('"layout"');
+  const gitDir = git(worktree, "rev-parse", "--absolute-git-dir"); expect(existsSync(path.join(gitDir, "ballet"))).toBe(false); expect(network).not.toHaveBeenCalled();
+  expect(JSON.parse(readFileSync(path.join(root, ".ballet/event-storming/model.json"), "utf8")).processes[0].title).toBe("Orders");
+  const server = vi.fn(), daemon = vi.fn(), stdout = vi.fn(), stderr = vi.fn();
+  const code = await runBalletCli(["context", "event-storming", "--json"], { cwd: () => worktree, server, daemon, output: { stdout, stderr }, openUrl: vi.fn(), updater: {} as never, version: "test" });
+  expect(code).toBe(0); expect(JSON.parse(stdout.mock.calls[0][0]).kind).toBe("index"); expect(server).not.toHaveBeenCalled(); expect(daemon).not.toHaveBeenCalled();
+});
+test("small index, unknown IDs and exclusive selectors never fall back to the full model", async () => {
+  const { root } = fixture(); const index = JSON.parse(await runContextCommand(["event-storming", "--json"], root));
+  expect(index.kind).toBe("index"); expect(JSON.stringify(index)).not.toContain("Order received");
+  await expect(runContextCommand(["event-storming", "--process", stormId(999), "--json"], root)).rejects.toThrow(/Unknown/);
+  await expect(runContextCommand(["event-storming", "--process", stormId(3), "--story", stormId(999)], root)).rejects.toThrow(/either/);
+  await expect(runContextCommand(["event-storming", "--story", stormId(999)], root)).rejects.toThrow(/not found/);
+});
+test("targeted projection retains external endpoints, fresh story content, approval state and exact source hashes", () => {
+  const { root, model } = fixture(); const documents = new ProjectDocumentRepository(path.join(root, ".ballet")), stories = new UserStoryService(documents, () => {});
+  const story = stories.create({ role: "buyer", goal: "buy", benefit: "goods", acceptanceCriteria: [{ given: "cart", when: "submit", then: "received" }] });
+  model.processes[0].storyIds = [story.value.id];
+  model.processes.push({ ...structuredClone(model.processes[0]), id: stormId(90), title: "Unrelated internals", storyIds: [], steps: [{ id: stormId(91), conceptId: stormId(2), storyIds: [], sources: [] }], connections: [] });
+  model.processes[0].connections.push({ id: stormId(92), source: stormId(5), target: stormId(91), label: "External dependency", condition: "failure", kind: "support" });
+  model.concepts[0].sources = ["https://example.invalid/evidence", `.ballet/user-stories/${story.value.id}.md`];
+  const service = new EventStormingService(documents, () => {}); service.save(model, service.read().contentHash);
+  const context = new EventStormingContextService(root); const result = context.read({ story: story.value.id });
+  expect(result.kind).toBe("detail"); if (result.kind !== "detail") throw new Error("Wrong projection");
+  expect(result.processes).toHaveLength(1); expect(result.externalSteps).toHaveLength(1); expect(result.externalSteps[0].processId).toBe(stormId(90));
+  expect(result.sources.find((s) => s.source.endsWith(`${story.value.id}.md`))?.contentHash).toBe(story.contentHash);
+  expect(result.sources.find((s) => s.source.startsWith("https:"))).toEqual({ source: "https://example.invalid/evidence", status: "not-read" });
+  stories.update(story.value.id, { role: story.value.role, goal: "changed", benefit: story.value.benefit, acceptanceCriteria: story.value.acceptanceCriteria, adrIds: [], details: "" }, story.contentHash);
+  expect(context.read({ story: story.value.id })).toMatchObject({ stories: [{ value: { goal: "changed", status: "draft" } }] });
+  const other = stories.create({ role: "reader", goal: "browse", benefit: "learn", acceptanceCriteria: [] });
+  expect(context.read({ story: other.value.id })).toMatchObject({ processes: [], stories: [{ value: { id: other.value.id } }] });
+  rmSync(path.join(root, ".ballet/user-stories", `${story.value.id}.md`));
+  expect(context.read({ process: stormId(3) })).toMatchObject({ issues: [{ id: story.value.id }] });
+  expect(context.read({ story: story.value.id })).toMatchObject({ processes: [{ id: stormId(3) }], issues: [{ id: story.value.id }] });
+});

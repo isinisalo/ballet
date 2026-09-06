@@ -1,62 +1,63 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { StormNavigation } from "./StormNavigation";
+import { StormConnectDialog } from "./StormConnectDialog";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { StormHeader } from "./StormHeader";
-import type { StormLevel } from "@shared/orchestration/eventStorming";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { RouteState } from "@/workspace/types";
 import type { WorkspaceNavigation } from "@/workspace/useWorkspaceNavigation";
 import { useStormDocument } from "./useStormDocument";
 import { useStormActions } from "./useStormActions";
-import { LEVELS, stormPath } from "./stormPresentation";
+import { stormPath } from "./stormPresentation";
+import { resolveStormView, invalidStormSelection, findStormSteps } from "./stormOperations";
 import { StormCanvas } from "./StormCanvas";
 import { StormTools } from "./StormTools";
-import { StormConnectDialog, StormDeleteDialog, StormLibrary } from "./StormDialogs";
 import { StormFileFeedback } from "./StormFileFeedback";
+import { StormOverview } from "./StormOverview";
+import { StormDetails } from "./StormDetails";
+import { useUserStories } from "../user-stories/useUserStories";
+import "../user-stories/userStories.css";
 import "./eventStorming.css";
-
 export function EventStormingWorkspace({ route, locked, navigate, onDirty }: { route: RouteState; locked: boolean; navigate: WorkspaceNavigation["navigate"]; onDirty(value: boolean): void }) {
-  const document = useStormDocument(locked, onDirty);
-  const board = document.value.boards.find((b) => b.id === route.entityId);
-  const actions = useStormActions(board, document.store.edit, navigate);
-  const [level, setLevel] = useState<StormLevel>("big-picture");
-  const [library, setLibrary] = useState(false); const [connect, setConnect] = useState(false);
+  const document = useStormDocument(locked, onDirty), model = document.model.value;
+  const stories = useUserStories(), mobile = useIsMobile();
+  const [search, setSearch] = useState(""), [details, setDetails] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const readOnly = locked || document.conflict || !document.baseline;
-  const invalid = Boolean(route.entityId && !board && !document.loading) || Boolean(route.itemId && board && !board.placements.some((p) => p.id === route.itemId));
-  const activeLevel = board?.level ?? level;
-  useEffect(() => { actions.setSelected(route.itemId ? [route.itemId] : []); }, [route.entityId, route.itemId]); // URL restores the selected placement.
+  const process = model.processes.find((p) => p.id === route.entityId);
+  const view = useMemo(() => process ? resolveStormView(model, document.layout.value, process, route.stormViewId) : undefined, [model, document.layout.value, process, route.stormViewId]);
+  const actions = useStormActions(process, view, document.store.edit, navigate, route.storyId);
+  const readOnly = locked || document.model.conflict || !document.model.baseline;
+  const invalid = !document.model.loading && invalidStormSelection(model, document.layout.value, route, stories.data);
   useEffect(() => { heading.current?.focus(); }, [route.entityId]);
-  const boards = document.value.boards.filter((b) => b.level === activeLevel);
-  const switchLevel = (next: StormLevel) => {
-    setLevel(next);
-    const related = document.value.boards.find((b) => b.level === next && (b.sourceBoardId === board?.id || b.id === board?.sourceBoardId));
-    navigate(stormPath(related?.id));
-  };
-  const edge = board?.connections.find((c) => actions.selected.includes(c.id));
+  useEffect(() => {
+    actions.setSelected(route.itemId && view ? view.placements.filter((p) => p.stepId === route.itemId).map((p) => p.id) : []);
+    if (route.itemId) setDetails(true);
+  }, [route.entityId, route.itemId, route.stormViewId]);
+  const openStory = (id: string) => { void document.store.save().then(() => navigate(`/project/user-stories?id=${id}`)); };
+  const panel = process && view ? <StormDetails model={model} process={process} view={view} stepId={route.itemId} actions={actions} edit={document.store.edit} locked={readOnly} stories={stories.data} openStory={openStory} /> : null;
+  const status = (file: typeof document.model | typeof document.layout) => file.error ? "Save failed" : file.saving ? "Saving" : file.dirty ? "Unsaved" : file.loading ? "Loading" : "Saved";
+  const results = findStormSteps(model, process, search);
   return <section className="storm-workspace" aria-label="Event Storming workspace">
-    <StormHeader board={board} heading={heading} document={document} activeLevel={activeLevel} switchLevel={switchLevel} navigate={navigate} readOnly={readOnly} actions={actions} />
-    {locked && <p className="storm-lock" role="status">Read only while an Environment Run is active. You can explore every board.</p>}
-    <StormFileFeedback document={document} />
-    {invalid ? <div className="storm-recovery"><h2>Board or note not found</h2><p>The link may refer to a removed item.</p><Button onClick={() => navigate(stormPath(board?.id))}>Return to {board ? "board" : "Event Storming"}</Button></div>
-      : board ? <>
-        <div className="storm-board-meta"><span>{LEVELS[board.level].hint}</span>{board.sourceBoardId && <Button variant="link" onClick={() => navigate(stormPath(board.sourceBoardId))}>Source board <ArrowUpRight /></Button>}
-          <Button variant="ghost" onClick={() => setLibrary(true)}>Find a note</Button><Button variant="ghost" disabled={readOnly} onClick={() => actions.action("delete-board")}>Delete board</Button></div>
-        <div className="storm-stage">
-          <StormCanvas key={board.id} value={document.value} board={board} focusId={route.itemId} actions={actions} locked={readOnly} undo={document.store.undo} redo={document.store.redo} />
-          <StormTools board={board} actions={actions} locked={readOnly} search={() => setLibrary(true)} link={() => setConnect(true)} />
-          {edge && <div className="storm-edge-editor"><label>Connection label<input aria-label="Edit connection label" value={edge.label} readOnly={readOnly} maxLength={500} onChange={(event) => actions.mutate((b) => { b.connections.find((c) => c.id === edge.id)!.label = event.target.value; })} /></label><Button disabled={readOnly} variant="ghost" onClick={() => actions.action("remove")}>Remove connection</Button></div>}
-        </div>
-        {connect && <StormConnectDialog open close={() => setConnect(false)} board={board} value={document.value} actions={actions} locked={readOnly} />}
-        <StormDeleteDialog value={document.value} board={board} actions={actions} locked={readOnly} />
-      </> : !document.loading && <div className="storm-overview">
-        <div className="storm-overview-intro"><div className="storm-wall-mark" aria-hidden="true"><i className="storm-color-event">Something<br />happened.</i><i className="storm-color-command">What<br />happens next?</i><i className="storm-color-hotspot">?</i></div>
-          <div><span className="storm-eyebrow">{LEVELS[activeLevel].label}</span><h2>{LEVELS[activeLevel].hint}</h2><p>Bring the people. Capture the events. Make the connections.</p><Button disabled={readOnly} onClick={() => actions.addBoard(activeLevel)}><Plus />Create {LEVELS[activeLevel].label} board</Button></div></div>
-        <div className="storm-board-cards">{boards.map((b) => <button className="storm-board-card" key={b.id} onClick={() => navigate(stormPath(b.id))}>
-          <div className="storm-board-preview" aria-hidden="true">{b.placements.slice(0, 12).map((p) => <i key={p.id} className={`storm-color-${document.value.notes.find((n) => n.id === p.noteId)?.kind ?? "note"}`} />)}</div>
-          <strong>{b.title}</strong><span>{b.placements.length} notes · {b.connections.length} connections <ArrowUpRight /></span>
-        </button>)}</div>
-        <Button variant="ghost" onClick={() => setLibrary(true)}>Find shared notes across all boards</Button>
-      </div>}
-    <StormLibrary open={library} close={() => setLibrary(false)} value={document.value} board={board} actions={actions} locked={readOnly} navigate={navigate} />
+    <header className="storm-header"><h1 ref={heading} tabIndex={-1}>Event Storming</h1><div className="storm-toolbar">
+      <span role="status">Model: {status(document.model)} · Layout: {status(document.layout)}</span>
+      <Button variant="outline" disabled={!process} onClick={() => navigate(stormPath(undefined, undefined, undefined, route.storyId))}>Overview</Button>
+      <Button disabled={readOnly} onClick={actions.addProcess}>New process</Button>
+      <Button variant="outline" disabled={locked || !document.canUndo} onClick={document.store.undo}>Undo</Button><Button variant="outline" disabled={locked || !document.canRedo} onClick={document.store.redo}>Redo</Button>
+      <Button disabled={readOnly} onClick={() => void document.store.save()}>Save</Button>
+    </div></header>
+    <StormNavigation model={model} process={process} view={view} route={route} stories={stories.data} layout={document.layout.value} search={search} setSearch={setSearch} navigate={navigate} showDetails={() => setDetails(true)} />
+    {locked && <p role="status">Read only while an Environment Run is active.</p>}
+    <StormFileFeedback file={document.store.model} name="model" /><StormFileFeedback file={document.store.layout} name="layout" />
+    {stories.error && <p role="alert">Story sources unavailable: {stories.error}</p>}
+    {invalid ? <div role="alert"><h2>Process, step or presentation not found</h2><Button onClick={() => navigate(stormPath())}>Return to overview</Button></div>
+      : !document.model.baseline ? <p role="status">{document.model.loading ? "Loading process map…" : "Repair the model file, then refresh to continue."}</p>
+        : process && view ? <>
+          <div className="storm-author-tools"><StormTools actions={actions} locked={readOnly} /><StormConnectDialog model={model} process={process} edit={document.store.edit} locked={readOnly} /></div>
+          {search && <div className="storm-search-results" aria-label="Search results">{results.map((s) => <Button key={s.id} variant="outline" onClick={() => navigate(stormPath(process.id, s.id, view.id, route.storyId))}>{model.concepts.find((c) => c.id === s.conceptId)?.title}</Button>)}{!results.length && <span>No matching steps</span>}</div>}
+          <div className="storm-stage"><StormCanvas key={view.id} model={model} view={view} focusId={route.itemId} storyId={route.storyId} actions={actions} showDetails={() => setDetails(true)} locked={readOnly || document.layout.conflict} undo={document.store.undo} redo={document.store.redo} />
+            {!mobile && <aside className="storm-details" aria-label="Process and step details">{panel}</aside>}</div>
+          <p className="storm-legend">◆ Event flow: solid arrow · Supporting information: dashed arrow · Responsibility: dotted arrow</p>
+          {mobile && <Sheet open={details} onOpenChange={setDetails}><SheetContent side="bottom" className="storm-mobile-details"><SheetHeader><SheetTitle>Process and step details</SheetTitle><SheetDescription>Edit the selected process or step and read its linked stories.</SheetDescription></SheetHeader>{panel}</SheetContent></Sheet>}
+        </> : <StormOverview model={model} search={search} storyId={route.storyId} select={(id) => navigate(stormPath(id, undefined, undefined, route.storyId))} />}
   </section>;
 }

@@ -1,3 +1,4 @@
+import type { EventStormingModelV2 } from "../../../shared/orchestration/eventStorming.js";
 import type { UserStoryV2 } from "../../../shared/orchestration/userStories.js";
 import type { ProjectConfigurationV26 } from "../../../shared/orchestration/environment.js";
 
@@ -13,7 +14,11 @@ export interface ProjectReference {
 export class ProjectReferenceIndex {
   private readonly references = new Map<string, ProjectReference[]>();
 
-  constructor(config: ProjectConfigurationV26, stories: UserStoryV2[] = []) {
+  constructor(config: ProjectConfigurationV26, stories: UserStoryV2[] = [], storm?: EventStormingModelV2) {
+    for (const process of storm?.processes ?? []) {
+      this.addMany("user-story", process.storyIds, "process", process.id, "storyIds");
+      for (const step of process.steps) this.addMany("user-story", step.storyIds, "process-step", step.id, "storyIds");
+    }
     for (const story of stories) this.addMany("adr", story.adrIds, "user-story", story.id, "adrIds");
     for (const state of config.environment.states) {
       for (const action of state.actions) {

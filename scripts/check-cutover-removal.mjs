@@ -4,7 +4,7 @@ import process from "node:process";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const scanRoots = [
-  "backend", "frontend", "shared",
+  "backend", "frontend", "shared", ".codex/agents",
   ".ballet/project.json", ".ballet/overview.md", ".ballet/user-stories", ".ballet/adr", ".ballet/instructions", ".ballet/releases", ".ballet/arc42",
   ".agents/skills", ".fixture-ballet-project/.ballet",
   "README.md", "ARCHITECTURE.md", "DESIGN.md", "AGENTS.md",
@@ -112,6 +112,11 @@ for (const filename of files) {
   const source = await readFile(filename, "utf8").catch(() => undefined);
   if (source === undefined) continue;
   const relative = path.relative(repositoryRoot, filename);
+  if (/^(?:backend|frontend\/src|shared|\.codex\/agents)\//.test(relative) && !relative.includes(".test.") && !relative.includes("/fixtures/")) {
+    for (const term of ["eventStorming" + "Markdown", "EventStormingModel" + "V1", "storm" + "Levels", "derive" + "StormBoard", "ballet-action-work-event-storming-", "ballet-action-validation-event-storming-"]) {
+      if (source.includes(term)) failures.push(`${relative}: removed Event Storming contract ${term}`);
+    }
+  }
   if (/^(?:backend|frontend\/src|shared)\//.test(relative) && !relative.includes(".test.")) {
     for (const term of ["Use" + "Case", "use" + "Cases", "useCase" + "Approval", "/project/" + "goals", "/project/" + "constraints", "/project/" + "use-cases", "ProjectConfigurationV" + "25", "RootSnapshotV" + "20"]) {
       if (source.includes(term)) failures.push(`${relative}: removed project definition contract ${term}`);
@@ -148,6 +153,12 @@ for (const filename of files) {
     failures.push(`${relative}: transition path remains`);
   }
 }
+
+for (const removed of [".ballet/event-storming/model.md", "backend/orchestration/project/eventStormingMarkdown.ts"]) {
+  if (await readFile(path.join(repositoryRoot, removed)).then(() => true, () => false)) failures.push(`${removed}: removed active Event Storming file remains`);
+}
+const project = JSON.parse(await readFile(path.join(repositoryRoot, ".ballet/project.json"), "utf8"));
+if (project.environment.states.some((state) => state.id === "event-storming" || state.actions.some((action) => action.id.startsWith("event-storming-")))) failures.push("Removed Event Storming State or Action remains in project config");
 
 function allowedReplacementHistory(relative) {
   return relative.startsWith(".ballet/adr/")

@@ -4,7 +4,7 @@ title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
 updatedAt: '2026-09-06'
-version: 38
+version: 39
 tags: [architecture, arc42, environment]
 ---
 
@@ -107,9 +107,9 @@ Successful work must remain Critic-readable through immutable commit/artifact ev
 
 ## Project/platform boundary
 
-Generic `shared/`, `backend/` and `frontend/` code knows only Overview, User Story, Event Storming model, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
+Generic `shared/`, `backend/` and `frontend/` code knows only Overview, User Story, Event Storming model, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own four-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
 
-Overview, ADRs, User Stories and Event Storming are repository-owned Markdown; none enters Config, SQLite or Run gates. Their exact source/HTTP mappings live in the [building-block view](.ballet/arc42/05-building-block-view.md); their UI contracts live in [DESIGN](DESIGN.md).
+Overview, ADRs and User Stories are repository-owned Markdown; Event Storming uses separate semantic model and layout JSON files; none enters Config, SQLite or Run gates. Their exact source/HTTP mappings live in the [building-block view](.ballet/arc42/05-building-block-view.md); their UI contracts live in [DESIGN](DESIGN.md).
 
 ## Failure modes
 

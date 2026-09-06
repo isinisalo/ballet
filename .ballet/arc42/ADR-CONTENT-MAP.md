@@ -4,7 +4,7 @@ title: ADR-sisällön siirtokartoitus
 status: accepted
 createdAt: '2026-09-06'
 updatedAt: '2026-09-06'
-version: 1
+version: 2
 tags: [adr, traceability]
 ---
 
@@ -74,7 +74,7 @@ Lähderevisio on `29a4a0a8262d0ce66c32e7b0cdb35cd3da9d0b7e`. Taulukko kattaa jok
 | feedback | `ba0bdc02-5d4b-425d-8d0a-3a38f9d99489` | `4436191c-d365-4d73-b9b1-9128e5eeba6e` | [9def77e6-89c3-4ef3-b295-89323c592807](../user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md) |
 | refinement | `3d075703-a410-4d75-b98f-942f9755e9a8` | `db0094fb-775f-4552-bf8a-674564d177a0` | [cc322abc-96e2-41ef-93f8-1b5aba633995](../user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md) |
 
-[Kanoninen Event Storming -malli](../event-storming/model.md) sisältää jokaisen kortin lähteet. Ohjelmistosuunnittelutaulut kuvaavat nykyisiä vastuita, eivät uusia hyväksyttyjä palvelurajoja.
+[Kanoninen Event Storming -malli](../event-storming/model.json) sisältää jokaisen kortin lähteet. Prosessien valinnaiset vastuunäkymät kuvaavat nykyisiä vastuita, eivät uusia hyväksyttyjä palvelurajoja.
 
 ## Sisältörajat
 

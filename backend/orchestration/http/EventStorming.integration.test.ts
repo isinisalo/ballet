@@ -6,6 +6,9 @@ import express from "express";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { emptyEventStormingModel, type EventStormingDocument } from "../../../shared/orchestration/eventStorming.js";
+import { emptyEventStormingLayout, type EventStormingLayoutDocument } from "../../../shared/orchestration/eventStormingLayout.js";
+import type { StormContextDetail, StormContextIndex } from "../../../shared/orchestration/eventStormingContext.js";
+import { stormFixture, stormId } from "../../../shared/orchestration/testing/eventStormingFixture.js";
 import { sendKnownHttpError } from "../../http/errors.js";
 import { loopbackSecurity } from "../../server/createBalletServer.js";
 import { ProjectDocumentRepository } from "../project/ProjectDocumentRepository.js";
@@ -21,14 +24,14 @@ const headers = { Origin: "http://127.0.0.1:4317", "Content-Type": "application/
 const json = (value: unknown): RequestInit => ({ method: "PUT", headers, body: JSON.stringify(value) });
 
 describe("Event Storming HTTP contracts", () => {
-  test("writes only model.md; SQLite is used solely for the read-only active Run lock", async () => {
+  test("writes only model.json; SQLite is used solely for the read-only active Run lock", async () => {
     const { request, root, queries, invalidations } = await fixture();
     const empty = await (await request("")).json() as EventStormingDocument;
     expect(empty.contentHash).toBe("absent");
     const response = await request("", json({ value: empty.value, expectedHash: "absent" })); expect(response.status).toBe(200);
     const saved = await response.json() as EventStormingDocument;
     expect(saved.contentHash).toMatch(/^[a-f0-9]{64}$/);
-    expect(readFileSync(path.join(root, ".ballet/event-storming/model.md"), "utf8")).toContain("version: 1");
+    expect(readFileSync(path.join(root, ".ballet/event-storming/model.json"), "utf8")).toContain('"version": 2');
     expect(await (await request("")).json()).toEqual(saved);
     expect(readdirSync(path.join(root, ".ballet"))).toEqual(["event-storming"]);
     expect(queries.mock.calls.map(([sql]) => sql.trim())).toEqual(["SELECT 1 FROM environment_runs WHERE status IN ('pending','running') LIMIT 1"]);
@@ -37,7 +40,7 @@ describe("Event Storming HTTP contracts", () => {
   test("rejects hostile origins, unknown fields/queries, incompatible versions, oversized requests and stale hashes", async () => {
     const { request } = await fixture(); const value = emptyEventStormingModel();
     expect((await request("", { ...json({ value, expectedHash: "absent" }), headers: { ...headers, Origin: "https://hostile.invalid" } })).status).toBe(403);
-    for (const body of [{ value, expectedHash: "absent", actor: "forged" }, { value: { ...value, version: 2 }, expectedHash: "absent" }, { value: { ...value, done: true }, expectedHash: "absent" }]) {
+    for (const body of [{ value, expectedHash: "absent", actor: "forged" }, { value: { ...value, version: 1 }, expectedHash: "absent" }, { value: { ...value, done: true }, expectedHash: "absent" }]) {
       expect((await request("", json(body))).status).toBe(400);
     }
     expect((await request("?path=../../outside")).status).toBe(400);
@@ -49,6 +52,26 @@ describe("Event Storming HTTP contracts", () => {
     database.prepare("INSERT INTO environment_runs (status) VALUES ('running')").run();
     expect((await request("")).status).toBe(200);
     expect((await request("", json({ value: emptyEventStormingModel(), expectedHash: "absent" }))).status).toBe(409);
+    expect((await request("/layout")).status).toBe(200);
+    expect((await request("/context")).status).toBe(200);
+    expect((await request("/layout", json({ value: emptyEventStormingLayout(), expectedHash: "absent" }))).status).toBe(409);
+  });
+  test("layout has its own hash and security contract; HTTP context uses the semantic projection", async () => {
+    const { request } = await fixture(); const { model, layout } = stormFixture();
+    const saved = await (await request("", json({ value: model, expectedHash: "absent" }))).json() as EventStormingDocument;
+    const savedLayout = await (await request("/layout", json({ value: layout, expectedHash: "absent" }))).json() as EventStormingLayoutDocument;
+    model.description = "Independent semantic edit";
+    expect((await request("", json({ value: model, expectedHash: saved.contentHash }))).status).toBe(200);
+    layout.views[0]!.placements[0]!.x += 40;
+    expect((await request("/layout", json({ value: layout, expectedHash: savedLayout.contentHash }))).status).toBe(200);
+    expect((await request("/layout", json({ value: layout, expectedHash: savedLayout.contentHash }))).status).toBe(409);
+    expect((await request("/layout", { ...json({ value: layout, expectedHash: "absent" }), headers: { ...headers, Origin: "https://hostile.invalid" } })).status).toBe(403);
+    expect((await request("/layout?path=other")).status).toBe(400);
+    expect((await request("/context?process=" + stormId(3) + "&story=" + stormId(9))).status).toBe(400);
+    const context = await (await request("/context?process=" + stormId(3))).json() as StormContextDetail;
+    expect(context.processes[0].connections).toEqual(model.processes[0]!.connections);
+    expect(context).not.toHaveProperty("layout");
+    expect(((await (await request("/context")).json()) as StormContextIndex).kind).toBe("index");
   });
 });
 

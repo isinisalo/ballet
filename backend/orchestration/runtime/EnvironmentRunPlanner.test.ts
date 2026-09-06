@@ -29,6 +29,22 @@ describe("EnvironmentRunPlanner immutable context", () => {
     expect(JSON.stringify(context)).not.toContain("UC-1");
   });
 
+  test("preserves an opaque process target in both role contexts without injecting model or stories", async () => {
+    const project = definition();
+    const target = { processId: "00000000-0000-4000-8000-000000000003" };
+    project.config.environment.states[0].actions[0].input = { eventStormingTarget: target };
+    project.configSha256 = contentHash(projectConfigurationV26Schema.parse(project.config));
+    const planner = new EnvironmentRunPlanner({ load: async () => project }, {
+      inspectAgent: async (agent) => agentCapability(agent.id), inspectAction: async (actionId, profiles) => actionCapability(actionId, profiles)
+    }, () => "2026-09-06T10:00:00.000Z");
+    const { snapshot } = await planner.plan(); const state = snapshot.environment.states[0], action = state.actions[0];
+    for (const role of ["validation", "work"] as const) {
+      const context = buildBoundedTaskContext({ snapshot, state, action, composition: action[role], outputSchemaId: `${role}-v11` });
+      expect(context).toMatchObject({ definitions: { action: { input: { eventStormingTarget: target } } } });
+      expect(context).not.toHaveProperty("model"); expect(context).not.toHaveProperty("userStories");
+    }
+  });
+
   test("plans a Run without project document or story approval inputs", async () => {
     const project = definition();
     project.configSha256 = contentHash(projectConfigurationV26Schema.parse(project.config));

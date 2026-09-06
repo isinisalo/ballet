@@ -189,7 +189,7 @@ if (!parsed.success) {
   for (const issue of validateRunnableEnvironment(config.environment)) {
     addIssue(`Default project is not runnable: ${issue.path}: ${issue.message}`);
   }
-  if (config.environment.states.length !== 5) addIssue(`Default project must contain five canonical States; found ${config.environment.states.length}.`);
+  if (config.environment.states.length !== 4) addIssue(`Default project must contain four canonical States; found ${config.environment.states.length}.`);
   await validateCodexAgents(root, config);
   if (config.critic.enabled) addIssue("Default Critic schedule must be disabled.");
   if (config.critic.schedules.length === 0) addIssue("Default Critic needs a disabled example schedule with a valid IANA timezone.");
@@ -233,8 +233,7 @@ else {
 const additionalLinkFiles = ["README.md", "DESIGN.md", "AGENTS.md", ".ballet/overview.md",
   ...(await walk(path.join(root, ".ballet/user-stories"))).filter((file) => file.endsWith(".md")).map(rel),
   ...(await walk(path.join(root, ".agents/skills"))).filter((file) => file.endsWith(".md")).map(rel),
-  ...(await walk(path.join(root, ".ballet/adr"))).filter((file) => file.endsWith(".md")).map(rel),
-  ".ballet/event-storming/model.md"];
+  ...(await walk(path.join(root, ".ballet/adr"))).filter((file) => file.endsWith(".md")).map(rel)];
 for (const filename of additionalLinkFiles) await validateLocalLinks(path.join(root, filename));
 
 for (const removed of [".ballet/graph-node-library", ".ballet/graph-node-modules"]) {

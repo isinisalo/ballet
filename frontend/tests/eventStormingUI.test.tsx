@@ -1,38 +1,48 @@
-import { useSyncExternalStore } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test, vi } from "vitest";
-import { StormCanvas } from "../src/orchestration/event-storming/StormCanvas";
-import { StormDocumentStore } from "../src/orchestration/event-storming/StormDocumentStore";
-import { useStormActions } from "../src/orchestration/event-storming/useStormActions";
-import { emptyEventStormingModel, type EventStormingDocument } from "@shared/orchestration/eventStorming";
-import { createBoard } from "../src/orchestration/event-storming/stormOperations";
-
-test("canvas typing remains complete across renders and duplicate placements update together", async () => {
-  const value = emptyEventStormingModel(), id = () => crypto.randomUUID();
-  const noteId = id(); value.notes.push({ id: noteId, title: "", kind: "event", details: "", sources: [] });
-  const board = createBoard(id(), "big-picture", "Workshop"); value.boards.push(board);
-  for (let i = 0; i < 2; i++) board.placements.push({ id: id(), noteId, x: 200 + i * 240, y: 200, width: 184, height: 168, pivotal: false });
-  const base: EventStormingDocument = { value, body: "", contentHash: "absent" };
-  const save = vi.fn(async (value, _hash) => { void _hash; return { ...base, value, contentHash: "a".repeat(64) }; });
-  const store = new StormDocumentStore({ read: async () => base, save }); await store.refresh();
-  const { unmount } = render(<CanvasHarness store={store} />);
-  const inputs = await screen.findAllByRole("textbox", { name: "Domain Event title" });
-  await userEvent.type(inputs[0], "Order confirmed without losing letters");
-  expect(inputs[0]).toHaveValue("Order confirmed without losing letters"); expect(inputs[1]).toHaveValue("Order confirmed without losing letters");
-  await userEvent.keyboard("{Escape}"); expect(inputs[0]).not.toHaveFocus();
-  await userEvent.keyboard("{F2}"); expect(inputs[0]).toHaveFocus();
-  await act(() => store.save()); expect(save.mock.calls.at(-1)?.[0].notes[0].title).toBe("Order confirmed without losing letters");
-  fireEvent.click(screen.getAllByRole("button", { name: "+ Details" })[0]);
-  await userEvent.type(screen.getByRole("textbox", { name: "Source references" }), ".ballet/adr/adr-046.md");
-  await act(() => store.save()); expect(store.getSnapshot().dirty).toBe(false);
-  await act(async () => { store.undo(); });
-  await waitFor(() => expect(screen.getByRole("textbox", { name: "Source references" })).toHaveValue(".ballet/adr/adr-046.m"));
-  unmount(); store.dispose();
+import { afterEach, expect, test, vi } from "vitest";
+import { EventStormingWorkspace } from "../src/orchestration/event-storming/EventStormingWorkspace";
+import { stormApi } from "../src/orchestration/event-storming/stormApi";
+import { userStoryApi } from "../src/orchestration/user-stories/userStoryApi";
+import { routeFromPath } from "../src/workspace/routing";
+import { emptyEventStormingModel, eventStormingSemanticHash } from "@shared/orchestration/eventStorming";
+import { emptyEventStormingLayout } from "@shared/orchestration/eventStormingLayout";
+import { stormId } from "@shared/orchestration/testing/eventStormingFixture";
+vi.mock("../src/orchestration/useOrchestrationInvalidations", () => ({ useOrchestrationInvalidations: () => {} }));
+vi.mock("../src/hooks/use-mobile", () => ({ useIsMobile: () => false }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+test("create an incomplete process, link a source story, read criteria, connect a branch and reopen saved content", async () => {
+  let model = emptyEventStormingModel(), layout = emptyEventStormingLayout();
+  const read = () => ({ value: structuredClone(model), contentHash: eventStormingSemanticHash(model), semanticHash: eventStormingSemanticHash(model) });
+  vi.spyOn(stormApi, "read").mockImplementation(async () => read());
+  vi.spyOn(stormApi, "readLayout").mockImplementation(async () => ({ value: structuredClone(layout), contentHash: "b".repeat(64) }));
+  vi.spyOn(stormApi, "save").mockImplementation(async (value) => { model = structuredClone(value); return read(); });
+  vi.spyOn(stormApi, "saveLayout").mockImplementation(async (value) => { layout = structuredClone(value); return { value: layout, contentHash: "b".repeat(64) }; });
+  const story = { version: 2 as const, id: stormId(99), role: "buyer", goal: "place order", benefit: "receive goods", acceptanceCriteria: [{ given: "cart exists", when: "order submitted", then: "receipt appears" }], adrIds: [], details: "Additional source description", status: "draft" as const, approvalRevision: 0 };
+  vi.spyOn(userStoryApi, "list").mockResolvedValue({ stories: [{ value: story, contentHash: "c".repeat(64), semanticHash: "d".repeat(64) }], issues: [] });
+  const updateStory = vi.spyOn(userStoryApi, "save"); const user = userEvent.setup();
+  const first = render(<Harness />); await user.click(await screen.findByRole("button", { name: "New process" }));
+  await user.clear(await screen.findByRole("textbox", { name: "Process name" })); await user.type(screen.getByRole("textbox", { name: "Process name" }), "Simple purchase");
+  await user.click(screen.getByRole("button", { name: "Event", exact: true }));
+  await user.type(await screen.findByRole("textbox", { name: "Card name" }), "Order received");
+  await user.selectOptions(screen.getByRole("combobox", { name: "Link a story" }), story.id);
+  expect(await screen.findByText("cart exists")).toBeVisible(); expect(screen.getByText("order submitted")).toBeVisible(); expect(screen.getByText("receipt appears")).toBeVisible(); expect(screen.getByText("Draft")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Save", exact: true })); await waitFor(() => expect(model.processes[0].steps[0].storyIds).toEqual([story.id]));
+  const firstStep = model.processes[0].steps[0].id;
+  await user.click(screen.getByRole("button", { name: "Command", exact: true })); await user.type(screen.getByRole("textbox", { name: "Card name" }), "Retry order");
+  await user.click(screen.getByRole("button", { name: "Add connection", exact: true }));
+  await user.selectOptions(screen.getByRole("combobox", { name: "From step" }), firstStep);
+  const lastStep = screen.getByRole("combobox", { name: "To step" }).querySelectorAll("option")[2].value;
+  await user.selectOptions(screen.getByRole("combobox", { name: "To step" }), lastStep);
+  await user.type(screen.getByRole("textbox", { name: "New connection condition" }), "Payment failed"); await user.click(screen.getByRole("button", { name: "Save connection" }));
+  await user.click(screen.getByRole("button", { name: "Save", exact: true })); await waitFor(() => expect(model.processes[0].connections[0].condition).toBe("Payment failed"));
+  expect(updateStory).not.toHaveBeenCalled(); const processId = model.processes[0].id; first.unmount();
+  render(<Harness initial={`/project/event-storming?process=${processId}&step=${firstStep}`} />);
+  expect(await screen.findByRole("textbox", { name: "Card name" })).toHaveValue("Order received");
+  expect(await screen.findByText("receipt appears")).toBeVisible();
 });
-
-function CanvasHarness({ store }: { store: StormDocumentStore }) {
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const actions = useStormActions(state.value.boards[0], store.edit, vi.fn());
-  return <div style={{ width: 1024, height: 768 }}><StormCanvas value={state.value} board={state.value.boards[0]} actions={actions} locked={false} undo={store.undo} redo={store.redo} /></div>;
+function Harness({ initial = "/project/event-storming" }: { initial?: string }) {
+  const [route, setRoute] = useState(() => routeFromPath(initial));
+  return <EventStormingWorkspace route={route} locked={false} onDirty={() => {}} navigate={(path) => setRoute(routeFromPath(path))} />;
 }

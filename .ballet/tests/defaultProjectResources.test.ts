@@ -19,16 +19,15 @@ const walk = (directory: string): string[] => readdirSync(directory).flatMap((en
 });
 
 describe("canonical default project resources", () => {
-  test("loads the exact runnable five-State 21-Action lifecycle without project-definition config copies", () => {
+  test("loads the exact runnable four-State 18-Action lifecycle without project-definition config copies", () => {
     const project = projectConfigurationV26Schema.parse(load(".ballet/project.json"));
-    expect(project.environment.states.map(({ order }) => order).sort((left, right) => left - right)).toEqual([1, 2, 3, 4, 5]);
+    expect(project.environment.states.map(({ order }) => order).sort((left, right) => left - right)).toEqual([1, 2, 3, 4]);
     // Authoring may reorder States; verify the resource inventory independently of serialized order.
-    const states = ["event-storming", "arc42", "design", "build", "deploy"].map((id) => project.environment.states.find((state) => state.id === id)!);
+    const states = ["arc42", "design", "build", "deploy"].map((id) => project.environment.states.find((state) => state.id === id)!);
     expect(states.map(({ id, name }) => [id, name])).toEqual([
-      ["event-storming", "Event Storming"], ["arc42", "Arc42"], ["design", "Design"], ["build", "Build"], ["deploy", "Deploy"]
+      ["arc42", "Arc42"], ["design", "Design"], ["build", "Build"], ["deploy", "Deploy"]
     ]);
     expect(states.map(({ actions }) => actions.map(({ id }) => id))).toEqual([
-      ["event-storming-big-picture-exploration", "event-storming-process-modeling", "event-storming-software-design"],
       ["arc42-introduction-goals", "arc42-constraints", "arc42-context-scope", "arc42-solution-strategy",
         "arc42-building-block-view", "arc42-runtime-view", "arc42-deployment-view", "arc42-crosscutting-concepts",
         "arc42-architectural-decisions", "arc42-quality-requirements", "arc42-risks-technical-debt", "arc42-glossary"],
@@ -37,7 +36,7 @@ describe("canonical default project resources", () => {
       ["deploy-to-dev", "deploy-acceptance-test"]
     ]);
     const actions = project.environment.states.flatMap(({ actions }) => actions);
-    expect(actions).toHaveLength(21);
+    expect(actions).toHaveLength(18);
     expect(actions.every(({ id, input, validation, work }) => input !== undefined
       && validation.agentId === `ballet-action-validation-${id}` && validation.skillResources.length > 0
       && work.agentId === `ballet-action-work-${id}` && work.skillResources.length > 0)).toBe(true);
@@ -79,7 +78,7 @@ describe("canonical default project resources", () => {
       expect(agent).toMatchObject({ name: id, model: "gpt-5.6-sol", model_reasoning_effort: "high" });
       return String(agent.developer_instructions);
     });
-    expect(new Set(instructions).size).toBe(42);
+    expect(new Set(instructions).size).toBe(36);
     for (const state of project.environment.states) for (const action of state.actions) {
       for (const role of ["validation", "work"] as const) {
         const id = action[role].agentId;
@@ -99,14 +98,14 @@ describe("canonical default project resources", () => {
       .toEqual([...skillIds].sort());
   });
 
-  test("uses two governance and 42 Action Codex TOML Agents with a disabled valid Critic schedule", () => {
+  test("uses two governance and 36 Action Codex TOML Agents with a disabled valid Critic schedule", () => {
     const project = projectConfigurationV26Schema.parse(load(".ballet/project.json"));
     for (const [id, effort] of [["ballet-critic-agent", "low"], ["ballet-refinement-agent", "high"]] as const) {
       const agent = parseToml(readFileSync(path.join(root, ".codex", "agents", `${id}.toml`), "utf8"));
       expect(agent).toMatchObject({ name: id, model: "gpt-5.6-sol", model_reasoning_effort: effort, sandbox_mode: "read-only" });
       expect(String(agent.developer_instructions)).toContain("## Task");
     }
-    expect(readdirSync(path.join(root, ".codex", "agents")).filter((file) => file.endsWith(".toml"))).toHaveLength(44);
+    expect(readdirSync(path.join(root, ".codex", "agents")).filter((file) => file.endsWith(".toml"))).toHaveLength(38);
     expect(project.critic.enabled).toBe(false);
     expect(project.critic.schedules).toEqual([{ id: "weekday-quality-review", kind: "weekly", timeZone: "Europe/Helsinki", localTimes: ["09:00"], weekdays: [1, 3, 5] }]);
   });

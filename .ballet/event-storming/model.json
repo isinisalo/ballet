@@ -1,0 +1,4134 @@
+{
+  "concepts": [
+    {
+      "details": "Queued-työ säilyy SQLiteen tallennettuna; jo claimattua tehtävää ei ajeta uudelleen.",
+      "id": "022ca7ef-9193-48bf-a076-89591fad5ff4",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Palauta palvelut katkoksen jälkeen"
+    },
+    {
+      "details": "Palvelin tarkistaa preimagen ja base commitin ja soveltaa sallitun muutoksen managed worktreehen.",
+      "id": "022f9769-b5c0-4221-bebf-4cbd9ab4615c",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Sovella hyväksytty muutos"
+    },
+    {
+      "details": "Lease vanheni daemonin menetyksen jälkeen; tehtävää ei requeueata.",
+      "id": "0a36fef4-cef8-4175-b656-c5ec384faf21",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Tehtävä päättyi runtime_lost-virheeseen"
+    },
+    {
+      "details": "Tarina omistaa semanttisen sisältönsä ja hyväksyntärevisionsa. Tallennus ei hyväksy; merkityksen muutos mitätöi hyväksynnän.",
+      "id": "0b4e5387-4386-4ca3-9b82-327a75d5cdd6",
+      "kind": "aggregate",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "User Story"
+    },
+    {
+      "details": "Voimassa oleva päätös ja soveltamisala tallennetaan kolmirivisenä recordina.",
+      "id": "0c385d44-c5ae-4e7b-a136-5706c1683292",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "ADR tallennettiin"
+    },
+    {
+      "details": "Agenttien määritelmät, hashit ja Skill-koostumus sidotaan samaan muuttumattomaan lähtötilaan.",
+      "id": "0c7f7560-c960-4673-8197-ce97a4676099",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Käynnistä Environment Run"
+    },
+    {
+      "details": "Checkout-token suojaa sisäistä rajaa; palvelin luo tehtävän yksikäsitteisen leasen.",
+      "id": "0d322dfa-61c9-4541-bf34-bd958eadbf1d",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Varaa jonotettu tehtävä"
+    },
+    {
+      "details": "Prosessin tavoiteltu hyöty. Palvelin omistaa jonon ja leasen; daemon omistaa Codex-prosessin. Claimattua tehtävää ei palauteta jonoon eikä tulosta hyväksytä väärällä leasella.",
+      "id": "0f672016-246a-4d80-b899-17b6073c0830",
+      "kind": "value",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Paikallinen ja kestävä suoritus"
+    },
+    {
+      "details": "Critic on read-only. Vain ihmisen hyväksymä exact revision/hash saa luoda yhden kausaalisesti sidotun Feedback-entryn.",
+      "id": "0fd41b9e-82f5-49e7-bb1a-ce41f76a2ff7",
+      "kind": "aggregate",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic-ehdotus ja päätös"
+    },
+    {
+      "details": "Vain lukeva agentti nimeää base commitin, sallitut muutokset, hashit, diffin ja vaikutusjoukon.",
+      "id": "11ca25a0-a066-4511-925e-b0c8bae79e66",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Laadi rajattu Refinement-ehdotus"
+    },
+    {
+      "details": "Checkout-token suojaa sisäistä rajaa; palvelin luo tehtävän yksikäsitteisen leasen.",
+      "id": "120df932-7ea8-499b-ba30-d36cbe2397fc",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Tehtävä claimattiin"
+    },
+    {
+      "details": "TOMLit, Skillit ja Codexin model/reasoning-valmius tarkistetaan ennen dispatchia.",
+      "id": "12f2a569-a086-4054-ab25-e4bd5a7b10de",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Tarkista resurssien valmius"
+    },
+    {
+      "details": "Postcheck palauttaa done, retry tai blocked. Vain validoitu retry käyttää semanttista retry-budjettia.",
+      "id": "146517d0-fd1f-4499-a7a2-291495196292",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Actionin tulos arvioitiin"
+    },
+    {
+      "details": "Luotettu ihminen hyväksyy täsmällisen revision ja hashin.",
+      "id": "17798111-31e0-42db-abb9-837514389bdb",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic-ehdotus hyväksyttiin"
+    },
+    {
+      "details": "Hyväksyntä appendaa täsmälleen yhden immutable Feedback-entryn alkuperäviitteineen.",
+      "id": "17e9acde-3e2e-4c8a-84f7-0aa7ed5b6eab",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic-palaute tallennettiin"
+    },
+    {
+      "details": "Prosessin käyttämä ulkoinen järjestelmä: Git ja Agent-TOML-tiedostot. Sovelluspalvelun vastuu: Action-authorointipalvelu. Nykyisen vastuun kuvaus; ei uusi arkkitehtuuripäätös. State order ja Action priority ovat positiivisia ja yksikäsitteisiä. Action omistaa kaksi nimettyä TOML-agenttia ja niiden Skill-valinnat.",
+      "id": "1b1e7486-5055-4f80-90fb-3b00040cedf6",
+      "kind": "system",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/arc42/05-building-block-view.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Git ja Agent-TOML-tiedostot"
+    },
+    {
+      "details": "Voimassa oleva päätös ja soveltamisala tallennetaan kolmirivisenä recordina.",
+      "id": "1c13c4a4-7da1-4e9f-a738-ff211c918085",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Kirjaa arkkitehtuuripäätös"
+    },
+    {
+      "details": "Väärä hash, muuttunut base commit, kielletty polku tai puuttuva vaikutus tuottaa nolla projektikirjoitusta ja nolla continuationia.",
+      "id": "1fa6399d-307b-4105-bc0b-d61b54560411",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Refinement-apply estettiin"
+    },
+    {
+      "details": "Kaikki Actionit ovat done; finalisointi sitoo terminaalisen tuloksen committiin ja säilyvään artefaktievidenssiin.",
+      "id": "21191eee-61b5-45e6-9d6d-da34a847485e",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Run Evidence muodostettiin"
+    },
+    {
+      "details": "Rooli, tavoite, hyöty, hyväksymiskriteerit ja ADR-viitteet kuuluvat tarinaan.",
+      "id": "231d1ba3-d86e-4ec5-953c-81ca945987bf",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Kirjoita User Story"
+    },
+    {
+      "details": "Työ jaetaan rajattuihin vaiheisiin; jokaisella Statella on vähintään yksi Action.",
+      "id": "234ee251-b5a9-4f13-bd84-5c2e625a7a0d",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Määrittele Environmentin Statet"
+    },
+    {
+      "details": "Palvelin tarkistaa preimagen ja base commitin ja soveltaa sallitun muutoksen managed worktreehen.",
+      "id": "2c0de0f8-766a-4200-bda6-45fc115076b2",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Refinement-commit muodostettiin"
+    },
+    {
+      "details": "Ihminen käyttää paikallista käyttöliittymää. Toimivalta ei tule providerin tulosteesta.",
+      "id": "2db34c15-5434-4e22-81a4-74c0686969e5",
+      "kind": "actor",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Runin käynnistäjä"
+    },
+    {
+      "details": "Agenttien määritelmät, hashit ja Skill-koostumus sidotaan samaan muuttumattomaan lähtötilaan.",
+      "id": "2e58932c-651e-47f8-a154-ada552103c93",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Root Snapshot jäädytettiin"
+    },
+    {
+      "details": "Prosessin käyttämä ulkoinen järjestelmä: Codex CLI ja macOS launchd. Sovelluspalvelun vastuu: Checkout-daemon ja Codex CLI. Nykyisen vastuun kuvaus; ei uusi arkkitehtuuripäätös. Palvelin omistaa jonon ja leasen; daemon omistaa Codex-prosessin. Claimattua tehtävää ei palauteta jonoon eikä tulosta hyväksytä väärällä leasella.",
+      "id": "2fd804de-fe56-45c9-9d75-684105ff72c1",
+      "kind": "system",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/arc42/05-building-block-view.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Codex CLI ja macOS launchd"
+    },
+    {
+      "details": "Ihminen antaa vain kategorian ja kommentin; palvelin lisää teknisen alkuperän.",
+      "id": "31d161b4-46f0-4cd4-a1c5-fcdb58cb3e0c",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Kirjaa ihmispalaute"
+    },
+    {
+      "details": "Prosessin tavoiteltu hyöty. State order ja Action priority ovat positiivisia ja yksikäsitteisiä. Action omistaa kaksi nimettyä TOML-agenttia ja niiden Skill-valinnat.",
+      "id": "34654214-fd6a-4933-96b6-036d72019b6d",
+      "kind": "value",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Rajattu ja todennettava työ"
+    },
+    {
+      "details": "Ajastus on oletuksena pois käytöstä; lease estää päällekkäiset esiintymät.",
+      "id": "34d69e17-928b-4421-a19e-7215469d67b7",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic-arviointi aloitettiin"
+    },
+    {
+      "details": "Jaetun Skillin kaikki vaikutukset ja vaadittu validointi ovat tarkastettavissa ennen hyväksyntää.",
+      "id": "360c1cee-30bb-4fec-b895-7777299d3b93",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Muutoksen vaikutukset tarkastettiin"
+    },
+    {
+      "details": "Prosessin käyttämä ulkoinen järjestelmä: Git-worktree ja paikalliset artefaktit. Sovelluspalvelun vastuu: Runtime ja Git-worktree-palvelu. Nykyisen vastuun kuvaus; ei uusi arkkitehtuuripäätös. Root Snapshot on muuttumaton. Myöhempi State odottaa edeltävien Actionien done-tilaa. Validation omistaa delegoinnin, postcheckin ja semanttisen retryn.",
+      "id": "3ef91417-c69d-4fda-85cc-4709a1d0cb63",
+      "kind": "system",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/arc42/05-building-block-view.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Git-worktree ja paikalliset artefaktit"
+    },
+    {
+      "details": "Asennus, autentikointi ja valittu model/reasoning todennetaan. Palvelimen health ei odota daemonin löytymistä.",
+      "id": "44dd5316-4b59-4ac7-8a7e-403ff228fb0a",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Runtimen valmius tarkistettiin"
+    },
+    {
+      "details": "Peruutus on operatiivinen terminaali eikä semanttinen retry.",
+      "id": "461dd592-012c-4666-bbdf-7137aef823a9",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Run peruutettiin"
+    },
+    {
+      "details": "Validation antaa dynaamisen promptin; Work kirjoittaa vain hallittuun worktreehen ja palauttaa completed tai needs_input.",
+      "id": "47d3e227-9eaa-4f49-bd62-edf3a5ebe947",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Work suoritettiin"
+    },
+    {
+      "details": "Palvelin omistaa jonon ja leasen; daemon omistaa Codex-prosessin. Claimattua tehtävää ei palauteta jonoon eikä tulosta hyväksytä väärällä leasella.",
+      "id": "4812c8db-35e7-4306-8760-13224e695d4e",
+      "kind": "aggregate",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Leasettu tehtävä"
+    },
+    {
+      "details": "Luotettu ihminen hyväksyy juuri tarkastetun revision ja hashit.",
+      "id": "48b2f633-a98d-48ea-b366-235c12f08ca7",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Hyväksy täsmällinen muutos"
+    },
+    {
+      "details": "Vain lukeva Critic nimeää evidenssiin perustuvan ehdotuksen kirjoittamatta projektiin tai Feedbackiin.",
+      "id": "4a36dd61-b15a-4f97-a5aa-fbeea2703b33",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Arvioi viimeisin Run Evidence"
+    },
+    {
+      "details": "Prosessin käyttämä ulkoinen järjestelmä: Git ja paikalliset Skill-tiedostot. Sovelluspalvelun vastuu: Refinement-apply-palvelu. Nykyisen vastuun kuvaus; ei uusi arkkitehtuuripäätös. Hyväksyntä sidotaan exact change-, impact- ja preimage-hasheihin. Apply tuottaa yhden commitin ja yhden uuden Runin muuttamatta parentia.",
+      "id": "4c898994-0a6d-4375-b25c-a934374b6fa4",
+      "kind": "system",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/arc42/05-building-block-view.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Git ja paikalliset Skill-tiedostot"
+    },
+    {
+      "details": "TOMLit, Skillit ja Codexin model/reasoning-valmius tarkistetaan ennen dispatchia.",
+      "id": "4e062061-7908-4663-9033-bae9304a869e",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Actionin resurssit todennettiin"
+    },
+    {
+      "details": "Uusi Action saa omat Validation- ja Work-TOMLit, ei kopioitua toisen Actionin ohjetta.",
+      "id": "51f7ba7d-de7c-4fb7-9c61-740fabb56f42",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Action ja sen agentit luotiin"
+    },
+    {
+      "details": "Ihminen peruuttaa käynnissä olevan Runin. Provider peruutetaan eikä myöhempää dispatchia tehdä.",
+      "id": "5d869ff5-5a7a-401a-8617-61568d049ba4",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Peruuta Run"
+    },
+    {
+      "details": "Ihminen käyttää paikallista käyttöliittymää. Toimivalta ei tule providerin tulosteesta.",
+      "id": "5dd34d75-46b2-40fa-b801-5c91694f76e8",
+      "kind": "actor",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Palautteen arvioija"
+    },
+    {
+      "details": "Ihminen käyttää paikallista käyttöliittymää. Toimivalta ei tule providerin tulosteesta.",
+      "id": "5e3363aa-efb5-48fc-bc6e-1523dac4df6e",
+      "kind": "actor",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Muutoksen hyväksyjä"
+    },
+    {
+      "details": "Semanttinen muutos palauttaa tarinan luonnokseksi. Esitystavan vastaavat muutokset eivät mitätöi hyväksyntää.",
+      "id": "5fdfc058-2cdb-42cb-974f-d227c1255281",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Tarinan hyväksyntä mitätöityi"
+    },
+    {
+      "details": "Precheck palauttaa done, delegate tai blocked. Done ei vaadi tarpeetonta Work-suoritusta.",
+      "id": "60dcc297-331c-469b-bb1e-f0f2f3d4fedb",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Action tarkistettiin ennen työtä"
+    },
+    {
+      "details": "Hylätty, vanhentunut tai hyväksymätön ehdotus tuottaa nolla Feedback-entryä.",
+      "id": "6125fb63-7ae6-45ee-b2c5-c7c08d861d1c",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Hylkää Critic-ehdotus"
+    },
+    {
+      "details": "Optimistinen hash estää ulkoisen editorin muutosten ylikirjoituksen; oma luonnos säilyy.",
+      "id": "62314b7b-f14c-42d3-ae0e-4a7d443563ed",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Hylkää vanhentunut tallennus"
+    },
+    {
+      "details": "Näyttää täsmällisen diffin, sallitut polut, hashit, jaetun Skillin vaikutukset sekä parent-, proposal-, approval- ja commit-viitteet.",
+      "id": "63c56006-52e4-4288-acd8-2e060add8f97",
+      "kind": "read-model",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Refinement review ja lineage"
+    },
+    {
+      "details": "URL omistaa Staten, Actionin ja agentin valinnan. Puu projisoi järjestyksen; geometria ei ole runtime-totuutta.",
+      "id": "6595c7af-5104-40f5-bd21-93860a77f1d7",
+      "kind": "read-model",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Loop Engineering -puu"
+    },
+    {
+      "details": "Sortable-lista lähettää kaikki ID:t; palvelin normalisoi järjestyksen arvoiksi 1..n.",
+      "id": "682cf189-d5cf-4fbf-bdb3-d83b1a0a3d93",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Suoritusjärjestys tallennettiin"
+    },
+    {
+      "details": "Daemonin tila, PID, uptime, last seen, virhe, aktiiviset tehtävät, Codex-valmius ja lokit. Restart estetään aktiivisen työn aikana.",
+      "id": "691bc275-4506-4dec-a900-584a3851e4be",
+      "kind": "read-model",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Runtimes-diagnostiikka"
+    },
+    {
+      "details": "Vain lukeva Critic nimeää evidenssiin perustuvan ehdotuksen kirjoittamatta projektiin tai Feedbackiin.",
+      "id": "6cef2975-04c4-4565-b09f-16f30774ce39",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic-ehdotus laadittiin"
+    },
+    {
+      "details": "Hyväksyntä appendaa täsmälleen yhden immutable Feedback-entryn alkuperäviitteineen.",
+      "id": "6d0c6346-ec46-49d6-ba80-0aaf0c6e6848",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Kirjaa hyväksytty ehdotus palautteeksi"
+    },
+    {
+      "details": "Uusi snapshot nimeää parentin, ehdotuksen, hyväksynnän ja commitin; parentin sisältö ei muutu.",
+      "id": "6d46dbe1-b5f5-46e2-9b0d-f623544662ef",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Continuation Run luotiin"
+    },
+    {
+      "details": "Sortable-lista lähettää kaikki ID:t; palvelin normalisoi järjestyksen arvoiksi 1..n.",
+      "id": "6fae5808-9886-4d2a-a71a-d087849d8abc",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Järjestä Statet ja Actionit"
+    },
+    {
+      "details": "Puuttuva, ylimääräinen, symlinkattu, väärän niminen tai duplikaattiohjeinen agentti estää preflightin.",
+      "id": "6fc2f920-23f2-45a8-a5ae-af502a16648d",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Hylkää virheellinen koostumus"
+    },
+    {
+      "details": "Mallinnus perustuu nykyisiin dokumentteihin. Ihmisen kanssa pidetyn Event Storming -työpajan evidenssiä ei ole: toimijoiden käyttämä sanasto ja prosessien rajat odottavat yhteistä katselmointia. Tämä ei ole runtime-esto.",
+      "id": "72521641-b439-4e55-b0cf-b405548f4326",
+      "kind": "hotspot",
+      "sources": [
+        ".ballet/overview.md"
+      ],
+      "title": "Prosessirajojen yhteinen katselmointi"
+    },
+    {
+      "details": "State order ja Action priority ovat positiivisia ja yksikäsitteisiä. Action omistaa kaksi nimettyä TOML-agenttia ja niiden Skill-valinnat.",
+      "id": "75ab8bc7-b9b7-43d7-8ef8-387c152d2b30",
+      "kind": "aggregate",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Environment-määritys"
+    },
+    {
+      "details": "Prosessin käyttämä ulkoinen järjestelmä: Git ja paikallinen tiedostojärjestelmä. Sovelluspalvelun vastuu: Projektidokumenttipalvelu. Nykyisen vastuun kuvaus; ei uusi arkkitehtuuripäätös. Tarina omistaa semanttisen sisältönsä ja hyväksyntärevisionsa. Tallennus ei hyväksy; merkityksen muutos mitätöi hyväksynnän.",
+      "id": "75bd6f9b-51ab-425b-a9fe-03d12c5538e3",
+      "kind": "system",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/arc42/05-building-block-view.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Git ja paikallinen tiedostojärjestelmä"
+    },
+    {
+      "details": "Puuttuva, ylimääräinen, symlinkattu, väärän niminen tai duplikaattiohjeinen agentti estää preflightin.",
+      "id": "76a1859e-7423-4d48-a2d8-2eb12189dbda",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Authorointi tai valmiustarkistus estyi"
+    },
+    {
+      "details": "Overviewn tarkoitus, tulokset, rajaus ja yhteiset vaatimukset tallennetaan yhteen Markdown-tiedostoon.",
+      "id": "7b106a6f-746d-4f5e-916c-f3155c229fbf",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Muokkaa projektikuvausta"
+    },
+    {
+      "details": "Prosessin tavoiteltu hyöty. Hyväksyntä sidotaan exact change-, impact- ja preimage-hasheihin. Apply tuottaa yhden commitin ja yhden uuden Runin muuttamatta parentia.",
+      "id": "7f343df1-5897-4fa8-8779-5ad99601c5c5",
+      "kind": "value",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Turvallinen ja auditoitava parannus"
+    },
+    {
+      "details": "Natiivin macOS-paketin SHA-256 ja attestointi tarkistetaan ennen suoran asennuksen atomista aktivointia. Homebrew omistaa oman päivityspolkunsa.",
+      "id": "81f93d10-9743-49fb-93fc-9e4eebb9ec0e",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-009-varmennettu-macos-jakelu.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027203.md"
+      ],
+      "title": "Varmenna ja aktivoi julkaisu"
+    },
+    {
+      "details": "Queued-työ säilyy SQLiteen tallennettuna; jo claimattua tehtävää ei ajeta uudelleen.",
+      "id": "8389f28c-9bc9-48f9-84ed-b61cfbd13c4d",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Jonotettu työ palautui"
+    },
+    {
+      "details": "Prosessin käyttämä ulkoinen järjestelmä: Codex CLI. Sovelluspalvelun vastuu: Critic-ajastin ja päätöspalvelu. Nykyisen vastuun kuvaus; ei uusi arkkitehtuuripäätös. Critic on read-only. Vain ihmisen hyväksymä exact revision/hash saa luoda yhden kausaalisesti sidotun Feedback-entryn.",
+      "id": "848ceaee-00d2-4a93-ad01-2355222c6c4b",
+      "kind": "system",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/arc42/05-building-block-view.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Codex CLI"
+    },
+    {
+      "details": "Luotettu ihmisidentiteetti hyväksyy tallennetun tiedosto- ja semanttisen hashin täsmällisesti.",
+      "id": "8885ea91-05d5-4338-ba9b-b3f46f3371a0",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Hyväksy tallennettu tarina"
+    },
+    {
+      "details": "Postcheck palauttaa done, retry tai blocked. Vain validoitu retry käyttää semanttista retry-budjettia.",
+      "id": "8c938689-4c24-4ed8-8439-8c3a4926907a",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Tee Validation-postcheck"
+    },
+    {
+      "details": "Prosessin tavoiteltu hyöty. Tarina omistaa semanttisen sisältönsä ja hyväksyntärevisionsa. Tallennus ei hyväksy; merkityksen muutos mitätöi hyväksynnän.",
+      "id": "8f053585-b941-46e5-a425-eaf58fd88f92",
+      "kind": "value",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Yksi ymmärrettävä projektimäärittely"
+    },
+    {
+      "details": "Exhaustion tai Validation blocked pysäyttää etenemisen ja kirjoittaa yhden blocked-Feedbackin samassa transaktiossa.",
+      "id": "904583b6-990f-41ae-b533-e8e9ec41b4e5",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Estä retry-rajan ylitys"
+    },
+    {
+      "details": "Optimistinen hash estää ulkoisen editorin muutosten ylikirjoituksen; oma luonnos säilyy.",
+      "id": "932e3055-2781-4d9e-97be-1d87c0cd7c04",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Projektisisällön tallennus hylättiin"
+    },
+    {
+      "details": "Ihminen antaa vain kategorian ja kommentin; palvelin lisää teknisen alkuperän.",
+      "id": "9647dd59-3438-4565-bb0b-6cf0b9310995",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Ihmispalaute tallennettiin"
+    },
+    {
+      "details": "Git-checkoutin juuri ja HEAD tunnistetaan. Jokaisella checkoutilla on oma identiteetti, loopback-portti ja tila.",
+      "id": "9690f5de-9d1e-480e-bda7-75789d5f48e1",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Käynnistä checkoutin palvelut"
+    },
+    {
+      "details": "Lease vanheni daemonin menetyksen jälkeen; tehtävää ei requeueata.",
+      "id": "9f71dcf2-cdf8-49ba-963f-514a3b5c9f1f",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Päätä runtimensa menettänyt tehtävä"
+    },
+    {
+      "details": "Exhaustion tai Validation blocked pysäyttää etenemisen ja kirjoittaa yhden blocked-Feedbackin samassa transaktiossa.",
+      "id": "9f76de14-e2f6-4d1d-95f9-451fdfb4ae24",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Action ja Feedback estyivät atomisesti"
+    },
+    {
+      "details": "Luotettu ihminen hyväksyy täsmällisen revision ja hashin.",
+      "id": "a410e4bc-718e-4296-9a26-d0d21f5bc602",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Hyväksy Critic-ehdotus"
+    },
+    {
+      "details": "Config ja omistetut Agent-TOMLit muuttuvat atomisesti tai eivät lainkaan. Roolien oikeuksia ei voi laajentaa TOMLissa.",
+      "id": "a51f2fb0-6180-4bed-8bf1-1f7ea415d8c7",
+      "kind": "policy",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Aktiivinen Run lukitsee authoroinnin"
+    },
+    {
+      "details": "Validation antaa dynaamisen promptin; Work kirjoittaa vain hallittuun worktreehen ja palauttaa completed tai needs_input.",
+      "id": "a5b3bfeb-359b-4cc1-bd82-97a5cb71a7bb",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Delegoi rajattu Work"
+    },
+    {
+      "details": "Work-yrityksiä sallitaan 1 + maxRetries. Korjauspalaute välitetään seuraavaan yritykseen. Provider-virhe ei ole semanttinen retry.",
+      "id": "a6832bac-f5bf-4304-a22d-ba3b3324594d",
+      "kind": "policy",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Retry → uusi rajattu Work-yritys"
+    },
+    {
+      "details": "Ajastus on oletuksena pois käytöstä; lease estää päällekkäiset esiintymät.",
+      "id": "a6cad801-8cb2-47f5-bd71-d5b80797a0f1",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Käynnistä erääntynyt Critic"
+    },
+    {
+      "details": "Rooli, tavoite, hyöty, hyväksymiskriteerit ja ADR-viitteet kuuluvat tarinaan.",
+      "id": "a6e46ead-cfd4-4580-a03f-98b3cb51017a",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Tarinaluonnos tallennettiin"
+    },
+    {
+      "details": "Daemon ajaa Codex CLI:n ja toimittaa tuloksen lease- ja fencing-rajojen läpi.",
+      "id": "a768e1f5-f597-412f-b30d-c1203902c0aa",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Providerin tulos vastaanotettiin"
+    },
+    {
+      "details": "Ihminen käyttää paikallista käyttöliittymää. Toimivalta ei tule providerin tulosteesta.",
+      "id": "a7f095cf-9156-4a13-8956-eac0109cfcb8",
+      "kind": "actor",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Työn määrittelijä"
+    },
+    {
+      "details": "Run Gate näyttää palvelimen etenemisfaktat. Terminaalinen Run Evidence projisoi commitin, artefaktit ja hyväksyntäviitteet ilman rinnakkaista tallennustotuutta.",
+      "id": "a8179a54-f7de-49a6-bd4a-76cd5e9429b1",
+      "kind": "read-model",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Run Gate ja Run Evidence"
+    },
+    {
+      "details": "Duplikaattikomento ja restart eivät luo toista Feedback-entryä. Ajastin sallii korkeintaan yhden catch-upin.",
+      "id": "a890f62f-43e9-483c-9d4c-1e35f95e53c6",
+      "kind": "policy",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Ihmisen hyväksyntä → yksi Feedback"
+    },
+    {
+      "details": "Jaetun Skillin kaikki vaikutukset ja vaadittu validointi ovat tarkastettavissa ennen hyväksyntää.",
+      "id": "ab0b3c45-f6f6-42dc-b03e-10bc91c78af3",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Tarkasta diff ja vaikutukset"
+    },
+    {
+      "details": "Asennus, autentikointi ja valittu model/reasoning todennetaan. Palvelimen health ei odota daemonin löytymistä.",
+      "id": "b5e3fe45-0681-44e3-85a5-faf785413681",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Tarkista Codex-valmius"
+    },
+    {
+      "details": "Hyväksytty tarina ei ole Run-portti. Semanttinen hash käsittää sanat, rakenteen, linkit, koodin ja järjestetyt kriteerit.",
+      "id": "b70a0c86-8cd3-4772-a3ea-5e8e63d20e50",
+      "kind": "policy",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Merkitys muuttui → hyväksyntä vanheni"
+    },
+    {
+      "details": "Työ jaetaan rajattuihin vaiheisiin; jokaisella Statella on vähintään yksi Action.",
+      "id": "bfa7a70d-0fe7-4905-8eef-3f0fd57178f4",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Statet määriteltiin"
+    },
+    {
+      "details": "Kaikki Actionit ovat done; finalisointi sitoo terminaalisen tuloksen committiin ja säilyvään artefaktievidenssiin.",
+      "id": "c322601e-8254-4887-b45e-75c2ba85209a",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Finalisoi valmis Run"
+    },
+    {
+      "details": "Overviewn tarkoitus, tulokset, rajaus ja yhteiset vaatimukset tallennetaan yhteen Markdown-tiedostoon.",
+      "id": "c6ad6caf-ac9d-4031-8d0f-93e3874b1c37",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Projektikuvaus tallennettiin"
+    },
+    {
+      "details": "Luotettu ihminen hyväksyy juuri tarkastetun revision ja hashit.",
+      "id": "c88fc915-feab-41f7-9834-6d9b52f1834d",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Refinement hyväksyttiin"
+    },
+    {
+      "details": "Uusi Action saa omat Validation- ja Work-TOMLit, ei kopioitua toisen Actionin ohjetta.",
+      "id": "c8a1a71c-acae-4288-bf53-42ab58c1885c",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Luo rajattu Action"
+    },
+    {
+      "details": "Ihminen käyttää paikallista käyttöliittymää. Toimivalta ei tule providerin tulosteesta.",
+      "id": "ca83c128-9d26-4a4c-896f-365e2b1879eb",
+      "kind": "actor",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Paikallinen operaattori"
+    },
+    {
+      "details": "Väärä arkkitehtuuri tai epäonnistunut varmennus aktivoi nolla pakettia. Julkaisu ja deploy edellyttävät erillistä täsmällistä ihmisvaltuutusta.",
+      "id": "d183b59d-fe0a-47db-9801-4c2097f01925",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-009-varmennettu-macos-jakelu.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027203.md"
+      ],
+      "title": "Varmennettu paketti aktivoitiin"
+    },
+    {
+      "details": "Git-checkoutin juuri ja HEAD tunnistetaan. Jokaisella checkoutilla on oma identiteetti, loopback-portti ja tila.",
+      "id": "d18c5f7a-ca31-40fb-a736-3d4e6b4f0502",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Palvelin ja daemon käynnistyivät"
+    },
+    {
+      "details": "Config ja kaksi TOMLia tallennetaan atomisesti täsmällisillä hasheilla.",
+      "id": "d3504513-4afc-4083-af6c-0c7021081734",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Actionin koostumus tallennettiin"
+    },
+    {
+      "details": "Prosessin tavoiteltu hyöty. Critic on read-only. Vain ihmisen hyväksymä exact revision/hash saa luoda yhden kausaalisesti sidotun Feedback-entryn.",
+      "id": "d524f702-c7de-458e-a0b1-f5c4b1aed035",
+      "kind": "value",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Harkittu parannuspalaute"
+    },
+    {
+      "details": "Prosessin tavoiteltu hyöty. Root Snapshot on muuttumaton. Myöhempi State odottaa edeltävien Actionien done-tilaa. Validation omistaa delegoinnin, postcheckin ja semanttisen retryn.",
+      "id": "d7aeddfd-7b67-488d-aafe-43d44a5bd468",
+      "kind": "value",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Todennettu ja jäljitettävä tulos"
+    },
+    {
+      "details": "Config ja kaksi TOMLia tallennetaan atomisesti täsmällisillä hasheilla.",
+      "id": "da56eac4-b164-4bd1-b1fb-ab1eb75f572b",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-042-action-specific-codex-agents.md",
+        ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md"
+      ],
+      "title": "Valitse agentin ohje ja Skillit"
+    },
+    {
+      "details": "Semanttinen muutos palauttaa tarinan luonnokseksi. Esitystavan vastaavat muutokset eivät mitätöi hyväksyntää.",
+      "id": "dd63a167-758d-45f8-8236-9eb82085bf0a",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Muuta tarinan merkitystä"
+    },
+    {
+      "details": "Vain olemassa olevan Action-agentin developer_instructions ja sallitut instruction-/Skill-polut ovat soveltamisen piirissä. Muut TOML-kentät jäävät authorointiin.",
+      "id": "e5f79a9f-7a2f-45de-95e4-c366420d40b9",
+      "kind": "policy",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Kelvollinen hyväksytty apply → uusi Run"
+    },
+    {
+      "details": "Ihminen käyttää paikallista käyttöliittymää. Toimivalta ei tule providerin tulosteesta.",
+      "id": "e72c51cc-3a6e-405f-be35-de8445371b75",
+      "kind": "actor",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Projektin omistaja"
+    },
+    {
+      "details": "Uusi snapshot nimeää parentin, ehdotuksen, hyväksynnän ja commitin; parentin sisältö ei muutu.",
+      "id": "ebd5aa83-1e35-4632-b1e9-a0f14d30ac6e",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Luo muuttumaton jatkoajo"
+    },
+    {
+      "details": "Root Snapshot on muuttumaton. Myöhempi State odottaa edeltävien Actionien done-tilaa. Validation omistaa delegoinnin, postcheckin ja semanttisen retryn.",
+      "id": "ee014148-26a7-4ce1-ad92-862269a9a42f",
+      "kind": "aggregate",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Environment Run"
+    },
+    {
+      "details": "Vain lukeva agentti nimeää base commitin, sallitut muutokset, hashit, diffin ja vaikutusjoukon.",
+      "id": "f0a720d9-a2b3-4f60-b070-3f3738a450da",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Muutosehdotus laadittiin"
+    },
+    {
+      "details": "Hylätty, vanhentunut tai hyväksymätön ehdotus tuottaa nolla Feedback-entryä.",
+      "id": "f1cd5dbd-a603-4ce8-b76e-a9747c26e06e",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic-ehdotus hylättiin"
+    },
+    {
+      "details": "Ehdotus ja ihmisen päätös näkyvät erillisinä. Feedback näyttää alkuperän; hylätty tai hyväksymätön ehdotus ei ole Feedbackia.",
+      "id": "f4206cda-7f79-4951-8be6-5bc5c0803e18",
+      "kind": "read-model",
+      "sources": [
+        ".ballet/adr/adr-040-codex-only-fixed-governance-agents.md",
+        ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md"
+      ],
+      "title": "Critic review ja Feedback Box"
+    },
+    {
+      "details": "Runtimensa menettänyt claimattu tehtävä päättyy kerran runtime_lost-virheeseen. Vanhentunut callback ei tuota toista tulosta.",
+      "id": "f44d5345-7471-44f6-8000-e2f9c9f7a43c",
+      "kind": "policy",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Leasen menetys → terminaalinen virhe"
+    },
+    {
+      "details": "Hyväksyntä sidotaan exact change-, impact- ja preimage-hasheihin. Apply tuottaa yhden commitin ja yhden uuden Runin muuttamatta parentia.",
+      "id": "f82b8f49-c1f2-4eb4-8b29-32ad8ff9cf7e",
+      "kind": "aggregate",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Refinement-ehdotus ja apply"
+    },
+    {
+      "details": "Precheck palauttaa done, delegate tai blocked. Done ei vaadi tarpeetonta Work-suoritusta.",
+      "id": "f8c3f921-3751-4062-a914-c842bae9b245",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027201.md"
+      ],
+      "title": "Tee Validation-precheck"
+    },
+    {
+      "details": "Luotettu ihmisidentiteetti hyväksyy tallennetun tiedosto- ja semanttisen hashin täsmällisesti.",
+      "id": "f9295d71-aa62-43bf-ad03-f86225679e50",
+      "kind": "event",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Tarina hyväksyttiin"
+    },
+    {
+      "details": "Overview, Event Storming, User Stories ja ADRs lukevat repositorylähteitä. Hyväksyntä näytetään vain nykyiselle semanttiselle hashille.",
+      "id": "fba97b32-b1e8-4d77-b850-44e30151d802",
+      "kind": "read-model",
+      "sources": [
+        ".ballet/adr/adr-048-four-project-views.md",
+        ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md"
+      ],
+      "title": "Projektin neljä näkymää"
+    },
+    {
+      "details": "Väärä hash, muuttunut base commit, kielletty polku tai puuttuva vaikutus tuottaa nolla projektikirjoitusta ja nolla continuationia.",
+      "id": "fbb7a2d1-4899-444c-afba-95631559eb2b",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-034-validation-led-environment-state-action-orchestration.md",
+        ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md"
+      ],
+      "title": "Hylkää vanhentunut tai kielletty apply"
+    },
+    {
+      "details": "Daemon ajaa Codex CLI:n ja toimittaa tuloksen lease- ja fencing-rajojen läpi.",
+      "id": "fd797518-322f-4e4f-b826-8dda32ee44dd",
+      "kind": "command",
+      "sources": [
+        ".ballet/adr/adr-037-checkout-local-daemon.md",
+        ".ballet/user-stories/aae46173-ec52-44d0-8fa6-e80353027202.md"
+      ],
+      "title": "Suorita provider-tehtävä"
+    }
+  ],
+  "description": "Nykyisiin projektidokumentteihin perustuva rekonstruktio, ei väite pidetystä työpajasta. Kuusi rinnakkaista prosessia etenevät vasemmalta oikealle. Ihminen omistaa tavoitteet ja hyväksynnät; runtime omistaa suorituksen.",
+  "documentation": "\n# Balletin Event Storming\n\nTämä malli rekonstruoi 6.9.2026 dokumentoidun Balletin toiminnan. Se ei väitä, että työpaja olisi pidetty tai tarinat hyväksytty. Big Picture kokoaa kuusi rinnakkaista prosessia. Prosessitaulut tarkentavat komennot ja poikkeukset; ohjelmistosuunnittelutaulut näyttävät nykyiset vastuut ja invariantit.\n\nKorttien sources-viitteet osoittavat nykyisiin User Storyihin, ADR-recordeihin ja arkkitehtuurin vastuunäkymään. Samat korttitunnisteet esiintyvät usealla taululla, mutta sijoittelu ja yhteydet kuuluvat taululle. Kehykset eivät lisää uusia alustan palveluita tai päätöksiä.\n\n[Siirtokartoitus](../arc42/ADR-CONTENT-MAP.md) nimeää ADR:istä siirretyn tiedon omistajat.\n",
+  "processes": [
+    {
+      "boundaries": [
+        {
+          "details": "Nykyiseen arkkitehtuuriin sidottu vastuumalli. Kehys kuvaa nykyistä vastuualueen rajaa, ei ehdotusta uudeksi palveluksi tai bounded context -jaoksi.",
+          "id": "6a914ee2-2808-4814-90d8-80e96ab227c0",
+          "kind": "bounded-context",
+          "sources": [],
+          "stepIds": [
+            "29716cb3-4120-4114-b74e-7102338896cf",
+            "2e49eefc-df61-4804-aaf4-4badbe2c4d3d",
+            "2f4926b7-f4c2-43dc-b474-f664b0674d81",
+            "3e52eea6-75ff-42ae-995b-fe0130815af7",
+            "5e85f887-cc1f-4917-a47f-5e93d40f282b",
+            "65abbeab-7c83-4149-82e3-90028cba21a9",
+            "73e3d85b-f112-47d1-8853-6744530ad542",
+            "819d84b6-ce73-42cd-891a-7df40cf0b472",
+            "95fc2834-bc2b-4c03-99f9-7ba81ba3af70",
+            "a301f8c7-be7a-4df2-94ff-6b6d1841fb29",
+            "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6",
+            "c567a9d5-cc9e-4dcd-abea-4390d79bfa98",
+            "d0f7fd63-8236-49c0-9b63-fb897ce425b7",
+            "d1a5dcf4-21e8-4187-beab-6b3e6a7adcb0",
+            "f2d795e6-7793-46f8-8e43-93cdbbe86f01"
+          ],
+          "title": "Refinement ja continuation"
+        }
+      ],
+      "connections": [
+        {
+          "condition": "",
+          "id": "001ed665-bac1-48b8-89ea-134429bcfd0d",
+          "kind": "flow",
+          "label": "",
+          "source": "f2d795e6-7793-46f8-8e43-93cdbbe86f01",
+          "target": "29716cb3-4120-4114-b74e-7102338896cf"
+        },
+        {
+          "condition": "",
+          "id": "0098b57f-885a-41b6-acd7-dda7667888b4",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "f2d795e6-7793-46f8-8e43-93cdbbe86f01",
+          "target": "2e49eefc-df61-4804-aaf4-4badbe2c4d3d"
+        },
+        {
+          "condition": "",
+          "id": "04fcd51b-a2e0-4809-ae40-3f422889f727",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "95fc2834-bc2b-4c03-99f9-7ba81ba3af70",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "0c8d684d-bb54-4092-8428-40e1565051b9",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "65abbeab-7c83-4149-82e3-90028cba21a9",
+          "target": "95fc2834-bc2b-4c03-99f9-7ba81ba3af70"
+        },
+        {
+          "condition": "",
+          "id": "0cde3e57-1e6f-4a9e-8d95-7603afb304d9",
+          "kind": "flow",
+          "label": "sääntö",
+          "source": "f2d795e6-7793-46f8-8e43-93cdbbe86f01",
+          "target": "d1a5dcf4-21e8-4187-beab-6b3e6a7adcb0"
+        },
+        {
+          "condition": "",
+          "id": "1320006a-e7af-4e81-a964-656694495344",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "2f4926b7-f4c2-43dc-b474-f664b0674d81",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "185b4efe-882c-472f-a902-fb80005fd022",
+          "kind": "responsibility",
+          "label": "käsittelee",
+          "source": "819d84b6-ce73-42cd-891a-7df40cf0b472",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "",
+          "id": "1f1cd46e-f515-4240-8a6a-3a3cb7ade289",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "73e3d85b-f112-47d1-8853-6744530ad542",
+          "target": "5e85f887-cc1f-4917-a47f-5e93d40f282b"
+        },
+        {
+          "condition": "",
+          "id": "2a28500f-71ea-4eb9-9340-299d76dc28e1",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "3e52eea6-75ff-42ae-995b-fe0130815af7",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "",
+          "id": "2f5e6c8b-07fa-46ac-a8f4-ac31ae3e61cf",
+          "kind": "responsibility",
+          "label": "rajoittaa",
+          "source": "d1a5dcf4-21e8-4187-beab-6b3e6a7adcb0",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "invariantin estämä polku",
+          "id": "46464469-172b-47ef-b49c-e020028b68eb",
+          "kind": "responsibility",
+          "label": "invariantin estämä polku",
+          "source": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29",
+          "target": "c567a9d5-cc9e-4dcd-abea-4390d79bfa98"
+        },
+        {
+          "condition": "",
+          "id": "4e64008a-a46e-4fe3-bb2c-c21bef8a64f4",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "2e49eefc-df61-4804-aaf4-4badbe2c4d3d",
+          "target": "29716cb3-4120-4114-b74e-7102338896cf"
+        },
+        {
+          "condition": "",
+          "id": "52780569-c712-4f23-a9d7-09d56b6f89c1",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "2e49eefc-df61-4804-aaf4-4badbe2c4d3d",
+          "target": "29716cb3-4120-4114-b74e-7102338896cf"
+        },
+        {
+          "condition": "",
+          "id": "5e98974c-0639-47df-816b-bbf576d08e51",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "73e3d85b-f112-47d1-8853-6744530ad542",
+          "target": "5e85f887-cc1f-4917-a47f-5e93d40f282b"
+        },
+        {
+          "condition": "",
+          "id": "60e13168-c98f-4001-8cb3-a62a0d25e395",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "f2d795e6-7793-46f8-8e43-93cdbbe86f01",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "70187155-d035-4ba1-9e3e-927438d49e5e",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "5e85f887-cc1f-4917-a47f-5e93d40f282b",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "74968da3-9937-499a-918c-6220c321ac37",
+          "kind": "flow",
+          "label": "",
+          "source": "95fc2834-bc2b-4c03-99f9-7ba81ba3af70",
+          "target": "5e85f887-cc1f-4917-a47f-5e93d40f282b"
+        },
+        {
+          "condition": "",
+          "id": "7bc4a7c2-df7d-46d0-afea-c97df60994cb",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "29716cb3-4120-4114-b74e-7102338896cf",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "7e61635d-df8f-462e-a983-88d9dbc1f9c7",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "29716cb3-4120-4114-b74e-7102338896cf",
+          "target": "d0f7fd63-8236-49c0-9b63-fb897ce425b7"
+        },
+        {
+          "condition": "",
+          "id": "851f0d2d-c4f7-40ed-a69a-f07fe5645360",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "65abbeab-7c83-4149-82e3-90028cba21a9",
+          "target": "95fc2834-bc2b-4c03-99f9-7ba81ba3af70"
+        },
+        {
+          "condition": "",
+          "id": "93eb12e5-677a-4714-a31c-087e4c95e139",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "2e49eefc-df61-4804-aaf4-4badbe2c4d3d",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "esto tai poikkeus",
+          "id": "9b47498b-cd6e-4b47-ae2d-c6d668387bd8",
+          "kind": "flow",
+          "label": "esto tai poikkeus",
+          "source": "d1a5dcf4-21e8-4187-beab-6b3e6a7adcb0",
+          "target": "eb1ca2a9-6a8a-4c45-a02d-eae3647b10b0"
+        },
+        {
+          "condition": "",
+          "id": "b18724bb-90ed-42ff-b72c-1579786c23dd",
+          "kind": "flow",
+          "label": "",
+          "source": "29716cb3-4120-4114-b74e-7102338896cf",
+          "target": "2f4926b7-f4c2-43dc-b474-f664b0674d81"
+        },
+        {
+          "condition": "",
+          "id": "b244bb4e-ef5f-4943-8042-9a0d10417e17",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "3e52eea6-75ff-42ae-995b-fe0130815af7",
+          "target": "f2d795e6-7793-46f8-8e43-93cdbbe86f01"
+        },
+        {
+          "condition": "",
+          "id": "c0b21039-d50f-4df5-87c5-bec2e64eb20f",
+          "kind": "responsibility",
+          "label": "projisoidaan",
+          "source": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "c641568f-d03f-45af-b368-72dc4cd6735c",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "3e52eea6-75ff-42ae-995b-fe0130815af7",
+          "target": "f2d795e6-7793-46f8-8e43-93cdbbe86f01"
+        },
+        {
+          "condition": "",
+          "id": "dcdd29e0-ff4a-4d63-bcae-a19eaeffbb18",
+          "kind": "support",
+          "label": "näytetään",
+          "source": "2f4926b7-f4c2-43dc-b474-f664b0674d81",
+          "target": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6"
+        },
+        {
+          "condition": "",
+          "id": "dd20356a-1017-4473-a6e5-e5e07ada7042",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "eb1ca2a9-6a8a-4c45-a02d-eae3647b10b0",
+          "target": "c567a9d5-cc9e-4dcd-abea-4390d79bfa98"
+        },
+        {
+          "condition": "",
+          "id": "df9a5358-da65-4e09-b2fe-e5aa9d1f4040",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "d0f7fd63-8236-49c0-9b63-fb897ce425b7",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "",
+          "id": "e2f6b371-5b07-41a1-988b-8df6e8e48383",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "d0f7fd63-8236-49c0-9b63-fb897ce425b7",
+          "target": "2f4926b7-f4c2-43dc-b474-f664b0674d81"
+        },
+        {
+          "condition": "",
+          "id": "e3ed2aca-c6a3-44af-b820-660fbdd9ed80",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "65abbeab-7c83-4149-82e3-90028cba21a9",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "",
+          "id": "e7585954-acb5-4720-8346-ab9782168e35",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "5e85f887-cc1f-4917-a47f-5e93d40f282b",
+          "target": "3e52eea6-75ff-42ae-995b-fe0130815af7"
+        },
+        {
+          "condition": "",
+          "id": "eaa0cbc1-e37b-45a5-871b-8457eb062faf",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "d0f7fd63-8236-49c0-9b63-fb897ce425b7",
+          "target": "2f4926b7-f4c2-43dc-b474-f664b0674d81"
+        },
+        {
+          "condition": "",
+          "id": "f23c157d-4d63-4b7c-bf7b-3d54ee22b993",
+          "kind": "flow",
+          "label": "",
+          "source": "5e85f887-cc1f-4917-a47f-5e93d40f282b",
+          "target": "f2d795e6-7793-46f8-8e43-93cdbbe86f01"
+        },
+        {
+          "condition": "",
+          "id": "f61c3eb2-d7e4-44d2-b5fa-a9cef6819e1b",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "73e3d85b-f112-47d1-8853-6744530ad542",
+          "target": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29"
+        },
+        {
+          "condition": "",
+          "id": "f8e3728f-d5b8-4b76-b43d-81ca045da09e",
+          "kind": "flow",
+          "label": "aloittaa",
+          "source": "f3b86247-be71-442f-9bcb-45028ad605ab",
+          "target": "65abbeab-7c83-4149-82e3-90028cba21a9"
+        },
+        {
+          "condition": "",
+          "id": "fab93ebd-5284-4d0f-9d4b-74377c9ff15e",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "95fc2834-bc2b-4c03-99f9-7ba81ba3af70",
+          "target": "73e3d85b-f112-47d1-8853-6744530ad542"
+        }
+      ],
+      "description": "Dokumentoidun prosessin komennot, tapahtumat, toimija, säännöt ja poikkeuspolut. Yhteydet kuvaavat ehtoja, eivät alustan uusia kontrollikomentoja.",
+      "id": "3d075703-a410-4d75-b98f-942f9755e9a8",
+      "sources": [],
+      "steps": [
+        {
+          "conceptId": "2c0de0f8-766a-4200-bda6-45fc115076b2",
+          "id": "29716cb3-4120-4114-b74e-7102338896cf",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "022f9769-b5c0-4221-bebf-4cbd9ab4615c",
+          "id": "2e49eefc-df61-4804-aaf4-4badbe2c4d3d",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "6d46dbe1-b5f5-46e2-9b0d-f623544662ef",
+          "id": "2f4926b7-f4c2-43dc-b474-f664b0674d81",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "48b2f633-a98d-48ea-b366-235c12f08ca7",
+          "id": "3e52eea6-75ff-42ae-995b-fe0130815af7",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "360c1cee-30bb-4fec-b895-7777299d3b93",
+          "id": "5e85f887-cc1f-4917-a47f-5e93d40f282b",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "11ca25a0-a066-4511-925e-b0c8bae79e66",
+          "id": "65abbeab-7c83-4149-82e3-90028cba21a9",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "ab0b3c45-f6f6-42dc-b03e-10bc91c78af3",
+          "id": "73e3d85b-f112-47d1-8853-6744530ad542",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "7f343df1-5897-4fa8-8779-5ad99601c5c5",
+          "id": "7f361f22-ea12-4884-ae4d-d91312b805ff",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "4c898994-0a6d-4375-b25c-a934374b6fa4",
+          "id": "819d84b6-ce73-42cd-891a-7df40cf0b472",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "f0a720d9-a2b3-4f60-b070-3f3738a450da",
+          "id": "95fc2834-bc2b-4c03-99f9-7ba81ba3af70",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "f82b8f49-c1f2-4eb4-8b29-32ad8ff9cf7e",
+          "id": "a301f8c7-be7a-4df2-94ff-6b6d1841fb29",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "63c56006-52e4-4288-acd8-2e060add8f97",
+          "id": "b029fca5-ae6d-46cf-9f6d-cfc6a18f12d6",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "1fa6399d-307b-4105-bc0b-d61b54560411",
+          "id": "c567a9d5-cc9e-4dcd-abea-4390d79bfa98",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "ebd5aa83-1e35-4632-b1e9-a0f14d30ac6e",
+          "id": "d0f7fd63-8236-49c0-9b63-fb897ce425b7",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "e5f79a9f-7a2f-45de-95e4-c366420d40b9",
+          "id": "d1a5dcf4-21e8-4187-beab-6b3e6a7adcb0",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "fbb7a2d1-4899-444c-afba-95631559eb2b",
+          "id": "eb1ca2a9-6a8a-4c45-a02d-eae3647b10b0",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "c88fc915-feab-41f7-9834-6d9b52f1834d",
+          "id": "f2d795e6-7793-46f8-8e43-93cdbbe86f01",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        },
+        {
+          "conceptId": "5e3363aa-efb5-48fc-bc6e-1523dac4df6e",
+          "id": "f3b86247-be71-442f-9bcb-45028ad605ab",
+          "sources": [],
+          "storyIds": [
+            "cc322abc-96e2-41ef-93f8-1b5aba633995"
+          ]
+        }
+      ],
+      "storyIds": [
+        "cc322abc-96e2-41ef-93f8-1b5aba633995"
+      ],
+      "title": "6. Refinement ja continuation"
+    },
+    {
+      "boundaries": [
+        {
+          "details": "Nykyiseen arkkitehtuuriin sidottu vastuumalli. Kehys kuvaa nykyistä vastuualueen rajaa, ei ehdotusta uudeksi palveluksi tai bounded context -jaoksi.",
+          "id": "7937be8a-390e-4f3a-b655-712fc829c8dc",
+          "kind": "bounded-context",
+          "sources": [],
+          "stepIds": [
+            "0e3cd332-ef16-44cc-b50d-943db94d47ce",
+            "20689832-caf5-4609-b442-f989f2d86162",
+            "2fa38f01-27e8-4287-a34d-08dddc8903f4",
+            "37a0bfdf-ec6a-4f40-adf5-91969e18af0b",
+            "4487c01b-d37e-484e-b166-bcea8920a74e",
+            "4c36c070-5075-4aca-84d5-71b6e94cc71f",
+            "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+            "72677c49-07f4-443c-ae5f-241aab91fbce",
+            "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+            "7bb247ed-e568-4110-9707-8e91fc310761",
+            "911f81f6-eb82-43f8-832c-6a290376b07c",
+            "a81e702a-e01b-4d19-beda-2ca69be5cbac",
+            "abe5ac1a-8469-44f1-98b9-bd3000a76676",
+            "e10e8f50-3ffc-42ec-9b4b-b9f344607a14",
+            "f4c14313-201f-498b-83c5-d9dd3b0519a7"
+          ],
+          "title": "Runtime ja finalisointi"
+        }
+      ],
+      "connections": [
+        {
+          "condition": "",
+          "id": "0a6b0c6e-8232-4c1c-a16a-3fe34a567db7",
+          "kind": "flow",
+          "label": "aloittaa",
+          "source": "ee0c2228-639e-4619-ae75-b2188cc0fa3f",
+          "target": "7bb247ed-e568-4110-9707-8e91fc310761"
+        },
+        {
+          "condition": "",
+          "id": "1a70c717-6005-4e8b-b5d2-317fa5add0c9",
+          "kind": "flow",
+          "label": "erillinen elinkaaripolku",
+          "source": "b5fad18b-f2b8-46a6-8454-0bbccc537997",
+          "target": "c8dd3556-a51e-4aca-bb83-e29e8045adb9"
+        },
+        {
+          "condition": "",
+          "id": "1c2c3f2e-cab0-4d9e-b64c-296dd8b688e8",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "abe5ac1a-8469-44f1-98b9-bd3000a76676",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        },
+        {
+          "condition": "",
+          "id": "272f22ec-ae37-47bc-b83d-68e8ba3dff41",
+          "kind": "responsibility",
+          "label": "projisoidaan",
+          "source": "20689832-caf5-4609-b442-f989f2d86162",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "",
+          "id": "2e2e8092-3049-4339-ab30-1fe07b6959bd",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "7bb247ed-e568-4110-9707-8e91fc310761",
+          "target": "4c36c070-5075-4aca-84d5-71b6e94cc71f"
+        },
+        {
+          "condition": "",
+          "id": "2e62705d-be2f-4ba6-bca5-121cc11b5bd1",
+          "kind": "flow",
+          "label": "",
+          "source": "f4c14313-201f-498b-83c5-d9dd3b0519a7",
+          "target": "723b6b3c-1df2-41eb-bfac-02ae3579dc83"
+        },
+        {
+          "condition": "esto tai poikkeus",
+          "id": "390a3f3d-2e7c-4bdc-954a-4d769e46bdfc",
+          "kind": "flow",
+          "label": "esto tai poikkeus",
+          "source": "0e3cd332-ef16-44cc-b50d-943db94d47ce",
+          "target": "a18ae090-07b5-4394-9085-69be571d584f"
+        },
+        {
+          "condition": "blocked: ei Workia",
+          "id": "45f69d80-5045-48ea-a90a-60306d94a805",
+          "kind": "flow",
+          "label": "blocked: ei Workia",
+          "source": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+          "target": "a18ae090-07b5-4394-9085-69be571d584f"
+        },
+        {
+          "condition": "",
+          "id": "4b948dce-2595-479d-8975-82a25605c88d",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "4487c01b-d37e-484e-b166-bcea8920a74e",
+          "target": "e10e8f50-3ffc-42ec-9b4b-b9f344607a14"
+        },
+        {
+          "condition": "",
+          "id": "4dd56bd7-98bd-4d9d-a0ea-4e3e35e7dcab",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "invariantin estämä polku",
+          "id": "541089f4-bfbd-4746-9bfc-d6303a911c7e",
+          "kind": "responsibility",
+          "label": "invariantin estämä polku",
+          "source": "20689832-caf5-4609-b442-f989f2d86162",
+          "target": "72677c49-07f4-443c-ae5f-241aab91fbce"
+        },
+        {
+          "condition": "",
+          "id": "564c8d2f-f39b-41d3-9024-4ddde5a038bf",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "4487c01b-d37e-484e-b166-bcea8920a74e",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        },
+        {
+          "condition": "",
+          "id": "596754e6-7ce7-414c-b706-fef09ee2df6b",
+          "kind": "flow",
+          "label": "sääntö",
+          "source": "f4c14313-201f-498b-83c5-d9dd3b0519a7",
+          "target": "0e3cd332-ef16-44cc-b50d-943db94d47ce"
+        },
+        {
+          "condition": "",
+          "id": "5a3c1b66-54b6-4b20-9248-1089a77a093f",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "abe5ac1a-8469-44f1-98b9-bd3000a76676",
+          "target": "f4c14313-201f-498b-83c5-d9dd3b0519a7"
+        },
+        {
+          "condition": "retry: budjettia jäljellä",
+          "id": "5cf0bb9b-c09e-4c4a-a357-74b44104f505",
+          "kind": "flow",
+          "label": "retry: budjettia jäljellä",
+          "source": "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+          "target": "abe5ac1a-8469-44f1-98b9-bd3000a76676"
+        },
+        {
+          "condition": "",
+          "id": "69c92f41-cfe2-40ae-b8e2-74fad41439bc",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "f4c14313-201f-498b-83c5-d9dd3b0519a7",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "",
+          "id": "6e8dd5fc-5924-4a22-9178-fbe926222312",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "911f81f6-eb82-43f8-832c-6a290376b07c",
+          "target": "723b6b3c-1df2-41eb-bfac-02ae3579dc83"
+        },
+        {
+          "condition": "",
+          "id": "78fbf359-e9f5-4fa5-8ef3-656daa1d582e",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "7bb247ed-e568-4110-9707-8e91fc310761",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        },
+        {
+          "condition": "",
+          "id": "7da9aac5-9983-4386-9bdf-ef3dda6c3740",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "4487c01b-d37e-484e-b166-bcea8920a74e",
+          "target": "e10e8f50-3ffc-42ec-9b4b-b9f344607a14"
+        },
+        {
+          "condition": "",
+          "id": "83440366-a068-4630-904a-8b92ed7a2d6f",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "a18ae090-07b5-4394-9085-69be571d584f",
+          "target": "72677c49-07f4-443c-ae5f-241aab91fbce"
+        },
+        {
+          "condition": "blocked tai retry-budjetti loppui",
+          "id": "84ebb4eb-12b5-4705-8b5e-2f813f22e3b4",
+          "kind": "flow",
+          "label": "blocked tai retry-budjetti loppui",
+          "source": "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+          "target": "a18ae090-07b5-4394-9085-69be571d584f"
+        },
+        {
+          "condition": "",
+          "id": "859d8cb4-48d1-411d-9596-9d9254a2f722",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "f4c14313-201f-498b-83c5-d9dd3b0519a7",
+          "target": "911f81f6-eb82-43f8-832c-6a290376b07c"
+        },
+        {
+          "condition": "",
+          "id": "8795629f-9198-4179-9260-787f702bcf13",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+          "target": "4487c01b-d37e-484e-b166-bcea8920a74e"
+        },
+        {
+          "condition": "",
+          "id": "88e65e8b-0d22-44fa-a0d5-c5835ab0f400",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "911f81f6-eb82-43f8-832c-6a290376b07c",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        },
+        {
+          "condition": "",
+          "id": "898b93dc-c3d5-45cf-a604-dd973ca43d39",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+          "target": "abe5ac1a-8469-44f1-98b9-bd3000a76676"
+        },
+        {
+          "condition": "",
+          "id": "8eecb0b7-4840-4c99-ae15-adf13eb2d6b6",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "4c36c070-5075-4aca-84d5-71b6e94cc71f",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "",
+          "id": "9be215c9-1d99-4d71-a599-be418f8e0ef8",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "2fa38f01-27e8-4287-a34d-08dddc8903f4",
+          "target": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c"
+        },
+        {
+          "condition": "",
+          "id": "a7f0e0ef-f53d-4c30-921f-f7a4d5d5f460",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "abe5ac1a-8469-44f1-98b9-bd3000a76676",
+          "target": "f4c14313-201f-498b-83c5-d9dd3b0519a7"
+        },
+        {
+          "condition": "",
+          "id": "a9673fef-a8f5-4be0-a403-2a84e879649c",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "2fa38f01-27e8-4287-a34d-08dddc8903f4",
+          "target": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c"
+        },
+        {
+          "condition": "",
+          "id": "aa5b8a22-b222-42f9-ab4e-a29d9aab154a",
+          "kind": "flow",
+          "label": "",
+          "source": "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+          "target": "e10e8f50-3ffc-42ec-9b4b-b9f344607a14"
+        },
+        {
+          "condition": "",
+          "id": "ab3792d8-cf81-49c5-9791-1eec68fb6f7c",
+          "kind": "support",
+          "label": "näytetään",
+          "source": "e10e8f50-3ffc-42ec-9b4b-b9f344607a14",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "",
+          "id": "b9717059-679f-4a8f-b375-f39a6c95b9d9",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "911f81f6-eb82-43f8-832c-6a290376b07c",
+          "target": "723b6b3c-1df2-41eb-bfac-02ae3579dc83"
+        },
+        {
+          "condition": "",
+          "id": "b9826c96-b130-4439-afbb-dadaf0f7752c",
+          "kind": "flow",
+          "label": "",
+          "source": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+          "target": "f4c14313-201f-498b-83c5-d9dd3b0519a7"
+        },
+        {
+          "condition": "kelvollinen komento",
+          "id": "bcc01960-a6f7-43fe-8657-c648033ee7e2",
+          "kind": "flow",
+          "label": "kelvollinen komento",
+          "source": "b5fad18b-f2b8-46a6-8454-0bbccc537997",
+          "target": "c8dd3556-a51e-4aca-bb83-e29e8045adb9"
+        },
+        {
+          "condition": "",
+          "id": "c8c29591-16af-4c52-88ef-414739ae84b5",
+          "kind": "responsibility",
+          "label": "rajoittaa",
+          "source": "0e3cd332-ef16-44cc-b50d-943db94d47ce",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        },
+        {
+          "condition": "",
+          "id": "d164e0e0-6f46-411a-a48c-7c3edf5488b9",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "4c36c070-5075-4aca-84d5-71b6e94cc71f",
+          "target": "2fa38f01-27e8-4287-a34d-08dddc8903f4"
+        },
+        {
+          "condition": "",
+          "id": "d39fa55c-a3bb-4b28-839b-302245d4a8f7",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "7bb247ed-e568-4110-9707-8e91fc310761",
+          "target": "4c36c070-5075-4aca-84d5-71b6e94cc71f"
+        },
+        {
+          "condition": "",
+          "id": "db98c639-e8a9-4294-89f2-568e3cd0d724",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "",
+          "id": "dd9cf138-7502-4199-be4a-46ec65917b4a",
+          "kind": "flow",
+          "label": "",
+          "source": "4c36c070-5075-4aca-84d5-71b6e94cc71f",
+          "target": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c"
+        },
+        {
+          "condition": "",
+          "id": "e737b416-64b0-4999-ac04-66dcd1a04a9d",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "2fa38f01-27e8-4287-a34d-08dddc8903f4",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        },
+        {
+          "condition": "",
+          "id": "f2739d5d-0d3c-4328-916d-88b48dd34da3",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "e10e8f50-3ffc-42ec-9b4b-b9f344607a14",
+          "target": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b"
+        },
+        {
+          "condition": "done: kaikki Actionit valmiit",
+          "id": "fb082573-ccf7-434c-b9be-b630d59ea166",
+          "kind": "flow",
+          "label": "done: kaikki Actionit valmiit",
+          "source": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+          "target": "4487c01b-d37e-484e-b166-bcea8920a74e"
+        },
+        {
+          "condition": "",
+          "id": "fdbcd402-d088-41c2-9bca-75bc75ce4fd1",
+          "kind": "responsibility",
+          "label": "käsittelee",
+          "source": "a81e702a-e01b-4d19-beda-2ca69be5cbac",
+          "target": "20689832-caf5-4609-b442-f989f2d86162"
+        }
+      ],
+      "description": "Dokumentoidun prosessin komennot, tapahtumat, toimija, säännöt ja poikkeuspolut. Yhteydet kuvaavat ehtoja, eivät alustan uusia kontrollikomentoja.",
+      "id": "598ff734-ac7f-47f6-bd92-2fc73cdf6e88",
+      "sources": [],
+      "steps": [
+        {
+          "conceptId": "a6832bac-f5bf-4304-a22d-ba3b3324594d",
+          "id": "0e3cd332-ef16-44cc-b50d-943db94d47ce",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "ee014148-26a7-4ce1-ad92-862269a9a42f",
+          "id": "20689832-caf5-4609-b442-f989f2d86162",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "f8c3f921-3751-4062-a914-c842bae9b245",
+          "id": "2fa38f01-27e8-4287-a34d-08dddc8903f4",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "a8179a54-f7de-49a6-bd4a-76cd5e9429b1",
+          "id": "37a0bfdf-ec6a-4f40-adf5-91969e18af0b",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "c322601e-8254-4887-b45e-75c2ba85209a",
+          "id": "4487c01b-d37e-484e-b166-bcea8920a74e",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "2e58932c-651e-47f8-a154-ada552103c93",
+          "id": "4c36c070-5075-4aca-84d5-71b6e94cc71f",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "146517d0-fd1f-4499-a7a2-291495196292",
+          "id": "723b6b3c-1df2-41eb-bfac-02ae3579dc83",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "9f76de14-e2f6-4d1d-95f9-451fdfb4ae24",
+          "id": "72677c49-07f4-443c-ae5f-241aab91fbce",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "60dcc297-331c-469b-bb1e-f0f2f3d4fedb",
+          "id": "735f27f1-ae5b-4b87-9ad8-d3acc21a469c",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "0c7f7560-c960-4673-8197-ce97a4676099",
+          "id": "7bb247ed-e568-4110-9707-8e91fc310761",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "8c938689-4c24-4ed8-8439-8c3a4926907a",
+          "id": "911f81f6-eb82-43f8-832c-6a290376b07c",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "d7aeddfd-7b67-488d-aafe-43d44a5bd468",
+          "id": "9e7b4804-d77c-40b7-b2bf-492e38ff6ae1",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "904583b6-990f-41ae-b533-e8e9ec41b4e5",
+          "id": "a18ae090-07b5-4394-9085-69be571d584f",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "3ef91417-c69d-4fda-85cc-4709a1d0cb63",
+          "id": "a81e702a-e01b-4d19-beda-2ca69be5cbac",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "a5b3bfeb-359b-4cc1-bd82-97a5cb71a7bb",
+          "id": "abe5ac1a-8469-44f1-98b9-bd3000a76676",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "5d869ff5-5a7a-401a-8617-61568d049ba4",
+          "id": "b5fad18b-f2b8-46a6-8454-0bbccc537997",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "461dd592-012c-4666-bbdf-7137aef823a9",
+          "id": "c8dd3556-a51e-4aca-bb83-e29e8045adb9",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "21191eee-61b5-45e6-9d6d-da34a847485e",
+          "id": "e10e8f50-3ffc-42ec-9b4b-b9f344607a14",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "2db34c15-5434-4e22-81a4-74c0686969e5",
+          "id": "ee0c2228-639e-4619-ae75-b2188cc0fa3f",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        },
+        {
+          "conceptId": "47d3e227-9eaa-4f49-bd62-edf3a5ebe947",
+          "id": "f4c14313-201f-498b-83c5-d9dd3b0519a7",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027201"
+          ]
+        }
+      ],
+      "storyIds": [
+        "aae46173-ec52-44d0-8fa6-e80353027201"
+      ],
+      "title": "3. Validation, Work ja Run Evidence"
+    },
+    {
+      "boundaries": [
+        {
+          "details": "Nykyiseen arkkitehtuuriin sidottu vastuumalli. Kehys kuvaa nykyistä vastuualueen rajaa, ei ehdotusta uudeksi palveluksi tai bounded context -jaoksi.",
+          "id": "27ec7530-b4f4-43b6-89a9-fc881c9548db",
+          "kind": "bounded-context",
+          "sources": [],
+          "stepIds": [
+            "1c4bcf03-d9b5-470a-9c9d-1c77b3702755",
+            "250209bb-4e6c-4be7-b7d0-3d9640ef9168",
+            "5e38d6a8-04ad-4987-9664-26c444be3f06",
+            "647e107c-e20a-46df-ae05-838a8ee231ac",
+            "66ecbc69-b221-4ef7-bdcd-beb6db9dce84",
+            "954f44d6-59ed-4822-b015-c9e8c29fdc73",
+            "9a15417b-b8e3-47a0-8f2b-2230e8abd43d",
+            "a4256f72-7158-495b-9c79-8b9cf4d1337f",
+            "ac51cf79-6c93-4624-b5fb-dd1c787a79f3",
+            "b43e0a55-39e1-422d-8441-50c81c019e91",
+            "bd85a76b-5976-452d-afdf-2069ff1aaa1a",
+            "bde5fa7f-75ac-402a-9e62-35b8572c5ee3",
+            "c791763b-eb4f-4ad1-a668-1389aae1f351",
+            "d898e857-893c-4750-afde-edce195c0600",
+            "e175d159-9f6b-431f-b25e-4a61af720813"
+          ],
+          "title": "Jono, lease ja daemon"
+        }
+      ],
+      "connections": [
+        {
+          "condition": "",
+          "id": "03b6cabf-972a-41fa-9725-81c727b48b6f",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "647e107c-e20a-46df-ae05-838a8ee231ac",
+          "target": "66ecbc69-b221-4ef7-bdcd-beb6db9dce84"
+        },
+        {
+          "condition": "",
+          "id": "06d905b6-42f7-4b75-80af-981e3cfba880",
+          "kind": "responsibility",
+          "label": "käsittelee",
+          "source": "d898e857-893c-4750-afde-edce195c0600",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "",
+          "id": "099aa637-bb9b-452a-9a4a-6a101bb6f7e0",
+          "kind": "flow",
+          "label": "erillinen elinkaaripolku",
+          "source": "cdbdd49d-bfc9-4126-8b59-f6e7d1d7e756",
+          "target": "0f540cfc-4c07-460a-8e57-dc8bcbe5c0e2"
+        },
+        {
+          "condition": "",
+          "id": "0f4604d5-5c54-4da6-be83-38293b5a682b",
+          "kind": "responsibility",
+          "label": "projisoidaan",
+          "source": "5e38d6a8-04ad-4987-9664-26c444be3f06",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        },
+        {
+          "condition": "",
+          "id": "11b4f168-e173-4105-be53-619bbc4f94ce",
+          "kind": "flow",
+          "label": "aloittaa",
+          "source": "1fb6c41d-e925-4cf2-9785-18b9ad7e04df",
+          "target": "a4256f72-7158-495b-9c79-8b9cf4d1337f"
+        },
+        {
+          "condition": "",
+          "id": "12292df5-c689-4068-80be-c1555395e428",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "bde5fa7f-75ac-402a-9e62-35b8572c5ee3",
+          "target": "647e107c-e20a-46df-ae05-838a8ee231ac"
+        },
+        {
+          "condition": "",
+          "id": "157e0236-074a-498c-8ca3-e9425cfef302",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "954f44d6-59ed-4822-b015-c9e8c29fdc73",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        },
+        {
+          "condition": "",
+          "id": "18057191-0651-452e-ba49-ec50699a6d53",
+          "kind": "flow",
+          "label": "sääntö",
+          "source": "647e107c-e20a-46df-ae05-838a8ee231ac",
+          "target": "bd85a76b-5976-452d-afdf-2069ff1aaa1a"
+        },
+        {
+          "condition": "",
+          "id": "1c7edd17-fd7b-4cd2-a0db-8afbcfcad2a8",
+          "kind": "flow",
+          "label": "",
+          "source": "e175d159-9f6b-431f-b25e-4a61af720813",
+          "target": "954f44d6-59ed-4822-b015-c9e8c29fdc73"
+        },
+        {
+          "condition": "",
+          "id": "1e7ed9aa-a2ed-450b-b19f-65415fd1ca1c",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "bde5fa7f-75ac-402a-9e62-35b8572c5ee3",
+          "target": "647e107c-e20a-46df-ae05-838a8ee231ac"
+        },
+        {
+          "condition": "",
+          "id": "261cafa9-d702-4bf5-95c1-dd5c3b7db059",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "250209bb-4e6c-4be7-b7d0-3d9640ef9168",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "",
+          "id": "37826cd5-cf14-49fd-bfec-8e3bbe5d39ee",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "647e107c-e20a-46df-ae05-838a8ee231ac",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        },
+        {
+          "condition": "",
+          "id": "40bd401b-5139-42a0-bbd0-a4b458a3bf32",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "79046570-69ec-441e-ab70-bf3f4e78c053",
+          "target": "1c4bcf03-d9b5-470a-9c9d-1c77b3702755"
+        },
+        {
+          "condition": "",
+          "id": "51b56309-9689-4b74-8cef-30f94f3d7ef5",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "c791763b-eb4f-4ad1-a668-1389aae1f351",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "",
+          "id": "739554a5-25b8-4fe7-9366-f81e144614e1",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "66ecbc69-b221-4ef7-bdcd-beb6db9dce84",
+          "target": "b43e0a55-39e1-422d-8441-50c81c019e91"
+        },
+        {
+          "condition": "",
+          "id": "74a00e9b-fc0f-4a50-a8ee-a383c1f273ff",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "a4256f72-7158-495b-9c79-8b9cf4d1337f",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "",
+          "id": "7b12d581-51f4-41d8-8d93-97921567b02e",
+          "kind": "responsibility",
+          "label": "rajoittaa",
+          "source": "bd85a76b-5976-452d-afdf-2069ff1aaa1a",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "kelvollinen komento",
+          "id": "7c02e1a4-8a99-46f4-ab87-b8e0b64f8870",
+          "kind": "flow",
+          "label": "kelvollinen komento",
+          "source": "cdbdd49d-bfc9-4126-8b59-f6e7d1d7e756",
+          "target": "0f540cfc-4c07-460a-8e57-dc8bcbe5c0e2"
+        },
+        {
+          "condition": "",
+          "id": "963d20f4-ca78-4408-9c94-f700e67af7bc",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "a4256f72-7158-495b-9c79-8b9cf4d1337f",
+          "target": "e175d159-9f6b-431f-b25e-4a61af720813"
+        },
+        {
+          "condition": "",
+          "id": "98f9ea31-cfe0-4e07-afa9-e878e2ea3134",
+          "kind": "flow",
+          "label": "",
+          "source": "954f44d6-59ed-4822-b015-c9e8c29fdc73",
+          "target": "647e107c-e20a-46df-ae05-838a8ee231ac"
+        },
+        {
+          "condition": "",
+          "id": "9a082ae7-4ca3-4300-bb03-3f6fbf8df857",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "66ecbc69-b221-4ef7-bdcd-beb6db9dce84",
+          "target": "b43e0a55-39e1-422d-8441-50c81c019e91"
+        },
+        {
+          "condition": "invariantin estämä polku",
+          "id": "9f0ee28f-9f22-4b7e-b934-dc0e37369bfa",
+          "kind": "responsibility",
+          "label": "invariantin estämä polku",
+          "source": "5e38d6a8-04ad-4987-9664-26c444be3f06",
+          "target": "1c4bcf03-d9b5-470a-9c9d-1c77b3702755"
+        },
+        {
+          "condition": "",
+          "id": "a6128fe7-4b58-4cb9-b755-d9e1def5558f",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "250209bb-4e6c-4be7-b7d0-3d9640ef9168",
+          "target": "954f44d6-59ed-4822-b015-c9e8c29fdc73"
+        },
+        {
+          "condition": "",
+          "id": "adb1b6b3-5867-4b6f-b96d-c73d20b23117",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "250209bb-4e6c-4be7-b7d0-3d9640ef9168",
+          "target": "954f44d6-59ed-4822-b015-c9e8c29fdc73"
+        },
+        {
+          "condition": "",
+          "id": "c3705a96-7dd3-420f-9c20-115a7793e9c4",
+          "kind": "flow",
+          "label": "",
+          "source": "647e107c-e20a-46df-ae05-838a8ee231ac",
+          "target": "b43e0a55-39e1-422d-8441-50c81c019e91"
+        },
+        {
+          "condition": "",
+          "id": "d009e1e2-8b6e-41d7-b3ba-8b954dc9ea2d",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "bde5fa7f-75ac-402a-9e62-35b8572c5ee3",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "",
+          "id": "d0b3d3d0-430f-4bee-a0e0-d69d9f7d91bf",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "954f44d6-59ed-4822-b015-c9e8c29fdc73",
+          "target": "bde5fa7f-75ac-402a-9e62-35b8572c5ee3"
+        },
+        {
+          "condition": "",
+          "id": "d3059e57-5dfc-47c7-8da2-88450064c054",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "e175d159-9f6b-431f-b25e-4a61af720813",
+          "target": "250209bb-4e6c-4be7-b7d0-3d9640ef9168"
+        },
+        {
+          "condition": "",
+          "id": "d568691f-ebac-4d71-9022-1e63eddf0f8c",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "a4256f72-7158-495b-9c79-8b9cf4d1337f",
+          "target": "e175d159-9f6b-431f-b25e-4a61af720813"
+        },
+        {
+          "condition": "",
+          "id": "d68db8cb-1835-4a9a-a17d-95d781627a0b",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "c791763b-eb4f-4ad1-a668-1389aae1f351",
+          "target": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3"
+        },
+        {
+          "condition": "esto tai poikkeus",
+          "id": "dd9bed58-a505-41eb-a4f4-cfdab76315dc",
+          "kind": "flow",
+          "label": "esto tai poikkeus",
+          "source": "bd85a76b-5976-452d-afdf-2069ff1aaa1a",
+          "target": "79046570-69ec-441e-ab70-bf3f4e78c053"
+        },
+        {
+          "condition": "",
+          "id": "df97d363-df87-459e-9350-31fbe2cd73e6",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "66ecbc69-b221-4ef7-bdcd-beb6db9dce84",
+          "target": "5e38d6a8-04ad-4987-9664-26c444be3f06"
+        },
+        {
+          "condition": "",
+          "id": "e054bea7-ba72-4606-b59b-eff686693832",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "e175d159-9f6b-431f-b25e-4a61af720813",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        },
+        {
+          "condition": "",
+          "id": "e8ded11f-8d46-49b9-bcf2-8c426f21fe71",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "c791763b-eb4f-4ad1-a668-1389aae1f351",
+          "target": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3"
+        },
+        {
+          "condition": "",
+          "id": "ede24ed8-0c8d-45e2-bd71-b5e9d3be20a5",
+          "kind": "support",
+          "label": "näytetään",
+          "source": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        },
+        {
+          "condition": "",
+          "id": "f33ca510-9850-4a9e-b92c-46b0bccaceec",
+          "kind": "flow",
+          "label": "",
+          "source": "b43e0a55-39e1-422d-8441-50c81c019e91",
+          "target": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3"
+        },
+        {
+          "condition": "",
+          "id": "f5dfa380-3f4c-4121-aca9-a9d8a245ae4b",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        },
+        {
+          "condition": "",
+          "id": "fa8544cb-1c8a-4d24-bd30-79c38104488b",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "b43e0a55-39e1-422d-8441-50c81c019e91",
+          "target": "c791763b-eb4f-4ad1-a668-1389aae1f351"
+        },
+        {
+          "condition": "",
+          "id": "fc13fbcc-b577-46d7-827d-1d3435f7d33f",
+          "kind": "flow",
+          "label": "erillinen asennuspolku",
+          "source": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3",
+          "target": "0f540cfc-4c07-460a-8e57-dc8bcbe5c0e2"
+        },
+        {
+          "condition": "",
+          "id": "fc5510ca-25f4-4125-b8c2-5f8b43440817",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "b43e0a55-39e1-422d-8441-50c81c019e91",
+          "target": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d"
+        }
+      ],
+      "description": "Dokumentoidun prosessin komennot, tapahtumat, toimija, säännöt ja poikkeuspolut. Yhteydet kuvaavat ehtoja, eivät alustan uusia kontrollikomentoja.",
+      "id": "74f22c5a-3ae7-4184-bf95-4e69368c586d",
+      "sources": [],
+      "steps": [
+        {
+          "conceptId": "d183b59d-fe0a-47db-9801-4c2097f01925",
+          "id": "0f540cfc-4c07-460a-8e57-dc8bcbe5c0e2",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027203"
+          ]
+        },
+        {
+          "conceptId": "0a36fef4-cef8-4175-b656-c5ec384faf21",
+          "id": "1c4bcf03-d9b5-470a-9c9d-1c77b3702755",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "ca83c128-9d26-4a4c-896f-365e2b1879eb",
+          "id": "1fb6c41d-e925-4cf2-9785-18b9ad7e04df",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "b5e3fe45-0681-44e3-85a5-faf785413681",
+          "id": "250209bb-4e6c-4be7-b7d0-3d9640ef9168",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "0f672016-246a-4d80-b899-17b6073c0830",
+          "id": "3e9f1896-c0b2-42af-bb63-7260621d515e",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "4812c8db-35e7-4306-8760-13224e695d4e",
+          "id": "5e38d6a8-04ad-4987-9664-26c444be3f06",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "120df932-7ea8-499b-ba30-d36cbe2397fc",
+          "id": "647e107c-e20a-46df-ae05-838a8ee231ac",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "fd797518-322f-4e4f-b826-8dda32ee44dd",
+          "id": "66ecbc69-b221-4ef7-bdcd-beb6db9dce84",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "9f71dcf2-cdf8-49ba-963f-514a3b5c9f1f",
+          "id": "79046570-69ec-441e-ab70-bf3f4e78c053",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "44dd5316-4b59-4ac7-8a7e-403ff228fb0a",
+          "id": "954f44d6-59ed-4822-b015-c9e8c29fdc73",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "691bc275-4506-4dec-a900-584a3851e4be",
+          "id": "9a15417b-b8e3-47a0-8f2b-2230e8abd43d",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "9690f5de-9d1e-480e-bda7-75789d5f48e1",
+          "id": "a4256f72-7158-495b-9c79-8b9cf4d1337f",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "8389f28c-9bc9-48f9-84ed-b61cfbd13c4d",
+          "id": "ac51cf79-6c93-4624-b5fb-dd1c787a79f3",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "a768e1f5-f597-412f-b30d-c1203902c0aa",
+          "id": "b43e0a55-39e1-422d-8441-50c81c019e91",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "f44d5345-7471-44f6-8000-e2f9c9f7a43c",
+          "id": "bd85a76b-5976-452d-afdf-2069ff1aaa1a",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "0d322dfa-61c9-4541-bf34-bd958eadbf1d",
+          "id": "bde5fa7f-75ac-402a-9e62-35b8572c5ee3",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "022ca7ef-9193-48bf-a076-89591fad5ff4",
+          "id": "c791763b-eb4f-4ad1-a668-1389aae1f351",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "81f93d10-9743-49fb-93fc-9e4eebb9ec0e",
+          "id": "cdbdd49d-bfc9-4126-8b59-f6e7d1d7e756",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027203"
+          ]
+        },
+        {
+          "conceptId": "2fd804de-fe56-45c9-9d75-684105ff72c1",
+          "id": "d898e857-893c-4750-afde-edce195c0600",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        },
+        {
+          "conceptId": "d18c5f7a-ca31-40fb-a736-3d4e6b4f0502",
+          "id": "e175d159-9f6b-431f-b25e-4a61af720813",
+          "sources": [],
+          "storyIds": [
+            "aae46173-ec52-44d0-8fa6-e80353027202"
+          ]
+        }
+      ],
+      "storyIds": [
+        "aae46173-ec52-44d0-8fa6-e80353027202",
+        "aae46173-ec52-44d0-8fa6-e80353027203"
+      ],
+      "title": "4. Paikallinen palvelu, daemon ja jakelu"
+    },
+    {
+      "boundaries": [
+        {
+          "details": "Nykyiseen arkkitehtuuriin sidottu vastuumalli. Kehys kuvaa nykyistä vastuualueen rajaa, ei ehdotusta uudeksi palveluksi tai bounded context -jaoksi.",
+          "id": "2842febc-a8fc-40a0-8d0c-8edc11ed0ab5",
+          "kind": "bounded-context",
+          "sources": [],
+          "stepIds": [
+            "03fef151-5d31-443c-a93f-577961c8bcb5",
+            "1f239872-516d-4b13-bb4b-1a3bb51e9012",
+            "56ca081b-0afb-47c0-9d32-0e2f2714fbd5",
+            "61e29a82-76ac-44da-877b-64171cfb7804",
+            "6d717025-6ddd-4650-b57d-eccfbf1bd1e3",
+            "8baed908-a010-4214-8a9a-b5bb8fc57ada",
+            "8c8431ab-bac9-45f8-84cf-920ecbd3c574",
+            "95358baf-d737-4ae3-9f01-e7a9e998f172",
+            "9a0539b4-97d4-4efb-aa4e-c796f74618c1",
+            "a131b092-597b-4a22-8aa5-25d840a4999c",
+            "ccdf9912-28a0-49db-a9e0-04005965643b",
+            "e28dc29f-d369-492f-8710-0e5fc4bc4dea",
+            "eca2020f-18cb-41be-a1b8-a436b3cfb003",
+            "ef1b2486-4826-465a-b89b-d88ce051299e",
+            "fe236363-9aaf-462d-85a1-dbe829860efa"
+          ],
+          "title": "Git ja projektidokumentit"
+        }
+      ],
+      "connections": [
+        {
+          "condition": "",
+          "id": "034d9aff-3062-403b-8f3a-1c1c6f74b537",
+          "kind": "flow",
+          "label": "",
+          "source": "8baed908-a010-4214-8a9a-b5bb8fc57ada",
+          "target": "95358baf-d737-4ae3-9f01-e7a9e998f172"
+        },
+        {
+          "condition": "",
+          "id": "03bc60d5-13c7-4aa4-a2cb-3255cedc0e17",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "8baed908-a010-4214-8a9a-b5bb8fc57ada",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "0d044aa5-808b-4cdf-8d6c-ca7316f9382a",
+          "kind": "flow",
+          "label": "seuraava määrittelyvaihe",
+          "source": "8baed908-a010-4214-8a9a-b5bb8fc57ada",
+          "target": "03fef151-5d31-443c-a93f-577961c8bcb5"
+        },
+        {
+          "condition": "",
+          "id": "132dfdfb-c7fe-48eb-9acb-71c31d27d245",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "ccdf9912-28a0-49db-a9e0-04005965643b",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "134547e4-d314-40de-8446-3eba484030f4",
+          "kind": "flow",
+          "label": "aloittaa",
+          "source": "ce20215f-4a95-4ecf-b0a9-dc49b4340f69",
+          "target": "eca2020f-18cb-41be-a1b8-a436b3cfb003"
+        },
+        {
+          "condition": "",
+          "id": "16f64f97-f486-4e88-b21d-5aa4c9fd9d1a",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "e28dc29f-d369-492f-8710-0e5fc4bc4dea",
+          "target": "fe236363-9aaf-462d-85a1-dbe829860efa"
+        },
+        {
+          "condition": "",
+          "id": "1bc468c7-e43f-415f-9a4f-1001605a8dc8",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "8c8431ab-bac9-45f8-84cf-920ecbd3c574",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "304b4b28-cee1-4d04-9d8a-61ff421613b1",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "a131b092-597b-4a22-8aa5-25d840a4999c",
+          "target": "8baed908-a010-4214-8a9a-b5bb8fc57ada"
+        },
+        {
+          "condition": "",
+          "id": "3b251e23-6fbb-438e-b3a6-33f8ae3278f5",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "95358baf-d737-4ae3-9f01-e7a9e998f172",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "42451b05-0f99-41de-a81d-41a6b6b586ad",
+          "kind": "flow",
+          "label": "seuraava määrittelyvaihe",
+          "source": "fe236363-9aaf-462d-85a1-dbe829860efa",
+          "target": "a131b092-597b-4a22-8aa5-25d840a4999c"
+        },
+        {
+          "condition": "",
+          "id": "45dfdf20-68c4-43e0-a82c-15c1e28bbd15",
+          "kind": "flow",
+          "label": "seuraava määrittelyvaihe",
+          "source": "8c8431ab-bac9-45f8-84cf-920ecbd3c574",
+          "target": "e28dc29f-d369-492f-8710-0e5fc4bc4dea"
+        },
+        {
+          "condition": "",
+          "id": "486a061a-61e0-4948-8799-0e66795dd436",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "eca2020f-18cb-41be-a1b8-a436b3cfb003",
+          "target": "ccdf9912-28a0-49db-a9e0-04005965643b"
+        },
+        {
+          "condition": "",
+          "id": "5750607c-0815-4e93-9097-20d00606d080",
+          "kind": "flow",
+          "label": "",
+          "source": "fe236363-9aaf-462d-85a1-dbe829860efa",
+          "target": "8baed908-a010-4214-8a9a-b5bb8fc57ada"
+        },
+        {
+          "condition": "",
+          "id": "5dbac26d-a5f3-43ef-8596-9ca22a9f7763",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "f1ca9a72-e979-47ae-877b-59e6725aecfc",
+          "target": "6d717025-6ddd-4650-b57d-eccfbf1bd1e3"
+        },
+        {
+          "condition": "invariantin estämä polku",
+          "id": "67a96339-4147-4a57-8bb4-98c76171faf4",
+          "kind": "responsibility",
+          "label": "invariantin estämä polku",
+          "source": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5",
+          "target": "6d717025-6ddd-4650-b57d-eccfbf1bd1e3"
+        },
+        {
+          "condition": "",
+          "id": "78bdc8ed-1fde-48d5-aea0-3070296ff649",
+          "kind": "responsibility",
+          "label": "projisoidaan",
+          "source": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "7a583b0c-20ea-4632-9a44-6fef16149809",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "ef1b2486-4826-465a-b89b-d88ce051299e",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "",
+          "id": "7ad22017-5b5d-473a-b3f6-2b7ded375210",
+          "kind": "flow",
+          "label": "",
+          "source": "ccdf9912-28a0-49db-a9e0-04005965643b",
+          "target": "8c8431ab-bac9-45f8-84cf-920ecbd3c574"
+        },
+        {
+          "condition": "",
+          "id": "8153558e-d2f0-49e8-8347-43a769c8acce",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "fe236363-9aaf-462d-85a1-dbe829860efa",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "84ce10d3-079f-487a-8e6b-453b9a32105e",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "e28dc29f-d369-492f-8710-0e5fc4bc4dea",
+          "target": "fe236363-9aaf-462d-85a1-dbe829860efa"
+        },
+        {
+          "condition": "",
+          "id": "87887d59-c184-43a7-8a0a-bc923fa49bc0",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "03fef151-5d31-443c-a93f-577961c8bcb5",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "esto tai poikkeus",
+          "id": "974a8642-11a9-4c23-b161-4255b77fa427",
+          "kind": "flow",
+          "label": "esto tai poikkeus",
+          "source": "61e29a82-76ac-44da-877b-64171cfb7804",
+          "target": "f1ca9a72-e979-47ae-877b-59e6725aecfc"
+        },
+        {
+          "condition": "",
+          "id": "97d0194c-17a8-43e3-bda0-d2f19c689f94",
+          "kind": "responsibility",
+          "label": "käsittelee",
+          "source": "9a0539b4-97d4-4efb-aa4e-c796f74618c1",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "",
+          "id": "a4bcb34b-3c4f-41f3-a273-bd0a009e399c",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "a131b092-597b-4a22-8aa5-25d840a4999c",
+          "target": "8baed908-a010-4214-8a9a-b5bb8fc57ada"
+        },
+        {
+          "condition": "",
+          "id": "a727c21f-20f3-4142-b80e-3841bf617ea8",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "e28dc29f-d369-492f-8710-0e5fc4bc4dea",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "",
+          "id": "ad603d2e-678c-4054-a17e-4c9ab6ece5fc",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "a131b092-597b-4a22-8aa5-25d840a4999c",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "",
+          "id": "b7e22c1c-7979-4655-a316-bff332e4b8e7",
+          "kind": "responsibility",
+          "label": "rajoittaa",
+          "source": "61e29a82-76ac-44da-877b-64171cfb7804",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "",
+          "id": "c52430ce-120d-4c89-a1de-1748579a7735",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "03fef151-5d31-443c-a93f-577961c8bcb5",
+          "target": "95358baf-d737-4ae3-9f01-e7a9e998f172"
+        },
+        {
+          "condition": "",
+          "id": "ca24b03c-761b-49c2-b52d-40e0ddd6fd87",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "eca2020f-18cb-41be-a1b8-a436b3cfb003",
+          "target": "ccdf9912-28a0-49db-a9e0-04005965643b"
+        },
+        {
+          "condition": "",
+          "id": "cf2318d6-03ca-4cdf-b920-204167a39be2",
+          "kind": "flow",
+          "label": "sääntö",
+          "source": "fe236363-9aaf-462d-85a1-dbe829860efa",
+          "target": "61e29a82-76ac-44da-877b-64171cfb7804"
+        },
+        {
+          "condition": "",
+          "id": "d814da7d-bdb4-4c56-aab5-e0dc8ccd6d94",
+          "kind": "flow",
+          "label": "seuraava määrittelyvaihe",
+          "source": "ccdf9912-28a0-49db-a9e0-04005965643b",
+          "target": "ef1b2486-4826-465a-b89b-d88ce051299e"
+        },
+        {
+          "condition": "",
+          "id": "eb6008ea-850c-4f19-ae3f-f0f38ce44ee0",
+          "kind": "support",
+          "label": "näytetään",
+          "source": "95358baf-d737-4ae3-9f01-e7a9e998f172",
+          "target": "1f239872-516d-4b13-bb4b-1a3bb51e9012"
+        },
+        {
+          "condition": "",
+          "id": "f1007f06-12c7-41e1-b5cd-dc0401d88bb6",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "ef1b2486-4826-465a-b89b-d88ce051299e",
+          "target": "8c8431ab-bac9-45f8-84cf-920ecbd3c574"
+        },
+        {
+          "condition": "",
+          "id": "f978a137-fa9d-487a-802c-d8964c303089",
+          "kind": "flow",
+          "label": "",
+          "source": "8c8431ab-bac9-45f8-84cf-920ecbd3c574",
+          "target": "fe236363-9aaf-462d-85a1-dbe829860efa"
+        },
+        {
+          "condition": "",
+          "id": "fb38ed80-819b-4439-8b4e-b581e3d5cc7f",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "eca2020f-18cb-41be-a1b8-a436b3cfb003",
+          "target": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5"
+        },
+        {
+          "condition": "",
+          "id": "fc886682-af8a-4762-8dc6-c066991546df",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "03fef151-5d31-443c-a93f-577961c8bcb5",
+          "target": "95358baf-d737-4ae3-9f01-e7a9e998f172"
+        },
+        {
+          "condition": "",
+          "id": "fe4f31a9-5337-426e-9000-ce1b1e3caa67",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "ef1b2486-4826-465a-b89b-d88ce051299e",
+          "target": "8c8431ab-bac9-45f8-84cf-920ecbd3c574"
+        }
+      ],
+      "description": "Dokumentoidun prosessin komennot, tapahtumat, toimija, säännöt ja poikkeuspolut. Yhteydet kuvaavat ehtoja, eivät alustan uusia kontrollikomentoja.",
+      "id": "8319f5a8-4263-483e-b027-83bb1c082406",
+      "sources": [],
+      "steps": [
+        {
+          "conceptId": "1c13c4a4-7da1-4e9f-a738-ff211c918085",
+          "id": "03fef151-5d31-443c-a93f-577961c8bcb5",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "fba97b32-b1e8-4d77-b850-44e30151d802",
+          "id": "1f239872-516d-4b13-bb4b-1a3bb51e9012",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "0b4e5387-4386-4ca3-9b82-327a75d5cdd6",
+          "id": "56ca081b-0afb-47c0-9d32-0e2f2714fbd5",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "b70a0c86-8cd3-4772-a3ea-5e8e63d20e50",
+          "id": "61e29a82-76ac-44da-877b-64171cfb7804",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "932e3055-2781-4d9e-97be-1d87c0cd7c04",
+          "id": "6d717025-6ddd-4650-b57d-eccfbf1bd1e3",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "5fdfc058-2cdb-42cb-974f-d227c1255281",
+          "id": "8baed908-a010-4214-8a9a-b5bb8fc57ada",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "a6e46ead-cfd4-4580-a03f-98b3cb51017a",
+          "id": "8c8431ab-bac9-45f8-84cf-920ecbd3c574",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "0c385d44-c5ae-4e7b-a136-5706c1683292",
+          "id": "95358baf-d737-4ae3-9f01-e7a9e998f172",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "75bd6f9b-51ab-425b-a9fe-03d12c5538e3",
+          "id": "9a0539b4-97d4-4efb-aa4e-c796f74618c1",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "dd63a167-758d-45f8-8236-9eb82085bf0a",
+          "id": "a131b092-597b-4a22-8aa5-25d840a4999c",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "8f053585-b941-46e5-a425-eaf58fd88f92",
+          "id": "ae9c3b6a-b080-4308-8741-8e1f92b9f4a7",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "c6ad6caf-ac9d-4031-8d0f-93e3874b1c37",
+          "id": "ccdf9912-28a0-49db-a9e0-04005965643b",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "e72c51cc-3a6e-405f-be35-de8445371b75",
+          "id": "ce20215f-4a95-4ecf-b0a9-dc49b4340f69",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "8885ea91-05d5-4338-ba9b-b3f46f3371a0",
+          "id": "e28dc29f-d369-492f-8710-0e5fc4bc4dea",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "7b106a6f-746d-4f5e-916c-f3155c229fbf",
+          "id": "eca2020f-18cb-41be-a1b8-a436b3cfb003",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "231d1ba3-d86e-4ec5-953c-81ca945987bf",
+          "id": "ef1b2486-4826-465a-b89b-d88ce051299e",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "62314b7b-f14c-42d3-ae0e-4a7d443563ed",
+          "id": "f1ca9a72-e979-47ae-877b-59e6725aecfc",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        },
+        {
+          "conceptId": "f9295d71-aa62-43bf-ad03-f86225679e50",
+          "id": "fe236363-9aaf-462d-85a1-dbe829860efa",
+          "sources": [],
+          "storyIds": [
+            "54625950-26fb-46fe-90e3-f4cf31084368"
+          ]
+        }
+      ],
+      "storyIds": [
+        "54625950-26fb-46fe-90e3-f4cf31084368"
+      ],
+      "title": "1. Projektisisältö ja tarinoiden hyväksyntä"
+    },
+    {
+      "boundaries": [
+        {
+          "details": "Nykyiseen arkkitehtuuriin sidottu vastuumalli. Kehys kuvaa nykyistä vastuualueen rajaa, ei ehdotusta uudeksi palveluksi tai bounded context -jaoksi.",
+          "id": "e936bc89-e6a7-4c37-83a3-118b36b62b02",
+          "kind": "bounded-context",
+          "sources": [],
+          "stepIds": [
+            "089604c0-58ef-4946-be4a-e2159cdaba60",
+            "0da03c1d-465a-49e4-b87c-84c0b8280b9b",
+            "22b10cc2-3bf1-48b4-aa96-1f555c651e43",
+            "2abb4470-09eb-47fd-81b0-5c5b2458a543",
+            "32923c7b-f461-4a64-bb58-caf704aed9a6",
+            "37305d84-bb89-4867-8956-ab33745a468f",
+            "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83",
+            "5b0a4c6a-3a0e-447a-9235-6bb2894ee83b",
+            "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+            "880ab9f2-7e6c-4c25-9993-af4106357d8a",
+            "8b000976-0e48-4129-a915-cbc8881440d8",
+            "b498ed9c-c2cb-448c-a697-14b19c24548f",
+            "cd2ec4d9-a8b0-4e01-8e49-87a14c302195",
+            "eefc4b2a-a417-4bdb-a9e3-17d695a89b39",
+            "fe682395-37c9-4e25-b4e2-43050376def0"
+          ],
+          "title": "Critic ja Feedback"
+        }
+      ],
+      "connections": [
+        {
+          "condition": "",
+          "id": "01fbb764-2384-4d21-a96b-1dbf7d42c6fb",
+          "kind": "flow",
+          "label": "",
+          "source": "089604c0-58ef-4946-be4a-e2159cdaba60",
+          "target": "0da03c1d-465a-49e4-b87c-84c0b8280b9b"
+        },
+        {
+          "condition": "",
+          "id": "07b09c80-7617-4918-83f3-02cbd0f86728",
+          "kind": "flow",
+          "label": "",
+          "source": "37305d84-bb89-4867-8956-ab33745a468f",
+          "target": "fe682395-37c9-4e25-b4e2-43050376def0"
+        },
+        {
+          "condition": "",
+          "id": "09fb598d-ee80-459f-8738-e5ad1ccb9273",
+          "kind": "flow",
+          "label": "aloittaa",
+          "source": "46e67ce5-b433-4b8b-a607-6a96b35f6d11",
+          "target": "b498ed9c-c2cb-448c-a697-14b19c24548f"
+        },
+        {
+          "condition": "",
+          "id": "0fd4f52b-c78d-4274-b03a-f3cd792d5a26",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "32923c7b-f461-4a64-bb58-caf704aed9a6",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "1995da36-5319-49c9-a323-62ee208e1500",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "5b0a4c6a-3a0e-447a-9235-6bb2894ee83b",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "22309d4b-9a49-41af-9d83-994cd3c30765",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "cd2ec4d9-a8b0-4e01-8e49-87a14c302195",
+          "target": "fe682395-37c9-4e25-b4e2-43050376def0"
+        },
+        {
+          "condition": "",
+          "id": "31e4ec9e-4057-4a0e-991f-6f033278684d",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "b498ed9c-c2cb-448c-a697-14b19c24548f",
+          "target": "089604c0-58ef-4946-be4a-e2159cdaba60"
+        },
+        {
+          "condition": "",
+          "id": "36804b2c-f479-4646-89d3-1b1ebe3ba8ff",
+          "kind": "flow",
+          "label": "",
+          "source": "0da03c1d-465a-49e4-b87c-84c0b8280b9b",
+          "target": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1"
+        },
+        {
+          "condition": "",
+          "id": "3a436ced-bcca-4a94-92e1-d29e7fc911e7",
+          "kind": "flow",
+          "label": "sääntö",
+          "source": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+          "target": "880ab9f2-7e6c-4c25-9993-af4106357d8a"
+        },
+        {
+          "condition": "",
+          "id": "3e334e7e-8055-4d24-ab31-1c9b676718aa",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "089604c0-58ef-4946-be4a-e2159cdaba60",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "4b1c8e13-3d12-4d39-bd78-b92a9ef66196",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "8b000976-0e48-4129-a915-cbc8881440d8",
+          "target": "0da03c1d-465a-49e4-b87c-84c0b8280b9b"
+        },
+        {
+          "condition": "",
+          "id": "505250d2-0aff-4f9f-b226-c272a2617ab4",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "0da03c1d-465a-49e4-b87c-84c0b8280b9b",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "53fb1598-da7f-476d-bc1f-6e5f114e42c7",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "8b000976-0e48-4129-a915-cbc8881440d8",
+          "target": "0da03c1d-465a-49e4-b87c-84c0b8280b9b"
+        },
+        {
+          "condition": "",
+          "id": "562239fa-03c4-4eb4-bb55-dcf2d14f3233",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "cd2ec4d9-a8b0-4e01-8e49-87a14c302195",
+          "target": "fe682395-37c9-4e25-b4e2-43050376def0"
+        },
+        {
+          "condition": "",
+          "id": "5981acc9-d891-4a7b-a83d-b5253354accd",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "5b0a4c6a-3a0e-447a-9235-6bb2894ee83b",
+          "target": "37305d84-bb89-4867-8956-ab33745a468f"
+        },
+        {
+          "condition": "",
+          "id": "65c0d03e-4d8e-4703-b9f1-2b41ebd91228",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "0da03c1d-465a-49e4-b87c-84c0b8280b9b",
+          "target": "32923c7b-f461-4a64-bb58-caf704aed9a6"
+        },
+        {
+          "condition": "esto tai poikkeus",
+          "id": "672f7ccf-b836-4f6f-a690-918cd7eaa457",
+          "kind": "flow",
+          "label": "esto tai poikkeus",
+          "source": "880ab9f2-7e6c-4c25-9993-af4106357d8a",
+          "target": "7533474b-f039-43a8-bffc-b28f59667433"
+        },
+        {
+          "condition": "",
+          "id": "6d5d1b8f-6ac7-458f-b911-c7f4612e1f2f",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "fe682395-37c9-4e25-b4e2-43050376def0",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "70781be6-fad8-4527-927d-7b59a0a81ff0",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "32923c7b-f461-4a64-bb58-caf704aed9a6",
+          "target": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1"
+        },
+        {
+          "condition": "ihminen hylkää",
+          "id": "7876772b-3ecf-4d6c-b1f2-626febb22194",
+          "kind": "flow",
+          "label": "ihminen hylkää",
+          "source": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+          "target": "7533474b-f039-43a8-bffc-b28f59667433"
+        },
+        {
+          "condition": "invariantin estämä polku",
+          "id": "85c6679a-67b3-46e8-9953-89df805495ac",
+          "kind": "responsibility",
+          "label": "invariantin estämä polku",
+          "source": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39",
+          "target": "22b10cc2-3bf1-48b4-aa96-1f555c651e43"
+        },
+        {
+          "condition": "",
+          "id": "974bbf35-d653-425a-9994-75f83622d428",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "b498ed9c-c2cb-448c-a697-14b19c24548f",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "992633a7-408d-4021-94f5-19391c43657a",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+          "target": "5b0a4c6a-3a0e-447a-9235-6bb2894ee83b"
+        },
+        {
+          "condition": "",
+          "id": "9ce281bc-3292-4118-8177-18c3714850ed",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "7533474b-f039-43a8-bffc-b28f59667433",
+          "target": "22b10cc2-3bf1-48b4-aa96-1f555c651e43"
+        },
+        {
+          "condition": "",
+          "id": "a076485a-a90c-436d-83a3-eb1516ad280b",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "a479c201-737d-4f97-91f4-6b4db81e47c2",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "cd2ec4d9-a8b0-4e01-8e49-87a14c302195",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "ac67ae5c-b83d-48b6-9e36-1b3ffa045b07",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "32923c7b-f461-4a64-bb58-caf704aed9a6",
+          "target": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1"
+        },
+        {
+          "condition": "",
+          "id": "ad07e622-e8cd-4688-9628-169493930370",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "8b000976-0e48-4129-a915-cbc8881440d8",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "ae083b12-650c-4299-a63e-a6df53ca33ab",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "089604c0-58ef-4946-be4a-e2159cdaba60",
+          "target": "8b000976-0e48-4129-a915-cbc8881440d8"
+        },
+        {
+          "condition": "",
+          "id": "af694a63-a896-4e23-8702-5d9fcdc6a70d",
+          "kind": "responsibility",
+          "label": "rajoittaa",
+          "source": "880ab9f2-7e6c-4c25-9993-af4106357d8a",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "c28f7cb2-0bf6-46dc-9e3a-0597f96649bb",
+          "kind": "responsibility",
+          "label": "projisoidaan",
+          "source": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "d2787c9b-59f0-48a5-a0a4-c34dfb9e9e8f",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "5b0a4c6a-3a0e-447a-9235-6bb2894ee83b",
+          "target": "37305d84-bb89-4867-8956-ab33745a468f"
+        },
+        {
+          "condition": "",
+          "id": "d53bf721-dd3d-4b36-9e9e-957ccaaa60ec",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "37305d84-bb89-4867-8956-ab33745a468f",
+          "target": "cd2ec4d9-a8b0-4e01-8e49-87a14c302195"
+        },
+        {
+          "condition": "",
+          "id": "d5ea9876-fe25-4924-b40d-81e3620729f8",
+          "kind": "responsibility",
+          "label": "käsittelee",
+          "source": "2abb4470-09eb-47fd-81b0-5c5b2458a543",
+          "target": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39"
+        },
+        {
+          "condition": "",
+          "id": "d9dc7659-df51-4216-925a-67611837e4a5",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "37305d84-bb89-4867-8956-ab33745a468f",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "dcba5b29-f976-4f10-8a43-d32d0d567788",
+          "kind": "support",
+          "label": "näytetään",
+          "source": "fe682395-37c9-4e25-b4e2-43050376def0",
+          "target": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83"
+        },
+        {
+          "condition": "",
+          "id": "e2aac726-0a57-4e12-86e9-eb96003326ba",
+          "kind": "flow",
+          "label": "",
+          "source": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+          "target": "37305d84-bb89-4867-8956-ab33745a468f"
+        },
+        {
+          "condition": "",
+          "id": "f76ce3be-8f50-4cd6-b644-233fddf4057e",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "b498ed9c-c2cb-448c-a697-14b19c24548f",
+          "target": "089604c0-58ef-4946-be4a-e2159cdaba60"
+        }
+      ],
+      "description": "Dokumentoidun prosessin komennot, tapahtumat, toimija, säännöt ja poikkeuspolut. Yhteydet kuvaavat ehtoja, eivät alustan uusia kontrollikomentoja.",
+      "id": "ba0bdc02-5d4b-425d-8d0a-3a38f9d99489",
+      "sources": [],
+      "steps": [
+        {
+          "conceptId": "9647dd59-3438-4565-bb0b-6cf0b9310995",
+          "id": "089604c0-58ef-4946-be4a-e2159cdaba60",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "34d69e17-928b-4421-a19e-7215469d67b7",
+          "id": "0da03c1d-465a-49e4-b87c-84c0b8280b9b",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "f1cd5dbd-a603-4ce8-b76e-a9747c26e06e",
+          "id": "22b10cc2-3bf1-48b4-aa96-1f555c651e43",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "848ceaee-00d2-4a93-ad01-2355222c6c4b",
+          "id": "2abb4470-09eb-47fd-81b0-5c5b2458a543",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "4a36dd61-b15a-4f97-a5aa-fbeea2703b33",
+          "id": "32923c7b-f461-4a64-bb58-caf704aed9a6",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "17798111-31e0-42db-abb9-837514389bdb",
+          "id": "37305d84-bb89-4867-8956-ab33745a468f",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "5dd34d75-46b2-40fa-b801-5c91694f76e8",
+          "id": "46e67ce5-b433-4b8b-a607-6a96b35f6d11",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "f4206cda-7f79-4951-8be6-5bc5c0803e18",
+          "id": "56d1f529-566a-4f3a-b9d0-48b7ed2fbe83",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "a410e4bc-718e-4296-9a26-d0d21f5bc602",
+          "id": "5b0a4c6a-3a0e-447a-9235-6bb2894ee83b",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "6cef2975-04c4-4565-b09f-16f30774ce39",
+          "id": "69620e75-6ddf-41a0-acb5-c0d192ca1bc1",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "6125fb63-7ae6-45ee-b2c5-c7c08d861d1c",
+          "id": "7533474b-f039-43a8-bffc-b28f59667433",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "a890f62f-43e9-483c-9d4c-1e35f95e53c6",
+          "id": "880ab9f2-7e6c-4c25-9993-af4106357d8a",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "a6cad801-8cb2-47f5-bd71-d5b80797a0f1",
+          "id": "8b000976-0e48-4129-a915-cbc8881440d8",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "31d161b4-46f0-4cd4-a1c5-fcdb58cb3e0c",
+          "id": "b498ed9c-c2cb-448c-a697-14b19c24548f",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "d524f702-c7de-458e-a0b1-f5c4b1aed035",
+          "id": "c642cc14-f653-43d1-94f3-6d772f2de198",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "6d0c6346-ec46-49d6-ba80-0aaf0c6e6848",
+          "id": "cd2ec4d9-a8b0-4e01-8e49-87a14c302195",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "0fd41b9e-82f5-49e7-bb1a-ce41f76a2ff7",
+          "id": "eefc4b2a-a417-4bdb-a9e3-17d695a89b39",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        },
+        {
+          "conceptId": "17e9acde-3e2e-4c8a-84f7-0aa7ed5b6eab",
+          "id": "fe682395-37c9-4e25-b4e2-43050376def0",
+          "sources": [],
+          "storyIds": [
+            "9def77e6-89c3-4ef3-b295-89323c592807"
+          ]
+        }
+      ],
+      "storyIds": [
+        "9def77e6-89c3-4ef3-b295-89323c592807"
+      ],
+      "title": "5. Feedback ja Critic"
+    },
+    {
+      "boundaries": [
+        {
+          "details": "Nykyiseen arkkitehtuuriin sidottu vastuumalli. Kehys kuvaa nykyistä vastuualueen rajaa, ei ehdotusta uudeksi palveluksi tai bounded context -jaoksi.",
+          "id": "63fbc438-eb29-4ca5-9314-e69d65b18038",
+          "kind": "bounded-context",
+          "sources": [],
+          "stepIds": [
+            "0b75b9a2-b851-4d7f-94b6-c76e5716be08",
+            "16cc53bc-ce21-4d4a-80c4-6c0a3418a1ee",
+            "2afd1ed1-209c-44e8-9dd1-924ce2f6e177",
+            "3c570b7d-18cd-4297-a447-e9e1ad3dd89b",
+            "43db813c-1231-464c-9a63-357a37717be9",
+            "667068fb-0219-4a0a-b3c3-54fefeafb285",
+            "6d134227-074b-45c2-9ca6-ff0572ad1c95",
+            "7cf77bba-a3ba-45a4-90d4-1d316056916d",
+            "82cc49f6-5e47-4e51-962b-1a833fec4e07",
+            "984db572-6ef5-4e71-8e0a-096d99139e7b",
+            "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4",
+            "ad8c9126-3c85-4a50-afb3-e00d7bc02df6",
+            "be8841fd-a9db-48e4-a25f-07137839d6bd",
+            "bebfd57c-e9dc-4263-b0c5-0b1c0820e465",
+            "d47c5052-2234-49ee-b519-5534c4178099"
+          ],
+          "title": "Projektimääritys ja Action Agentit"
+        }
+      ],
+      "connections": [
+        {
+          "condition": "",
+          "id": "02911b92-6ff2-475c-b573-3a807af208a0",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "2ea99370-dd50-483e-96b5-5af220b7b7eb",
+          "target": "82cc49f6-5e47-4e51-962b-1a833fec4e07"
+        },
+        {
+          "condition": "",
+          "id": "03b132c6-4568-430e-91f3-cfea2b5ace0f",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "3c570b7d-18cd-4297-a447-e9e1ad3dd89b",
+          "target": "43db813c-1231-464c-9a63-357a37717be9"
+        },
+        {
+          "condition": "",
+          "id": "1142047c-36e2-4767-a883-d30aff1726f8",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "6d134227-074b-45c2-9ca6-ff0572ad1c95",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "invariantin estämä polku",
+          "id": "183aa80f-a8e0-45e0-a445-dd5b793f2787",
+          "kind": "responsibility",
+          "label": "invariantin estämä polku",
+          "source": "984db572-6ef5-4e71-8e0a-096d99139e7b",
+          "target": "82cc49f6-5e47-4e51-962b-1a833fec4e07"
+        },
+        {
+          "condition": "",
+          "id": "193a2641-7a08-4dd4-b31b-500ddc1288f2",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "6d134227-074b-45c2-9ca6-ff0572ad1c95",
+          "target": "3c570b7d-18cd-4297-a447-e9e1ad3dd89b"
+        },
+        {
+          "condition": "",
+          "id": "1aa132ab-421b-4675-ab1e-8e51fd985333",
+          "kind": "flow",
+          "label": "",
+          "source": "be8841fd-a9db-48e4-a25f-07137839d6bd",
+          "target": "667068fb-0219-4a0a-b3c3-54fefeafb285"
+        },
+        {
+          "condition": "",
+          "id": "229d813b-0c76-4907-ab78-4a031bf01d99",
+          "kind": "responsibility",
+          "label": "käsittelee",
+          "source": "bebfd57c-e9dc-4263-b0c5-0b1c0820e465",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "2c87ed89-7a78-4619-8a55-1eb99c097bb4",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "7cf77bba-a3ba-45a4-90d4-1d316056916d",
+          "target": "6d134227-074b-45c2-9ca6-ff0572ad1c95"
+        },
+        {
+          "condition": "",
+          "id": "2dcd14c2-3036-421b-bf57-33a645205990",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "43db813c-1231-464c-9a63-357a37717be9",
+          "target": "0b75b9a2-b851-4d7f-94b6-c76e5716be08"
+        },
+        {
+          "condition": "",
+          "id": "3063a831-7290-421d-be3c-8d0cdf59ba06",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "be8841fd-a9db-48e4-a25f-07137839d6bd",
+          "target": "d47c5052-2234-49ee-b519-5534c4178099"
+        },
+        {
+          "condition": "",
+          "id": "5e199ad9-a53f-46f3-9125-841780e7f9e7",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "667068fb-0219-4a0a-b3c3-54fefeafb285",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "esto tai poikkeus",
+          "id": "625a8c9b-0d76-469c-b566-f49039bc2ae3",
+          "kind": "flow",
+          "label": "esto tai poikkeus",
+          "source": "16cc53bc-ce21-4d4a-80c4-6c0a3418a1ee",
+          "target": "2ea99370-dd50-483e-96b5-5af220b7b7eb"
+        },
+        {
+          "condition": "",
+          "id": "6d59f981-0632-4b6e-8a5c-7c599cb6864a",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "be8841fd-a9db-48e4-a25f-07137839d6bd",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "",
+          "id": "73919ec9-b953-42f0-96dd-514d05b7793a",
+          "kind": "responsibility",
+          "label": "rajoittaa",
+          "source": "16cc53bc-ce21-4d4a-80c4-6c0a3418a1ee",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "7c50364a-b4a2-4cb8-b1ce-1e148658bbc0",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "ad8c9126-3c85-4a50-afb3-e00d7bc02df6",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "",
+          "id": "7f65839d-b1fe-4a0d-8048-986c7bb04a74",
+          "kind": "support",
+          "label": "näytetään",
+          "source": "667068fb-0219-4a0a-b3c3-54fefeafb285",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "",
+          "id": "83e18cb2-42a7-4a68-ab9d-ad55c7074245",
+          "kind": "flow",
+          "label": "jatkoehdon täyttyessä",
+          "source": "ad8c9126-3c85-4a50-afb3-e00d7bc02df6",
+          "target": "7cf77bba-a3ba-45a4-90d4-1d316056916d"
+        },
+        {
+          "condition": "",
+          "id": "8eee4a03-5e54-4fe0-9506-b7b732d19136",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "0b75b9a2-b851-4d7f-94b6-c76e5716be08",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "91bdeb9c-fdb9-4e9e-8d61-f914d0c44bcb",
+          "kind": "flow",
+          "label": "",
+          "source": "6d134227-074b-45c2-9ca6-ff0572ad1c95",
+          "target": "43db813c-1231-464c-9a63-357a37717be9"
+        },
+        {
+          "condition": "",
+          "id": "9ab5a824-0866-441e-a56b-d1e2138775d1",
+          "kind": "responsibility",
+          "label": "projisoidaan",
+          "source": "984db572-6ef5-4e71-8e0a-096d99139e7b",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "",
+          "id": "a53e1c6f-d4aa-4b80-97b9-71fe5298dd5f",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "3c570b7d-18cd-4297-a447-e9e1ad3dd89b",
+          "target": "43db813c-1231-464c-9a63-357a37717be9"
+        },
+        {
+          "condition": "",
+          "id": "a580e61a-f08d-4a9c-bce9-a5d4d48395d3",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "2afd1ed1-209c-44e8-9dd1-924ce2f6e177",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "a969b485-c772-44f5-97b2-bde0c98fa6a7",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "d47c5052-2234-49ee-b519-5534c4178099",
+          "target": "667068fb-0219-4a0a-b3c3-54fefeafb285"
+        },
+        {
+          "condition": "",
+          "id": "aaf62dde-8950-4a7d-aefa-28b960dc5b0a",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "7cf77bba-a3ba-45a4-90d4-1d316056916d",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "aeca0d5d-6a9b-46da-aafe-3b8b1bae2bbc",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "0b75b9a2-b851-4d7f-94b6-c76e5716be08",
+          "target": "be8841fd-a9db-48e4-a25f-07137839d6bd"
+        },
+        {
+          "condition": "",
+          "id": "b00bd0a7-1584-4b2b-a445-3cbbc865ab32",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "2afd1ed1-209c-44e8-9dd1-924ce2f6e177",
+          "target": "ad8c9126-3c85-4a50-afb3-e00d7bc02df6"
+        },
+        {
+          "condition": "",
+          "id": "b09f4795-4dac-4f0b-a459-f6b63ef825eb",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "7cf77bba-a3ba-45a4-90d4-1d316056916d",
+          "target": "6d134227-074b-45c2-9ca6-ff0572ad1c95"
+        },
+        {
+          "condition": "",
+          "id": "b9161656-f939-4d9e-bb77-992e97b9f4ff",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "d47c5052-2234-49ee-b519-5534c4178099",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "bc030288-e0a0-4761-bf9d-ec964f34508e",
+          "kind": "flow",
+          "label": "",
+          "source": "43db813c-1231-464c-9a63-357a37717be9",
+          "target": "be8841fd-a9db-48e4-a25f-07137839d6bd"
+        },
+        {
+          "condition": "",
+          "id": "c45d119e-4de2-4a04-9587-9cb614e01872",
+          "kind": "responsibility",
+          "label": "luettava fakta",
+          "source": "43db813c-1231-464c-9a63-357a37717be9",
+          "target": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4"
+        },
+        {
+          "condition": "",
+          "id": "c4b9c0cc-3b94-4605-b9dc-329884b5433d",
+          "kind": "flow",
+          "label": "sääntö",
+          "source": "43db813c-1231-464c-9a63-357a37717be9",
+          "target": "16cc53bc-ce21-4d4a-80c4-6c0a3418a1ee"
+        },
+        {
+          "condition": "",
+          "id": "c7bf1bbf-98da-48eb-97dc-cf870637032f",
+          "kind": "flow",
+          "label": "",
+          "source": "ad8c9126-3c85-4a50-afb3-e00d7bc02df6",
+          "target": "6d134227-074b-45c2-9ca6-ff0572ad1c95"
+        },
+        {
+          "condition": "",
+          "id": "d756081f-f7ac-4c6e-b34a-b561cbd42682",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "d47c5052-2234-49ee-b519-5534c4178099",
+          "target": "667068fb-0219-4a0a-b3c3-54fefeafb285"
+        },
+        {
+          "condition": "",
+          "id": "dd9f1d4d-0dcf-4222-bcae-81bdb485faf6",
+          "kind": "responsibility",
+          "label": "komennon omistus",
+          "source": "3c570b7d-18cd-4297-a447-e9e1ad3dd89b",
+          "target": "984db572-6ef5-4e71-8e0a-096d99139e7b"
+        },
+        {
+          "condition": "",
+          "id": "df5a70d2-d359-47b1-85e8-fd176c220a23",
+          "kind": "flow",
+          "label": "aloittaa",
+          "source": "a03dcde1-2cda-4441-a623-39608e9146b7",
+          "target": "2afd1ed1-209c-44e8-9dd1-924ce2f6e177"
+        },
+        {
+          "condition": "",
+          "id": "e5ef2156-e683-44d3-accd-c6335e15ece2",
+          "kind": "flow",
+          "label": "tulos",
+          "source": "0b75b9a2-b851-4d7f-94b6-c76e5716be08",
+          "target": "be8841fd-a9db-48e4-a25f-07137839d6bd"
+        },
+        {
+          "condition": "",
+          "id": "e9e770c1-27a9-497e-b458-0f95e8b6c40e",
+          "kind": "flow",
+          "label": "tuottaa",
+          "source": "2afd1ed1-209c-44e8-9dd1-924ce2f6e177",
+          "target": "ad8c9126-3c85-4a50-afb3-e00d7bc02df6"
+        }
+      ],
+      "description": "Dokumentoidun prosessin komennot, tapahtumat, toimija, säännöt ja poikkeuspolut. Yhteydet kuvaavat ehtoja, eivät alustan uusia kontrollikomentoja.",
+      "id": "c8d2c75c-a2e3-4197-a69f-7a5f6cc281a8",
+      "sources": [],
+      "steps": [
+        {
+          "conceptId": "6fae5808-9886-4d2a-a71a-d087849d8abc",
+          "id": "0b75b9a2-b851-4d7f-94b6-c76e5716be08",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "a51f2fb0-6180-4bed-8bf1-1f7ea415d8c7",
+          "id": "16cc53bc-ce21-4d4a-80c4-6c0a3418a1ee",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "234ee251-b5a9-4f13-bd84-5c2e625a7a0d",
+          "id": "2afd1ed1-209c-44e8-9dd1-924ce2f6e177",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "6fc2f920-23f2-45a8-a5ae-af502a16648d",
+          "id": "2ea99370-dd50-483e-96b5-5af220b7b7eb",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "da56eac4-b164-4bd1-b1fb-ab1eb75f572b",
+          "id": "3c570b7d-18cd-4297-a447-e9e1ad3dd89b",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "d3504513-4afc-4083-af6c-0c7021081734",
+          "id": "43db813c-1231-464c-9a63-357a37717be9",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "4e062061-7908-4663-9033-bae9304a869e",
+          "id": "667068fb-0219-4a0a-b3c3-54fefeafb285",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "51f7ba7d-de7c-4fb7-9c61-740fabb56f42",
+          "id": "6d134227-074b-45c2-9ca6-ff0572ad1c95",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "c8a1a71c-acae-4288-bf53-42ab58c1885c",
+          "id": "7cf77bba-a3ba-45a4-90d4-1d316056916d",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "76a1859e-7423-4d48-a2d8-2eb12189dbda",
+          "id": "82cc49f6-5e47-4e51-962b-1a833fec4e07",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "75ab8bc7-b9b7-43d7-8ef8-387c152d2b30",
+          "id": "984db572-6ef5-4e71-8e0a-096d99139e7b",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "6595c7af-5104-40f5-bd21-93860a77f1d7",
+          "id": "99bbb534-8e12-4171-8eb9-cf5a7a39e1f4",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "a7f095cf-9156-4a13-8956-eac0109cfcb8",
+          "id": "a03dcde1-2cda-4441-a623-39608e9146b7",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "bfa7a70d-0fe7-4905-8eef-3f0fd57178f4",
+          "id": "ad8c9126-3c85-4a50-afb3-e00d7bc02df6",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "682cf189-d5cf-4fbf-bdb3-d83b1a0a3d93",
+          "id": "be8841fd-a9db-48e4-a25f-07137839d6bd",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "1b1e7486-5055-4f80-90fb-3b00040cedf6",
+          "id": "bebfd57c-e9dc-4263-b0c5-0b1c0820e465",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "12f2a569-a086-4054-ab25-e4bd5a7b10de",
+          "id": "d47c5052-2234-49ee-b519-5534c4178099",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        },
+        {
+          "conceptId": "34654214-fd6a-4933-96b6-036d72019b6d",
+          "id": "d8f7406e-5851-4386-98d7-3aac2b1b5029",
+          "sources": [],
+          "storyIds": [
+            "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+          ]
+        }
+      ],
+      "storyIds": [
+        "837f8ecb-c3e7-46d5-a8a4-9521f37542e4"
+      ],
+      "title": "2. Environment ja Action Agentit"
+    }
+  ],
+  "sharedConceptIds": [
+    "72521641-b439-4e55-b0cf-b405548f4326"
+  ],
+  "version": 2
+}

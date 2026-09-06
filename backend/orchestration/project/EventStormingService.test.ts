@@ -1,80 +1,105 @@
-import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { emptyEventStormingModel, eventStormingModelSchema, type EventStormingModelV1 } from "../../../shared/orchestration/eventStorming.js";
+import { emptyEventStormingModel, eventStormingModelSchema, eventStormingSemanticHash, serializeStormJson } from "../../../shared/orchestration/eventStorming.js";
+import { eventStormingLayoutSchema } from "../../../shared/orchestration/eventStormingLayout.js";
+import { stormFixture, stormId } from "../../../shared/orchestration/testing/eventStormingFixture.js";
 import { EventStormingService } from "./EventStormingService.js";
+import { EventStormingContextService } from "./EventStormingContextService.js";
 import { ProjectDocumentRepository } from "./ProjectDocumentRepository.js";
-import { parseEventStormingMarkdown, serializeEventStormingMarkdown } from "./eventStormingMarkdown.js";
-
+import { UserStoryService } from "./UserStoryService.js";
 const roots: string[] = [];
-afterEach(() => { roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })); });
+afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), "ballet-storm-")); roots.push(root);
-  const connection = vi.fn(() => { throw new Error("Event Storming must not access SQLite"); });
-  const locked = vi.fn(); const documents = new ProjectDocumentRepository(path.join(root, ".ballet"), connection);
-  return { root, locked, connection, documents, service: new EventStormingService(documents, locked) };
+  const connection = vi.fn(() => { throw new Error("No SQLite allowed"); }), locked = vi.fn();
+  const documents = new ProjectDocumentRepository(path.join(root, ".ballet"), connection);
+  return { root, connection, documents, locked, service: new EventStormingService(documents, locked), context: new EventStormingContextService(root) };
 }
-function model(): EventStormingModelV1 {
-  const noteId = randomUUID();
-  return { version: 1, notes: [{ id: noteId, kind: "event", title: "Order placed", details: "Keep stakeholder language", sources: [] }],
-    boards: [{ id: randomUUID(), title: "Ordering", level: "big-picture", description: "", frames: [], connections: [],
-      placements: [{ id: randomUUID(), noteId, x: 0, y: 0, width: 184, height: 168, pivotal: false }] }] };
-}
-describe("Event Storming repository ownership", () => {
-  test("first read creates nothing; shared notes and layouts survive restart without database access", () => {
+describe("Event Storming semantic and layout ownership", () => {
+  test("empty read creates no files; independent JSON roundtrips preserve IDs and Markdown", () => {
     const f = fixture(); expect(f.service.read().contentHash).toBe("absent"); expect(readdirSync(f.root)).toEqual([]);
-    const value = model(); const source = value.boards[0];
-    value.boards.push({ ...source, id: randomUUID(), sourceBoardId: source.id, level: "process-modelling", placements: source.placements.map((p) => ({ ...p, id: randomUUID(), x: 800 })) });
-    const saved = f.service.save(value, "absent"); value.notes[0].title = "Purchase confirmed";
-    f.service.save(value, saved.contentHash);
-    const restarted = new EventStormingService(f.documents, f.locked).read();
-    expect(restarted.value.notes).toHaveLength(1); expect(restarted.value.notes[0].title).toBe("Purchase confirmed");
-    expect(restarted.value.boards.flatMap((b) => b.placements.map((p) => p.x)).sort()).toEqual([0, 800]);
-    expect(f.connection).not.toHaveBeenCalled(); expect(readdirSync(path.join(f.root, ".ballet"))).toEqual(["event-storming"]);
+    const { model, layout } = stormFixture(); const saved = f.service.save(model, "absent"); f.service.saveLayout(layout, "absent");
+    expect(new EventStormingService(f.documents, f.locked).read()).toEqual(saved);
+    expect(f.service.readLayout().value).toEqual(layout); expect(saved.value.documentation).toBe(model.documentation);
+    expect(readdirSync(path.join(f.root, ".ballet/event-storming")).sort()).toEqual(["layout.json", "model.json"]); expect(f.connection).not.toHaveBeenCalled();
   });
-  test("preserves agent Markdown bytes, exposes external changes and rejects stale writes", () => {
-    const f = fixture(); const saved = f.service.save(model(), "absent"); const filename = path.join(f.root, ".ballet/event-storming/model.md");
-    const body = "\n## Workshop evidence\r\nDomain expert said **confirmed**.\n";
-    const external = { ...saved.value, notes: saved.value.notes.map((n) => ({ ...n, title: "Agent change" })) };
-    writeFileSync(filename, serializeEventStormingMarkdown(external, body));
-    expect(() => f.service.save(saved.value, saved.contentHash)).toThrow(/stale/);
-    const latest = f.service.read(); expect(latest.value.notes[0].title).toBe("Agent change");
-    f.service.save(latest.value, latest.contentHash); expect(f.service.read().body).toBe(body);
-    expect(readFileSync(filename, "utf8").endsWith(body)).toBe(true);
+  test("layout edits and missing/broken layout never change semantic hash or context", () => {
+    const f = fixture(), { model, layout } = stormFixture(); f.service.save(model, "absent");
+    const before = f.context.read({ process: stormId(3) }); const raw = readFileSync(path.join(f.root, ".ballet/event-storming/model.json"));
+    const saved = f.service.saveLayout(layout, "absent"); layout.views[0].placements[0].x += 99; f.service.saveLayout(layout, saved.contentHash);
+    expect(f.context.read({ process: stormId(3) })).toEqual(before);
+    writeFileSync(path.join(f.root, ".ballet/event-storming/layout.json"), "<<<<<<< unresolved");
+    expect(() => f.service.readLayout()).toThrow(/Repair/); expect(f.context.read({ process: stormId(3) })).toEqual(before);
+    expect(readFileSync(path.join(f.root, ".ballet/event-storming/model.json"))).toEqual(raw);
   });
-  test("invalid, duplicate, oversized and incompatible data cannot overwrite a file", () => {
-    const f = fixture(); f.service.save(model(), "absent"); const filename = path.join(f.root, ".ballet/event-storming/model.md");
-    for (const content of ["broken", "---\nversion: 2\nnotes: []\nboards: []\n---\n", "---\nversion: 1\nversion: 1\n---\n", "x".repeat(800_000)]) {
-      writeFileSync(filename, content); expect(() => f.service.read()).toThrow(); expect(() => f.service.save(emptyEventStormingModel(), "absent")).toThrow();
-      expect(readFileSync(filename, "utf8")).toBe(content);
+  test("model and layout have separate conflict boundaries and invalid JSON cannot be overwritten", () => {
+    const f = fixture(), { model, layout } = stormFixture(); const saved = f.service.save(model, "absent"), geometry = f.service.saveLayout(layout, "absent");
+    layout.views[0].placements[0].x++; f.service.saveLayout(layout, geometry.contentHash);
+    model.description = "Changed semantics"; expect(f.service.save(model, saved.contentHash).value.description).toBe("Changed semantics");
+    expect(() => f.service.save(model, saved.contentHash)).toThrow(/stale/); expect(() => f.service.saveLayout(layout, geometry.contentHash)).toThrow(/stale/);
+    const filename = path.join(f.root, ".ballet/event-storming/model.json");
+    for (const source of ["{", "<<<<<<< branch", '{"version":1}', '"x"']) {
+      writeFileSync(filename, source); expect(() => f.service.read()).toThrow(/Invalid Event Storming/);
+      expect(() => f.service.save(emptyEventStormingModel(), "absent")).toThrow(); expect(readFileSync(filename, "utf8")).toBe(source);
     }
   });
-  test("validates references, versions, duplicates, finite geometry and safe source links", () => {
-    const base = model(); const broken = structuredClone(base); broken.boards[0].placements[0].noteId = randomUUID();
-    expect(eventStormingModelSchema.safeParse(broken).success).toBe(false);
-    for (const mutate of [(v: EventStormingModelV1) => v.notes.push(v.notes[0]),
-      (v: EventStormingModelV1) => { v.boards[0].placements[0].x = NaN; },
-      (v: EventStormingModelV1) => { v.boards[0].sourceBoardId = v.boards[0].id; },
-      (v: EventStormingModelV1) => { v.boards[0].connections.push({ id: randomUUID(), source: randomUUID(), target: randomUUID(), label: "" }); },
-      (v: EventStormingModelV1) => { v.notes[0].sources = ["javascript:alert(1)"]; }]) {
-      const value = structuredClone(base); mutate(value); expect(eventStormingModelSchema.safeParse(value).success).toBe(false);
+  test("invalid layout versions preserve the file and leave semantics available", () => {
+    const f = fixture(), { model, layout } = stormFixture(); f.service.save(model, "absent");
+    const filename = path.join(f.root, ".ballet/event-storming/layout.json");
+    for (const content of ['{"version":2,"views":[]}', "<<<<<<< branch", "{"]) {
+      writeFileSync(filename, content);
+      expect(() => f.service.saveLayout(layout, "absent")).toThrow(/Repair/);
+      expect(readFileSync(filename, "utf8")).toBe(content); expect(f.context.read().kind).toBe("index");
     }
-    expect(() => parseEventStormingMarkdown("---\na: &a [a]\nnotes: *a\nversion: 1\nboards: []\n---\n")).toThrow();
   });
-  test("refuses symlink ancestors, symlink files and arbitrary document IDs", () => {
-    const f = fixture(); const outside = path.join(f.root, "outside"); mkdirSync(outside);
-    symlinkSync(outside, path.join(f.root, ".ballet")); expect(() => f.service.read()).toThrow(/ordinary directory/);
-    rmSync(path.join(f.root, ".ballet")); mkdirSync(path.join(f.root, ".ballet/event-storming"), { recursive: true });
-    writeFileSync(path.join(outside, "target.md"), "untouched"); symlinkSync(path.join(outside, "target.md"), path.join(f.root, ".ballet/event-storming/model.md"));
-    expect(() => f.service.read()).toThrow(/ordinary file/); expect(() => f.documents.put("event-storming", "../escape", "x", "absent")).toThrow();
-    expect(readFileSync(path.join(outside, "target.md"), "utf8")).toBe("untouched");
+  test("strict references, duplicate IDs, versions, geometry, safe sources and size limits", () => {
+    const { model, layout } = stormFixture();
+    for (const change of [(v: typeof model) => v.concepts.push(v.concepts[0]), (v: typeof model) => { v.processes[0].steps[0].conceptId = stormId(999); },
+      (v: typeof model) => { v.processes[0].connections[0].target = stormId(999); }, (v: typeof model) => { v.concepts[0].sources = ["javascript:alert(1)"]; }]) {
+      const value = structuredClone(model); change(value); expect(eventStormingModelSchema.safeParse(value).success).toBe(false);
+    }
+    expect(eventStormingModelSchema.safeParse({ ...model, version: 1 }).success).toBe(false);
+    expect(eventStormingModelSchema.safeParse({ ...model, x: 1 }).success).toBe(false);
+    layout.views[0].placements[0].x = NaN; expect(eventStormingLayoutSchema.safeParse(layout).success).toBe(false);
+    const f = fixture(); mkdirSync(path.join(f.root, ".ballet/event-storming"), { recursive: true });
+    writeFileSync(path.join(f.root, ".ballet/event-storming/model.json"), " ".repeat(786_433)); expect(() => f.service.read()).toThrow(/oversized/);
   });
-  test("serialization is stable across input ordering and supports 500 notes", () => {
-    const value = model(); const board = value.boards[0];
-    for (let index = 1; index < 500; index++) { const id = randomUUID(); value.notes.push({ ...value.notes[0], id, title: `Event ${index}` }); board.placements.push({ ...board.placements[0], id: randomUUID(), noteId: id, x: index * 100 }); }
-    const first = serializeEventStormingMarkdown(value); value.notes.reverse(); board.placements.reverse();
-    expect(serializeEventStormingMarkdown(value)).toBe(first); expect(parseEventStormingMarkdown(first).value.notes).toHaveLength(500);
+  test("repeated concepts, incomplete processes and branches are valid without story or aggregate", () => {
+    const f = fixture(), { model } = stormFixture(); model.processes[0].steps.push({ ...model.processes[0].steps[0], id: stormId(9) });
+    expect(f.service.save(model, "absent").value.processes[0].steps).toHaveLength(3);
+    model.concepts.reverse(); model.processes[0].steps.reverse();
+    expect(eventStormingSemanticHash(model)).toBe(f.service.read().semanticHash); expect(serializeStormJson(model)).toBe(serializeStormJson(f.service.read().value));
+  });
+  test("symlink files and ancestors are rejected and the Markdown write path is closed", () => {
+    const f = fixture(), outside = fixture(); mkdirSync(path.join(f.root, ".ballet")); symlinkSync(outside.root, path.join(f.root, ".ballet/event-storming"));
+    expect(() => f.service.read()).toThrow(/ordinary/); expect(() => f.service.save(stormFixture().model, "absent")).toThrow(/ordinary/);
+    expect(() => f.documents.put("event-storming", "model", "old content", "absent")).toThrow(/dedicated JSON/);
+  });
+  test("whole story links derive backlinks, block deletion and never rewrite approved story bytes", () => {
+    const f = fixture(); const stories = new UserStoryService(f.documents, () => {});
+    const draft = stories.create({ role: "buyer", goal: "order", benefit: "receive goods", acceptanceCriteria: [{ given: "items", when: "submit", then: "received" }], details: "More", adrIds: [] });
+    const approved = stories.approve(draft.value.id, draft.contentHash, draft.semanticHash, { id: "human", source: "request_context" }, "2026-09-06T10:00:00Z");
+    const filename = path.join(f.root, ".ballet/user-stories", `${draft.value.id}.md`), bytes = readFileSync(filename);
+    const { model } = stormFixture(); model.processes[0].steps[0].storyIds = [draft.value.id]; const saved = f.service.save(model, "absent");
+    expect(f.service.storyReferences(draft.value.id)).toHaveLength(1); expect(() => stories.remove(draft.value.id, approved.contentHash)).toThrow(/Orders/);
+    expect(readFileSync(filename)).toEqual(bytes); const context = f.context.read({ story: draft.value.id });
+    expect(context.kind === "detail" && context.stories[0].value.status).toBe("approved");
+    model.processes[0].steps[0].storyIds = []; f.service.save(model, saved.contentHash); stories.remove(draft.value.id, approved.contentHash);
+    expect(() => stories.require(draft.value.id)).toThrow();
+  });
+  test("a source removed in Git remains repairable but cannot acquire new links", () => {
+    const f = fixture(); const stories = new UserStoryService(f.documents, () => {});
+    const story = stories.create({ role: "reader", goal: "read", benefit: "learn", acceptanceCriteria: [] });
+    const { model } = stormFixture(); model.processes[0].storyIds = [story.value.id];
+    const saved = f.service.save(model, "absent");
+    rmSync(path.join(f.root, ".ballet/user-stories", `${story.value.id}.md`));
+    model.description = "Other changes are still allowed";
+    const updated = f.service.save(model, saved.contentHash);
+    expect(f.context.read()).toMatchObject({ stories: [{ id: story.value.id, issue: "Story source is missing." }] });
+    model.processes[0].steps[0].storyIds = [story.value.id];
+    expect(() => f.service.save(model, updated.contentHash)).toThrow(/not found/);
+    expect(f.service.read()).toEqual(updated);
   });
 });
