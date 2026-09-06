@@ -14,7 +14,7 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 ## Ihmisen päätösvalta ja immutable evidenssi
 
-- Use Caset ja niiden hyväksynnät ovat project-local evidenssiä. Run ei portita, snapshottaa eikä injektoi niitä; valitun Actionin instruction tai Skill ohjaa agentin lukemaan tarvittavat `.ballet/**`-dokumentit.
+- User Storyt ja niiden hyväksynnät ovat project-local evidenssiä. Run ei portita, snapshottaa eikä injektoi niitä; valitun Actionin instruction tai Skill ohjaa agentin lukemaan tarvittavat `.ballet/**`-dokumentit.
 - Critic proposal ei ole Feedbackiä ennen eksplisiittistä human approval -komentoa.
 - Refinement proposal on read-only ja sidotaan exact change-, impact- ja preimage-hasheihin. Vasta human approval saa käynnistää sallituille instruction- ja Skill-poluille rajatun applyn.
 - Hyväksytty refinement tuottaa yhden managed-worktree-commitin ja uuden immutable continuation-runin. Parent runia ei muuteta.
@@ -24,12 +24,12 @@ Nämä ohjeet koskevat koko repositoriota. Aloita aina `ARCHITECTURE.md`-tiedost
 
 - Aktiiviset versiot: [ARCHITECTURE.md:n versiomatriisi](ARCHITECTURE.md#active-version-matrix). Älä ylläpidä rinnakkaista versioluetteloa. Action execution bindingia ei ole.
 - Vanhasta datasta ei tehdä migraatiota, readeria, route-aliasta tai dual-write-polkuja. Epäyhteensopiva machine-local SQLite arkistoidaan tai poistetaan ennen käynnistystä.
-- Canonical URLit ovat `/automation/loops`, `/agents`, `/skills`, `/runtimes`, `/project/goals`, `/project/adrs`, `/project/constraints`, `/project/use-cases`, `/project/instructions`, `/run`, `/feedback`, `/reviews/critic` ja `/reviews/refinement`; Run Evidence näkyy omistavan Runin sisällä. API on `/api/*`.
+- Canonical URLit ovat `/automation/loops`, `/agents`, `/skills`, `/runtimes`, `/project/overview`, `/project/event-storming`, `/project/user-stories`, `/project/adrs`, `/project/instructions`, `/run`, `/feedback`, `/reviews/critic` ja `/reviews/refinement`; Run Evidence näkyy omistavan Runin sisällä. API on `/api/*`.
 
 ## Platformin ja projektin raja
 
 - Platform-koodi toteuttaa vain yleiset Environment-, State-, Action-, Validation/Work-, Feedback-, Critic-, Refinement-, provider-, worktree-, queue/event-, SQLite-, HTTP-security- ja SSE-primitivet.
-- Goals, ADR:t, Constraints, Use Caset, Environment-määritys, instructionit, Skillit, release- ja arc42-menettelyt ovat project-local dataa `.ballet/**`- ja `.agents/skills/**`-poluissa.
+- Overview, ADR:t, User Storyt, Environment-määritys, instructionit, Skillit, release- ja arc42-menettelyt ovat project-local dataa `.ballet/**`- ja `.agents/skills/**`-poluissa.
 - Älä kovakoodaa projektikohtaisia workflow-tunnisteita `backend/`, `frontend/` tai `shared/`-koodiin.
 
 ## UI ja design

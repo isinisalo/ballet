@@ -1,5 +1,5 @@
 import type {
-  ActionAgentDefinition, ActionDefinition, ActionAgentRole, ProjectConfigurationV25, StateDefinition
+  ActionAgentDefinition, ActionDefinition, ActionAgentRole, ProjectConfigurationV26, StateDefinition
 } from "../../../shared/orchestration/environment.js";
 import { actionAgentId } from "../../../shared/orchestration/environment.js";
 import type { ProjectConfigurationRepository } from "./ProjectConfigurationRepository.js";
@@ -65,7 +65,7 @@ export class ActionAgentMutationService {
       value: starterAgent(action, role) }));
   }
 
-  private mutate(before: ProjectConfigurationV25, after: ProjectConfigurationV25, writes: AgentWrite[], deletes: string[], expectedHash: string): unknown {
+  private mutate(before: ProjectConfigurationV26, after: ProjectConfigurationV26, writes: AgentWrite[], deletes: string[], expectedHash: string): unknown {
     this.projects.assertUnlocked();
     const ids = [...new Set([...writes.map(({ id }) => id), ...deletes])];
     const snapshots = new Map(ids.map((id) => [id, this.agents.inspectAction(id)]));
@@ -116,14 +116,14 @@ const starterAgent = (action: ActionDefinition, role: ActionAgentRole): Omit<Act
 const publicSlot = (slot: ReturnType<CodexAgentRepository["requireAction"]>) => {
   const { source, ...value } = slot; void source; return value;
 };
-const requireState = (config: ProjectConfigurationV25, stateId: string): StateDefinition => {
+const requireState = (config: ProjectConfigurationV26, stateId: string): StateDefinition => {
   const state = config.environment.states.find(({ id }) => id === stateId); if (!state) throw new NotFoundError(`State ${stateId} was not found.`); return state;
 };
-const requireAction = (config: ProjectConfigurationV25, stateId: string, actionId: string): ActionDefinition => {
+const requireAction = (config: ProjectConfigurationV26, stateId: string, actionId: string): ActionDefinition => {
   const action = requireState(config, stateId).actions.find(({ id }) => id === actionId);
   if (!action) throw new NotFoundError(`Action ${actionId} was not found.`); return action;
 };
-const replaceState = (config: ProjectConfigurationV25, state: StateDefinition): ProjectConfigurationV25 => ({
+const replaceState = (config: ProjectConfigurationV26, state: StateDefinition): ProjectConfigurationV26 => ({
   ...config, environment: { ...config.environment, states: replace(config.environment.states, state) }
 });
 const replace = <T extends { id: string }>(values: T[], value: T): T[] =>

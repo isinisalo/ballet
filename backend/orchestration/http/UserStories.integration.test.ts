@@ -54,6 +54,25 @@ describe("User Story HTTP contracts", () => {
     expect(await (await request(`/${saved.value.id}`)).json()).toEqual(saved);
   });
 
+  test("requires explicit human approval of the persisted file and semantic hash", async () => {
+    const { request } = await fixture();
+    const saved = await (await request("", json("POST", input))).json() as UserStoryDocument;
+    const endpoint = `/${saved.value.id}/approve`;
+    const command = { expectedHash: saved.contentHash, expectedContentHash: saved.semanticHash };
+    expect((await request(endpoint, json("POST", { ...command, actor: { id: "agent" } }))).status).toBe(400);
+    expect((await request(endpoint, json("POST", { ...command, approvedBy: "agent" }))).status).toBe(400);
+    expect((await request(endpoint, json("POST", { ...command, expectedHash: "f".repeat(64) }))).status).toBe(409);
+    expect((await request(endpoint, json("POST", { ...command, expectedContentHash: "f".repeat(64) }))).status).toBe(409);
+    expect((await request(endpoint, { ...json("POST", command), headers: { ...headers, Origin: "https://agent.invalid" } })).status).toBe(403);
+    const response = await request(endpoint, json("POST", command)); expect(response.status).toBe(200);
+    const approved = await response.json() as UserStoryDocument;
+    expect(approved.value.approval).toEqual({ approvedBy: "human", approvedAt: "2026-09-05T10:00:00.000Z", revision: 1, contentHash: saved.semanticHash });
+    const edited = await (await request(`/${saved.value.id}`, json("PUT", { value: { ...input, benefit: "New benefit" }, expectedHash: approved.contentHash }))).json() as UserStoryDocument;
+    expect(edited.value.status).toBe("draft"); expect(edited.value.approval).toBeUndefined();
+    expect((await request(endpoint, json("POST", command))).status).toBe(409);
+    expect((await request(`/${saved.value.id}/return-to-draft`, json("POST", { expectedHash: saved.contentHash }))).status).toBe(409);
+  });
+
   test("keeps reads available and rejects every mutation during an active Run", async () => {
     const { request, projects } = await fixture();
     const saved = await (await request("", json("POST", input))).json() as UserStoryDocument;
@@ -74,7 +93,7 @@ async function fixture() {
   // Only the exercised User Story facade dependencies exist; runtime operations must not be reached.
   const controller = new ApiController({ project, connection, invalidations, now: () => "2026-09-05T10:00:00.000Z" } as unknown as OrchestrationControllerDependencies);
   const app = express(); app.use(loopbackSecurity(4317)); app.use(express.json({ limit: "1mb" }));
-  app.use("/api", createOrchestrationRouter({ controller, actor: () => ({ id: "human", source: "request_context" }) }));
+  app.use("/api", createOrchestrationRouter({ controller, actor: () => ({ id: "human", source: "local_operator" }) }));
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     void _next; if (!sendKnownHttpError(error, res)) res.status(500).json({ error: String(error) });
   });

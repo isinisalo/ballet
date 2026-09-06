@@ -1,0 +1,295 @@
+{
+  "baseCommit": "caacde54ec9cf8a01375884f033fb2617f7807fe",
+  "files": [
+    {
+      "source": ".ballet/goals/ballet-project-map.png",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/ballet-project-map.png",
+      "sha256": "2246ac61c94b323f50efed4a787c67a1ae8c6191e4f0166425e819c016361f34"
+    },
+    {
+      "source": ".ballet/goals/goal-001-paikallinen-agenttikomentokeskus.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-001-paikallinen-agenttikomentokeskus.md",
+      "sha256": "ef4da59bfccab137497ae45e9a30c71f66734735bfc357ae8a2e15ce0dbb0543"
+    },
+    {
+      "source": ".ballet/goals/goal-002-versionhallittu-projektimalli.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-002-versionhallittu-projektimalli.md",
+      "sha256": "d750cd2740fcd1b09e11e8cac472234e3b552ec90db4250c316c616dc5d84530"
+    },
+    {
+      "source": ".ballet/goals/goal-003-monipalveluntarjoajan-agenttisuoritus.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-003-monipalveluntarjoajan-agenttisuoritus.md",
+      "sha256": "e62571cd26e252c0356f3b55825df52130fcd828273feb69540eab5acb9f1ac2"
+    },
+    {
+      "source": ".ballet/goals/goal-004-loop-tyonkulut-ja-ajastus.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-004-loop-tyonkulut-ja-ajastus.md",
+      "sha256": "054494740d66a60934b3f84b29764d23b48e8e8b1515039c1445bac964594fa0"
+    },
+    {
+      "source": ".ballet/goals/goal-005-turvallinen-git-suoritus.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-005-turvallinen-git-suoritus.md",
+      "sha256": "5e97432bad5f9a820d31a6307f052cb9680606374dcbe80077ee8b94de28e352"
+    },
+    {
+      "source": ".ballet/goals/goal-006-kestava-tila-ja-havainnoitavuus.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-006-kestava-tila-ja-havainnoitavuus.md",
+      "sha256": "131212e84b5a513f28471275a3a925c2178ad41fc9901fc4f151d77a7be2cfd2"
+    },
+    {
+      "source": ".ballet/goals/goal-007-operaattorin-kayttokokemus.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-007-operaattorin-kayttokokemus.md",
+      "sha256": "2f9f38193b260f24503753e908cb978444d02c4534fdda1220455883e4d36c0f"
+    },
+    {
+      "source": ".ballet/goals/goal-008-checkout-elinkaari-ja-jakelu.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-008-checkout-elinkaari-ja-jakelu.md",
+      "sha256": "ef93f76e40b984877b6dc4faa57980ee3b9814660609f74e799aa81a120e7aa3"
+    },
+    {
+      "source": ".ballet/goals/goal-009-arc42-jatkuva-arkkitehtuurimenetelma.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-009-arc42-jatkuva-arkkitehtuurimenetelma.md",
+      "sha256": "b5389e340d408d8550182863c742957f46145a48b41367cf65689236f810b114"
+    },
+    {
+      "source": ".ballet/goals/goal-010-asennettavat-loop-moduulit.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-010-asennettavat-loop-moduulit.md",
+      "sha256": "0da8cbcfcfd3e7b21561e783969590bd8a473c5d3b0f014df96f7f53301a4c20"
+    },
+    {
+      "source": ".ballet/goals/goal-011-loop-engineer-kolmitasoinen-canvas.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-011-loop-engineer-kolmitasoinen-canvas.md",
+      "sha256": "aae75c526ddaf3d1b5154b2951ab6cc7a28ece158c30a1c3cb3fff62d72c9b12"
+    },
+    {
+      "source": ".ballet/goals/goal-012-graph-ja-loop-engineering.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-012-graph-ja-loop-engineering.md",
+      "sha256": "af6f31b108dbde75115f18708578b8942ea7b59002a5b1ff9b6f91d778d2eb22"
+    },
+    {
+      "source": ".ballet/goals/goal-013-workflow-engineering.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-013-workflow-engineering.md",
+      "sha256": "43a4a0c7dbb9aecbe960767875d7d3709b6ffd7c932fa7033915ea3857e10c26"
+    },
+    {
+      "source": ".ballet/goals/goal-014-graph-engineering-runbook.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-014-graph-engineering-runbook.md",
+      "sha256": "2c8ef3144594f361360327ddb1d9059770693f022d70bc137d0b487d82fd55db"
+    },
+    {
+      "source": ".ballet/goals/goal-015-three-level-graph-node-engineering.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-015-three-level-graph-node-engineering.md",
+      "sha256": "b6dbedb203f8c98b2f13a03fc6f7eb7c1af026c7ad45e4b2ebc39419b5e33f7d"
+    },
+    {
+      "source": ".ballet/goals/goal-016-stochastic-policy-orchestration.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-016-stochastic-policy-orchestration.md",
+      "sha256": "e07f30aab0dcd07661c1e834d115faf336602c62db6b096755bdc3fe8b5668ae"
+    },
+    {
+      "source": ".ballet/goals/goal-017-outcome-aware-hierarchical-ssp-smdp.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-017-outcome-aware-hierarchical-ssp-smdp.md",
+      "sha256": "ba6594fb567f6b51aa9b3daa064781301d45d7e48c5b4bd4564403cae7098bfa"
+    },
+    {
+      "source": ".ballet/goals/goal-018-capability-first-card-authoring.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-018-capability-first-card-authoring.md",
+      "sha256": "269e0af484cc0c2b25ac89d5426a7a59b8d092e3ca6a8f71105c6cda6c9856a3"
+    },
+    {
+      "source": ".ballet/goals/goal-019-governed-policy-calibration-and-promotion.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-019-governed-policy-calibration-and-promotion.md",
+      "sha256": "e9a2b6ef74a37f6c3918e2f09f100ee046acba133801abf0c03918aae6430810"
+    },
+    {
+      "source": ".ballet/goals/goal-020-graph-reward-mdp.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-020-graph-reward-mdp.md",
+      "sha256": "fbe05940f38ecbb677d3fdaf2977e34731b8b81625c3523f16bafc6c16d7616a"
+    },
+    {
+      "source": ".ballet/goals/goal-021-hierarchical-reward-mdp.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-021-hierarchical-reward-mdp.md",
+      "sha256": "09ac61ea889c3535c932a0055835f71de9b280033a565e731256228bbf5a8a04"
+    },
+    {
+      "source": ".ballet/goals/goal-022-validation-led-environment-orchestration.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-022-validation-led-environment-orchestration.md",
+      "sha256": "b87e659f162f00e3cd6787dce625b5c425ecdc1c403642e2197ee420a844533b"
+    },
+    {
+      "source": ".ballet/goals/goal-023-markdown-agent-daemon-orchestration.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-023-markdown-agent-daemon-orchestration.md",
+      "sha256": "99fb16184bfb06d4fafa08695fc20a6cb8c44f90b60b364bef7de983924a4b0b"
+    },
+    {
+      "source": ".ballet/goals/goal-024-checkout-local-daemon.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/goal-024-checkout-local-daemon.md",
+      "sha256": "4a6a1bf2f294a3b53b984ab07440a04748c5593fae11d0636b31bc53691e1917"
+    },
+    {
+      "source": ".ballet/goals/summary.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/goals/summary.md",
+      "sha256": "8cfbafd5e86754bd9b3da4cbc8e885b2d41adb281f9ca74ac9589631301ef0a5"
+    },
+    {
+      "source": ".ballet/constraints/constraint-001.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-001.md",
+      "sha256": "6d9d89f5e591643a2e1a2bbb54cd9832bbfea4596087a2b33f7232c6ba87a91b"
+    },
+    {
+      "source": ".ballet/constraints/constraint-002.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-002.md",
+      "sha256": "553d9a77219aa19ac8e343c3010bfe2c3644812ad6477f09592bd8e1f91a8a26"
+    },
+    {
+      "source": ".ballet/constraints/constraint-003.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-003.md",
+      "sha256": "2cbbfea009969827e9520eee44130ab544982186f6565ae6636dcd1138479ff2"
+    },
+    {
+      "source": ".ballet/constraints/constraint-004.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-004.md",
+      "sha256": "0a0e0fbb119fa0231a7768f450fbd7f63f17f9a3d261a6097684715ff89fee0a"
+    },
+    {
+      "source": ".ballet/constraints/constraint-005.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-005.md",
+      "sha256": "0bc30b085924f760e6add2b3eb99ca760cb44cf28106650c6d3f998d9d768c90"
+    },
+    {
+      "source": ".ballet/constraints/constraint-006.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-006.md",
+      "sha256": "99c138e8ad5fbd67745166bd8d67ba39e92882ff34bb4fac412a246861a9710b"
+    },
+    {
+      "source": ".ballet/constraints/constraint-007.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-007.md",
+      "sha256": "f9e384f095f740a7700e663a04811597680808379c54e82ef443c47aaa1fa23d"
+    },
+    {
+      "source": ".ballet/constraints/constraint-008.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-008.md",
+      "sha256": "8a675aabf84a2eca8e61db7f8bcbb0a2a7a938e380bbda6df5c48a2bbc824806"
+    },
+    {
+      "source": ".ballet/constraints/constraint-009.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-009.md",
+      "sha256": "e6aa37fce30326667655c04e66f2ce36f691e075fb84044901a63cfd129eecd1"
+    },
+    {
+      "source": ".ballet/constraints/constraint-010.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-010.md",
+      "sha256": "9ed7368852b98eaddeef3cf1eb3f8fa5b4b30c9aed3c9210844a1aa91f78941b"
+    },
+    {
+      "source": ".ballet/constraints/constraint-011.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-011.md",
+      "sha256": "db834d9d5480dba572b51584e45d330aaf27b954a81be469c475898f730be6b3"
+    },
+    {
+      "source": ".ballet/constraints/constraint-012.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-012.md",
+      "sha256": "dbcfcf220eae9c80d458bd9c15dd4d18d62dbf14de5ed5b260edadadef72f115"
+    },
+    {
+      "source": ".ballet/constraints/constraint-013.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-013.md",
+      "sha256": "3c2f4810fc84baf972313e26ddc50be6da1da706ff2868c3c04b6de292ecade0"
+    },
+    {
+      "source": ".ballet/constraints/constraint-014.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-014.md",
+      "sha256": "da972ee8759c208f4c09fa9c5495ec58cfbd018495d4499efb982ede1d09d874"
+    },
+    {
+      "source": ".ballet/constraints/constraint-015.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/constraints/constraint-015.md",
+      "sha256": "b0e85e1869378d3678f85165304f7e1e40271a6f61dec8bcb24ac91f7080364d"
+    },
+    {
+      "source": ".ballet/use-cases/UC-01.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-01.md",
+      "sha256": "273896dd339bf6c80a2e57613d481f77f30161fd4bac842db3897e1e36c6dcdf"
+    },
+    {
+      "source": ".ballet/use-cases/UC-02.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-02.md",
+      "sha256": "d0d13fd457fe2ae612b32f410e9f8ea12c704021632afd706fb519e4b74c7a1d"
+    },
+    {
+      "source": ".ballet/use-cases/UC-03.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-03.md",
+      "sha256": "a6693f500f4e1372deb6912299456b552316451fc2ac19328d9a5d563e1806fd"
+    },
+    {
+      "source": ".ballet/use-cases/UC-04.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-04.md",
+      "sha256": "f88f1ddfb31c88af390cd90ad95a969571b25b7c261bb12e34a6def29a6eb2ea"
+    },
+    {
+      "source": ".ballet/use-cases/UC-05.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-05.md",
+      "sha256": "9a7cacc46f0f4ff3139790cc62aa1fdc55cce701557375bac2d6f400e2ad6d92"
+    },
+    {
+      "source": ".ballet/use-cases/UC-06.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-06.md",
+      "sha256": "17721da3cfefe4d55e0a2f2908e0a7a2ae347951626ff5248c93dd8f4ea71b13"
+    },
+    {
+      "source": ".ballet/use-cases/UC-07.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-07.md",
+      "sha256": "56d2e0bb853877ae97723dd89b2a37eb83bb58d32b0d2ab858b0740a5cd4816e"
+    },
+    {
+      "source": ".ballet/use-cases/UC-08.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-08.md",
+      "sha256": "f3a9e0a5059c8d090666cda8700cd5b8ff6fa566c134d488eade7d66aca94417"
+    },
+    {
+      "source": ".ballet/use-cases/UC-09.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-09.md",
+      "sha256": "65ffa65f04d7f391a92b0dc7102579e7c62921247ab750d62d204525e496f03e"
+    },
+    {
+      "source": ".ballet/use-cases/UC-10.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-10.md",
+      "sha256": "2be14eaee9114857805131395d77211bd9a7b2c3e5d013f3874429a7285f3ef6"
+    },
+    {
+      "source": ".ballet/use-cases/UC-11.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-11.md",
+      "sha256": "6a74530db425ad8c5cdd5bc79af5feadd459f3c1b6e6118d3bb85fd4ba15684b"
+    },
+    {
+      "source": ".ballet/use-cases/UC-12.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-12.md",
+      "sha256": "5046ad13d529acb53a7527c72cfc5b8358309a13a6800696df78976f6d864634"
+    },
+    {
+      "source": ".ballet/use-cases/UC-13.md",
+      "archived": ".ballet/history/project-definition-2026-09-06/use-cases/UC-13.md",
+      "sha256": "4067255424d01c6ff5cc6d75a41978b789cd451af27d1a1f46f29a36ec1d246b"
+    },
+    {
+      "source": ".ballet/project.json",
+      "archived": ".ballet/history/project-definition-2026-09-06/project.json",
+      "sha256": "f4a85f21b79851c0e91b4cdb848513c242be767785b3e251350bd2121a3f9fd3"
+    }
+  ],
+  "destinations": {
+    "UC-01": ".ballet/user-stories/54625950-26fb-46fe-90e3-f4cf31084368.md",
+    "UC-02": ".ballet/user-stories/9b094976-5840-4764-8c2d-9a42559a09d6.md",
+    "UC-04": ".ballet/user-stories/b87320a0-3e7c-4a59-b120-4fa7e3d95b7c.md",
+    "UC-06": ".ballet/user-stories/837f8ecb-c3e7-46d5-a8a4-9521f37542e4.md",
+    "UC-10": ".ballet/user-stories/a172e384-43eb-4fb3-95ca-9d42ab52a5f7.md",
+    "UC-11": ".ballet/user-stories/ff255f3a-5748-42da-904c-311cc9ff9c43.md",
+    "UC-12": ".ballet/user-stories/9def77e6-89c3-4ef3-b295-89323c592807.md",
+    "UC-13": ".ballet/user-stories/cc322abc-96e2-41ef-93f8-1b5aba633995.md",
+    "UC-03": ".ballet/overview.md#project-truth-and-explicit-context",
+    "UC-05": ".ballet/overview.md#ordered-execution-and-validation",
+    "UC-07": ".ballet/overview.md#ordered-execution-and-validation",
+    "UC-08": ".ballet/overview.md#ordered-execution-and-validation",
+    "UC-09": ".ballet/overview.md#ordered-execution-and-validation"
+  }
+}

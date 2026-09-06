@@ -1,4 +1,3 @@
-export * from "./direction.js";
 export * from "./environment.js";
 export * from "./execution.js";
 export * from "./gates.js";
@@ -15,7 +14,6 @@ export * from "./routeInventory.js";
 export * from "./runtime.js";
 export * from "./taskEnvelopes.js";
 export * from "./versions.js";
-export * from "./schemas/directionSchemas.js";
 export * from "./schemas/environmentSchemas.js";
 export * from "./schemas/executionSchemas.js";
 export * from "./schemas/outcomeSchemas.js";

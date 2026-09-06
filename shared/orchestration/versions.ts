@@ -1,5 +1,5 @@
-export const PROJECT_CONFIG_VERSION = 25 as const;
-export const ROOT_SNAPSHOT_VERSION = 20 as const;
+export const PROJECT_CONFIG_VERSION = 26 as const;
+export const ROOT_SNAPSHOT_VERSION = 21 as const;
 export const TASK_ENVELOPE_VERSION = 11 as const;
 export const ROLE_OUTCOME_VERSION = 11 as const;
 export const PROMPT_COMPOSITION_VERSION = 16 as const;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EXECUTION_SPEC_VERSION, PROJECT_CONFIG_VERSION, ROLE_OUTCOME_VERSION,
-  TASK_ENVELOPE_VERSION, actionAgentDefinitionSchema, agentRunSchema, approveUseCase, projectConfigurationV25Schema,
+  TASK_ENVELOPE_VERSION, actionAgentDefinitionSchema, agentRunSchema, projectConfigurationV26Schema,
   refinementOutcomeSchema, roleOutcomeV11Schema, sha256, taskEnvelopeV11Schema,
   validationDecisionSchema, workOutcomeSchema
 } from "../../../shared/orchestration/index.js";
@@ -113,14 +113,14 @@ describe("task and runtime boundary schemas", () => {
   });
 });
 
-describe("Project Configuration v25 boundary", () => {
+describe("Project Configuration v26 boundary", () => {
   it("publishes the canonical strict versions", () => {
-    expect(PROJECT_CONFIG_VERSION).toBe(25);
+    expect(PROJECT_CONFIG_VERSION).toBe(26);
     expect(TASK_ENVELOPE_VERSION).toBe(11);
     expect(ROLE_OUTCOME_VERSION).toBe(11);
     expect(EXECUTION_SPEC_VERSION).toBe(18);
-    expect(ROOT_SNAPSHOT_VERSION).toBe(20);
-    expect(DATABASE_SCHEMA_VERSION).toBe(23);
+    expect(ROOT_SNAPSHOT_VERSION).toBe(21);
+    expect(DATABASE_SCHEMA_VERSION).toBe(24);
   });
 
   it("accepts only the strict Action Agent definition", () => {
@@ -132,27 +132,12 @@ describe("Project Configuration v25 boundary", () => {
   });
 
   it("accepts a runnable bounded Environment and rejects unknown fields", () => {
-    const useCase = approveUseCase({
-      id: "UC-1", name: "Use Case", status: "draft",
-      examples: [{ given: "Direction", when: "Action runs", then: "Outcome exists" }],
-      successGoals: ["Success"], failureGoals: ["Failure"], expectedOutcomes: ["Evidence"],
-      goalIds: ["goal"], adrIds: ["adr"], constraintIds: ["constraint"]
-    }, { approvedBy: "human", approvedAt: "2026-08-29T10:00:00.000Z", revision: 1 });
     const validation = { agentId: "ballet-action-validation-action", skillResources: [] };
     const work = { agentId: "ballet-action-work-action", skillResources: [] };
     const criticAgent = { agentId: "ballet-critic-agent", skillResources: [] };
     const refinementAgent = { agentId: "ballet-refinement-agent", skillResources: [] };
     const config = {
-      version: 25,
-      direction: {
-        goals: [{ id: "goal", name: "Goal", status: "accepted" }],
-        adrs: [{ id: "adr", name: "ADR", status: "accepted" }],
-        constraints: [{
-          id: "constraint", name: "Constraint", status: "accepted", kind: "required",
-          description: "Required", rationale: "Reason"
-        }],
-        useCases: [useCase]
-      },
+      version: 26,
       environment: {
         id: "environment", name: "Environment", description: "Description",
         states: [{
@@ -164,15 +149,17 @@ describe("Project Configuration v25 boundary", () => {
       refinement: { version: 2, enabled: true, agent: refinementAgent,
         allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"] }
     };
-    expect(projectConfigurationV25Schema.safeParse(config).success).toBe(true);
-    expect(projectConfigurationV25Schema.safeParse({ ...config, version: 24 }).success).toBe(false);
-    expect(projectConfigurationV25Schema.safeParse({ ...config, environment: { ...config.environment,
+    expect(projectConfigurationV26Schema.safeParse(config).success).toBe(true);
+    expect(projectConfigurationV26Schema.safeParse({ ...config, direction: {} }).success).toBe(false);
+    expect(projectConfigurationV26Schema.safeParse({ ...config, overview: "duplicate" }).success).toBe(false);
+    expect(projectConfigurationV26Schema.safeParse({ ...config, version: 24 }).success).toBe(false);
+    expect(projectConfigurationV26Schema.safeParse({ ...config, environment: { ...config.environment,
       states: [{ ...config.environment.states[0], useCaseIds: ["UC-1"] }] } }).success).toBe(false);
-    expect(projectConfigurationV25Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
+    expect(projectConfigurationV26Schema.safeParse({ ...config, graph: {} }).success).toBe(false);
     const duplicateAction = structuredClone(config);
     duplicateAction.environment.states.push({ ...duplicateAction.environment.states[0]!, id: "state-2", order: 2 });
-    expect(projectConfigurationV25Schema.safeParse(duplicateAction).success).toBe(false);
-    expect(projectConfigurationV25Schema.safeParse({
+    expect(projectConfigurationV26Schema.safeParse(duplicateAction).success).toBe(false);
+    expect(projectConfigurationV26Schema.safeParse({
       ...config,
       critic: { ...config.critic, schedules: [{ ...config.critic.schedules[0], timeZone: "Mars/Olympus" }] }
     }).success).toBe(false);

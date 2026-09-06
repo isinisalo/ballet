@@ -12,7 +12,7 @@ import { EVENT_STORMING_LIMITS } from "../../../shared/orchestration/eventStormi
 import { USER_STORY_LIMITS } from "../../../shared/orchestration/userStories.js";
 
 const COLLECTIONS: Record<ProjectDocumentKind, string> = {
-  goal: "goals", adr: "adr", constraint: "constraints", "use-case": "use-cases",
+  overview: ".", adr: "adr",
   "user-story": "user-stories", "event-storming": "event-storming", instruction: "instructions", skill: "../.agents/skills"
 };
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
@@ -28,6 +28,7 @@ export class ProjectDocumentRepository {
   ) {}
 
   list(kind: ProjectDocumentKind): ProjectDocument[] {
+    if (kind === "overview") return this.optional(kind, "overview") ? [this.require(kind, "overview")] : [];
     const directory = this.collectionPath(kind);
     const metadata = status(directory);
     if (!metadata) return [];
@@ -86,7 +87,7 @@ export class ProjectDocumentRepository {
   }
 
   runReferences(kind: ProjectDocumentKind, id: string, activeOnly = false): string[] {
-    if (kind === "user-story" || kind === "event-storming") return [];
+    if (kind !== "instruction" && kind !== "skill") return [];
     if (!this.connection) return [];
     const rows = this.connection().prepare(`
       SELECT environment_run_id, execution_snapshot_json FROM environment_runs
@@ -103,6 +104,10 @@ export class ProjectDocumentRepository {
   private filename(kind: ProjectDocumentKind, id: string): string {
     if (!(kind === "skill" ? SAFE_SKILL_ID : SAFE_ID).test(id)) throw new ConflictError("Document id contains unsafe path characters.");
     const directory = this.collectionPath(kind);
+    if (kind === "overview") {
+      if (id !== "overview") throw new ConflictError("Overview uses one document only.");
+      return path.join(directory, "overview.md");
+    }
     if (kind === "event-storming") {
       if (id !== "model") throw new ConflictError("Event Storming uses the model document only.");
       return path.join(directory, "model.md");
@@ -117,7 +122,7 @@ export class ProjectDocumentRepository {
 
   private collectionPath(kind: ProjectDocumentKind): string {
     const directory = path.join(this.dataRoot, COLLECTIONS[kind]);
-    if (kind === "user-story" || kind === "event-storming") {
+    if (kind === "overview" || kind === "user-story" || kind === "event-storming") {
       for (const ancestor of [path.dirname(this.dataRoot), this.dataRoot, directory]) {
         const metadata = status(ancestor);
         if (metadata) assertOrdinaryDirectory(metadata, ancestor);
@@ -133,13 +138,8 @@ export class ProjectDocumentRepository {
 
 const snapshotContains = (snapshot: unknown, kind: ProjectDocumentKind, id: string): boolean => {
   const value = snapshot as {
-    direction?: { goals?: Array<{ id: string }>; adrs?: Array<{ id: string }>; constraints?: Array<{ id: string }> };
     resources?: Array<{ kind: string; id: string }>;
   };
-  if (kind === "goal") return value.direction?.goals?.some((item) => item.id === id) ?? false;
-  if (kind === "adr") return value.direction?.adrs?.some((item) => item.id === id) ?? false;
-  if (kind === "constraint") return value.direction?.constraints?.some((item) => item.id === id) ?? false;
-  if (kind === "use-case") return false;
   return value.resources?.some((item) => item.kind === kind && item.id === id) ?? false;
 };
 

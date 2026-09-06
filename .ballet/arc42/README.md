@@ -3,8 +3,8 @@ id: arc42-index
 title: Balletin arc42-arkkitehtuuri-indeksi
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-05'
-version: 30
+updatedAt: '2026-09-06'
+version: 31
 tags: [arc42, architecture, index]
 ---
 
@@ -25,4 +25,6 @@ Aloita [ARCHITECTURE.md:n lukupolusta ja aktiivisesta versiomatriisista](../../A
 11. [Riskit ja tekninen velka](11-risks-and-technical-debt.md)
 12. [Sanasto](12-glossary.md)
 
-Tukilähteet: [STATUS](STATUS.md), [TRACEABILITY](TRACEABILITY.md), [METHOD-HEALTH](METHOD-HEALTH.md), [runtime state contract](STATE-CONTRACT.md) ja [current Loop Engineering Dagre initiative](initiatives/loop-engineering-three-level-dagre/BRIEF.md). Historialliset initiativet ja superseded ADR:t ovat audit trailia, eivät aktiivinen vaihtoehtoinen arkkitehtuuri.
+Tukilähteet: [STATUS](STATUS.md), [TRACEABILITY](TRACEABILITY.md), [METHOD-HEALTH](METHOD-HEALTH.md), [runtime state contract](STATE-CONTRACT.md) ja [neljän Project-näkymän toimitusevidenssi](initiatives/four-project-views/EVIDENCE.md).
+
+Historialliset initiativet, elokuun 2026 `canvases/`-tilannekuvat, `migration/`-aineisto ja superseded ADR:t ovat päivättyä audit trailia, eivät aktiivinen vaihtoehtoinen arkkitehtuuri. Niiden vanhat termit ja lähdeviitteet kuvaavat omaa revisiotaan. Projektimäärittelyn alkuperäiset bytesit ja siirtokartta löytyvät [erillisestä historia-arkistosta](../history/project-definition-2026-09-06/README.md).

@@ -6,12 +6,11 @@ const documentRoutes = (collection: string) => [
 
 export const OrchestrationRouteInventory = [
   "GET /api/project", "PUT /api/project", "GET /api/events",
-  ...documentRoutes("goals"), ...documentRoutes("adrs"), ...documentRoutes("constraints"),
-  ...documentRoutes("use-cases"), "GET /api/agents", "GET /api/agents/:id", "PUT /api/agents/:id",
+  "GET /api/overview", "PUT /api/overview", ...documentRoutes("adrs"), "GET /api/agents", "GET /api/agents/:id", "PUT /api/agents/:id",
   ...documentRoutes("instructions"), ...documentRoutes("skills"),
   ...documentRoutes("user-stories"),
   "GET /api/event-storming", "PUT /api/event-storming",
-  "POST /api/use-cases/:id/approve", "POST /api/use-cases/:id/return-to-draft",
+  "POST /api/user-stories/:id/approve", "POST /api/user-stories/:id/return-to-draft",
   "GET /api/reference-index", "GET /api/environment", "PUT /api/environment",
   "POST /api/environment/states", "GET /api/environment/states/:stateId",
   "PUT /api/environment/states/:stateId",

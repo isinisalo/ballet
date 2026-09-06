@@ -2,7 +2,7 @@ import type { ActionRoleComposition, AgentComposition } from "../../../shared/or
 import type { ExecutionPromptEvidenceV16 } from "../../../shared/orchestration/execution.js";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV20 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV21 } from "../../../shared/orchestration/runtime.js";
 import type { TaskEnvelopeV11 } from "../../../shared/orchestration/taskEnvelopes.js";
 
 const MAX_PROMPT_BYTES = 512 * 1024;
@@ -10,7 +10,7 @@ const MAX_ENVELOPE_BYTES = 192 * 1024;
 const SYSTEM_ROLE_CONTRACT = "Ballet owns orchestration and human approvals. Obey the role, permissions, immutable context, and exact output contract.";
 
 export const composeOrchestrationPrompt = (input: {
-  snapshot: RootSnapshotV20;
+  snapshot: RootSnapshotV21;
   envelope: TaskEnvelopeV11;
   composition: ActionRoleComposition | AgentComposition;
   subject: ExecutionPromptEvidenceV16["subject"];
@@ -68,7 +68,7 @@ const evidence = (
 ): ExecutionPromptEvidenceV16["resources"][number] => ({
   kind, origin: "project", id: resource.id, relativePath: resource.relativePath, sourceSha256: resource.sourceSha256
 });
-const requireResource = (snapshot: RootSnapshotV20, kind: "instruction" | "skill", id: string) => {
+const requireResource = (snapshot: RootSnapshotV21, kind: "instruction" | "skill", id: string) => {
   const resource = snapshot.resources.find((candidate) => candidate.kind === kind && candidate.id === id);
   if (!resource) throw new Error(`Snapshot is missing ${kind} ${id}.`);
   return resource;

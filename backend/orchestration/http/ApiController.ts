@@ -15,7 +15,7 @@ import type { CriticSchedulerService } from "../governance/CriticSchedulerServic
 import type { FeedbackBoxService } from "../governance/FeedbackBoxService.js";
 import type { GovernanceExecutionService } from "../governance/GovernanceExecutionService.js";
 import type { RefinementApplyService } from "../governance/RefinementApplyService.js";
-import type { ProjectDefinitionService, DirectionValue } from "../project/ProjectDefinitionService.js";
+import type { ProjectDefinitionService } from "../project/ProjectDefinitionService.js";
 import type {
   InvalidationBroadcaster
 } from "./InvalidationBroadcaster.js";
@@ -212,5 +212,3 @@ export class ApiController {
     this.dependencies.invalidations?.publish(kind, this.dependencies.now(), entityId);
   }
 }
-
-export type { DirectionValue };

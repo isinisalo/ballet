@@ -17,7 +17,7 @@ import type { OrchestrationRuntimeProvider } from "../runtime/RuntimeProvider.js
 import { mapProviderPermissions } from "../runtime/ProviderPermissions.js";
 import { buildCriticEnvelope, buildRefinementEnvelope } from "./GovernanceEnvelopeBuilder.js";
 import { isAllowedCanonicalRefinementPath } from "../../../shared/orchestration/refinement.js";
-import type { RootSnapshotV20 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV21 } from "../../../shared/orchestration/runtime.js";
 import { parse as parseToml } from "smol-toml";
 
 export class GovernanceExecutionService {
@@ -257,7 +257,7 @@ export class GovernanceExecutionService {
       JOIN environment_runs er ON er.environment_run_id = rr.source_environment_run_id
       WHERE rr.refinement_run_id = ?
     `).get(refinementRunId) as { base_commit: string; result_commit: string | null; execution_snapshot_json: string };
-    const snapshot = JSON.parse(source.execution_snapshot_json) as RootSnapshotV20;
+    const snapshot = JSON.parse(source.execution_snapshot_json) as RootSnapshotV21;
     if (outcome.files.some((file) => !validAgentTomlRefinement(file, snapshot))) {
       this.failGovernanceRun(undefined, refinementRunId, at);
       throw new Error("Refinement may change only developer_instructions in a fixed governance Agent TOML.");
@@ -306,7 +306,7 @@ const passthroughGovernanceWorkspace: GovernanceWorkspaceBoundary = {
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue;
 const hash = (value: unknown): string => sha256(canonicalJson(json(value)));
 
-export const validAgentTomlRefinement = (file: RefinementOutcome["files"][number], snapshot: RootSnapshotV20): boolean => {
+export const validAgentTomlRefinement = (file: RefinementOutcome["files"][number], snapshot: RootSnapshotV21): boolean => {
   const match = /^\.codex\/agents\/(ballet-(?:(?:critic|refinement)-agent|action-(?:validation|work)-[a-z0-9][a-z0-9-]*))\.toml$/.exec(file.relativePath);
   if (!match) return true;
   if (file.operation !== "replace" || file.proposedContent === undefined) return false;

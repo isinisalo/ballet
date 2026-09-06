@@ -1,3 +1,4 @@
+import { UserStoryApproval } from "./UserStoryApproval";
 import { useState } from "react";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,20 +9,20 @@ import { ConfigureToolbar } from "../configure/ConfigureToolbar";
 import { UserStoryLegend } from "./UserStoryLegend";
 import { UserStoryFields } from "./UserStoryFields";
 import { useUserStoryDraft } from "./useUserStoryDraft";
-import { shortStoryId } from "./userStoryPresentation";
+import { shortStoryId, storyEditorStatus } from "./userStoryPresentation";
 import { UserStoryEditorFeedback } from "./UserStoryEditorFeedback";
 
-export function UserStoryEditor({ current, locked, unavailable = false, onDirty, onBack, onSaved, onRemoved, onRefresh }: {
+export function UserStoryEditor({ current, locked, unavailable = false, onDirty, onBack, onSaved, onApproved, onRemoved, onRefresh }: {
   current?: UserStoryDocument; locked: boolean; unavailable?: boolean; onDirty(dirty: boolean): void; onBack(): void;
-  onSaved(document: UserStoryDocument): void; onRemoved(id: string): void; onRefresh(): Promise<void>;
+  onApproved(document: UserStoryDocument): void; onSaved(document: UserStoryDocument): void; onRemoved(id: string): void; onRefresh(): Promise<void>;
 }) {
   const editor = useUserStoryDraft(current, onDirty);
   const [confirming, setConfirming] = useState(false);
-  const status = locked ? "Locked by active Run" : unavailable ? "File unavailable" : editor.pending ? "Saving…" : editor.dirty ? "Unsaved" : current ? "Saved" : "New";
+  const status = storyEditorStatus(locked, unavailable, editor.pending, editor.dirty, Boolean(current));
   const disabled = locked || unavailable || editor.pending;
   return <>
     <ConfigureToolbar status={status}>
-      <Button size="sm" variant="ghost" aria-label="Back to stories" disabled={editor.pending} onClick={onBack}><ArrowLeft aria-hidden="true" /></Button>
+      <Button size="sm" variant="ghost" className="min-w-10" aria-label="Back to stories" disabled={editor.pending} onClick={onBack}><ArrowLeft aria-hidden="true" /></Button>
       <Button size="sm" variant="outline" disabled={editor.pending} onClick={onBack}>Cancel</Button>
       <Button size="sm" type="submit" form="user-story-form" disabled={disabled || !editor.dirty || !editor.valid || editor.stale}>Save story</Button>
     </ConfigureToolbar>
@@ -36,6 +37,8 @@ export function UserStoryEditor({ current, locked, unavailable = false, onDirty,
         <form id="user-story-form" onSubmit={(event) => { event.preventDefault(); if (!disabled) void editor.save(onSaved); }}>
           <UserStoryFields editor={editor} disabled={disabled} />
         </form>
+        {current ? <UserStoryApproval current={current} disabled={disabled || editor.dirty || editor.stale || editor.conflict}
+          onApprove={() => editor.decide(true, onApproved)} onDraft={() => editor.decide(false, onApproved)} /> : null}
       </CardContent></Card>
       {current ? <p className="mt-4 break-all font-mono text-xs text-muted-foreground">{current.value.id}</p> : null}
     </div>

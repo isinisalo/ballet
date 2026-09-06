@@ -3,8 +3,8 @@ id: arc42-section-06
 title: Ajonaikainen näkymä
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-05'
-version: 30
+updatedAt: '2026-09-06'
+version: 31
 tags: [arc42, runtime]
 arc42Section: 6
 ---
@@ -13,7 +13,7 @@ arc42Section: 6
 
 | ID | Skenaario | Atominen/immutable raja |
 | --- | --- | --- |
-| RT-026 | Environment Run | v25 ordering/Agent/Skill preflight -> v20 snapshot without Use Case closure -> local Codex daemon lease -> lowest order/priority -> Validation precheck -> optional Work -> Validation postwork -> done/retry/blocked -> gated next State -> Run Evidence |
+| RT-026 | Environment Run | v26 ordering/Agent/Skill preflight -> v21 snapshot without project-document closure -> local Codex daemon lease -> lowest order/priority -> Validation precheck -> optional Work -> Validation postwork -> done/retry/blocked -> gated next State -> Run Evidence |
 | RT-027 | Feedback and Critic | schedule claim -> immutable read set -> pending proposal -> human decision; hyväksytty Critic proposal ja Feedback syntyvät samassa transaktiossa |
 | RT-028 | Refinement and continuation | read-only exact proposal -> human hash/revision approval -> allowlisted managed-worktree apply -> one commit -> immutable continuation link/run |
 | RT-029 | Markdown and Loop authoring | load source + baseline hash -> edit -> stale notification preserves draft and requires explicit reload -> strict server validation -> save/adopt returned hash -> invalidate affected approval |
@@ -22,8 +22,8 @@ arc42Section: 6
 | RT-032 | Checkout-local daemon task | ready Codex capability -> atomic claim/fencing -> ExecutionSpec v18 in server-owned worktree -> lease renew/events -> raw terminal callback -> server v11 validation/finalization; expiry -> one runtime_lost failure |
 | RT-033 | Historical Codex-only Action binding | superseded by RT-034; machine-local Action execution binding is removed |
 | RT-034 | Action Agent execution | exact Action-Agent inventory -> model/reasoning capability preflight -> freeze TOML definition/hash + Skill closure -> emit Validation/Work `action_agent` specs with TOML instructions; Validation read-only, Work managed-worktree, any mismatch -> zero dispatch |
-
 | RT-035 | Event Storming authoring | read model.md → edit note/placement → debounce or finish gesture → serial optimistic PUT → atomic file replacement → transient invalidation; conflict retains draft; Run lock blocks writes |
+| RT-036 | Project authoring and story agreement | Load canonical Markdown → edit with byte baseline → save atomically or retain conflicted draft → explicit human approval checks byte and semantic hashes → persist approver/time/revision in the same story. Semantic edits yield Draft. No project-document or approval step is added to Environment execution. |
 
 ## RT-026 rules
 

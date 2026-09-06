@@ -1,8 +1,6 @@
 export type WorkspaceView =
-  | "goals"
+  | "overview"
   | "adrs"
-  | "constraints"
-  | "use-cases"
   | "user-stories"
   | "event-storming"
   | "environment"

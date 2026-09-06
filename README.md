@@ -4,7 +4,7 @@ Ballet is a checkout-local command center for human-directed AI work. A human ow
 
 ## Core concepts
 
-- **Direction** keeps Goals, ADRs, Constraints and human-approved Use Cases as project-local evidence.
+- **Project** contains Overview, Event Storming, User Stories and ADRs, each backed by one canonical Markdown source.
 - **Environment** contains States with unique positive `order` values.
 - **State** contains bounded Actions with unique positive `priority` values.
 - **Validation** prechecks before Work and postchecks its result.
@@ -36,44 +36,26 @@ Agent execution is performed by one checkout-local daemon. `ballet start` provis
 
 | Path | Ownership |
 | --- | --- |
-| `.ballet/project.json` | strict Project Config v25: project direction, Action Agent IDs and role-specific Skill compositions |
+| `.ballet/project.json` | strict Project Config v26: Environment, Action Agent IDs and role-specific Skill compositions |
 | `.codex/agents/*.toml` | Action-specific Validation/Work definitions plus the two fixed read-only governance Agents |
-| `.ballet/goals/**` | human WHAT/WHY |
+| `.ballet/overview.md` | Purpose, Outcomes, Scope and Shared requirements |
 | `.ballet/adr/**` | accepted and superseded architecture decisions |
-| `.ballet/constraints/**` | required and prohibited operating boundaries |
-| `.ballet/use-cases/**` | human-readable approved Use Cases and approval provenance |
+| `.ballet/user-stories/<uuid>.md` | Role/Goal/Benefit, acceptance criteria, Markdown details, ADR references and exact human approval |
+| `.ballet/event-storming/model.md` | shared notes and board-local process views |
 | `.ballet/instructions/**` | optional generic project instructions; Action execution instructions live in Agent TOMLs |
 | `.agents/skills/**/SKILL.md` | selected reusable methods |
 | `.ballet/arc42/**` | canonical architecture views, quality scenarios, status, trace and evidence |
-| `.git/ballet/**` | machine-local SQLite v23, checkout-daemon state, logs and server-owned worktrees |
+| `.git/ballet/**` | machine-local SQLite v24, checkout-daemon state, logs and server-owned worktrees |
 
-Project truth is version-controlled. Runtime status, attempts, leases and approvals are machine-local facts and never write back as completion flags.
+Project truth is version-controlled. Runtime status, attempts, leases and governance approvals are machine-local facts and never write back as completion flags.
 
 ## Configuration example
 
-This abbreviated example shows the ownership boundary; the repository default contains five States, twenty-one Actions and thirteen approved Use Cases.
+This abbreviated example shows the ownership boundary; the repository default contains five States, twenty-one Actions and eight Draft User Stories awaiting explicit human approval.
 
 ```json
 {
-  "version": 25,
-  "direction": {
-    "goals": [{ "id": "goal-022", "name": "Human-directed orchestration", "status": "accepted" }],
-    "adrs": [{ "id": "adr-034", "name": "Validation-led Environment", "status": "accepted" }],
-    "constraints": [],
-    "useCases": [{
-      "id": "UC-07",
-      "name": "Check Action readiness",
-      "status": "approved",
-      "examples": [{ "given": "a pending Action", "when": "Validation prechecks", "then": "it decides with evidence" }],
-      "successGoals": ["Evidence before Work"],
-      "failureGoals": ["No false done"],
-      "expectedOutcomes": ["done, delegate or blocked"],
-      "goalIds": ["goal-022"],
-      "adrIds": ["adr-034"],
-      "constraintIds": ["constraint-005"],
-      "approval": { "approvedBy": "human-id", "approvedAt": "2026-08-29T00:00:00.000Z", "revision": 1, "contentHash": "<sha256>" }
-    }]
-  },
+  "version": 26,
   "environment": {
     "id": "example",
     "name": "Example",
@@ -101,9 +83,9 @@ This abbreviated example shows the ownership boundary; the repository default co
 
 The complete strict shape also requires one Validation and one Work Agent TOML per Action, the two governance Agent TOMLs, disabled-by-default Critic configuration and Refinement configuration. Action Agent TOMLs own role instructions, model and reasoning; Project Config owns the fixed Agent ID and Skill list. Inspect [`.ballet/project.json`](.ballet/project.json) for a runnable example.
 
-## Use Case approval
+## User Story approval
 
-Saving a draft is not approval. The human approval command binds the canonical semantic content to a SHA-256 and revision. Use Cases remain project-local evidence and do not gate an Environment Run or enter its snapshot/task context. A semantic edit invalidates the approval and returns the Use Case to draft; an agent task cannot call the approval boundary.
+Saving a draft is not approval. The explicit human approval command requires the saved file hash and semantic hash, then records human identity, time and revision in the story file. The semantic hash covers Role/Goal/Benefit, ordered criteria, ADR references and CommonMark details. Equivalent YAML/Markdown serialization preserves approval; stale files are rejected without discarding edits. User Stories remain project-local evidence and do not gate an Environment Run or enter its snapshot/task context. A semantic edit invalidates the approval and returns the User Story to draft; an agent task cannot call the approval boundary.
 
 ## Environment authoring
 
@@ -137,8 +119,9 @@ Refinement proposal generation is read-only. It records exact allowlisted paths,
 | --- | --- |
 | Loop Engineering / Environment / State / Action | `/automation/loops`, `/automation/loops/states/:stateId`, `/automation/loops/states/:stateId/actions/:actionId` |
 | Agents / Skills / Runtimes | `/agents`, `/skills`, `/runtimes` |
-| Goals / ADRs / Constraints | `/project/goals`, `/project/adrs`, `/project/constraints` |
-| Use Cases / Instructions | `/project/use-cases`, `/project/instructions` |
+| Overview / Event Storming | `/project/overview`, `/project/event-storming` |
+| User Stories / ADRs | `/project/user-stories`, `/project/adrs` |
+| Instructions (deep link) | `/project/instructions` |
 | Run Gate | `/run`, `/run/:runId`, nested State/Action detail |
 | Feedback Box | `/feedback`, `/feedback/:id` |
 | Critic / Refinement review | `/reviews/critic`, `/reviews/critic/:id`, `/reviews/refinement`, `/reviews/refinement/:id` |
@@ -148,7 +131,7 @@ JSON commands and projections live under canonical `/api/*` routes and SSE uses 
 
 ## Strict local state
 
-The active matrix is Project Config v25, Root Snapshot v20, Task Envelope and role outcome v11, prompt composition v16, ExecutionSpec v18 and SQLite v23. Feedback, Critic and Refinement are v2, Codex Agent is v3 and Run Evidence is v1. Validation and subordinate Work load their own TOML model/reasoning/instructions; role-derived permissions deny network and external read-only roots. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
+The active matrix is Project Config v26, Root Snapshot v21, Task Envelope and role outcome v11, prompt composition v16, ExecutionSpec v18 and SQLite v24. Feedback, Critic and Refinement are v2, Codex Agent is v3 and Run Evidence is v1. Validation and subordinate Work load their own TOML model/reasoning/instructions; role-derived permissions deny network and external read-only roots. Older local databases and daemon configs are intentionally unsupported and archived or replaced during the strict cut. There is no migration or compatibility reader.
 
 ## Verification
 

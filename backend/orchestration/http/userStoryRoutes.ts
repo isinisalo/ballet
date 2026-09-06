@@ -1,10 +1,11 @@
+import type { TrustedHumanActor } from "../../../shared/orchestration/persistence.js";
 import type express from "express";
 import { emptySchema, removeResourceSchema } from "../../../shared/orchestration/httpContracts.js";
-import { updateUserStorySchema, userStoryInputSchema, userStoryParamsSchema } from "../../../shared/orchestration/userStories.js";
+import { userStoryApprovalSchema, updateUserStorySchema, userStoryInputSchema, userStoryParamsSchema } from "../../../shared/orchestration/userStories.js";
 import { parseBody, parseParams, parseUnknown } from "../../http/validation/httpValidation.js";
 import type { ApiController } from "./ApiController.js";
 
-export function registerUserStoryRoutes(router: express.Router, controller: ApiController): void {
+export function registerUserStoryRoutes(router: express.Router, controller: ApiController, actor: () => TrustedHumanActor): void {
   router.get("/user-stories", (req, res) => {
     parseUnknown(emptySchema, req.query); res.json(controller.authoring.userStories());
   });
@@ -21,6 +22,17 @@ export function registerUserStoryRoutes(router: express.Router, controller: ApiC
     const { id } = parseParams(userStoryParamsSchema, req);
     const { value, expectedHash } = parseBody(updateUserStorySchema, req);
     res.json(controller.authoring.updateUserStory(id, value, expectedHash));
+  });
+  router.post("/user-stories/:id/approve", (req, res) => {
+    parseUnknown(emptySchema, req.query);
+    const { id } = parseParams(userStoryParamsSchema, req);
+    const input = parseBody(userStoryApprovalSchema, req);
+    res.json(controller.authoring.approveUserStory(id, input.expectedHash, input.expectedContentHash, actor()));
+  });
+  router.post("/user-stories/:id/return-to-draft", (req, res) => {
+    parseUnknown(emptySchema, req.query);
+    const { id } = parseParams(userStoryParamsSchema, req);
+    res.json(controller.authoring.returnStoryToDraft(id, parseBody(removeResourceSchema, req).expectedHash));
   });
   router.delete("/user-stories/:id", (req, res) => {
     parseUnknown(emptySchema, req.query);

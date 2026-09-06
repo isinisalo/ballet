@@ -5,8 +5,7 @@ import process from "node:process";
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const scanRoots = [
   "backend", "frontend", "shared",
-  ".ballet/project.json", ".ballet/goals", ".ballet/adr", ".ballet/constraints",
-  ".ballet/use-cases", ".ballet/instructions", ".ballet/releases", ".ballet/arc42",
+  ".ballet/project.json", ".ballet/overview.md", ".ballet/user-stories", ".ballet/adr", ".ballet/instructions", ".ballet/releases", ".ballet/arc42",
   ".agents/skills", ".fixture-ballet-project/.ballet",
   "README.md", "ARCHITECTURE.md", "DESIGN.md", "AGENTS.md",
   "package.json", "vite.config.ts", "scripts"
@@ -109,10 +108,15 @@ const self = path.resolve(import.meta.filename);
 const files = (await Promise.all(scanRoots.map((entry) => collect(path.join(repositoryRoot, entry))))).flat();
 const failures = [];
 for (const filename of files) {
-  if (filename === self) continue;
+  if (filename === self || filename.includes("/.ballet/history/")) continue;
   const source = await readFile(filename, "utf8").catch(() => undefined);
   if (source === undefined) continue;
   const relative = path.relative(repositoryRoot, filename);
+  if (/^(?:backend|frontend\/src|shared)\//.test(relative) && !relative.includes(".test.")) {
+    for (const term of ["Use" + "Case", "use" + "Cases", "useCase" + "Approval", "/project/" + "goals", "/project/" + "constraints", "/project/" + "use-cases", "ProjectConfigurationV" + "25", "RootSnapshotV" + "20"]) {
+      if (source.includes(term)) failures.push(`${relative}: removed project definition contract ${term}`);
+    }
+  }
   for (const term of prohibited) {
     if (source.includes(term) && !allowedHistoricalMatch(relative, source)) {
       failures.push(`${relative}: prohibited term ${JSON.stringify(term)}`);

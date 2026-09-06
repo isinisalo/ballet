@@ -1,5 +1,6 @@
+import { markdownEntity, splitMarkdownSource } from "./configure/markdownAuthoring";
 import { Fragment, useState } from "react";
-import { Bot, BookOpenText, Braces, ChevronDown, ChevronRight, FileCheck2, FileKey2, Gauge, MessageSquareWarning, Network, Play, Scale, ServerCog, Sparkles, Target } from "lucide-react";
+import { Bot, BookOpenText, Braces, ChevronDown, ChevronRight, FileKey2, MessageSquareWarning, Network, Play, Scale, ServerCog, Sparkles, FileText } from "lucide-react";
 import { Sidebar, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, useSidebar } from "@/components/ui/sidebar";
 import type { RouteState } from "@/workspace/types";
 import { orchestrationActionPath, orchestrationEntityPath, orchestrationStatePath } from "@/workspace/routing";
@@ -11,7 +12,7 @@ import { actionDisplayName } from "./actionDisplayName";
 const groups = [
   ["Automation", [["Loop Engineering", "/automation/loops", Network]]],
   ["Environment", [["Agents", "/agents", Bot], ["Skills", "/skills", Sparkles], ["Runtimes", "/runtimes", ServerCog]]],
-  ["Project", [["Goals", "/project/goals", Target], ["ADRs", "/project/adrs", Scale], ["Constraints", "/project/constraints", Gauge], ["Event Storming", "/project/event-storming", Network], ["User Story", "/project/user-stories", BookOpenText], ["Use Cases", "/project/use-cases", FileCheck2]]],
+  ["Project", [["Overview", "/project/overview", FileText], ["Event Storming", "/project/event-storming", Network], ["User Stories", "/project/user-stories", BookOpenText], ["ADRs", "/project/adrs", Scale]]],
   ["Run", [["Runs", "/run", Play], ["Feedback", "/feedback", MessageSquareWarning], ["Critic reviews", "/reviews/critic", FileKey2], ["Refinement reviews", "/reviews/refinement", Braces]]]
 ] as const;
 
@@ -84,6 +85,9 @@ function entityItems(path: string, data?: OrchestrationConfigureData): SidebarEn
     status: item.status, healthy: item.status === "ready" }));
   if (path === "/skills") return data.skills.map((item) => ({ id: item.id, label: item.id, status: "Skill", healthy: true }));
   if (path === "/project/instructions") return data.instructions.map((item) => ({ id: item.id, label: item.id, status: "Instruction", healthy: true }));
-  const values = path === "/project/goals" ? data.project.config.direction.goals : path === "/project/adrs" ? data.project.config.direction.adrs : path === "/project/constraints" ? data.project.config.direction.constraints : path === "/project/use-cases" ? data.project.config.direction.useCases : [];
-  return values.map((item) => ({ id: item.id, label: item.name, status: item.status, healthy: item.status === "accepted" || item.status === "approved" }));
+  return path === "/project/adrs" ? data.adrs.map((item) => {
+    const metadata = markdownEntity(item, splitMarkdownSource(item.content));
+    const status = String(metadata.frontmatter.status ?? "draft");
+    return { id: item.id, label: metadata.title, status, healthy: status === "accepted" };
+  }) : [];
 }

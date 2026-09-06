@@ -3,8 +3,8 @@ import { routeFromPath, orchestrationActionAgentPath, orchestrationActionPath, o
 
 describe("orchestration URL-owned routing", () => {
   it.each([
-    ["/project/goals", "goals"], ["/project/adrs", "adrs"],
-    ["/project/constraints", "constraints"], ["/project/use-cases?id=UC-1", "use-cases"],
+    ["/project/overview", "overview"], ["/project/adrs", "adrs"],
+    ["/project/constraints", "invalid"], ["/project/use-cases?id=UC-1", "invalid"], ["/project/goals", "invalid"],
     ["/automation/loops", "environment"], ["/project/instructions", "instructions"],
     ["/skills", "skills"], ["/agents", "agents"], ["/runtimes", "runtimes"],
     ["/reviews/critic", "critic-reviews"]

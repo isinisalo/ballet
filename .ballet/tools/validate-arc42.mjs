@@ -5,9 +5,9 @@ import path from "node:path";
 import process from "node:process";
 import YAML from "yaml";
 import { parse as parseToml } from "smol-toml";
-import { useCaseApprovalHash } from "../../shared/orchestration/direction.ts";
+import { UserStoryService } from "../../backend/orchestration/project/UserStoryService.ts";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.ts";
-import { actionAgentDefinitionSchema, governanceAgentDefinitionSchema, projectConfigurationV25Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
+import { actionAgentDefinitionSchema, governanceAgentDefinitionSchema, projectConfigurationV26Schema } from "../../shared/orchestration/schemas/environmentSchemas.ts";
 
 import { EventStormingService } from "../../backend/orchestration/project/EventStormingService.ts";
 import { ProjectDocumentRepository } from "../../backend/orchestration/project/ProjectDocumentRepository.ts";
@@ -35,6 +35,7 @@ const required = [
 const addIssue = (message) => issues.push(message);
 const rel = (absolute) => path.relative(root, absolute).split(path.sep).join("/");
 const exists = async (absolute) => stat(absolute).then(() => true, () => false);
+const sourceArchive = JSON.parse(await readFile(path.join(root, ".ballet/history/project-definition-2026-09-06/manifest.json"), "utf8"));
 const walk = async (directory) => {
   const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
   return (await Promise.all(entries.map((entry) => {
@@ -104,7 +105,15 @@ for (const [file, doc] of docs) {
     const target = raw.replace(/^<|>$/g, "").split(/\s+["']/)[0];
     if (/^(?:https?:|mailto:|app:)/.test(target)) continue;
     const [pathPart, rawAnchor] = target.split("#", 2);
-    const linked = pathPart ? path.resolve(path.dirname(file), decodeURIComponent(pathPart)) : file;
+    let linked = pathPart ? path.resolve(path.dirname(file), decodeURIComponent(pathPart)) : file;
+    if (!(await exists(linked)) && rel(file).startsWith(".ballet/arc42/initiatives/")) {
+      const relative = rel(linked);
+      if (/^\.ballet\/(goals|constraints|use-cases)\//.test(relative)) linked = path.join(root, ".ballet/history/project-definition-2026-09-06", relative.slice(".ballet/".length));
+    }
+    if (!(await exists(linked)) && rel(file).startsWith(".ballet/arc42/initiatives/")) {
+      const archived = spawnSync("git", ["cat-file", "-e", `${sourceArchive.baseCommit}:${rel(linked)}`], { encoding: "utf8" });
+      if (archived.status === 0) continue;
+    }
     if (!(await exists(linked))) { addIssue(`${rel(file)}: broken local link ${raw}.`); continue; }
     if (rawAnchor && linked.endsWith(".md")) {
       const linkedDoc = docs.get(linked) ?? await parseMarkdown(linked);
@@ -143,7 +152,7 @@ for (const filename of definitionFiles) {
     if (id) stableDefinitions.add(id);
   }
 }
-for (const directory of [".ballet/goals", ".ballet/adr"]) {
+for (const directory of [".ballet/adr"]) {
   for (const file of (await walk(path.join(root, directory))).filter((entry) => entry.endsWith(".md"))) {
     const id = (await parseMarkdown(file)).frontmatter?.id;
     if (typeof id === "string") stableDefinitions.add(id);
@@ -156,19 +165,12 @@ for (const line of traceLines.slice(2)) for (const id of line.match(
 ) ?? []) if (!stableDefinitions.has(id)) addIssue(`TRACEABILITY references undefined ID ${id}.`);
 
 const rawConfig = JSON.parse(await readFile(path.join(root, ".ballet/project.json"), "utf8"));
-const parsed = projectConfigurationV25Schema.safeParse(rawConfig);
+const parsed = projectConfigurationV26Schema.safeParse(rawConfig);
 let config;
 if (!parsed.success) {
   parsed.error.issues.forEach((issue) => addIssue(`.ballet/project.json:${issue.path.join(".")}: ${issue.message}`));
 } else {
   config = parsed.data;
-  const directionRoots = { goals: "goals", adrs: "adr", constraints: "constraints", useCases: "use-cases" };
-  for (const [field, directory] of Object.entries(directionRoots)) {
-    const documents = await indexedMarkdown(path.join(root, ".ballet", directory));
-    for (const item of config.direction[field]) if (!documents.has(item.id)) {
-      addIssue(`Project Config ${field} reference ${item.id} has no Markdown source.`);
-    }
-  }
   const skillIds = new Set();
   for (const agent of actionCompositions(config)) {
     agent.skillResources.forEach((id) => skillIds.add(id));
@@ -184,29 +186,10 @@ if (!parsed.success) {
   for (const issue of validateRunnableEnvironment(config.environment)) {
     addIssue(`Default project is not runnable: ${issue.path}: ${issue.message}`);
   }
-  if (config.direction.useCases.length !== 13) addIssue(`Default project must contain 13 Use Cases; found ${config.direction.useCases.length}.`);
-  const expectedUseCases = new Set(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
-  for (const id of expectedUseCases) if (!config.direction.useCases.some((useCase) => useCase.id === id)) addIssue(`Missing canonical Use Case ${id}.`);
   if (config.environment.states.length !== 5) addIssue(`Default project must contain five canonical States; found ${config.environment.states.length}.`);
   await validateCodexAgents(root, config);
   if (config.critic.enabled) addIssue("Default Critic schedule must be disabled.");
   if (config.critic.schedules.length === 0) addIssue("Default Critic needs a disabled example schedule with a valid IANA timezone.");
-
-  const useCaseDocuments = await indexedMarkdownDocuments(path.join(root, ".ballet/use-cases"));
-  for (const useCase of config.direction.useCases) {
-    const document = useCaseDocuments.get(useCase.id);
-    if (!document) { addIssue(`Use Case ${useCase.id} has no canonical Markdown document.`); continue; }
-    const fm = document.frontmatter;
-    const comparable = ["examples", "successGoals", "failureGoals", "expectedOutcomes", "goalIds", "adrIds", "constraintIds", "approval"];
-    if (fm.title !== useCase.name || fm.status !== useCase.status) addIssue(`Use Case ${useCase.id} title/status differs between config and Markdown.`);
-    for (const field of comparable) if (JSON.stringify(fm[field]) !== JSON.stringify(useCase[field])) {
-      addIssue(`Use Case ${useCase.id} ${field} differs between config and Markdown.`);
-    }
-    if (fm.approval?.contentHash !== useCaseApprovalHash(useCase)) addIssue(`Use Case ${useCase.id} Markdown approval hash is stale.`);
-    for (const heading of ["## Intent", "## Examples", "## Success goals", "## Failure goals", "## Expected outcomes"]) {
-      if (!document.body.includes(heading)) addIssue(`Use Case ${useCase.id} is missing ${heading}.`);
-    }
-  }
 
   const allSkillFiles = (await walk(path.join(root, ".agents/skills"))).filter((file) => file.endsWith("/SKILL.md"));
   for (const file of allSkillFiles) {
@@ -214,6 +197,15 @@ if (!parsed.success) {
     if (!skillIds.has(id)) addIssue(`Orphan Skill resource ${rel(file)}.`);
   }
 }
+
+const storyCollection = new UserStoryService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => {}).list();
+for (const issue of storyCollection.issues) addIssue(`User Story ${issue.id}: ${issue.message}`);
+const adrIds = await indexedMarkdown(path.join(root, ".ballet/adr"));
+for (const { value } of storyCollection.stories) {
+  for (const id of value.adrIds) if (!adrIds.has(id)) addIssue(`User Story ${value.id}: missing ADR ${id}.`);
+  if (!(docs.get(path.join(arc42Root, "TRACEABILITY.md"))?.body ?? "").includes(value.id)) addIssue(`TRACEABILITY missing User Story ${value.id}.`);
+}
+for (const removed of ["goals", "constraints", "use-cases"]) if (await exists(path.join(root, ".ballet", removed))) addIssue(`Removed active collection ${removed}.`);
 
 try { new EventStormingService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => {}).read(); }
 catch (error) { addIssue(`Event Storming model: ${error instanceof Error ? error.message : String(error)}`); }
@@ -226,7 +218,7 @@ if (!diagramSource) addIssue("Missing editable root ballet.drawio.");
 else {
   const parsedXml = spawnSync("xmllint", ["--noout", diagramPath], { encoding: "utf8" });
   if (parsedXml.status !== 0) addIssue(`ballet.drawio is not well-formed XML: ${parsedXml.stderr.trim()}`);
-  for (const label of ["Human direction", "Goals / ADRs / Constraints", "Approved Use Cases", "Environment", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Human approval", "Continuation Run", "Run Evidence"]) {
+  for (const label of ["Human direction", "Overview / ADRs", "User Stories", "Environment", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Human approval", "Continuation Run", "Run Evidence"]) {
     if (!diagramSource.includes(label)) addIssue(`ballet.drawio is missing required label ${label}.`);
   }
   for (const removed of ["RewardMDP", "reward_mdp", "Reward-MDP", "GraphNode", "ActionNode", "acceptance_ledger", "policy_decision"]) {
@@ -234,15 +226,10 @@ else {
   }
 }
 
-for (const useCase of rawConfig.direction?.useCases ?? []) {
-  if (!(docs.get(path.join(arc42Root, "TRACEABILITY.md"))?.body ?? "").includes(useCase.id)) {
-    addIssue(`TRACEABILITY is missing canonical Use Case ${useCase.id}.`);
-  }
-}
-
-const additionalLinkFiles = ["README.md", "DESIGN.md",
-  ...rawConfig.direction.constraints.map(({ id }) => `.ballet/constraints/${id}.md`),
-  ...rawConfig.direction.useCases.map(({ id }) => `.ballet/use-cases/${id}.md`)];
+const additionalLinkFiles = ["README.md", "DESIGN.md", "AGENTS.md", ".ballet/overview.md",
+  ...(await walk(path.join(root, ".ballet/user-stories"))).filter((file) => file.endsWith(".md")).map(rel),
+  ...(await walk(path.join(root, ".agents/skills"))).filter((file) => file.endsWith(".md")).map(rel),
+  ".ballet/adr/adr-048-four-project-views.md"];
 for (const filename of additionalLinkFiles) await validateLocalLinks(path.join(root, filename));
 
 for (const removed of [".ballet/graph-node-library", ".ballet/graph-node-modules"]) {
@@ -256,7 +243,7 @@ if (issues.length) {
 } else {
   const states = config?.environment.states.length ?? 0;
   const actions = config?.environment.states.reduce((total, state) => total + state.actions.length, 0) ?? 0;
-  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v25, ${states} States and ${actions} Actions.\n`);
+  process.stdout.write(`arc42 validation passed: ${sections.length} sections, ${ids.size} document IDs, Project Config v26, ${states} States and ${actions} Actions.\n`);
 }
 
 async function indexedMarkdown(directory) {
@@ -268,17 +255,10 @@ async function indexedMarkdown(directory) {
   return result;
 }
 
-async function indexedMarkdownDocuments(directory) {
-  const result = new Map();
-  for (const filename of (await walk(directory)).filter((file) => file.endsWith(".md"))) {
-    const document = await parseMarkdown(filename); if (typeof document.frontmatter?.id === "string") result.set(document.frontmatter.id, document); }
-  return result;
-}
-
 async function validateFixtureProject() {
   const fixtureRoot = path.join(root, ".fixture-ballet-project");
   const raw = JSON.parse(await readFile(path.join(fixtureRoot, ".ballet/project.json"), "utf8"));
-  const parsedFixture = projectConfigurationV25Schema.safeParse(raw);
+  const parsedFixture = projectConfigurationV26Schema.safeParse(raw);
   if (!parsedFixture.success) { parsedFixture.error.issues.forEach((issue) => addIssue(
     `Fixture Project Config:${issue.path.join(".")}: ${issue.message}`)); return; }
   const fixture = parsedFixture.data;

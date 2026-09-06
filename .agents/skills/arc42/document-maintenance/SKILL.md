@@ -5,7 +5,7 @@ description: Maintain Ballet arc42 Markdown canonically and without duplication.
 
 # Document maintenance
 
-1. Resolve the content owner before editing: Goal for WHAT/WHY, ADR for a decision, arc42 section for an architecture view, DESIGN.md for the UI system, or initiative artifact for bounded delivery.
+1. Resolve the content owner before editing: Overview for project WHAT/WHY, User Story for functional behavior, ADR for a decision, arc42 section for an architecture view, DESIGN.md for the UI system, or initiative artifact for bounded delivery.
 2. Classify new statements as Fact, Decision, Assumption, Hypothesis, Finding or Open question. Never promote an unsupported statement to Fact or Decision.
 3. Update the smallest canonical location and link from indexes; do not copy full source content.
 4. Preserve stable IDs and status. Supersede obsolete duplicates with a pointer after all active links move.

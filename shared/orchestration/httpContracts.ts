@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { CONTRACT_LIMITS } from "./limits.js";
 import { idSchema, nonEmptyTextSchema, sha256Schema } from "./schemas/common.js";
-import { constraintSchema, directionReferenceSchema, useCaseAuthoringSchema } from "./schemas/directionSchemas.js";
 import {
-  actionDefinitionSchema, environmentDefinitionSchema, projectConfigurationV25Schema, stateDefinitionSchema
+  actionDefinitionSchema, environmentDefinitionSchema, projectConfigurationV26Schema, stateDefinitionSchema
 } from "./schemas/environmentSchemas.js";
 
 const markdownSourceSchema = z.string().max(CONTRACT_LIMITS.text)
   .refine((value) => value.trim().length > 0, "Markdown must not be empty");
 
-export const documentKindSchema = z.enum(["goal", "adr", "constraint", "use-case", "user-story", "instruction", "skill"]);
+export const documentKindSchema = z.enum(["overview", "adr", "user-story", "instruction", "skill"]);
 export const idParamsSchema = z.object({ id: idSchema }).strict();
 export const governanceAgentParamsSchema = z.object({
   id: z.enum(["ballet-critic-agent", "ballet-refinement-agent"])
@@ -19,18 +18,12 @@ export const stateParamsSchema = z.object({ stateId: idSchema }).strict();
 export const actionParamsSchema = z.object({ stateId: idSchema, actionId: idSchema }).strict();
 export const emptySchema = z.object({}).strict();
 export const putProjectSchema = z.object({
-  expectedHash: z.union([sha256Schema, z.literal("absent")]), config: projectConfigurationV25Schema
+  expectedHash: z.union([sha256Schema, z.literal("absent")]), config: projectConfigurationV26Schema
 }).strict();
 export const putResourceSchema = z.object({
   expectedHash: z.union([sha256Schema, z.literal("absent")]), content: markdownSourceSchema
 }).strict();
 export const removeResourceSchema = z.object({ expectedHash: sha256Schema }).strict();
-export const removeDirectionSchema = z.object({ expectedHash: sha256Schema, expectedConfigHash: sha256Schema }).strict();
-export const putDirectionSchema = z.object({
-  expectedConfigHash: sha256Schema, expectedDocumentHash: z.union([sha256Schema, z.literal("absent")]),
-  markdown: markdownSourceSchema,
-  value: z.union([directionReferenceSchema, constraintSchema, useCaseAuthoringSchema])
-}).strict();
 export const putAgentSchema = z.object({
   expectedConfigHash: sha256Schema,
   expectedDocumentHash: sha256Schema,
@@ -39,10 +32,7 @@ export const putAgentSchema = z.object({
   reasoningEffort: nonEmptyTextSchema,
   skillResources: z.array(idSchema).max(CONTRACT_LIMITS.skillsPerAgent)
 }).strict();
-export const directionDecisionSchema = z.object({ expectedConfigHash: sha256Schema }).strict();
-export const useCaseApprovalDecisionSchema = z.object({
-  expectedConfigHash: sha256Schema, expectedContentHash: sha256Schema
-}).strict();
+export const configHashSchema = z.object({ expectedConfigHash: sha256Schema }).strict();
 export const startRunSchema = z.object({ environmentId: idSchema, expectedConfigHash: sha256Schema,
   input: z.string().max(CONTRACT_LIMITS.text).optional() }).strict();
 export const workInputResponseSchema = z.object({

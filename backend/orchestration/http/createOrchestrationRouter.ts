@@ -7,12 +7,11 @@ import type { ApiController } from "./ApiController.js";
 import { registerUserStoryRoutes } from "./userStoryRoutes.js";
 import {
   actionParamsSchema, createFeedbackSchema, criticDecisionSchema,
-  directionDecisionSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
-  createActionSchema, governanceAgentParamsSchema, idParamsSchema, putActionSchema, putAgentSchema, putDirectionSchema, putEnvironmentSchema, putProjectSchema,
-  putResourceSchema, putStateSchema, refinementDecisionSchema, removeDirectionSchema,
+  configHashSchema, emptySchema, eventQuerySchema, feedbackDecisionSchema, feedbackQuerySchema,
+  createActionSchema, governanceAgentParamsSchema, idParamsSchema, putActionSchema, putAgentSchema, putEnvironmentSchema, putProjectSchema,
+  putResourceSchema, putStateSchema, refinementDecisionSchema,
   removeResourceSchema, reorderSchema, runParamsSchema, startRunSchema, stateParamsSchema,
-  workInputResponseSchema,
-  useCaseApprovalDecisionSchema
+  workInputResponseSchema
 } from "../../../shared/orchestration/httpContracts.js";
 
 export interface OrchestrationRouterOptions {
@@ -26,8 +25,8 @@ export const createOrchestrationRouter = ({ controller, actor }: OrchestrationRo
   router.put("/project", route(async (req, res) => {
     const input = parseBody(putProjectSchema, req); res.json(controller.authoring.putProject(input.config, input.expectedHash));
   }));
-  registerDocumentRoutes(router, controller, actor);
-  registerUserStoryRoutes(router, controller);
+  registerDocumentRoutes(router, controller);
+  registerUserStoryRoutes(router, controller, actor);
   registerEventStormingRoutes(router, controller);
   registerEnvironmentRoutes(router, controller);
   registerRunRoutes(router, controller, actor);
@@ -53,35 +52,23 @@ const writeInvalidation = (response: express.Response, event: ReturnType<ApiCont
 };
 
 const registerDocumentRoutes = (
-  router: express.Router, controller: ApiController, actor: () => TrustedHumanActor
+  router: express.Router, controller: ApiController
 ): void => {
-  for (const [collection, kind] of [
-    ["goals", "goal"], ["adrs", "adr"], ["constraints", "constraint"], ["use-cases", "use-case"]
-  ] as const) {
-    router.get(`/${collection}`, route(async (_req, res) => res.json(controller.authoring.documents(kind))));
-    router.post(`/${collection}`, route(async (req, res) => {
-      const input = parseBody(putDirectionSchema, req); const id = input.value.id;
-      res.status(201).json(controller.authoring.createDirection({ kind, id, ...input }));
-    }));
-    router.get(`/${collection}/:id`, route(async (req, res) =>
-      res.json(controller.authoring.document(kind, parseParams(idParamsSchema, req).id))));
-    router.put(`/${collection}/:id`, route(async (req, res) => {
-      const { id } = parseParams(idParamsSchema, req); const input = parseBody(putDirectionSchema, req);
-      res.json(controller.authoring.updateDirection({ kind, id, ...input }));
-    }));
-    router.delete(`/${collection}/:id`, route(async (req, res) => {
-      const { id } = parseParams(idParamsSchema, req); const input = parseBody(removeDirectionSchema, req);
-      res.json(controller.authoring.removeDirection({ kind, id, expectedConfigHash: input.expectedConfigHash,
-        expectedDocumentHash: input.expectedHash }));
-    }));
-  }
+  router.get("/overview", route(async (req, res) => {
+    parseUnknown(emptySchema, req.query); res.json(controller.authoring.overview());
+  }));
+  router.put("/overview", route(async (req, res) => {
+    parseUnknown(emptySchema, req.query);
+    const input = parseBody(putResourceSchema, req);
+    res.json(controller.authoring.saveOverview(input.content, input.expectedHash));
+  }));
   router.get("/agents", route(async (_req, res) => res.json(controller.authoring.agents())));
   router.get("/agents/:id", route(async (req, res) => res.json(controller.authoring.agent(parseParams(governanceAgentParamsSchema, req).id))));
   router.put("/agents/:id", route(async (req, res) => {
     const { id } = parseParams(governanceAgentParamsSchema, req);
     res.json(controller.authoring.updateAgent({ id, ...parseBody(putAgentSchema, req) }));
   }));
-  for (const [collection, kind] of [["instructions", "instruction"], ["skills", "skill"]] as const) {
+  for (const [collection, kind] of [["adrs", "adr"], ["instructions", "instruction"], ["skills", "skill"]] as const) {
     router.get(`/${collection}`, route(async (_req, res) => res.json(controller.authoring.documents(kind))));
     router.post(`/${collection}`, route(async (req, res) => {
       const input = parseBody(putResourceSchema.extend({ id: idParamsSchema.shape.id }), req);
@@ -98,14 +85,6 @@ const registerDocumentRoutes = (
       controller.authoring.removeResource(kind, id, input.expectedHash); res.status(204).end();
     }));
   }
-  router.post("/use-cases/:id/approve", route(async (req, res) => {
-    const { id } = parseParams(idParamsSchema, req); const input = parseBody(useCaseApprovalDecisionSchema, req);
-    res.json(controller.authoring.approveUseCase(id, input.expectedConfigHash, input.expectedContentHash, actor()));
-  }));
-  router.post("/use-cases/:id/return-to-draft", route(async (req, res) => {
-    const { id } = parseParams(idParamsSchema, req); const input = parseBody(directionDecisionSchema, req);
-    res.json(controller.authoring.revokeUseCase(id, input.expectedConfigHash));
-  }));
   router.get("/reference-index", route(async (_req, res) => res.json(controller.authoring.referenceIndex())));
 };
 
@@ -128,7 +107,7 @@ const registerEnvironmentRoutes = (router: express.Router, controller: ApiContro
     res.json(controller.authoring.updateState(input.state, input.expectedConfigHash));
   }));
   router.delete("/environment/states/:stateId", route(async (req, res) => {
-    const { stateId } = parseParams(stateParamsSchema, req); const input = parseBody(directionDecisionSchema, req);
+    const { stateId } = parseParams(stateParamsSchema, req); const input = parseBody(configHashSchema, req);
     res.json(controller.authoring.removeState(stateId, input.expectedConfigHash));
   }));
   router.post("/environment/states/:stateId/actions/reprioritize", route(async (req, res) => {
@@ -150,7 +129,7 @@ const registerEnvironmentRoutes = (router: express.Router, controller: ApiContro
     }, input.expectedConfigHash));
   }));
   router.delete("/environment/states/:stateId/actions/:actionId", route(async (req, res) => {
-    const { stateId, actionId } = parseParams(actionParamsSchema, req); const input = parseBody(directionDecisionSchema, req);
+    const { stateId, actionId } = parseParams(actionParamsSchema, req); const input = parseBody(configHashSchema, req);
     res.json(controller.authoring.removeAction(stateId, actionId, input.expectedConfigHash));
   }));
 };
@@ -231,7 +210,7 @@ const route = (handler: (req: express.Request, res: express.Response) => Promise
   (req, res, next) => { void handler(req, res).catch(next); };
 
 export const orchestrationDocumentCollections: Readonly<Record<string, ProjectDocumentKind>> = Object.freeze({
-  goals: "goal", adrs: "adr", constraints: "constraint", "use-cases": "use-case",
+  overview: "overview", adrs: "adr",
   "user-stories": "user-story",
   instructions: "instruction", skills: "skill"
 });

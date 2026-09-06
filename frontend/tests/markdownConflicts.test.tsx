@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { ResourceWorkspace } from "../src/orchestration/configure/ResourceWorkspace";
-import { MarkdownDirectionWorkspace } from "../src/orchestration/configure/MarkdownDirectionWorkspace";
+import { ProjectMarkdownWorkspace } from "../src/orchestration/configure/ProjectMarkdownWorkspace";
 
 it("preserves a resource draft and blocks stale saves until explicit reload", async () => {
   const resource = { kind: "skill" as const, id: "sample", content: "# Original\n", contentHash: "old" };
@@ -17,15 +17,24 @@ it("preserves a resource draft and blocks stale saves until explicit reload", as
   expect(screen.getByLabelText("Markdown Body")).toHaveValue("# External\n");
 });
 
-it("keeps a Direction draft tied to its original document hash", () => {
-  const value = { id: "goal-1", name: "Goal", status: "draft" as const };
-  const document = { kind: "goal" as const, id: value.id, content: "---\nid: goal-1\ntitle: Goal\nstatus: draft\n---\n\n# Original\n", contentHash: "old" };
-  const props = { kind: "goals" as const, values: [value], documents: [document], selectedId: value.id, locked: false, navigate: vi.fn(), onSave: vi.fn() };
-  const view = render(<MarkdownDirectionWorkspace {...props} />);
+it("keeps an ADR draft tied to its original document hash", () => {
+  const document = { kind: "adr" as const, id: "adr-1", content: "---\nid: adr-1\ntitle: Decision\nstatus: draft\n---\n\n# Original\n", contentHash: "old" };
+  const props = { kind: "adrs" as const, documents: [document], selectedId: document.id, navigate: vi.fn(), onSave: vi.fn() };
+  const view = render(<ProjectMarkdownWorkspace {...props} />);
   fireEvent.change(screen.getByLabelText("Markdown Body"), { target: { value: "# My draft" } });
-  view.rerender(<MarkdownDirectionWorkspace {...props} documents={[{ ...document, contentHash: "new", content: document.content + "External" }]} />);
+  view.rerender(<ProjectMarkdownWorkspace {...props} documents={[{ ...document, contentHash: "new", content: document.content + "External" }]} />);
   expect(screen.getByRole("button", { name: "Save Markdown" })).toBeDisabled();
   expect(screen.getByLabelText("Markdown Body")).toHaveValue("# My draft");
+});
+
+it("keeps the new ADR editor open when Create clears an existing selection", () => {
+  const document = { kind: "adr" as const, id: "adr-1", content: "---\nid: adr-1\ntitle: Decision\n---\n# Original\n", contentHash: "old" };
+  const props = { kind: "adrs" as const, documents: [document], navigate: vi.fn(), onSave: vi.fn() };
+  const view = render(<ProjectMarkdownWorkspace {...props} selectedId="adr-1" />);
+  fireEvent.click(screen.getByRole("button", { name: "Create" }));
+  view.rerender(<ProjectMarkdownWorkspace {...props} />);
+  expect((screen.getByLabelText("YAML Frontmatter") as HTMLTextAreaElement).value).toContain("title: New ADR");
+  expect(props.navigate).toHaveBeenCalledWith("/project/adrs");
 });
 
 it("retains the dirty resource after a failed save and adopts the returned baseline after success", async () => {
@@ -39,24 +48,4 @@ it("retains the dirty resource after a failed save and adopts the returned basel
   fireEvent.click(screen.getByRole("button", { name: "Save Markdown" }));
   await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(screen.getByRole("button", { name: "Save Markdown" })).toBeDisabled());
-});
-
-import userEvent from "@testing-library/user-event";
-import { useCaseApprovalHash } from "@shared/orchestration/direction";
-import { orchestrationConfig } from "./orchestrationFixtures";
-import { frontmatterToYaml } from "../src/workspace/documents/frontmatter";
-
-it("approves the persisted Use Case hash only through explicit confirmation", async () => {
-  const user = userEvent.setup();
-  const value = { ...orchestrationConfig().direction.useCases[0]!, status: "draft" as const, approval: undefined };
-  const document = { kind: "use-case" as const, id: value.id, content: `---\n${frontmatterToYaml({ ...value, title: value.name })}\n---\n\n# Use Case\n`, contentHash: "old" };
-  const onApprove = vi.fn();
-  render(<MarkdownDirectionWorkspace kind="use-cases" values={[value]} documents={[document]} selectedId={value.id} locked={false} navigate={vi.fn()} onSave={vi.fn()} onApprove={onApprove} />);
-  await user.click(screen.getByRole("button", { name: "Approve exact content…" }));
-  expect(screen.getByRole("dialog")).toHaveTextContent(useCaseApprovalHash(value));
-  expect(onApprove).not.toHaveBeenCalled();
-  await user.click(screen.getByRole("button", { name: "Approve exact content" }));
-  expect(onApprove).toHaveBeenCalledWith(value);
-  fireEvent.change(screen.getByLabelText("Markdown Body"), { target: { value: "# Changed" } });
-  expect(screen.getByRole("button", { name: "Approve exact content…" })).toBeDisabled();
 });

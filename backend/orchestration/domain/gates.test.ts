@@ -1,28 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionFlags, approveUseCase, canTransitionUseCase, deriveEnvironmentStatus, deriveStateStatus,
-  hasValidUseCaseApproval, invalidateUseCaseApproval,
+  actionFlags, deriveEnvironmentStatus, deriveStateStatus,
   nextRunnableAction, nextRunnableState, orderedActions, orderedStates, retryBudget, stateFlags,
-  useCaseApprovalHash, validateActionInstruction, validateRunnableEnvironment,
-  type ActionExecution, type EnvironmentDefinition, type StateExecution, type UseCase
+  validateActionInstruction, validateRunnableEnvironment,
+  type ActionExecution, type EnvironmentDefinition, type StateExecution
 } from "../../../shared/orchestration/index.js";
-
-const draftUseCase = (): UseCase => ({
-  id: "UC-1",
-  name: "Deliver evidence",
-  status: "draft",
-  examples: [{ given: "approved direction", when: "work completes", then: "evidence is visible" }],
-  successGoals: ["Evidence exists"],
-  failureGoals: ["Evidence is missing"],
-  expectedOutcomes: ["Auditable result"],
-  goalIds: ["goal-1"],
-  adrIds: ["adr-1"],
-  constraintIds: ["constraint-1"]
-});
-
-const approvedUseCase = (): UseCase => approveUseCase(draftUseCase(), {
-  approvedBy: "human-1", approvedAt: "2026-08-29T10:00:00.000Z", revision: 1
-});
 
 const environment = (): EnvironmentDefinition => ({
   id: "env-1",
@@ -37,31 +19,6 @@ const environment = (): EnvironmentDefinition => ({
       work: { agentId: "ballet-action-work-action-1", skillResources: [] }
     }]
   }]
-});
-
-describe("Use Case approval", () => {
-  it("produces a deterministic hash independent of approval timestamps and set ordering", () => {
-    const first = approvedUseCase();
-    const reordered = { ...first, goalIds: ["goal-2", "goal-1"], approval: undefined, status: "draft" as const };
-    const equivalent = { ...reordered, goalIds: ["goal-1", "goal-2"] };
-    expect(useCaseApprovalHash(reordered)).toBe(useCaseApprovalHash(equivalent));
-    expect(useCaseApprovalHash(first)).toBe(useCaseApprovalHash({ ...first, approval: { ...first.approval!, approvedAt: "2030-01-01T00:00:00.000Z" } }));
-    expect(hasValidUseCaseApproval(first)).toBe(true);
-  });
-
-  it("invalidates approval when semantic content changes", () => {
-    const previous = approvedUseCase();
-    const changed = invalidateUseCaseApproval(previous, { ...previous, name: "Changed" });
-    expect(changed).toMatchObject({ status: "draft" });
-    expect(changed.approval).toBeUndefined();
-  });
-
-  it.each([
-    ["draft", "approved", true], ["approved", "draft", true],
-    ["draft", "draft", false], ["approved", "approved", false]
-  ] as const)("transition %s to %s is %s", (from, to, expected) => {
-    expect(canTransitionUseCase(from, to)).toBe(expected);
-  });
 });
 
 describe("ordered Environment gates", () => {

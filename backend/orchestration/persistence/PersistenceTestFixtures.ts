@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type {
   ActionDefinition, CreateAgentRunInput, CreateEnvironmentRunInput, FeedbackSeed,
-  RunEvidenceSeed, RootSnapshotV20, StateDefinition, TaskEnvelopeV11
+  RunEvidenceSeed, RootSnapshotV21, StateDefinition, TaskEnvelopeV11
 } from "../../../shared/orchestration/index.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import { LocalDatabase } from "./LocalDatabase.js";
@@ -79,12 +79,11 @@ export const environmentSeed = (options: {
     description: `${role} test Agent`, developerInstructions: `${VALID_INSTRUCTION}\n\nAction Agent ${action.id} ${role}.`,
     model: "gpt-5.6-sol", reasoningEffort: "high", contentSha256: HASH_A
   }))));
-  const snapshot: RootSnapshotV20 = {
-    version: 20, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
-    directionSha256: "b".repeat(64), environmentSha256: "c".repeat(64),
+  const snapshot: RootSnapshotV21 = {
+    version: 21, projectHeadSha: options.baseCommit ?? TEST_SHA, projectConfigSha256: HASH_A,
+    environmentSha256: "c".repeat(64),
     resourceSha256: "d".repeat(64),
     environment: { id: "environment-1", name: "Environment", description: "Test Environment", states: states.map(({ definition }) => definition) },
-    direction: { goals: [], adrs: [], constraints: [] },
     agents: (["ballet-critic-agent", "ballet-refinement-agent"] as const).map((id) => ({
       id, name: id, description: "Test Agent", developerInstructions: VALID_INSTRUCTION,
       model: "gpt-5.6-sol", reasoningEffort: "high", sandboxMode: "read-only" as const, contentSha256: HASH_A

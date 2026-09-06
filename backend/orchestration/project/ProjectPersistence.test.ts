@@ -19,8 +19,8 @@ describe("canonical project persistence", () => {
     const context = fixture(false);
     const rejectedOldVersion = { version: 19, projectModel: {} };
     writeFileSync(path.join(context.root, ".ballet", "project.json"), JSON.stringify(rejectedOldVersion));
-    expect(() => context.projects.load()).toThrow("Project Config v25 is required");
-    expect(() => context.projects.loadOptional()).toThrow("Project Config v25 is required");
+    expect(() => context.projects.load()).toThrow("Project Config v26 is required");
+    expect(() => context.projects.loadOptional()).toThrow("Project Config v26 is required");
   });
 
   test("writes stable canonical JSON atomically and enforces optimistic hashes", () => {
@@ -39,9 +39,9 @@ describe("canonical project persistence", () => {
     mkdirSync(path.dirname(context.projects.configPath), { recursive: true }); symlinkSync(target, context.projects.configPath);
     expect(() => context.projects.load()).toThrow("ordinary file");
     const markdown = path.join(context.root, "target.md"); writeFileSync(markdown, "# target\n");
-    mkdirSync(path.join(context.documents.dataRoot, "goals"), { recursive: true });
-    symlinkSync(markdown, path.join(context.documents.dataRoot, "goals", "goal-1.md"));
-    expect(() => context.documents.require("goal", "goal-1")).toThrow("ordinary file");
+    mkdirSync(path.join(context.documents.dataRoot, "adr"), { recursive: true });
+    symlinkSync(markdown, path.join(context.documents.dataRoot, "adr", "adr-1.md"));
+    expect(() => context.documents.require("adr", "adr-1")).toThrow("ordinary file");
   });
 
   test("locks snapshotted config while allowing Action-unreferenced instruction documents", () => {
@@ -58,22 +58,8 @@ describe("canonical project persistence", () => {
     expect(context.documents.put("instruction", "extra", `${VALID_INSTRUCTION}\n`, extra.contentHash).content).toContain("Acceptance evidence");
   });
 
-  test("invalidates Use Case approval on a semantic Markdown authoring edit", () => {
-    const context = fixture();
-    const document = context.documents.put("use-case", "UC-1", "# Use Case\n", "absent");
-    const loaded = context.projects.load();
-    const useCase = loaded.config.direction.useCases[0]!;
-    context.service.putDirection({ kind: "use-case", id: useCase.id, value: { ...useCase, name: "Changed semantics" },
-      markdown: "# Changed semantics\n", expectedConfigHash: loaded.configHash, expectedDocumentHash: document.contentHash });
-    const saved = context.projects.load().config.direction.useCases[0];
-    expect(saved).toMatchObject({ status: "draft" }); expect(saved).not.toHaveProperty("approval");
-  });
-
-  test("indexes deletion blockers across Direction, Environment, instructions, and skills", () => {
+  test("indexes resource usages without project document execution gates", () => {
     const index = new ProjectReferenceIndex(validProjectConfig());
-    expect(index.for("goal", "goal-1")).toContainEqual(expect.objectContaining({ ownerType: "use-case" }));
-    expect(index.for("use-case", "UC-1")).toEqual([]);
-    expect(index.for("use-case", "UC-1")).not.toContainEqual(expect.objectContaining({ ownerType: "action" }));
     expect(index.for("instruction", "instruction")).toEqual([]);
     expect(index.for("skill", "").length).toBe(0);
   });

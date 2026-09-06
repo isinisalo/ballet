@@ -3,7 +3,6 @@ import { validateUniqueActionPriority, validateUniqueStateOrder } from "../gates
 import { CONTRACT_LIMITS } from "../limits.js";
 import { PROJECT_CONFIG_VERSION } from "../versions.js";
 import { idListSchema, idSchema, nonEmptyTextSchema } from "./common.js";
-import { directionSchema } from "./directionSchemas.js";
 import { actionAgentId } from "../environment.js";
 
 const codexModelSchema = z.enum(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"]);
@@ -116,9 +115,8 @@ const refinementConfigurationSchema = z.object({
   ])
 }).strict();
 
-export const projectConfigurationV25Schema = z.object({
+export const projectConfigurationV26Schema = z.object({
   version: z.literal(PROJECT_CONFIG_VERSION),
-  direction: directionSchema,
   environment: environmentDefinitionSchema,
   critic: criticConfigurationSchema,
   refinement: refinementConfigurationSchema

@@ -1,5 +1,5 @@
 import type { JsonValue } from "./primitives.js";
-import type { AgentRunPhase, AgentRunRole, RootSnapshotV20 } from "./runtime.js";
+import type { AgentRunPhase, AgentRunRole, RootSnapshotV21 } from "./runtime.js";
 
 export interface StoredEnvironmentRun {
   environmentRunId: string;
@@ -13,7 +13,7 @@ export interface StoredEnvironmentRun {
   resultCommit?: string;
   worktreePath: string;
   branch: string;
-  executionSnapshot: RootSnapshotV20;
+  executionSnapshot: RootSnapshotV21;
   executionSnapshotHash: string;
   activeStateExecutionId?: string;
   activeActionExecutionId?: string;

@@ -3,8 +3,8 @@ id: arc42-section-03
 title: Konteksti ja rajaus
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-08-29'
-version: 8
+updatedAt: '2026-09-06'
+version: 9
 tags: [arc42, context, interfaces]
 arc42Section: 3
 ---
@@ -15,4 +15,4 @@ Ihminen authoroi ja hyväksyy direction-dokumentit sekä käyttää paikallista 
 
 Järjestelmän ulkopuolelle jäävät käyttäjän Git remote, trackerit, julkaisu- ja deploy-kohteet. Niihin ei kirjoiteta ilman erillistä, täsmällistä valtuutusta. Providerin teksti on epäluotettua inputia eikä approval-komento.
 
-Project truth: `.ballet/project.json`, Goals, ADR:t, Constraints, Use Caset, instructionit ja Skillit. Runtime truth: snapshotit, statukset, yritykset, eventit, Feedback, proposalit, approvalit ja continuation-lineage `.git/ballet`-alueella.
+Project truth: `.ballet/project.json`, Overview, ADR:t, User Storyt, instructionit ja Skillit. Runtime truth: snapshotit, statukset, yritykset, eventit, Feedback, proposalit, approvalit ja continuation-lineage `.git/ballet`-alueella.

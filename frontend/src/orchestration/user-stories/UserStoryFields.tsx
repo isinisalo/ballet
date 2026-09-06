@@ -39,5 +39,16 @@ export function UserStoryFields({ editor, disabled }: { editor: ReturnType<typeo
       <Button id="add-criterion" type="button" variant="outline" size="sm" className="mt-4" disabled={draft.acceptanceCriteria.length >= USER_STORY_LIMITS.criteria} onClick={editor.addCriterion}>Add acceptance criterion</Button>
       {draft.acceptanceCriteria.length >= USER_STORY_LIMITS.criteria ? <p className="mt-2 text-sm text-muted-foreground">Maximum {USER_STORY_LIMITS.criteria} criteria reached.</p> : null}
     </section>
+    <details className="min-w-0"><summary className="min-h-10 py-2 md:min-h-0 md:py-0 cursor-pointer rounded-sm text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Details and references</summary>
+      <div className="mt-4 grid min-w-0 gap-4">
+        <div className="grid gap-2"><Label htmlFor="story-details">Additional context (Markdown)</Label>
+          <Textarea id="story-details" className="min-h-40 font-mono" maxLength={CONTRACT_LIMITS.text} value={draft.details ?? ""}
+            onChange={(event) => setDraft({ ...draft, details: event.target.value })} /></div>
+        <div className="grid gap-2"><Label htmlFor="story-adrs">Related ADR IDs (one per line)</Label>
+          <Textarea id="story-adrs" value={(draft.adrIds ?? []).join("\n")} onChange={(event) => setDraft({ ...draft, adrIds: event.target.value ? event.target.value.split("\n") : [] })} />
+          {Object.keys(errors).some((key) => key.startsWith("adrIds")) ? <p role="alert" className="text-sm text-destructive">Enter valid ADR IDs, one per line, without empty lines.</p> : null}
+        </div>
+      </div>
+    </details>
   </fieldset>;
 }

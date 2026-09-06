@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { ROOT_SNAPSHOT_VERSION } from "../versions.js";
 import { gitObjectIdSchema, idListSchema, idSchema, sha256Schema, timestampSchema } from "./common.js";
-import { constraintSchema, directionReferenceSchema } from "./directionSchemas.js";
 import { actionAgentDefinitionSchema, agentCompositionSchema, governanceAgentDefinitionSchema, environmentDefinitionSchema } from "./environmentSchemas.js";
 
 const runtimeCapabilityBase = {
@@ -18,19 +17,13 @@ const roleModelCapabilitySchema = z.object({
   supportedReasoningEfforts: z.array(z.string().trim().min(1))
 }).strict();
 
-export const rootSnapshotV20Schema = z.object({
+export const rootSnapshotV21Schema = z.object({
   version: z.literal(ROOT_SNAPSHOT_VERSION),
   projectHeadSha: gitObjectIdSchema,
   projectConfigSha256: sha256Schema,
-  directionSha256: sha256Schema,
   environmentSha256: sha256Schema,
   resourceSha256: sha256Schema,
   environment: environmentDefinitionSchema,
-  direction: z.object({
-    goals: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
-    adrs: z.array(directionReferenceSchema.extend({ contentSha256: sha256Schema }).strict()),
-    constraints: z.array(constraintSchema.extend({ contentSha256: sha256Schema }).strict())
-  }).strict(),
   agents: z.array(governanceAgentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()).length(2),
   actionAgents: z.array(actionAgentDefinitionSchema.extend({ contentSha256: sha256Schema }).strict()),
   runtimeCapabilities: z.array(z.union([
@@ -76,7 +69,7 @@ export const environmentRunSchema = z.object({
   id: idSchema,
   environmentId: idSchema,
   status: environmentRunStatusSchema,
-  snapshot: rootSnapshotV20Schema,
+  snapshot: rootSnapshotV21Schema,
   continuationOfRunId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

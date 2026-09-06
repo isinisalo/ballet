@@ -53,6 +53,11 @@ export function useUserStoryDraft(current: UserStoryDocument | undefined, onDirt
     await userStoryApi.remove(baseline);
     if (active.current) { onDirty(false); onRemoved(baseline.value.id); }
   });
-  return { draft, setDraft, criterionKeys, dirty, valid, errors, pending, error, conflict, stale, baseline,
+  const decide = (approval: boolean, onSaved: (document: UserStoryDocument) => void) => mutate(async () => {
+    if (!baseline || dirty || stale || conflict) return;
+    const saved = await (approval ? userStoryApi.approve(baseline) : userStoryApi.returnToDraft(baseline));
+    if (active.current) { setBaseline(saved); setDraft(storyInput(saved.value)); onSaved(saved); }
+  });
+  return { decide, draft, setDraft, criterionKeys, dirty, valid, errors, pending, error, conflict, stale, baseline,
     reset, addCriterion, removeCriterion, save, remove };
 }

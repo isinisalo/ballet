@@ -1,7 +1,4 @@
 export const CONTRACT_LIMITS = {
-  directionItems: 256,
-  useCases: 128,
-  examplesPerUseCase: 50,
   states: 128,
   actionsPerState: 128,
   actionsTotal: 4_096,

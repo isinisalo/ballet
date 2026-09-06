@@ -1,7 +1,7 @@
 import type { ActionDefinition, CriticScheduleDefinition, StateDefinition } from "./environment.js";
 import type { ExecutionSpecV18 } from "./execution.js";
 import type { JsonValue } from "./primitives.js";
-import type { AgentRunPhase, AgentRunRole, RootSnapshotV20 } from "./runtime.js";
+import type { AgentRunPhase, AgentRunRole, RootSnapshotV21 } from "./runtime.js";
 import type { TaskEnvelopeV11 } from "./taskEnvelopes.js";
 import type { ValidationOutcome, WorkOutcome } from "./outcomes.js";
 import type { FeedbackCategory, FeedbackTargetType } from "./reviews.js";
@@ -31,7 +31,7 @@ export interface CreateEnvironmentRunInput {
   baseCommit: string;
   worktreePath: string;
   branch: string;
-  executionSnapshot: RootSnapshotV20;
+  executionSnapshot: RootSnapshotV21;
   executionSnapshotHash: string;
   transitionLimit: number;
   states: StateExecutionSeed[];

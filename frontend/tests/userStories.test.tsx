@@ -10,11 +10,11 @@ import { UserStoriesWorkspace } from "../src/orchestration/user-stories/UserStor
 import { userStoryApi } from "../src/orchestration/user-stories/userStoryApi";
 import { useWorkspaceNavigation, useWorkspaceNavigationBlocker } from "../src/workspace/useWorkspaceNavigation";
 
-const saved: UserStoryDocument = { contentHash: "a".repeat(64), value: {
-  version: 1, id: "00000000-0000-4000-8000-000000000001", role: "project owner", goal: "to define an outcome", benefit: "the team understands its purpose",
+const saved: UserStoryDocument = { contentHash: "a".repeat(64), semanticHash: "b".repeat(64), value: {
+  version: 2, status: "draft", approvalRevision: 0, adrIds: [], details: "", id: "00000000-0000-4000-8000-000000000001", role: "project owner", goal: "to define an outcome", benefit: "the team understands its purpose",
   acceptanceCriteria: [{ given: "a project", when: "I save", then: "the file exists" }, { given: "a saved story", when: "I restart", then: "the story remains" }]
 } };
-const editorProps = () => ({ locked: false, onDirty: vi.fn(), onBack: vi.fn(), onSaved: vi.fn(), onRemoved: vi.fn(), onRefresh: vi.fn(async () => undefined) });
+const editorProps = () => ({ locked: false, onDirty: vi.fn(), onBack: vi.fn(), onSaved: vi.fn(), onApproved: vi.fn(), onRemoved: vi.fn(), onRefresh: vi.fn(async () => undefined) });
 const fillStory = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.type(screen.getByRole("textbox", { name: /Role/ }), "project owner");
   await user.type(screen.getByRole("textbox", { name: /Goal/ }), "to define an outcome");
@@ -48,7 +48,7 @@ describe("User Story authoring", () => {
     await user.type(screen.getByRole("textbox", { name: "WHEN for criterion 1" }), "I save");
     await user.type(screen.getByRole("textbox", { name: "THEN for criterion 1" }), "the file exists");
     await user.click(screen.getByRole("button", { name: "Save story" }));
-    expect(save).toHaveBeenCalledWith({ role: saved.value.role, goal: saved.value.goal, benefit: saved.value.benefit, acceptanceCriteria: [saved.value.acceptanceCriteria[0]] }, undefined);
+    expect(save).toHaveBeenCalledWith({ role: saved.value.role, goal: saved.value.goal, benefit: saved.value.benefit, adrIds: [], details: "", acceptanceCriteria: [saved.value.acceptanceCriteria[0]] }, undefined);
     expect(props.onSaved).toHaveBeenCalledWith(saved);
   });
 
@@ -144,3 +144,34 @@ function WorkspaceHarness() {
   useWorkspaceNavigationBlocker(navigation.setNavigationBlocker, dirty, "Discard unsaved User Story changes?");
   return <UserStoriesWorkspace route={navigation.route} locked={false} navigate={navigation.navigate} onDirty={setDirty} />;
 }
+
+it("requires an explicit saved-content confirmation and disables approval for a dirty or stale draft", async () => {
+  const user = userEvent.setup(); const props = editorProps();
+  const approved = { ...saved, contentHash: "c".repeat(64), value: { ...saved.value, status: "approved" as const, approvalRevision: 1,
+    approval: { approvedBy: "human", approvedAt: "2026-09-06T10:00:00.000Z", revision: 1, contentHash: saved.semanticHash } } };
+  const approve = vi.spyOn(userStoryApi, "approve").mockResolvedValue(approved);
+  const view = render(<UserStoryEditor {...props} current={saved} />);
+  await user.click(screen.getByRole("button", { name: "Approve story" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent(saved.semanticHash); expect(approve).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Confirm approval" }));
+  await waitFor(() => expect(approve).toHaveBeenCalledWith(saved)); expect(props.onApproved).toHaveBeenCalledWith(approved);
+  view.unmount();
+  const other = render(<UserStoryEditor {...editorProps()} current={saved} />);
+  await user.type(screen.getByRole("textbox", { name: /Role/ }), " changed");
+  expect(screen.getByRole("button", { name: "Approve story" })).toBeDisabled();
+  other.rerender(<UserStoryEditor {...editorProps()} current={{ ...saved, contentHash: "d".repeat(64) }} />);
+  expect(screen.getByRole("button", { name: "Approve story" })).toBeDisabled();
+  expect(screen.getByRole("textbox", { name: /Role/ })).toHaveValue("project owner changed");
+});
+
+it("keeps the draft after a stale approval response and does not retry against a refreshed hash", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(userStoryApi, "approve").mockRejectedValue(new ApiRequestError("Story file changed", 409));
+  render(<UserStoryEditor {...editorProps()} current={saved} />);
+  await user.click(screen.getByRole("button", { name: "Approve story" }));
+  await user.click(screen.getByRole("button", { name: "Confirm approval" }));
+  await screen.findByText("Story file changed");
+  expect(screen.getByRole("textbox", { name: /Role/ })).toHaveValue(saved.value.role);
+  expect(screen.getByRole("button", { name: "Approve story" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Check current file" })).toBeEnabled();
+});

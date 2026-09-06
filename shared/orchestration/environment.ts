@@ -1,4 +1,3 @@
-import type { Direction } from "./direction.js";
 import type { JsonValue } from "./primitives.js";
 import { PROJECT_CONFIG_VERSION } from "./versions.js";
 
@@ -89,9 +88,8 @@ export interface RefinementConfiguration {
   allowedRoots: [".codex/agents", ".ballet/instructions", ".agents/skills"];
 }
 
-export interface ProjectConfigurationV25 {
+export interface ProjectConfigurationV26 {
   version: typeof PROJECT_CONFIG_VERSION;
-  direction: Direction;
   environment: EnvironmentDefinition;
   critic: CriticConfiguration;
   refinement: RefinementConfiguration;

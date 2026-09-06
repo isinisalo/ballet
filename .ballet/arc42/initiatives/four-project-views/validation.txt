@@ -1,0 +1,285 @@
+Local verification, 2026-09-06
+Working tree based on caacde54ec9cf8a01375884f033fb2617f7807fe
+All commands completed with exit status 0.
+
+$ npm run test
+
+> ballet@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /Users/iiro.sinisalo/git/ballet
+
+
+ Test Files  51 passed (51)
+      Tests  390 passed (390)
+   Start at  08:40:16
+   Duration  4.14s (transform 3.18s, setup 822ms, import 7.47s, tests 18.80s, environment 4.96s)
+
+
+$ npm run lint (script includes --max-warnings=0)
+
+> ballet@0.1.0 lint
+> eslint . --max-warnings=0
+
+
+$ npm run build
+
+> ballet@0.1.0 build
+> rm -rf dist dist-server && tsc -b --force && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2286 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/index.html                                                   0.59 kB │ gzip:   0.32 kB
+../dist/assets/geist-mono-symbols2-wght-normal-GZpp1pK2.woff2        5.80 kB
+../dist/assets/geist-mono-cyrillic-ext-wght-normal-I4S5GZfc.woff2    6.18 kB
+../dist/assets/geist-mono-vietnamese-wght-normal-D8KDMBhC.woff2      7.72 kB
+../dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2          10.25 kB
+../dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2           11.23 kB
+../dist/assets/geist-mono-cyrillic-wght-normal-BmXc_FBt.woff2       12.88 kB
+../dist/assets/geist-mono-latin-ext-wght-normal-DrnZ1wKl.woff2      14.78 kB
+../dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2            18.75 kB
+../dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2               19.00 kB
+../dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2        25.96 kB
+../dist/assets/geist-mono-latin-wght-normal-B_7UjwxQ.woff2          29.90 kB
+../dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2               48.26 kB
+../dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2           85.07 kB
+../dist/assets/WorkspaceApp-DNaT5o-Q.css                             3.42 kB │ gzip:   1.00 kB
+../dist/assets/LoopEngineeringWorkspace-B_5d_sYE.css                 4.51 kB │ gzip:   1.21 kB
+../dist/assets/EventStormingWorkspace-CBqL3D4E.css                  14.91 kB │ gzip:   3.19 kB
+../dist/assets/style-BnuhLJ6X.css                                   15.87 kB │ gzip:   2.67 kB
+../dist/assets/index-sSwCyCC2.css                                   80.86 kB │ gzip:  14.30 kB
+../dist/assets/index-CnFPNlMI.js                                     3.68 kB │ gzip:   1.75 kB
+../dist/assets/vendor-icons-BzxMpxKT.js                             15.91 kB │ gzip:   3.59 kB
+../dist/assets/EventStormingWorkspace-CXgrnGa_.js                   35.68 kB │ gzip:  11.70 kB
+../dist/assets/LoopEngineeringWorkspace-D6czyL62.js                 58.08 kB │ gzip:  20.42 kB
+../dist/assets/vendor-react-Ds1IGov0.js                            143.38 kB │ gzip:  45.98 kB
+../dist/assets/style-DyKWUQbG.js                                   185.66 kB │ gzip:  60.23 kB
+../dist/assets/vendor-ui-CgFXC9-B.js                               206.96 kB │ gzip:  69.18 kB
+../dist/assets/WorkspaceApp-CW1jJYwT.js                            382.88 kB │ gzip: 112.37 kB
+✓ built in 1.46s
+
+$ npm run validate:arc42
+
+> ballet@0.1.0 validate:arc42
+> tsx .ballet/tools/validate-arc42.mjs
+
+arc42 validation passed: 12 sections, 117 document IDs, Project Config v26, 5 States and 21 Actions.
+
+$ npm run validate:cutover
+
+> ballet@0.1.0 validate:cutover
+> node scripts/check-cutover-removal.mjs
+
+Strict cutover removal gate passed (571 files scanned).
+
+$ npx @google/design.md lint DESIGN.md
+{
+  "findings": [
+    {
+      "severity": "info",
+      "message": "Design system defines 65 colors, 7 typography scales, 6 rounding levels, 8 spacing tokens.",
+      "rule": "token-summary"
+    }
+  ],
+  "summary": {
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1
+  }
+}
+
+$ make latest
+BALLET_INSTALL_PREFIX="/Users/iiro.sinisalo/.local" npm run release:install
+
+> ballet@0.1.0 release:install
+> sh scripts/install-local.sh
+
+
+> ballet@0.1.0 release:build
+> sh scripts/build-release.sh 0.1.0 arm64 /Users/iiro.sinisalo/git/ballet/release
+
+
+> ballet@0.1.0 build
+> rm -rf dist dist-server && tsc -b --force && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2286 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/index.html                                                   0.59 kB │ gzip:   0.32 kB
+../dist/assets/geist-mono-symbols2-wght-normal-GZpp1pK2.woff2        5.80 kB
+../dist/assets/geist-mono-cyrillic-ext-wght-normal-I4S5GZfc.woff2    6.18 kB
+../dist/assets/geist-mono-vietnamese-wght-normal-D8KDMBhC.woff2      7.72 kB
+../dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2          10.25 kB
+../dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2           11.23 kB
+../dist/assets/geist-mono-cyrillic-wght-normal-BmXc_FBt.woff2       12.88 kB
+../dist/assets/geist-mono-latin-ext-wght-normal-DrnZ1wKl.woff2      14.78 kB
+../dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2            18.75 kB
+../dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2               19.00 kB
+../dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2        25.96 kB
+../dist/assets/geist-mono-latin-wght-normal-B_7UjwxQ.woff2          29.90 kB
+../dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2               48.26 kB
+../dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2           85.07 kB
+../dist/assets/WorkspaceApp-DNaT5o-Q.css                             3.42 kB │ gzip:   1.00 kB
+../dist/assets/LoopEngineeringWorkspace-B_5d_sYE.css                 4.51 kB │ gzip:   1.21 kB
+../dist/assets/EventStormingWorkspace-CBqL3D4E.css                  14.91 kB │ gzip:   3.19 kB
+../dist/assets/style-BnuhLJ6X.css                                   15.87 kB │ gzip:   2.67 kB
+../dist/assets/index-sSwCyCC2.css                                   80.86 kB │ gzip:  14.30 kB
+../dist/assets/index-CaDXFnY5.js                                     3.68 kB │ gzip:   1.74 kB
+../dist/assets/vendor-icons-BzxMpxKT.js                             15.91 kB │ gzip:   3.59 kB
+../dist/assets/EventStormingWorkspace-C48iijUf.js                   35.68 kB │ gzip:  11.70 kB
+../dist/assets/LoopEngineeringWorkspace-D_XOMnaC.js                 58.08 kB │ gzip:  20.42 kB
+../dist/assets/vendor-react-Ds1IGov0.js                            143.38 kB │ gzip:  45.98 kB
+../dist/assets/style-DyKWUQbG.js                                   185.66 kB │ gzip:  60.23 kB
+../dist/assets/vendor-ui-CgFXC9-B.js                               206.96 kB │ gzip:  69.18 kB
+../dist/assets/WorkspaceApp-CieDzc-I.js                            382.89 kB │ gzip: 112.38 kB
+✓ built in 1.51s
+npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+
+added 180 packages in 895ms
+9d80aabcf718fc6cb757ea185177ce91ab34f3174481a518f16e9ea770cd21cf  /Users/iiro.sinisalo/git/ballet/release/ballet_0.1.0_darwin_arm64.tar.gz
+
+Installed local Ballet 0.1.0 to /Users/iiro.sinisalo/.local/bin/ballet.
+Start Ballet from a committed Git checkout root:
+  cd <checkout> && ballet
+"/Users/iiro.sinisalo/.local/bin/ballet" restart
+Ballet restarted at http://127.0.0.1:53321.
+"/Users/iiro.sinisalo/.local/bin/ballet" status
+{
+  "checkoutRoot": "/Users/iiro.sinisalo/git/ballet",
+  "stateRoot": "/Users/iiro.sinisalo/git/ballet/.git/ballet",
+  "serviceLabel": "ai.ballet.ff4e78cd5914766c",
+  "configured": true,
+  "port": 53321,
+  "instanceId": "0112b415-8a54-4160-8b57-72c2dea7c313",
+  "url": "http://127.0.0.1:53321",
+  "launchd": {
+    "loaded": true,
+    "running": true,
+    "pid": 84694
+  },
+  "health": {
+    "ok": true,
+    "instanceId": "0112b415-8a54-4160-8b57-72c2dea7c313",
+    "checkoutRoot": "/Users/iiro.sinisalo/git/ballet",
+    "port": 53321,
+    "version": "0.1.0",
+    "startedAt": "2026-09-06T05:40:08.494Z"
+  },
+  "daemon": {
+    "launchd": {
+      "loaded": true,
+      "running": true,
+      "pid": 87997
+    },
+    "runtime": {
+      "status": "online",
+      "pid": 87997,
+      "daemonVersion": "0.1.0",
+      "uptimeSeconds": 0,
+      "activeTaskCount": 0,
+      "lastSeenAt": "2026-09-06T05:40:21.061Z",
+      "refreshRequested": false,
+      "restartRequested": false,
+      "providers": [
+        {
+          "provider": "codex",
+          "cliVersion": "0.151.0",
+          "authStatus": "ready",
+          "health": "ready",
+          "capabilities": {
+            "models": [
+              {
+                "id": "gpt-5.6-sol",
+                "label": "GPT-5.6-Sol",
+                "reasoningOptions": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                  "ultra"
+                ],
+                "defaultReasoning": "low"
+              },
+              {
+                "id": "gpt-5.6-terra",
+                "label": "GPT-5.6-Terra",
+                "reasoningOptions": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                  "ultra"
+                ],
+                "defaultReasoning": "medium"
+              },
+              {
+                "id": "gpt-5.6-luna",
+                "label": "GPT-5.6-Luna",
+                "reasoningOptions": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ],
+                "defaultReasoning": "medium"
+              },
+              {
+                "id": "gpt-5.5",
+                "label": "GPT-5.5",
+                "reasoningOptions": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ],
+                "defaultReasoning": "medium"
+              },
+              {
+                "id": "gpt-5.4-mini",
+                "label": "GPT-5.4-Mini",
+                "reasoningOptions": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ],
+                "defaultReasoning": "medium"
+              },
+              {
+                "id": "gpt-5.3-codex-spark",
+                "label": "GPT-5.3-Codex-Spark",
+                "reasoningOptions": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ],
+                "defaultReasoning": "high"
+              }
+            ],
+            "supportsResume": true,
+            "supportsStructuredOutput": true,
+            "policy": {
+              "workspaceWrite": true
+            },
+            "refreshedAt": "2026-09-06T05:40:20.929Z"
+          },
+          "busy": false,
+          "updatedAt": "2026-09-06T05:40:21.061Z"
+        }
+      ]
+    }
+  }
+}
+
+$ git diff --check
+No output; exit status 0.

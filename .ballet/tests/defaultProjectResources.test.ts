@@ -4,9 +4,11 @@ import path from "node:path";
 import YAML from "yaml";
 import { parse as parseToml } from "smol-toml";
 import { describe, expect, test } from "vitest";
-import { useCaseApprovalHash } from "../../shared/orchestration/direction.js";
+import { createHash } from "node:crypto";
+import { UserStoryService } from "../../backend/orchestration/project/UserStoryService.js";
+import { ProjectDocumentRepository } from "../../backend/orchestration/project/ProjectDocumentRepository.js";
 import { validateRunnableEnvironment } from "../../shared/orchestration/gates.js";
-import { projectConfigurationV25Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV26Schema } from "../../shared/orchestration/schemas/environmentSchemas.js";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
@@ -23,11 +25,8 @@ const walk = (directory: string): string[] => readdirSync(directory).flatMap((en
 });
 
 describe("canonical default project resources", () => {
-  test("loads the exact runnable five-State 21-Action lifecycle with 13 approved Use Cases", () => {
-    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
-    expect(project.direction.useCases.map(({ id }) => id)).toEqual(Array.from({ length: 13 }, (_, index) => `UC-${String(index + 1).padStart(2, "0")}`));
-    expect(project.direction.useCases.every(({ status }) => status === "approved")).toBe(true);
-    expect(project.direction.useCases.every((useCase) => useCase.approval?.contentHash === useCaseApprovalHash(useCase))).toBe(true);
+  test("loads the exact runnable five-State 21-Action lifecycle without project-definition config copies", () => {
+    const project = projectConfigurationV26Schema.parse(load(".ballet/project.json"));
     expect(project.environment.states.map(({ order }) => order).sort((left, right) => left - right)).toEqual([1, 2, 3, 4, 5]);
     // Authoring may reorder States; verify the resource inventory independently of serialized order.
     const states = ["event-storming", "arc42", "design", "build", "deploy"].map((id) => project.environment.states.find((state) => state.id === id)!);
@@ -52,20 +51,30 @@ describe("canonical default project resources", () => {
     expect(validateRunnableEnvironment(project.environment)).toEqual([]);
   });
 
-  test("keeps Use Case documents identical to the approved semantic values and hashes", () => {
-    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
-    for (const useCase of project.direction.useCases) {
-      const document = markdownFrontmatter(`.ballet/use-cases/${useCase.id}.md`);
-      expect(document.frontmatter).toMatchObject({ id: useCase.id, title: useCase.name, status: useCase.status, approval: useCase.approval });
-      for (const field of ["examples", "successGoals", "failureGoals", "expectedOutcomes", "goalIds", "adrIds", "constraintIds"] as const) {
-        expect(document.frontmatter[field]).toEqual(useCase[field]);
-      }
-      expect(document.frontmatter.approval.contentHash).toBe(useCaseApprovalHash(useCase));
+  test("retains original bytes and approval provenance while converted stories remain unapproved", () => {
+    const archive = load(".ballet/history/project-definition-2026-09-06/manifest.json");
+    for (const file of archive.files) {
+      const bytes = readFileSync(path.join(root, file.archived));
+      expect(createHash("sha256").update(bytes).digest("hex"), file.source).toBe(file.sha256);
     }
+    const collection = new UserStoryService(new ProjectDocumentRepository(path.join(root, ".ballet")), () => undefined).list();
+    expect(collection.issues).toEqual([]); expect(collection.stories).toHaveLength(8);
+    const trace = readFileSync(path.join(root, ".ballet/arc42/TRACEABILITY.md"), "utf8");
+    for (const { value } of collection.stories) {
+      expect(value.status).toBe("draft"); expect(value.approvalRevision).toBe(0); expect(value.approval).toBeUndefined();
+      expect(trace).toContain(value.id); expect(value.acceptanceCriteria.length).toBeGreaterThan(0);
+      for (const id of value.adrIds) expect(readdirSync(path.join(root, ".ballet/adr")).some((file) => markdownFrontmatter(`.ballet/adr/${file}`).frontmatter.id === id), id).toBe(true);
+    }
+    for (const source of Object.values(archive.destinations) as string[]) expect(existsSync(path.join(root, source.split("#")[0]!))).toBe(true);
+    expect(Object.keys(archive.destinations)).toHaveLength(13);
+    const config = load(".ballet/project.json");
+    expect(config).not.toHaveProperty("direction"); expect(config).not.toHaveProperty("overview");
+    for (const removed of ["goals", "constraints", "use-cases"]) expect(existsSync(path.join(root, ".ballet", removed))).toBe(false);
+    for (const section of ["Purpose", "Outcomes", "Scope", "Shared requirements"]) expect(readFileSync(path.join(root, ".ballet/overview.md"), "utf8")).toContain(`## ${section}`);
   });
 
   test("resolves every selected Action Agent and shared Skill with no orphan runtime resource", () => {
-    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV26Schema.parse(load(".ballet/project.json"));
     const actionRoles = project.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]));
     const agentIds = new Set(actionRoles.map(({ agentId }) => agentId));
     const skillIds = new Set([project.critic.agent, project.refinement.agent, ...actionRoles].flatMap(({ skillResources }) => skillResources));
@@ -97,7 +106,7 @@ describe("canonical default project resources", () => {
   });
 
   test("uses two governance and 42 Action Codex TOML Agents with a disabled valid Critic schedule", () => {
-    const project = projectConfigurationV25Schema.parse(load(".ballet/project.json"));
+    const project = projectConfigurationV26Schema.parse(load(".ballet/project.json"));
     for (const [id, effort] of [["ballet-critic-agent", "low"], ["ballet-refinement-agent", "high"]] as const) {
       const agent = parseToml(readFileSync(path.join(root, ".codex", "agents", `${id}.toml`), "utf8"));
       expect(agent).toMatchObject({ name: id, model: "gpt-5.6-sol", model_reasoning_effort: effort, sandbox_mode: "read-only" });
@@ -109,10 +118,10 @@ describe("canonical default project resources", () => {
   });
 
   test("loads the compact fixture as a runnable two-State multi-Action project", () => {
-    const fixture = projectConfigurationV25Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
+    const fixture = projectConfigurationV26Schema.parse(load(".fixture-ballet-project/.ballet/project.json"));
     expect(fixture.environment.states).toHaveLength(2);
     expect(fixture.environment.states.flatMap(({ actions }) => actions)).toHaveLength(3);
-    expect(fixture.direction.useCases).toHaveLength(2);
+    expect(new UserStoryService(new ProjectDocumentRepository(path.join(root, ".fixture-ballet-project/.ballet")), () => undefined).list().stories).toHaveLength(2);
     expect(validateRunnableEnvironment(fixture.environment)).toEqual([]);
     expect(fixture.critic.enabled).toBe(false);
     expect(fixture.critic.schedules).toHaveLength(1);
@@ -123,7 +132,7 @@ describe("canonical default project resources", () => {
     const filename = path.join(root, "ballet.drawio");
     expect(() => execFileSync("xmllint", ["--noout", filename], { stdio: "pipe" })).not.toThrow();
     const source = readFileSync(filename, "utf8");
-    for (const label of ["Human direction", "Approved Use Cases", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Continuation Run", "Run Evidence"]) expect(source).toContain(label);
+    for (const label of ["Human direction", "User Stories", "Ordered States", "Priority Actions", "Validation main", "Work subordinate", "Feedback Box", "Critic proposal", "Refinement proposal", "Continuation Run", "Run Evidence"]) expect(source).toContain(label);
     for (const removed of ["RewardMDP", "GraphNode", "ActionNode", "acceptance_ledger", "policy_decision"]) expect(source).not.toContain(removed);
   });
 });

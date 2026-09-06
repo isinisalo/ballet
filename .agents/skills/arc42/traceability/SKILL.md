@@ -1,6 +1,6 @@
 ---
 name: traceability
-description: Build and validate stable architecture trace chains. Use when work connects Goals or requirements to quality scenarios, decisions, concepts, building blocks, runtime/deployment scenarios, tests, monitors and evidence.
+description: Build and validate stable architecture trace chains. Use when work connects Overview or story requirements to quality scenarios, decisions, concepts, building blocks, runtime/deployment scenarios, tests, monitors and evidence.
 ---
 
 # Traceability

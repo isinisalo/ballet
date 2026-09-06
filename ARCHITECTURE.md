@@ -3,8 +3,8 @@ id: architecture-root
 title: Ballet architecture entrypoint
 status: accepted
 createdAt: '2026-08-16'
-updatedAt: '2026-09-05'
-version: 37
+updatedAt: '2026-09-06'
+version: 38
 tags: [architecture, arc42, environment]
 ---
 
@@ -28,12 +28,12 @@ Load only the task-relevant views and Skills. Initiative documents record bounde
 
 | Contract | Version |
 | --- | ---: |
-| Project Config | 25 |
-| Root Snapshot | 20 |
+| Project Config | 26 |
+| Root Snapshot | 21 |
 | Task Envelope / role outcome | 11 / 11 |
 | Prompt composition | 16 |
 | ExecutionSpec | 18 |
-| SQLite | 23 |
+| SQLite | 24 |
 | Feedback / Critic / Refinement | 2 / 2 / 2 |
 | Codex Agent / Run Evidence | 3 / 1 |
 
@@ -47,7 +47,7 @@ flowchart LR
   Ballet -->|leased immutable task over loopback| Daemon[Checkout-local daemon]
   Daemon -->|Codex CLI outcome| Ballet
   Ballet -->|local commits and artifacts| Git[Checkout-local Git repository]
-  Ballet -->|runtime facts| DB[(SQLite v23)]
+  Ballet -->|runtime facts| DB[(SQLite v24)]
   Browser[Same-origin browser UI] <-->|canonical JSON and SSE| Ballet
 ```
 
@@ -78,9 +78,9 @@ Source responsibilities and component mappings live in the [building-block view]
 
 | Truth | Canonical owner | Forbidden substitute |
 | --- | --- | --- |
-| WHAT/WHY and approved intent | Git: Goals, ADRs, Constraints, Use Cases, User Stories, Event Storming models, generic instructions, Skills, Action/governance `.codex/agents/*.toml` files and Project Config v25 | automatic run closure, provider prompt or client state |
-| Environment authoring | Git: Config, Action Agent TOMLs and Skills | SQLite completion flags |
-| Runtime status, attempts, gates, schedules and decisions | SQLite v23 plus immutable Root Snapshot v20 | config `done`/`blocked` fields or provider prose |
+| WHAT/WHY and approved intent | Git: Overview, User Stories, ADRs and Event Storming models | automatic run closure, provider prompt or client state |
+| Environment authoring | Git: Project Config, Action Agent TOMLs, instructions and Skills | SQLite completion flags |
+| Runtime status, attempts, gates, schedules and decisions | SQLite v24 plus immutable Root Snapshot v21 | config `done`/`blocked` fields or provider prose |
 | Repository effect | local commit SHA plus exact artifact hashes | approval flag without applied bytes |
 | Terminal evidence | recomputable Run Evidence projection inside its owning Run | mutable copied evidence document |
 
@@ -107,9 +107,9 @@ Successful work must remain Critic-readable through immutable commit/artifact ev
 
 ## Project/platform boundary
 
-Generic `shared/`, `backend/` and `frontend/` code knows only Direction, Use Case, User Story, Event Storming model, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
+Generic `shared/`, `backend/` and `frontend/` code knows only Overview, User Story, Event Storming model, Agent, Environment, State, Action, role, resource, approval and evidence primitives. Ballet's own five-State delivery arrangement, arc42 paths and exact verification commands live in `.ballet/**` and `.agents/**`. The compact fixture proves the same platform with unrelated IDs and fewer Actions.
 
-User Stories and Event Storming are repository-owned Markdown; neither enters Config, SQLite or Run gates. Their exact source/HTTP mappings live in the [building-block view](.ballet/arc42/05-building-block-view.md); their UI contracts live in [DESIGN](DESIGN.md).
+Overview, ADRs, User Stories and Event Storming are repository-owned Markdown; none enters Config, SQLite or Run gates. Their exact source/HTTP mappings live in the [building-block view](.ballet/arc42/05-building-block-view.md); their UI contracts live in [DESIGN](DESIGN.md).
 
 ## Failure modes
 

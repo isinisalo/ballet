@@ -1,4 +1,4 @@
-import type { ActionRoleComposition, AgentComposition, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
+import type { ActionRoleComposition, AgentComposition, ProjectConfigurationV26 } from "../../../shared/orchestration/environment.js";
 import { sha256 } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeResourceSnapshot } from "../../../shared/orchestration/runtime.js";
 
@@ -12,7 +12,7 @@ export interface ProjectResourceInput {
 export class ResourceContextError extends Error {}
 
 export const resolveOrchestrationResources = (
-  config: ProjectConfigurationV25,
+  config: ProjectConfigurationV26,
   catalog: readonly ProjectResourceInput[]
 ): RuntimeResourceSnapshot[] => {
   const indexed = new Map(catalog.map((resource) => [`${resource.kind}:${resource.id}`, resource]));
@@ -41,7 +41,7 @@ const addResource = (
   selected.set(key, { ...source, sourceSha256: sha256(source.content) });
 };
 
-const allCompositions = (config: ProjectConfigurationV25): Array<ActionRoleComposition | AgentComposition> => [
+const allCompositions = (config: ProjectConfigurationV26): Array<ActionRoleComposition | AgentComposition> => [
   config.critic.agent,
   config.refinement.agent,
   ...config.environment.states.flatMap((state) => state.actions.flatMap((action) => [action.validation, action.work]))

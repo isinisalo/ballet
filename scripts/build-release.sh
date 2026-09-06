@@ -119,19 +119,26 @@ done
 
 curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/project" -o "$SMOKE_ROOT/project.json"
 curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/environment" -o "$SMOKE_ROOT/environment.json"
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/overview" -o "$SMOKE_ROOT/overview.json"
+curl -fsS "http://127.0.0.1:${SMOKE_PORT}/api/user-stories" -o "$SMOKE_ROOT/stories.json"
 "$RUNTIME/node" -e '
 const fs = require("node:fs");
 const project = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 const environment = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-if (project.config?.version !== 25
+const overview = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const stories = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+if (project.config?.version !== 26
   || project.config?.environment?.id !== "fixture-environment"
-  || project.config?.direction?.useCases?.[0]?.status !== "approved"
+  || "direction" in project.config
+  || !overview.content?.includes("## Purpose")
+  || stories.stories?.length !== 2
+  || !stories.stories.every((story) => story.value.version === 2 && story.value.status === "draft" && !story.value.approval)
   || environment.environment?.id !== "fixture-environment"
   || environment.environment?.states?.[0]?.order !== 1
   || environment.environment?.states?.[0]?.actions?.[0]?.priority !== 1) {
   throw new Error("packaged Ballet server did not load the canonical fixture workspace");
 }
-' "$SMOKE_ROOT/project.json" "$SMOKE_ROOT/environment.json"
+' "$SMOKE_ROOT/project.json" "$SMOKE_ROOT/environment.json" "$SMOKE_ROOT/overview.json" "$SMOKE_ROOT/stories.json"
 
 [ -f "$SMOKE_ROOT/project/.git/ballet/state.sqlite" ] || { printf 'packaged Ballet server did not create state.sqlite\n' >&2; exit 1; }
 "$RUNTIME/node" -e '
@@ -139,7 +146,7 @@ const Database = require("better-sqlite3");
 const database = new Database(process.argv[1], { readonly: true });
 const version = database.prepare("SELECT value FROM metadata WHERE key = ?").get("schema_version")?.value;
 database.close();
-if (version !== "23") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 23`);
+if (version !== "24") throw new Error(`packaged Ballet created SQLite schema ${version ?? "unknown"}, expected 24`);
 ' "$SMOKE_ROOT/project/.git/ballet/state.sqlite"
 [ -z "$(git -C "$SMOKE_ROOT/project" status --porcelain)" ] || { git -C "$SMOKE_ROOT/project" status --short >&2; exit 1; }
 [ -z "$(find "$SMOKE_ROOT/home" -mindepth 1 -print -quit)" ] || { printf 'packaged Ballet wrote mutable state outside the checkout\n' >&2; exit 1; }

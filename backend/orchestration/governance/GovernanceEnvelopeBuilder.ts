@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { JsonValue } from "../../../shared/orchestration/primitives.js";
-import type { RootSnapshotV20 } from "../../../shared/orchestration/runtime.js";
+import type { RootSnapshotV21 } from "../../../shared/orchestration/runtime.js";
 import type { CriticTaskEnvelope, RefinementTaskEnvelope } from "../../../shared/orchestration/taskEnvelopes.js";
 
 export const buildCriticEnvelope = (input: {
@@ -13,7 +13,7 @@ export const buildCriticEnvelope = (input: {
     WHERE cr.critic_run_id = ?
   `).get(input.criticRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Critic Run ${input.criticRunId} has no immutable Run Evidence.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV20;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV21;
   const composition = snapshot.governance.critic;
   const instruction = requireAgent(snapshot, composition.agentId).developerInstructions;
   const feedback = input.connection.prepare(`
@@ -25,7 +25,6 @@ export const buildCriticEnvelope = (input: {
     snapshotSha256: input.snapshotSha256, instruction,
     context: json({
       boundary: "proposal only; do not modify files and do not approve",
-      direction: snapshot.direction,
       runEvidence: {
         id: row.run_evidence_id, resultCommit: row.result_commit,
         changedFiles: JSON.parse(String(row.changed_files_json)), artifacts: JSON.parse(String(row.artifact_refs_json)),
@@ -48,7 +47,7 @@ export const buildRefinementEnvelope = (input: {
     WHERE rr.refinement_run_id = ?
   `).get(input.refinementRunId) as Record<string, unknown> | undefined;
   if (!row) throw new Error(`Refinement Run ${input.refinementRunId} has no immutable source.`);
-  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV20;
+  const snapshot = JSON.parse(String(row.execution_snapshot_json)) as RootSnapshotV21;
   const selected = input.connection.prepare(`
     SELECT fe.* FROM refinement_run_feedback rrf
     JOIN feedback_entries fe ON fe.feedback_entry_id = rrf.feedback_entry_id
@@ -68,7 +67,6 @@ export const buildRefinementEnvelope = (input: {
     context: json({
       boundary: "read-only proposal; no write and no approval",
       feedback: selected,
-      direction: snapshot.direction,
       resources,
       actions: snapshot.environment.states.flatMap(({ actions }) => actions).map((action) => ({
         id: action.id, validationSkillIds: action.validation.skillResources, workSkillIds: action.work.skillResources
@@ -87,7 +85,7 @@ export const buildRefinementEnvelope = (input: {
   };
 };
 
-const requireAgent = (snapshot: RootSnapshotV20, id: string) => {
+const requireAgent = (snapshot: RootSnapshotV21, id: string) => {
   const agent = snapshot.agents.find(({ id: agentId }) => agentId === id);
   if (!agent) throw new Error(`Governance Agent ${id} is absent from snapshot.`);
   return agent;

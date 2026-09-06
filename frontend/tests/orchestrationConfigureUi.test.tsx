@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ActionWorkspace } from "../src/orchestration/configure/ActionWorkspace";
 import { AgentDefinitionsWorkspace } from "../src/orchestration/configure/AgentDefinitionsWorkspace";
 import { EnvironmentWorkspace } from "../src/orchestration/configure/EnvironmentWorkspace";
-import { MarkdownDirectionWorkspace } from "../src/orchestration/configure/MarkdownDirectionWorkspace";
+import { ProjectMarkdownWorkspace } from "../src/orchestration/configure/ProjectMarkdownWorkspace";
 import { ResourceWorkspace } from "../src/orchestration/configure/ResourceWorkspace";
 import { RuntimesWorkspace } from "../src/orchestration/configure/RuntimesWorkspace";
 import { StateWorkspace } from "../src/orchestration/configure/StateWorkspace";
@@ -16,11 +16,8 @@ import { resources, orchestrationConfig } from "./orchestrationFixtures";
 
 
 describe("orchestration Configure UI", () => {
-  it.each(["goals", "adrs", "constraints", "use-cases"] as const)("renders the %s Markdown workspace as editing only", (kind) => {
-    const config = orchestrationConfig();
-    const values = kind === "use-cases" ? config.direction.useCases : config.direction[kind];
-    const value = values[0]!;
-    render(<MarkdownDirectionWorkspace kind={kind} values={values} documents={[{ kind: kind === "use-cases" ? "use-case" : kind.slice(0, -1) as "goal" | "adr" | "constraint", id: value.id, content: "---\ntitle: Editable document\n---\n# Editable document\n", contentHash: "a".repeat(64) }]} selectedId={value.id} locked={false} navigate={vi.fn()} onSave={vi.fn()} />);
+  it.each(["overview", "adrs"] as const)("renders the %s Markdown workspace as editing only", (kind) => {
+    render(<ProjectMarkdownWorkspace kind={kind} documents={[{ kind: kind === "adrs" ? "adr" : "overview", id: "doc", content: "---\nid: doc\ntitle: Editable document\n---\n# Editable document\n", contentHash: "a".repeat(64) }]} selectedId="doc" navigate={vi.fn()} onSave={vi.fn()} />);
     expect(screen.queryByText("Preview")).not.toBeInTheDocument();
     expect(screen.getByLabelText("YAML Frontmatter")).toBeInTheDocument();
     expect(screen.getByLabelText("Markdown Body")).toBeInTheDocument();
@@ -35,9 +32,13 @@ describe("orchestration Configure UI", () => {
 });
 
 describe("orchestration Configure navigation and Actions", () => {
+  it("lists exactly the four Project views in canonical order", () => {
+    render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "overview" }} data={sidebarData()} navigate={vi.fn()} /></SidebarProvider>);
+    expect(within(screen.getByRole("region", { name: "Project" })).getAllByRole("button").map((button) => button.textContent)).toEqual(["Overview", "Event Storming", "User Stories", "ADRs"]);
+  });
   it("renders only State IDs in ascending order", () => { const config = orchestrationConfig(); render(<EnvironmentWorkspace environment={{ ...config.environment, states: [...config.environment.states].reverse() }} issues={[]} locked={false} navigate={vi.fn()} onSave={vi.fn()} onCreate={vi.fn()} onReorder={vi.fn()} />); const lanes = screen.getByRole("list", { name: "Ordered State lanes" }); expect(within(lanes).getAllByRole("button", { name: /Open State/ }).map((item) => item.textContent)).toEqual(["state-1", "state-2"]); expect(within(lanes).queryByText(/ORDER|Build|Verify/)).not.toBeInTheDocument(); });
   it("owns fixed Agent selection in the canonical sidebar URL", async () => { window.history.replaceState({}, "", "/agents/ballet-critic-agent"); const user = userEvent.setup(); const navigate = vi.fn(); const data = sidebarData(); render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "agents", entityId: "ballet-critic-agent" }} data={data} navigate={navigate} /></SidebarProvider>); const entity = screen.getByRole("button", { name: /Critic Agentready/ }); expect(entity).toHaveAttribute("aria-current", "page"); await user.click(entity); expect(navigate).toHaveBeenCalledWith("/agents/ballet-critic-agent"); });
-  it("hides Instructions from the sidebar while retaining the Project navigation", () => { window.history.replaceState({}, "", "/project/instructions"); render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "instructions" }} data={sidebarData()} navigate={vi.fn()} /></SidebarProvider>); expect(screen.queryByRole("button", { name: "Instructions" })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "Use Cases" })).toBeInTheDocument(); });
+  it("hides Instructions from the sidebar while retaining the Project navigation", () => { window.history.replaceState({}, "", "/project/instructions"); render(<SidebarProvider><OrchestrationSidebar route={{ view: "orchestration", workspaceView: "instructions" }} data={sidebarData()} navigate={vi.fn()} /></SidebarProvider>); expect(screen.queryByRole("button", { name: "Instructions" })).not.toBeInTheDocument(); expect(screen.getByRole("button", { name: "User Stories" })).toBeInTheDocument(); });
   it("renders the Loop Engineering State and Action hierarchy in canonical order", () => {
     window.history.replaceState({}, "", "/automation/loops/states/state-1/actions/action-1");
     const config = orchestrationConfig();
@@ -195,5 +196,5 @@ function runtimeModels() { return [
 ]; }
 function mockRuntimeModels() { const at = "2026-08-30T10:00:00.000Z"; vi.spyOn(orchestrationApi, "localRuntime").mockResolvedValue({ status: "online", daemonVersion: "2", uptimeSeconds: 10, activeTaskCount: 0, lastSeenAt: at, refreshRequested: false, restartRequested: false, providers: [{ provider: "codex", cliVersion: "1", authStatus: "ready", health: "ready", busy: false, updatedAt: at, capabilities: { models: runtimeModels(), supportsResume: true, supportsStructuredOutput: true, policy: { workspaceWrite: true }, refreshedAt: at } }] }); }
 function sidebarData(config = orchestrationConfig()) {
-  return { project: { path: "/project", config, configHash: "a".repeat(64) }, references: { entries: [], runReferences: [], activeRunIds: [] }, instructions: resources().filter(({ kind }) => kind === "instruction"), skills: resources().filter(({ kind }) => kind === "skill"), goals: [], adrs: [], constraints: [], useCases: [], agents: agentsResponse(), schedules: [] };
+  return { project: { path: "/project", config, configHash: "a".repeat(64) }, references: { entries: [], runReferences: [], activeRunIds: [] }, instructions: resources().filter(({ kind }) => kind === "instruction"), skills: resources().filter(({ kind }) => kind === "skill"), adrs: [], agents: agentsResponse(), schedules: [] };
 }

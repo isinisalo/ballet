@@ -26,7 +26,7 @@ describe("repository-first User Stories", () => {
     const { root, service, documents, database, filename } = fixture();
     expect(service.list()).toEqual({ stories: [], issues: [] });
     const saved = service.create({ ...input, acceptanceCriteria: [...input.acceptanceCriteria, { given: "offline", when: "I restart", then: "the file is retained" }] });
-    expect(readFileSync(filename(saved.value.id), "utf8")).toContain("version: 1");
+    expect(readFileSync(filename(saved.value.id), "utf8")).toContain("version: 2");
     const reopened = new UserStoryService(documents, () => undefined);
     expect(reopened.require(saved.value.id)).toEqual(saved);
     expect(reopened.list().stories).toEqual([saved]);
@@ -41,7 +41,7 @@ describe("repository-first User Stories", () => {
     writeFileSync(filename(first.value.id), readFileSync(filename(first.value.id), "utf8") + notes);
     const current = service.require(first.value.id);
     expect(() => service.update(first.value.id, input, first.contentHash)).toThrow("optimistic hash is stale");
-    const updated = service.update(first.value.id, { ...input, role: "reviewer", acceptanceCriteria: [] }, current.contentHash);
+    const updated = service.update(first.value.id, { ...input, role: "reviewer", details: current.value.details, acceptanceCriteria: [] }, current.contentHash);
     expect(readFileSync(filename(first.value.id), "utf8")).toContain(notes);
     expect(updated.value.acceptanceCriteria).toEqual([]);
     expect(() => service.remove(first.value.id, current.contentHash)).toThrow("optimistic hash is stale");
@@ -53,7 +53,7 @@ describe("repository-first User Stories", () => {
   test("reports invalid files without dropping valid stories or overwriting invalid input", () => {
     const { service, filename } = fixture();
     const good = service.create(input); const invalid = service.create(input);
-    const source = readFileSync(filename(invalid.value.id), "utf8").replace("version: 1", "version: 2");
+    const source = readFileSync(filename(invalid.value.id), "utf8").replace("version: 2", "version: 1");
     writeFileSync(filename(invalid.value.id), source);
     const collection = service.list();
     expect(collection.stories).toEqual([good]);
@@ -84,7 +84,7 @@ describe("repository-first User Stories", () => {
     const { service, filename } = fixture(); const saved = service.create(input);
     const source = readFileSync(filename(saved.value.id), "utf8");
     for (const invalid of [source.replace(saved.value.id, "00000000-0000-4000-8000-000000000000"),
-      source.replace("version: 1", "version: 1\nversion: 1"), source.replace("role: project owner", "role: &role project owner\nextra: *role")]) {
+      source.replace("version: 2", "version: 2\nversion: 2"), source.replace("role: project owner", "role: &role project owner\nextra: *role")]) {
       writeFileSync(filename(saved.value.id), invalid);
       expect(() => service.require(saved.value.id)).toThrow("Invalid User Story");
     }
@@ -103,4 +103,72 @@ describe("repository-first User Stories", () => {
     writeFileSync(filename(saved.value.id), "x".repeat(USER_STORY_LIMITS.documentBytes + 1));
     expect(() => service.require(saved.value.id)).toThrow("size limit");
   });
+});
+
+describe("exact human User Story approval", () => {
+  const human = { id: "reviewer", source: "request_context" as const };
+  const at = "2026-09-06T10:00:00.000Z";
+  test("stores approval only in the story and preserves it across YAML and Markdown presentation edits", () => {
+    const { service, filename, documents } = fixture();
+    const saved = service.create({ ...input, details: "# Intent\n\nRead the exact\nsaved content.\n\n- First\n- Second\n" });
+    const approved = service.approve(saved.value.id, saved.contentHash, saved.semanticHash, human, at);
+    expect(approved.value.approval).toEqual({ approvedBy: "reviewer", approvedAt: at, revision: 1, contentHash: saved.semanticHash });
+    expect(new UserStoryService(documents, () => undefined).require(saved.value.id)).toEqual(approved);
+    const presentation = readFileSync(filename(saved.value.id), "utf8").replace("role: project owner", 'role: "project owner"')
+      .replace("# Intent", "Intent\n======").replace("exact\nsaved", "exact saved").replace("- First\n- Second", "* First\n* Second").replaceAll("\n", "\r\n");
+    writeFileSync(filename(saved.value.id), presentation);
+    const reopened = service.require(saved.value.id);
+    expect(reopened.contentHash).not.toBe(approved.contentHash);
+    expect(reopened.semanticHash).toBe(approved.semanticHash);
+    expect(reopened.value.approval).toEqual(approved.value.approval);
+  });
+
+  test.each(["role", "goal", "benefit", "acceptanceCriteria", "details"] as const)("invalidates %s edits and keeps revision monotonic across reapproval", (field) => {
+    const { service } = fixture(); const saved = service.create(input);
+    const approved = service.approve(saved.value.id, saved.contentHash, saved.semanticHash, human, at);
+    const change = field === "acceptanceCriteria" ? [{ given: "changed", when: "changed", then: "changed" }] : "Changed meaning";
+    const edited = service.update(saved.value.id, { ...input, [field]: change }, approved.contentHash);
+    expect(edited.value.status).toBe("draft"); expect(edited.value.approval).toBeUndefined();
+    expect(edited.semanticHash).not.toBe(approved.semanticHash);
+    expect(edited.value.approvalRevision).toBe(1);
+    expect(service.approve(saved.value.id, edited.contentHash, edited.semanticHash, human, at).value.approval?.revision).toBe(2);
+  });
+
+  test("detects external semantic edits and refuses stale file or semantic hashes without rewriting the file", () => {
+    const { service, filename } = fixture(); const saved = service.create(input);
+    const approved = service.approve(saved.value.id, saved.contentHash, saved.semanticHash, human, at);
+    const changed = readFileSync(filename(saved.value.id), "utf8").replace("role: project owner", "role: reviewer");
+    writeFileSync(filename(saved.value.id), changed);
+    const current = service.require(saved.value.id);
+    expect(current.value.status).toBe("draft"); expect(current.value.approval).toBeUndefined();
+    expect(() => service.approve(saved.value.id, approved.contentHash, current.semanticHash, human, at)).toThrow("optimistic hash is stale");
+    expect(() => service.approve(saved.value.id, current.contentHash, approved.semanticHash, human, at)).toThrow("approval content is stale");
+    expect(readFileSync(filename(saved.value.id), "utf8")).toBe(changed);
+  });
+
+  test("rejects injected approval metadata and a non-human service actor", () => {
+    const { service, filename } = fixture(); const saved = service.create(input);
+    expect(() => service.create({ ...input, status: "approved" } as UserStoryInput)).toThrow();
+    expect(() => service.update(saved.value.id, { ...input, approval: { approvedBy: "agent" } } as UserStoryInput, saved.contentHash)).toThrow();
+    const before = readFileSync(filename(saved.value.id), "utf8");
+    expect(() => service.approve(saved.value.id, saved.contentHash, saved.semanticHash, { id: "agent", source: "provider" } as unknown as typeof human, at)).toThrow("trusted human");
+    expect(readFileSync(filename(saved.value.id), "utf8")).toBe(before);
+  });
+});
+
+test("validates ADR references before saving and invalidates approval when references change", () => {
+  const { service, documents } = fixture();
+  documents.put("adr", "adr-1", "---\nid: adr-1\ntitle: First\n---\nFirst decision.\n", "absent");
+  documents.put("adr", "adr-2", "---\nid: adr-2\ntitle: Second\n---\nSecond decision.\n", "absent");
+  const saved = service.create({ ...input, adrIds: ["adr-1"] });
+  const approved = service.approve(saved.value.id, saved.contentHash, saved.semanticHash,
+    { id: "human", source: "request_context" }, "2026-09-06T10:00:00.000Z");
+  expect(() => service.update(saved.value.id, { ...input, adrIds: ["missing"] }, approved.contentHash)).toThrow("was not found");
+  expect(service.require(saved.value.id)).toEqual(approved);
+  const edited = service.update(saved.value.id, { ...input, adrIds: ["adr-2"] }, approved.contentHash);
+  expect(edited.value.status).toBe("draft"); expect(edited.value.approval).toBeUndefined();
+  documents.remove("adr", "adr-2", documents.require("adr", "adr-2").contentHash, []);
+  expect(() => service.approve(edited.value.id, edited.contentHash, edited.semanticHash,
+    { id: "human", source: "request_context" }, "2026-09-06T10:01:00.000Z")).toThrow("was not found");
+  expect(service.require(edited.value.id)).toEqual(edited);
 });

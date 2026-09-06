@@ -14,10 +14,8 @@ export const routeFromPath = (path: string): RouteState => {
     "/agents": "agents",
     "/skills": "skills",
     "/runtimes": "runtimes",
-    "/project/goals": "goals",
+    "/project/overview": "overview",
     "/project/adrs": "adrs",
-    "/project/constraints": "constraints",
-    "/project/use-cases": "use-cases",
     "/project/user-stories": "user-stories",
     "/project/event-storming": "event-storming",
     "/project/instructions": "instructions",
@@ -69,6 +67,7 @@ export const orchestrationEntityPath = (base: string, id?: string) => id && base
   : `${base}${id ? `?id=${encodeURIComponent(id)}` : ""}`;
 
 function exactRoute(workspaceView: WorkspaceView, url: URL): RouteState {
+  if (workspaceView === "overview" && url.search) return { view: "orchestration", workspaceView: "invalid", recoveryPath: "/project/overview" };
   if (workspaceView === "event-storming") {
     const id = url.searchParams.get("id"); const item = url.searchParams.get("item");
     const invalid = (id !== null && !eventStormingId.safeParse(id).success) || (item !== null && (!id || !eventStormingId.safeParse(item).success))

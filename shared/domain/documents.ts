@@ -43,18 +43,6 @@ export interface Project extends MarkdownBackedEntity {
   updatedAt: string;
 }
 
-export interface Goal extends MarkdownBackedEntity {
-  id: string;
-  projectId: string;
-  title: string;
-  description: string;
-  status: "not-started" | "in-progress" | "at-risk" | "done";
-  targetDate: string;
-  owner: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Adr extends MarkdownBackedEntity {
   id: string;
   projectId: string;

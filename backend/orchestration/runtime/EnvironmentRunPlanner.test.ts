@@ -1,9 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { approveUseCase, type UseCase } from "../../../shared/orchestration/direction.js";
-import type { ActionAgentDefinition, ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
+import type { ActionAgentDefinition, ProjectConfigurationV26 } from "../../../shared/orchestration/environment.js";
 import { canonicalJson, sha256 } from "../../../shared/orchestration/primitives.js";
 import type { RuntimeActionCapabilitySnapshot, RuntimeAgentCapabilitySnapshot } from "../../../shared/orchestration/runtime.js";
-import { projectConfigurationV25Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
+import { projectConfigurationV26Schema } from "../../../shared/orchestration/schemas/environmentSchemas.js";
 import { EnvironmentRunPlanner, type ProjectDefinition } from "./EnvironmentRunPlanner.js";
 import { parseOrchestrationStructuredOutput } from "./StructuredOutputValidator.js";
 import { buildBoundedTaskContext } from "./TaskContextBuilder.js";
@@ -16,8 +15,9 @@ describe("EnvironmentRunPlanner immutable context", () => {
       inspectAction: async (actionId, profiles) => actionCapability(actionId, profiles)
     }, () => "2026-08-29T10:00:00.000Z");
     const result = await planner.plan();
-    expect(result.snapshot).toMatchObject({ version: 20, projectHeadSha: "a".repeat(40) });
-    expect(result.snapshot).not.toHaveProperty("approvedUseCases");
+    expect(result.snapshot).toMatchObject({ version: 21, projectHeadSha: "a".repeat(40) });
+    expect(result.snapshot).not.toHaveProperty("userStories");
+    expect(result.snapshot).not.toHaveProperty("direction");
     expect(result.snapshot.resources.map(({ kind }) => kind)).toEqual(["skill"]);
     expect(result.snapshot.permissions.find(({ role }) => role === "validation")?.toolPolicy).toBe("read_only");
     expect(result.snapshot.permissions.find(({ role }) => role === "work")?.toolPolicy).toBe("workspace_write");
@@ -29,17 +29,13 @@ describe("EnvironmentRunPlanner immutable context", () => {
     expect(JSON.stringify(context)).not.toContain("UC-1");
   });
 
-  test("plans a Run independently of Use Case approval status", async () => {
+  test("plans a Run without project document or story approval inputs", async () => {
     const project = definition();
-    project.config.direction.useCases = project.config.direction.useCases.map((useCase) => {
-      const { approval, ...draft } = useCase;
-      return { ...draft, status: "draft" as const, approvalRevision: approval?.revision };
-    });
-    project.configSha256 = contentHash(projectConfigurationV25Schema.parse(project.config));
+    project.configSha256 = contentHash(projectConfigurationV26Schema.parse(project.config));
     const planner = new EnvironmentRunPlanner({ load: async () => project }, {
       inspectAgent: async (agent) => agentCapability(agent.id), inspectAction: async (actionId, profiles) => actionCapability(actionId, profiles)
     }, () => "2026-08-30T10:00:00.000Z");
-    await expect(planner.plan()).resolves.toMatchObject({ snapshot: { version: 20 } });
+    await expect(planner.plan()).resolves.toMatchObject({ snapshot: { version: 21 } });
   });
 
   test("fails before provider work on missing resource or invalid instruction sections", async () => {
@@ -92,25 +88,12 @@ describe("strict orchestration provider output", () => {
 });
 
 const definition = (): ProjectDefinition => {
-  const draft: UseCase = {
-    id: "UC-1", name: "Execute Action", status: "draft",
-    examples: [{ given: "approved closure", when: "Environment runs", then: "Action is validated" }],
-    successGoals: ["Action done"], failureGoals: ["Action blocked visibly"], expectedOutcomes: ["evidence"],
-    goalIds: ["goal-1"], adrIds: ["adr-1"], constraintIds: ["constraint-1"]
-  };
-  const useCase = approveUseCase(draft, { approvedBy: "human-1", approvedAt: "2026-08-29T09:00:00.000Z", revision: 1 });
   const validationId = "ballet-action-validation-action-1";
   const workId = "ballet-action-work-action-1";
   const critic = { agentId: "ballet-critic-agent" as const, skillResources: ["skill-1"] };
   const refinement = { agentId: "ballet-refinement-agent" as const, skillResources: ["skill-1"] };
-  const config: ProjectConfigurationV25 = {
-    version: 25,
-    direction: {
-      goals: [{ id: "goal-1", name: "Goal", status: "accepted" }],
-      adrs: [{ id: "adr-1", name: "ADR", status: "accepted" }],
-      constraints: [{ id: "constraint-1", name: "Constraint", status: "accepted", kind: "required", description: "Safe", rationale: "Required" }],
-      useCases: [useCase]
-    },
+  const config: ProjectConfigurationV26 = {
+    version: 26,
     environment: {
       id: "environment-1", name: "Environment", description: "Ordered environment", states: [{
         id: "state-1", name: "State", description: "First State", order: 1, actions: [{
@@ -132,10 +115,6 @@ const definition = (): ProjectDefinition => {
     actionAgents: ([validationId, workId] as const).map((id) => ({ id, name: id,
       description: `Test ${id}`, developerInstructions: `${instruction()}\n\n${id}`,
       model: "gpt-5.6-sol", reasoningEffort: "high", contentSha256: "5".repeat(64) })),
-    directionDocumentHashes: {
-      goals: { "goal-1": "1".repeat(64) }, adrs: { "adr-1": "2".repeat(64) },
-      constraints: { "constraint-1": "3".repeat(64) }
-    },
     agentDocumentHashes: { "ballet-critic-agent": "4".repeat(64), "ballet-refinement-agent": "4".repeat(64),
       [validationId]: "5".repeat(64), [workId]: "5".repeat(64) },
     resources: [

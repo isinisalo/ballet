@@ -1,7 +1,7 @@
-import type { ProjectConfigurationV25 } from "../../../shared/orchestration/environment.js";
+import type { UserStoryV2 } from "../../../shared/orchestration/userStories.js";
+import type { ProjectConfigurationV26 } from "../../../shared/orchestration/environment.js";
 
-export type DirectionDocumentKind = "goal" | "adr" | "constraint" | "use-case";
-export type ProjectDocumentKind = DirectionDocumentKind | "user-story" | "event-storming" | "instruction" | "skill";
+export type ProjectDocumentKind = "overview" | "adr" | "user-story" | "event-storming" | "instruction" | "skill";
 export type ProjectReferenceKind = ProjectDocumentKind;
 
 export interface ProjectReference {
@@ -13,12 +13,8 @@ export interface ProjectReference {
 export class ProjectReferenceIndex {
   private readonly references = new Map<string, ProjectReference[]>();
 
-  constructor(config: ProjectConfigurationV25) {
-    for (const useCase of config.direction.useCases) {
-      this.addMany("goal", useCase.goalIds, "use-case", useCase.id, "goalIds");
-      this.addMany("adr", useCase.adrIds, "use-case", useCase.id, "adrIds");
-      this.addMany("constraint", useCase.constraintIds, "use-case", useCase.id, "constraintIds");
-    }
+  constructor(config: ProjectConfigurationV26, stories: UserStoryV2[] = []) {
+    for (const story of stories) this.addMany("adr", story.adrIds, "user-story", story.id, "adrIds");
     for (const state of config.environment.states) {
       for (const action of state.actions) {
         for (const [role, composition] of [["validation", action.validation], ["work", action.work]] as const) {

@@ -1,18 +1,17 @@
 import type { ContractIssue } from "@shared/orchestration/primitives";
-import type { ActionAgentDefinition, GovernanceAgentDefinition, GovernanceAgentId, ProjectConfigurationV25 } from "@shared/orchestration/environment";
+import type { ActionAgentDefinition, GovernanceAgentDefinition, GovernanceAgentId, ProjectConfigurationV26 } from "@shared/orchestration/environment";
 
 export interface ProjectRecord {
   path: string;
-  config: ProjectConfigurationV25;
+  config: ProjectConfigurationV26;
   configHash: string;
 }
 
 export interface ResourceDocument {
-  kind: "goal" | "adr" | "constraint" | "use-case" | "instruction" | "skill";
+  kind: "overview" | "adr" | "instruction" | "skill";
   id: string;
   content: string;
   contentHash: string;
-  value?: unknown;
 }
 
 export interface GovernanceAgentSlot {
@@ -30,7 +29,7 @@ export interface ActionAgentSlot {
   id: string; relativePath: string; status: "ready"; contentHash: string; agent: ActionAgentDefinition;
 }
 export interface ActionResponse {
-  action: ProjectConfigurationV25["environment"]["states"][number]["actions"][number]; configHash: string;
+  action: ProjectConfigurationV26["environment"]["states"][number]["actions"][number]; configHash: string;
   validationAgent: ActionAgentSlot; workAgent: ActionAgentSlot;
 }
 
@@ -47,7 +46,7 @@ export interface ReferenceIndexResponse {
 }
 
 export interface EnvironmentResponse {
-  environment: ProjectConfigurationV25["environment"];
+  environment: ProjectConfigurationV26["environment"];
   configHash: string;
   readinessIssues: ContractIssue[];
   activeRunIds: string[];
@@ -59,9 +58,7 @@ export interface OrchestrationConfigureData {
   references: ReferenceIndexResponse;
   instructions: ResourceDocument[];
   skills: ResourceDocument[];
-  goals: ResourceDocument[];
+  overview?: ResourceDocument;
   adrs: ResourceDocument[];
-  constraints: ResourceDocument[];
-  useCases: ResourceDocument[];
   agents: GovernanceAgentsResponse;
 }

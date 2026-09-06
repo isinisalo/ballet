@@ -7,9 +7,10 @@ export const STORY_PARTS = [
 ] as const;
 export const CRITERION_PARTS = ["given", "when", "then"] as const;
 export const shortStoryId = (id: string) => `US · ${id.slice(0, 8)}`;
-export const emptyStory = (): UserStoryInput => ({ role: "", goal: "", benefit: "", acceptanceCriteria: [] });
+export const emptyStory = (): UserStoryInput => ({ role: "", goal: "", benefit: "", acceptanceCriteria: [], adrIds: [], details: "" });
 export const storyInput = (value: UserStoryInput): UserStoryInput => ({
   role: value.role, goal: value.goal, benefit: value.benefit,
+  details: value.details ?? "", adrIds: value.adrIds ?? [],
   acceptanceCriteria: value.acceptanceCriteria.map(({ given, when, then }) => ({ given, when, then }))
 });
 export function storyFieldErrors(value: UserStoryInput): Record<string, string> {
@@ -18,3 +19,6 @@ export function storyFieldErrors(value: UserStoryInput): Record<string, string> 
   return Object.fromEntries(result.error.issues.map((issue) => [issue.path.join("."),
     issue.code === "too_small" ? "This field is required." : issue.message]));
 }
+
+export const storyEditorStatus = (locked: boolean, unavailable: boolean, pending: boolean, dirty: boolean, saved: boolean) =>
+  locked ? "Locked by active Run" : unavailable ? "File unavailable" : pending ? "Saving…" : dirty ? "Unsaved" : saved ? "Saved" : "New";

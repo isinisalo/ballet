@@ -15,12 +15,12 @@ export function UserStoriesWorkspace({ route, locked, navigate, onDirty }: {
   const workspace = useUserStoryWorkspace(route, locked, navigate);
   const { collection, creating, editing, selected, current } = workspace;
   const back = () => navigate(USER_STORIES_PATH);
-  const title = creating ? "New user story" : editing ? "Edit user story" : "User Story";
+  const title = creating ? "New user story" : editing ? "Edit user story" : "User Stories";
   const unavailable = Boolean(collection.error) || (!creating && !selected);
   let content;
   if (collection.loading) content = <p role="status" className="p-6 text-sm text-muted-foreground">Loading User Stories…</p>;
   else if (editing && (creating || current)) content = <UserStoryEditor key={workspace.routeKey} current={current} locked={locked} unavailable={unavailable}
-    onDirty={onDirty} onBack={back} onRefresh={collection.refresh} onSaved={workspace.onSaved} onRemoved={workspace.onRemoved} />;
+    onDirty={onDirty} onBack={back} onRefresh={collection.refresh} onApproved={collection.acceptSaved} onSaved={workspace.onSaved} onRemoved={workspace.onRemoved} />;
   else if (collection.data && !editing) content = <UserStoryList data={collection.data} locked={locked} canCreate={workspace.canCreate} notice={workspace.notice}
     onCreate={() => navigate(`${USER_STORIES_PATH}?create=story`)} onEdit={(id) => navigate(orchestrationEntityPath(USER_STORIES_PATH, id))} />;
   return <div ref={workspace.container} className="user-stories-workspace">
